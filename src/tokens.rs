@@ -50,6 +50,7 @@ pub enum Token {
     EndTag(Vec<char>),
 
     // garden-variety text
+    UnprocessedText(Vec<char>), // i.e., pre-inline checks
     Text(Vec<char>),
 
     // misc
