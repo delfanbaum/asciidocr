@@ -1,62 +1,87 @@
-pub enum List {
-    OrderedList(Box<Token>),
-    UnorderedList(Box<Token>),
-    DefinitionList(Box<Token>),
+#[derive(Debug)]
+pub struct Token {
+    token_type: TokenType,
+    line: usize,
+    id: Option<String>,
+    lexeme: String,
+    literal: Option<String>, // the "literal value", e.e., an ITALIC's contents
+    classes: Option<Vec<String>>,
+    children: Vec<Token>,
 }
 
-pub enum Token {
-    // container blocks tokens: children, id, classes
-    // There is probably a better classes data type to use
-    Section(Box<Self>, String, Vec<String>), // note, handling "section styles" TK
-    OpenBlock(Box<Self>, String, Vec<String>),
-    Sidebar(Box<Self>, String, Vec<String>),
-    Blockquote(Box<Self>, String, Vec<String>),
-    Verse(Box<Self>, String, Vec<String>),
-    PassthroughBlock(Vec<char>),
+// would later add pub enum Section{Preface, Introduction, etc}
 
-    // garden-variety blocks
-    Heading(Box<Self>), // styles, ID on section
-    Paragraph(Box<Self>, String, Vec<String>), // tokens, id, classes
-    Source(Box<Self>), // or can this just be a Vec<char> since it's essentially a
-    // pass-through?
+#[derive(Debug)]
+pub enum TokenType {
+    BlankLine, // these are effectively semantic, so we should track them
 
-    // lists
-    List(Box<List>),
-    ListItem(Box<Self>),
-    DefListTerm(Box<Self>),
-    DefListDesc(Box<Self>),
+    //Section -- inferred in parsing
+    OpenBlock, // "--"
+
+    // block info markers
+    BlockLabel, // ".Some text", specifically the r"^." here
+
+    Blockquote,            // [quote],
+    BlockquoteAttribution, // quoted in [quote, quoted]
+    BlockQuoteSource,      // source in [quote, quoted, source]
+
+    Verse,            // [quote],
+    VerseAttribution, // quoted in [quote, quoted]
+    VerseSource,      // source in [quote, quoted, source]
+
+    Source,         // [source]
+    SourceLanguage, // language in [source,language]
+
+    QuoteVerseBlock,  // i.e., "____"
+    PassthroughBlock, // i.e., "++++"
+    SourceBlock,      // i.e., "----"
+
+    Heading1,
+    Heading2,
+    Heading3,
+    Heading4,
+    Heading5,
+
+    // lists -- we need the items, the parser will take care of the list part
+    OrderedListItem,
+    UnorderedListItem,
+    DefinitionListItem,
+    DefListTerm,
+    DefListDesc,
 
     // formatting tokens (inline markup)
-    Bold(Vec<char>),
-    Italic(Vec<char>),
-    Monospace(Vec<char>),      // code
-    Styled(Vec<char>, String), // i.e., [.some_class]#applied to a span#
-    Superscript(Vec<char>),    // ^super^
-    Subscript(Vec<char>),      // ~sub~
+    Bold,   // TK Handle bounded characters, e.g., **Some**thing -> <b>Some</b>thing
+    Italic, // same applies above
+    Monospace,
+    InlineStyle, // i.e., [.some_class], usually [.x]#applied here#
+    Highlighted, // the part between the # above
+
+    Superscript, // ^super^
+    Subscript,   // ~sub~
 
     // breaks
-    ThematicBreak(Vec<char>), // do we need to keep the inner text? maybe not
-    PageBreak(Vec<char>),     // do we need to keep the inner text? maybe not
+    ThematicBreak,
+    PageBreak,
 
     // links
-    Link(Vec<char>, Box<Token>), // URL, link text
+    LinkUrl,
+    LinkText,
 
     // footnotes
-    Footnote(Box<Self>),
+    Footnote, // requires a second pass? OR: do some kind of `self.last_token` check on the
+    // scanner to determine if, for example, we've opened a link inside of our footnote
 
     // includes
-    Include(Vec<char>, String), // URI, tag
-    StartTag(Vec<char>),
-    EndTag(Vec<char>),
+    Include,
+    StartTag, // tag::[]
+    EndTag, 
 
     // garden-variety text
-    UnprocessedText(Vec<char>), // i.e., pre-inline checks
-    Text(Vec<char>),
+    Text,
 
     // misc
-    Comment(Vec<char>),
-    PassthroughInline(Vec<char>),
+    Comment,
+    PassthroughInline,
     // references, cross references TK
     // math blocks TK
-
 }
