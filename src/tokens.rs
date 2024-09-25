@@ -1,17 +1,27 @@
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct Token {
     token_type: TokenType,
     line: usize,
-    id: Option<String>,
+    //id: Option<String>,
     lexeme: String,
     literal: Option<String>, // the "literal value", e.e., an ITALIC's contents
-    classes: Option<Vec<String>>,
-    children: Vec<Token>,
+                             //classes: Option<Vec<String>>,
+}
+
+impl Token {
+    pub fn new(token_type: TokenType, line: usize, lexeme: String, literal: Option<String>) -> Self {
+        Token {
+            token_type,
+            line,
+            lexeme,
+            literal,
+        }
+    }
 }
 
 // would later add pub enum Section{Preface, Introduction, etc}
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum TokenType {
     BlankLine, // these are effectively semantic, so we should track them
 
@@ -74,7 +84,7 @@ pub enum TokenType {
     // includes
     Include,
     StartTag, // tag::[]
-    EndTag, 
+    EndTag,
 
     // garden-variety text
     Text,
