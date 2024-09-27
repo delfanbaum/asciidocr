@@ -1,4 +1,4 @@
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Token {
     token_type: TokenType,
     line: usize,
@@ -21,7 +21,7 @@ impl Token {
 
 // would later add pub enum Section{Preface, Introduction, etc}
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TokenType {
     BlankLine, // these are effectively semantic, so we should track them
 
@@ -42,6 +42,7 @@ pub enum TokenType {
     Source,         // [source]
     SourceLanguage, // language in [source,language]
 
+    AsideBlock,  // i.e., "****"
     QuoteVerseBlock,  // i.e., "____"
     PassthroughBlock, // i.e., "++++"
     SourceBlock,      // i.e., "----"
@@ -94,4 +95,9 @@ pub enum TokenType {
     PassthroughInline,
     // references, cross references TK
     // math blocks TK
+    
+    // End of File Token
+    Eof
 }
+
+
