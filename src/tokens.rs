@@ -1,20 +1,24 @@
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Token {
     pub token_type: TokenType,
-    pub line: usize,
     //id: Option<String>,
-    pub lexeme: String,
-    pub literal: Option<String>, // the "literal value", e.e., an ITALIC's contents
-                             //classes: Option<Vec<String>>,
+    pub lexeme: String,          // raw string of code
+    pub literal: Option<String>, // our literals are only ever strings (or represented as such)
+    pub line: usize,
 }
 
 impl Token {
-    pub fn new(token_type: TokenType, line: usize, lexeme: String, literal: Option<String>) -> Self {
+    pub fn new(
+        token_type: TokenType,
+        lexeme: String,
+        literal: Option<String>,
+        line: usize,
+    ) -> Self {
         Token {
             token_type,
-            line,
             lexeme,
             literal,
+            line,
         }
     }
 }
@@ -43,7 +47,7 @@ pub enum TokenType {
     Source,         // [source]
     SourceLanguage, // language in [source,language]
 
-    AsideBlock,  // i.e., "****"
+    AsideBlock,       // i.e., "****"
     QuoteVerseBlock,  // i.e., "____"
     PassthroughBlock, // i.e., "++++"
     SourceBlock,      // i.e., "----"
@@ -96,9 +100,7 @@ pub enum TokenType {
     PassthroughInline,
     // references, cross references TK
     // math blocks TK
-    
+
     // End of File Token
-    Eof
+    Eof,
 }
-
-
