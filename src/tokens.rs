@@ -1,10 +1,10 @@
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Token {
-    token_type: TokenType,
-    line: usize,
+    pub token_type: TokenType,
+    pub line: usize,
     //id: Option<String>,
-    lexeme: String,
-    literal: Option<String>, // the "literal value", e.e., an ITALIC's contents
+    pub lexeme: String,
+    pub literal: Option<String>, // the "literal value", e.e., an ITALIC's contents
                              //classes: Option<Vec<String>>,
 }
 
@@ -23,7 +23,8 @@ impl Token {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TokenType {
-    BlankLine, // these are effectively semantic, so we should track them
+    NewLineChar, // these are effectively semantic, so we should track them. Two in a row indicate
+    // a blank line, which often signals the end of a block
 
     //Section -- inferred in parsing
     OpenBlock, // "--"
