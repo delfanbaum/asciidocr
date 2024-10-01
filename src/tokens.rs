@@ -7,6 +7,18 @@ pub struct Token {
     pub line: usize,
 }
 
+impl Default for Token {
+    fn default() -> Self {
+        // defaults to EOF
+        Token {
+            token_type: TokenType::Eof,
+            lexeme: "\0".to_string(),
+            literal: None,
+            line: 0,
+        }
+    }
+}
+
 impl Token {
     pub fn new(
         token_type: TokenType,
@@ -21,20 +33,50 @@ impl Token {
             line,
         }
     }
+
+    pub fn token_type(&self) -> TokenType {
+        self.token_type
+    }
 }
 
 // would later add pub enum Section{Preface, Introduction, etc}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TokenType {
+    // BLOCKS
+    UnprocessedLine, // placeholder token for reprocessing
     NewLineChar, // these are effectively semantic, so we should track them. Two in a row indicate
     // a blank line, which often signals the end of a block
 
-    //Section -- inferred in parsing
-    OpenBlock, // "--"
+    // breaks
+    ThematicBreak,
+    PageBreak,
+
+    Comment,
+
+    // four char delimiters at new block
+    PassthroughBlock, // i.e., "++++"
+    AsideBlock,       // i.e., "****"
+    SourceBlock,      // i.e., "----"
+    QuoteVerseBlock,  // i.e., "____"
+    CommentBlock,  // i.e., "////"
+
+    // two-char delimiters as new block
+    OpenBlock, // i.e., --
+
+    // two-char delimiters as new line
+    OrderedListItem,
+    UnorderedListItem,
 
     // block info markers
     BlockLabel, // ".Some text", specifically the r"^." here
+
+    // headings
+    Heading1,
+    Heading2,
+    Heading3,
+    Heading4,
+    Heading5,
 
     Blockquote,            // [quote],
     BlockquoteAttribution, // quoted in [quote, quoted]
@@ -43,26 +85,21 @@ pub enum TokenType {
     Verse,            // [quote],
     VerseAttribution, // quoted in [quote, quoted]
     VerseSource,      // source in [quote, quoted, source]
+    
+    BlockContinuation, // a "+" all by itself on a line can signal continuation
 
-    Source,         // [source]
-    SourceLanguage, // language in [source,language]
+    //Source,         // [source]
+    //SourceLanguage, // language in [source,language]
+    //
+    //// includes
+    //Include,
+    //StartTag, // tag::[]
+    //EndTag,
 
-    AsideBlock,       // i.e., "****"
-    QuoteVerseBlock,  // i.e., "____"
-    PassthroughBlock, // i.e., "++++"
-    SourceBlock,      // i.e., "----"
+    // INLINES
 
-    Heading1,
-    Heading2,
-    Heading3,
-    Heading4,
-    Heading5,
-
-    // lists -- we need the items, the parser will take care of the list part
-    OrderedListItem,
-    UnorderedListItem,
-    DefinitionListItem,
-    DefListTerm,
+    // definition lists
+    DefListTerm, // starts with new line or block?
     DefListDesc,
 
     // formatting tokens (inline markup)
@@ -75,10 +112,6 @@ pub enum TokenType {
     Superscript, // ^super^
     Subscript,   // ~sub~
 
-    // breaks
-    ThematicBreak,
-    PageBreak,
-
     // links
     LinkUrl,
     LinkText,
@@ -87,20 +120,28 @@ pub enum TokenType {
     Footnote, // requires a second pass? OR: do some kind of `self.last_token` check on the
     // scanner to determine if, for example, we've opened a link inside of our footnote
 
-    // includes
-    Include,
-    StartTag, // tag::[]
-    EndTag,
 
     // garden-variety text
     Text,
 
     // misc
-    Comment,
     PassthroughInline,
     // references, cross references TK
     // math blocks TK
 
     // End of File Token
     Eof,
+}
+
+impl TokenType {
+    pub fn block_from_char(c: char) -> Self {
+        match c {
+            '+' => Self::PassthroughBlock,
+            '*' => Self::AsideBlock,
+            '-' => Self::SourceBlock,
+            '_' => Self::QuoteVerseBlock,
+            '/' => Self::CommentBlock,
+            _ => panic!("Invalid character match to produce block TokenType"),
+        }
+    }
 }
