@@ -128,7 +128,7 @@ impl Scanner {
             }
 
             // if it doesn't look like a block thing, save it for future processing
-            _ => self.add_rest_as_unprocesed_line(), // TK
+            _ => self.add_unprocesed_line(), // TK
         }
     }
 
@@ -169,6 +169,13 @@ impl Scanner {
         self.add_token(list_item_token, false);
         // include the rest of the line
         self.add_rest_as_unprocesed_line();
+    }
+
+    fn add_unprocesed_line(&mut self) {
+        while self.peek() != '\n' && !self.is_at_end() {
+            self.current += 1;
+        }
+        self.add_token(TokenType::UnprocessedLine, true)
     }
 
     fn add_rest_as_unprocesed_line(&mut self) {
@@ -399,6 +406,40 @@ mod tests {
                     2,
                 ),
                 Token::new(TokenType::NewLineChar, "\n".to_string(), None, 2),
+            ],
+            &markup,
+        );
+        let mut s = Scanner::new(markup);
+        s.scan_tokens();
+        assert_eq!(expected_tokens, s.tokens);
+    }
+
+    #[test]
+    fn test_block_continuation() {
+        let markup = "* Foo\n+\nBar".to_string();
+        let expected_tokens = expected_from(
+            vec![
+                Token::new(
+                    TokenType::UnorderedListItem,
+                    "* ".to_string(),
+                    None,
+                    1,
+                ),
+                Token::new(
+                    TokenType::UnprocessedLine,
+                    "Foo".to_string(),
+                    Some("Foo".to_string()),
+                    1,
+                ),
+                Token::new(TokenType::NewLineChar, "\n".to_string(), None, 1),
+                Token::new(TokenType::BlockContinuation, "+".to_string(), None, 2),
+                Token::new(TokenType::NewLineChar, "\n".to_string(), None, 2),
+                Token::new(
+                    TokenType::UnprocessedLine,
+                    "Bar".to_string(),
+                    Some("Bar".to_string()),
+                    3,
+                ),
             ],
             &markup,
         );
