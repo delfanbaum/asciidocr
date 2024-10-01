@@ -51,6 +51,8 @@ impl Scanner {
                     self.current += 3;
                     self.add_token(TokenType::ThematicBreak, false);
                     self.line += 1;
+                } else {
+                    self.add_unprocesed_line()
                 }
             }
             '<' => {
@@ -58,6 +60,8 @@ impl Scanner {
                     self.current += 3;
                     self.add_token(TokenType::PageBreak, false);
                     self.line += 1;
+                } else {
+                    self.add_unprocesed_line()
                 }
             }
             // potential block delimiter chars get treated similarly
@@ -118,16 +122,22 @@ impl Scanner {
                         self.add_token(TokenType::BlockLabel, false);
                         self.add_rest_as_unprocesed_line();
                     }
+                } else {
+                    self.add_unprocesed_line()
                 }
             }
 
-            '=' => { // possible heading
+            '=' => {
+                // possible heading
                 if self.starts_new_block() {
                     self.add_heading()
+                } else {
+                    self.add_unprocesed_line()
                 }
             }
 
-            '[' => { // role, quote, verse, source, etc
+            '[' => {
+                // role, quote, verse, source, etc
                 todo!()
             }
 
@@ -423,12 +433,7 @@ mod tests {
         let markup = "* Foo\n+\nBar".to_string();
         let expected_tokens = expected_from(
             vec![
-                Token::new(
-                    TokenType::UnorderedListItem,
-                    "* ".to_string(),
-                    None,
-                    1,
-                ),
+                Token::new(TokenType::UnorderedListItem, "* ".to_string(), None, 1),
                 Token::new(
                     TokenType::UnprocessedLine,
                     "Foo".to_string(),
