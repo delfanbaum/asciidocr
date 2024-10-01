@@ -121,10 +121,14 @@ impl Scanner {
                 }
             }
 
-            '=' => {
+            '=' => { // possible heading
                 if self.starts_new_block() {
                     self.add_heading()
                 }
+            }
+
+            '[' => { // role, quote, verse, source, etc
+                todo!()
             }
 
             // if it doesn't look like a block thing, save it for future processing
