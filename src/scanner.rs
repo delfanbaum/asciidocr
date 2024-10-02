@@ -3,16 +3,16 @@ use core::{panic, str};
 use crate::tokens::{Token, TokenType};
 
 #[derive(Debug)]
-pub struct Scanner {
-    pub source: String,
+pub struct Scanner<'a> {
+    pub source: &'a str,
     pub tokens: Vec<Token>,
     start: usize,
     current: usize,
     line: usize,
 }
 
-impl Scanner {
-    pub fn new(source: String) -> Self {
+impl<'a> Scanner<'a> {
+    pub fn new(source: &'a str) -> Self {
         Scanner {
             source,
             tokens: Vec::new(),
@@ -260,7 +260,7 @@ mod tests {
             )],
             &markup,
         );
-        let mut s = Scanner::new(markup);
+        let mut s = Scanner::new(&markup);
         s.scan_tokens();
         assert_eq!(expected_tokens, s.tokens);
     }
@@ -280,7 +280,7 @@ mod tests {
             vec![Token::new(expected_token, markup.clone(), None, 1)],
             &markup,
         );
-        let mut s = Scanner::new(markup);
+        let mut s = Scanner::new(&markup);
         s.scan_tokens();
         assert_eq!(expected_tokens, s.tokens);
     }
@@ -304,7 +304,7 @@ mod tests {
             ],
             &markup,
         );
-        let mut s = Scanner::new(markup);
+        let mut s = Scanner::new(&markup);
         s.scan_tokens();
         assert_eq!(expected_tokens, s.tokens);
     }
@@ -333,7 +333,7 @@ mod tests {
             ],
             &markup,
         );
-        let mut s = Scanner::new(markup);
+        let mut s = Scanner::new(&markup);
         s.scan_tokens();
         assert_eq!(expected_tokens, s.tokens);
     }
@@ -350,7 +350,7 @@ mod tests {
             ],
             &markup,
         );
-        let mut s = Scanner::new(markup);
+        let mut s = Scanner::new(&markup);
         s.scan_tokens();
         assert_eq!(expected_tokens, s.tokens);
     }
@@ -383,7 +383,7 @@ mod tests {
             ],
             &markup,
         );
-        let mut s = Scanner::new(markup);
+        let mut s = Scanner::new(&markup);
         s.scan_tokens();
         assert_eq!(expected_tokens, s.tokens);
     }
@@ -401,7 +401,7 @@ mod tests {
             ],
             &markup,
         );
-        let mut s = Scanner::new(markup);
+        let mut s = Scanner::new(&markup);
         s.scan_tokens();
         assert_eq!(expected_tokens, s.tokens);
     }
@@ -423,7 +423,7 @@ mod tests {
             ],
             &markup,
         );
-        let mut s = Scanner::new(markup);
+        let mut s = Scanner::new(&markup);
         s.scan_tokens();
         assert_eq!(expected_tokens, s.tokens);
     }
@@ -452,7 +452,7 @@ mod tests {
             ],
             &markup,
         );
-        let mut s = Scanner::new(markup);
+        let mut s = Scanner::new(&markup);
         s.scan_tokens();
         assert_eq!(expected_tokens, s.tokens);
     }
