@@ -138,7 +138,18 @@ impl<'a> Scanner<'a> {
 
             '[' => {
                 // role, quote, verse, source, etc
-                todo!()
+                if self.starts_attribute_line() {
+                    println!("{}", &self.source[self.start..self.current]);
+                    match self.source.as_bytes()[self.start + 1] as char {
+                        'q' => self.add_token(TokenType::Blockquote, true),
+                        'v' => self.add_token(TokenType::Verse, true),
+                        's' => self.add_token(TokenType::Source, true),
+                        _ => panic!("Unexpected attr line"), // TODO
+                    }
+                } else {
+                    println!("{}", &self.source[self.start..self.current]);
+                    self.add_unprocesed_line()
+                }
             }
 
             // if it doesn't look like a block thing, save it for future processing
@@ -224,6 +235,21 @@ impl<'a> Scanner<'a> {
             && str::from_utf8(&self.source.as_bytes()[self.start..self.current + delimiter_len])
                 .unwrap()
                 == &expected_block
+    }
+
+    /// Checks for lines such as [quote], [verse, Mary Oliver], [source, python], etc.
+    fn starts_attribute_line(&mut self) -> bool {
+        let current_placeholder = self.current;
+        while self.peek() != '\n' && !self.is_at_end() {
+            self.current += 1;
+        }
+        if self.source.as_bytes()[self.current - 1] as char == ']' {
+            // i.e., the end of an attribute list line
+            true
+        } else {
+            self.current = current_placeholder;
+            false
+        }
     }
 
     fn peek(&self) -> char {
@@ -420,6 +446,30 @@ mod tests {
                     2,
                 ),
                 Token::new(TokenType::NewLineChar, "\n".to_string(), None, 2),
+            ],
+            &markup,
+        );
+        let mut s = Scanner::new(&markup);
+        s.scan_tokens();
+        assert_eq!(expected_tokens, s.tokens);
+    }
+
+    #[rstest]
+    #[case("[quote]\n", TokenType::Blockquote)]
+    #[case("[quote, Georges Perec]\n", TokenType::Blockquote)]
+    #[case("[verse]\n", TokenType::Verse)]
+    #[case("[verse, Audre Lorde, A Litany for Survival]\n", TokenType::Verse)]
+    #[case("[source]\n", TokenType::Source)]
+    fn test_attribute_lines(#[case] markup: &str, #[case] expected_token: TokenType) {
+        let expected_tokens = expected_from(
+            vec![
+                Token::new(
+                    expected_token,
+                    markup[..markup.len() - 1].to_string(),
+                    Some(markup[..markup.len() - 1].to_string()),
+                    1,
+                ),
+                Token::new(TokenType::NewLineChar, "\n".to_string(), None, 1),
             ],
             &markup,
         );

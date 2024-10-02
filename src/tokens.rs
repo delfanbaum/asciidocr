@@ -79,16 +79,16 @@ pub enum TokenType {
     Heading5,
 
     Blockquote,            // [quote],
-    BlockquoteAttribution, // quoted in [quote, quoted]
-    BlockQuoteSource,      // source in [quote, quoted, source]
+    //BlockquoteAttribution, // quoted in [quote, quoted]
+    //BlockQuoteSource,      // source in [quote, quoted, source]
 
     Verse,            // [quote],
-    VerseAttribution, // quoted in [quote, quoted]
-    VerseSource,      // source in [quote, quoted, source]
+    //VerseAttribution, // quoted in [quote, quoted]
+    //VerseSource,      // source in [quote, quoted, source]
     
     BlockContinuation, // a "+" all by itself on a line can signal continuation
 
-    //Source,         // [source]
+    Source,         // [source]
     //SourceLanguage, // language in [source,language]
     //
     //// includes
