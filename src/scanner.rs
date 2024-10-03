@@ -25,7 +25,7 @@ impl<'a> Scanner<'a> {
     pub fn scan_tokens(&mut self) -> Vec<Token> {
         while !self.is_at_end() {
             self.start = self.current;
-            self.scan_blocks();
+            self.scan_token();
         }
 
         // end of file
@@ -35,8 +35,7 @@ impl<'a> Scanner<'a> {
         self.tokens.clone()
     }
 
-    /// First pass, scans for block tokens
-    fn scan_blocks(&mut self) {
+    fn scan_token(&mut self) {
         let c = self.source.as_bytes()[self.current] as char;
         self.current += 1; // this instead of the "advance" function in "Crafting Interpreters"
 
@@ -107,13 +106,7 @@ impl<'a> Scanner<'a> {
                                 self.add_text_until_next_markup()
                             }
                         }
-                        '_' => {
-                            if self.is_inline_formatting(c) {
-                                self.add_token(TokenType::Italic, false)
-                            } else {
-                                self.add_text_until_next_markup()
-                            }
-                        }
+                        '_' => self.add_token(TokenType::Italic, false),
                         _ => self.add_text_until_next_markup(),
                     }
                 }
@@ -266,10 +259,6 @@ impl<'a> Scanner<'a> {
         self.add_token(TokenType::Text, true)
     }
 
-    fn is_at_end(&self) -> bool {
-        self.current >= self.source.len()
-    }
-
     fn starts_new_block(&self) -> bool {
         println!("{:?}", self);
         self.start == 0
@@ -307,9 +296,8 @@ impl<'a> Scanner<'a> {
         }
     }
 
-    // checks to see if a character is likely inline formatting
-    fn is_inline_formatting(&self, c: char) -> bool {
-        vec![' ', c].contains(&self.peek()) || vec![' ', c].contains(&self.peek_back())
+    fn is_at_end(&self) -> bool {
+        self.current >= self.source.len()
     }
 
     fn peek(&self) -> char {
@@ -357,7 +345,7 @@ mod tests {
     }
 
     #[test]
-    fn test_newline() {
+    fn newline() {
         let markup = "\n".to_string();
         let expected_tokens = expected_from(
             vec![Token::new(
@@ -378,7 +366,7 @@ mod tests {
     #[case("____\n".to_string(), TokenType::QuoteVerseBlock)]
     #[case("____\n".to_string(), TokenType::QuoteVerseBlock)]
     #[case("--\n".to_string(), TokenType::OpenBlock)]
-    fn test_fenced_block_delimiter_start(
+    fn fenced_block_delimiter_start(
         #[case] markup: String,
         #[case] expected_token: TokenType,
     ) {
@@ -396,7 +384,7 @@ mod tests {
     #[case("\n\n____\n".to_string(), TokenType::QuoteVerseBlock)]
     #[case("\n\n////\n".to_string(), TokenType::CommentBlock)]
     #[case("\n\n--\n".to_string(), TokenType::OpenBlock)]
-    fn test_fenced_block_delimiter_new_block(
+    fn fenced_block_delimiter_new_block(
         #[case] markup: String,
         #[case] expected_token: TokenType,
     ) {
@@ -414,7 +402,7 @@ mod tests {
     #[rstest]
     #[case("* Foo\n".to_string(), TokenType::UnorderedListItem)]
     #[case(". Foo\n".to_string(), TokenType::OrderedListItem)]
-    fn test_list_items(#[case] markup: String, #[case] expected_token: TokenType) {
+    fn list_items(#[case] markup: String, #[case] expected_token: TokenType) {
         let mut delimiter = markup
             .clone()
             .split_whitespace()
@@ -439,7 +427,7 @@ mod tests {
     }
 
     #[test]
-    fn test_block_introduction() {
+    fn block_introduction() {
         let markup = ".Some title\n".to_string();
         let title = "Some title".to_string();
         let expected_tokens = expected_from(
@@ -459,7 +447,7 @@ mod tests {
     #[case("\n\n=== Foo\n".to_string(), TokenType::Heading3, 3)]
     #[case("\n\n==== Foo\n".to_string(), TokenType::Heading4, 4)]
     #[case("\n\n===== Foo\n".to_string(), TokenType::Heading5, 5)]
-    fn test_headings_after_block(
+    fn headings_after_block(
         #[case] markup: String,
         #[case] expected_token: TokenType,
         #[case] heading_level: usize,
@@ -487,7 +475,7 @@ mod tests {
     #[rstest]
     #[case("\n\n'''\n".to_string(), TokenType::ThematicBreak)]
     #[case("\n\n<<<\n".to_string(), TokenType::PageBreak)]
-    fn test_breaks(#[case] markup: String, #[case] expected_token: TokenType) {
+    fn breaks(#[case] markup: String, #[case] expected_token: TokenType) {
         // these should always be after a block, and the 'start' case is tested elsewhere
         let expected_tokens = expected_from(
             vec![
@@ -501,7 +489,7 @@ mod tests {
     }
 
     #[test]
-    fn test_comments() {
+    fn comments() {
         let comment_line = "// Some text or other".to_string();
         let markup = "\n".to_string() + &comment_line + "\n";
         let expected_tokens = expected_from(
@@ -526,7 +514,7 @@ mod tests {
     #[case("[verse]\n", TokenType::Verse)]
     #[case("[verse, Audre Lorde, A Litany for Survival]\n", TokenType::Verse)]
     #[case("[source]\n", TokenType::Source)]
-    fn test_attribute_lines(#[case] markup: &str, #[case] expected_token: TokenType) {
+    fn attribute_lines(#[case] markup: &str, #[case] expected_token: TokenType) {
         let expected_tokens = expected_from(
             vec![
                 Token::new(
@@ -543,7 +531,7 @@ mod tests {
     }
 
     #[test]
-    fn test_block_continuation() {
+    fn block_continuation() {
         let markup = "* Foo\n+\nBar".to_string();
         let expected_tokens = expected_from(
             vec![
@@ -576,7 +564,7 @@ mod tests {
     #[case('^', TokenType::Superscript)]
     #[case('~', TokenType::Subscript)]
     #[case('#', TokenType::Highlighted)]
-    fn test_inline_formatting(#[case] markup_char: char, #[case] expected_token: TokenType) {
+    fn inline_formatting(#[case] markup_char: char, #[case] expected_token: TokenType) {
         let markup = format!("Some {}bar{} bar.", markup_char, markup_char);
         let expected_tokens = expected_from(
             vec![
@@ -613,7 +601,7 @@ mod tests {
     #[case('^', TokenType::Superscript)]
     #[case('~', TokenType::Subscript)]
     #[case('#', TokenType::Highlighted)]
-    fn test_inline_formatting_doubles(
+    fn inline_formatting_doubles(
         #[case] markup_char: char,
         #[case] expected_token: TokenType,
     ) {
@@ -655,7 +643,7 @@ mod tests {
     #[rstest]
     #[case("footnote:[", TokenType::FootnoteMacro)]
     #[case("pass:[", TokenType::PassthroughInlineMacro)]
-    fn test_inline_macros(#[case] markup_check: &str, #[case] expected_token: TokenType) {
+    fn inline_macros(#[case] markup_check: &str, #[case] expected_token: TokenType) {
         let markup = format!("Some {}bar]", markup_check);
         let expected_tokens = expected_from(
             vec![
@@ -685,7 +673,7 @@ mod tests {
     }
 
     #[test]
-    fn test_definition_list_mark() {
+    fn definition_list_mark() {
         let markup = "Term:: Definition";
         let expected_tokens = expected_from(
             vec![
@@ -709,7 +697,7 @@ mod tests {
         scan_and_assert_eq(&markup, expected_tokens);
     }
     #[test]
-    fn test_defintion_list_mark_not_if_space_before() {
+    fn defintion_list_mark_not_if_space_before() {
         let markup = "Term :: bar";
 
         let expected_tokens = expected_from(
@@ -734,7 +722,7 @@ mod tests {
     }
 
     #[test]
-    fn test_link_with_text() {
+    fn link_with_text() {
         let markup = "Some http://example.com[bar]";
         let expected_tokens = expected_from(
             vec![
@@ -769,7 +757,7 @@ mod tests {
     }
 
     #[test]
-    fn test_link_no_text() {
+    fn link_no_text() {
         let markup = "Some http://example.com[]";
         let expected_tokens = expected_from(
             vec![
@@ -798,7 +786,7 @@ mod tests {
     }
 
     #[test]
-    fn test_inline_style_in_line() {
+    fn inline_style_in_line() {
         let markup = "Some [.style]#text#";
         let expected_tokens = expected_from(
             vec![
@@ -829,7 +817,7 @@ mod tests {
     }
 
     #[test]
-    fn test_inline_style_new_line() {
+    fn inline_style_new_line() {
         let markup = "\n[.style]#text#";
         let expected_tokens = expected_from(
             vec![
@@ -854,7 +842,7 @@ mod tests {
         scan_and_assert_eq(&markup, expected_tokens);
     }
     #[test]
-    fn test_inline_style_new_block() {
+    fn inline_style_new_block() {
         let markup = "\n\n[.style]#text#";
         let expected_tokens = expected_from(
             vec![
