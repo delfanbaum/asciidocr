@@ -44,7 +44,6 @@ impl Token {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TokenType {
     // BLOCKS
-    UnprocessedLine, // placeholder token for reprocessing
     NewLineChar, // these are effectively semantic, so we should track them. Two in a row indicate
     // a blank line, which often signals the end of a block
 
@@ -59,7 +58,7 @@ pub enum TokenType {
     AsideBlock,       // i.e., "****"
     SourceBlock,      // i.e., "----"
     QuoteVerseBlock,  // i.e., "____"
-    CommentBlock,  // i.e., "////"
+    CommentBlock,     // i.e., "////"
 
     // two-char delimiters as new block
     OpenBlock, // i.e., --
@@ -78,59 +77,44 @@ pub enum TokenType {
     Heading4,
     Heading5,
 
-    Blockquote,            // [quote],
-    //BlockquoteAttribution, // quoted in [quote, quoted]
-    //BlockQuoteSource,      // source in [quote, quoted, source]
+    Blockquote, // [quote],
+    Verse,      // [quote],
+    Source,     // [source]
 
-    Verse,            // [quote],
-    //VerseAttribution, // quoted in [quote, quoted]
-    //VerseSource,      // source in [quote, quoted, source]
-    
     BlockContinuation, // a "+" all by itself on a line can signal continuation
 
-    Source,         // [source]
-    //SourceLanguage, // language in [source,language]
-    //
-    //// includes
-    //Include,
-    //StartTag, // tag::[]
-    //EndTag,
-
     // INLINES
-
     // definition lists
-    DefListTerm, // starts with new line or block?
-    DefListDesc,
+    DefListMark, // just match "::" and the parser can figure it out
 
     // formatting tokens (inline markup)
     Bold,   // TK Handle bounded characters, e.g., **Some**thing -> <b>Some</b>thing
     Italic, // same applies above
     Monospace,
-    InlineStyle, // i.e., [.some_class], usually [.x]#applied here#
-    Highlighted, // the part between the # above
 
     Superscript, // ^super^
     Subscript,   // ~sub~
+    Highlighted, // #text# or [.class]#text#
 
-    // links
-    LinkUrl,
-    LinkText,
-
-    // footnotes
-    Footnote, // requires a second pass? OR: do some kind of `self.last_token` check on the
-    // scanner to determine if, for example, we've opened a link inside of our footnote
-
+    // inline macros
+    LinkMacro,
+    FootnoteMacro, // requires a second pass? OR: do some kind of `self.last_token` check on the
+    PassthroughInlineMacro,
+    InlineMacroClose,
 
     // garden-variety text
     Text,
 
-    // misc
-    PassthroughInline,
-    // references, cross references TK
-    // math blocks TK
-
     // End of File Token
     Eof,
+
+    InlineStyle, // i.e., [.some_class], usually [.x]#applied here#
+
+                 // references, cross references TK
+                 // math blocks TK
+                 //Include,
+                 //StartTag, // tag::[]
+                 //EndTag,
 }
 
 impl TokenType {
