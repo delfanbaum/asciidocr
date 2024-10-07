@@ -141,7 +141,12 @@ impl<'a> Scanner<'a> {
                         'q' => self.add_token(TokenType::Blockquote, true),
                         'v' => self.add_token(TokenType::Verse, true),
                         's' => self.add_token(TokenType::Source, true),
-                        _ => panic!("Unexpected attr line"), // TODO
+                        'N' => self.add_token(TokenType::Note, true),
+                        'T' => self.add_token(TokenType::Tip, true),
+                        'I' => self.add_token(TokenType::Important, true),
+                        'C' => self.add_token(TokenType::Caution, true),
+                        'W' => self.add_token(TokenType::Warning, true),
+                        _ => self.add_text_until_next_markup(),
                     }
                 } else if self.peek() == '.' {
                     self.add_inline_style()
@@ -182,6 +187,46 @@ impl<'a> Scanner<'a> {
             'h' => {
                 if self.peeks_ahead(3) == "ttp" {
                     self.add_link()
+                } else {
+                    self.add_text_until_next_markup()
+                }
+            }
+            'N' => {
+                if self.peeks_ahead(5) == "OTE: " {
+                    self.current += 5;
+                    self.add_token(TokenType::Note, true)
+                } else {
+                    self.add_text_until_next_markup()
+                }
+            }
+            'T' => {
+                if self.peeks_ahead(4) == "IP: " {
+                    self.current += 4;
+                    self.add_token(TokenType::Tip, true)
+                } else {
+                    self.add_text_until_next_markup()
+                }
+            }
+            'I' => {
+                if self.peeks_ahead(10) == "MPORTANT: " {
+                    self.current += 10;
+                    self.add_token(TokenType::Important, true)
+                } else {
+                    self.add_text_until_next_markup()
+                }
+            }
+            'C' => {
+                if self.peeks_ahead(8) == "AUTION: " {
+                    self.current += 8;
+                    self.add_token(TokenType::Caution, true)
+                } else {
+                    self.add_text_until_next_markup()
+                }
+            }
+            'W' => {
+                if self.peeks_ahead(8) == "ARNING: " {
+                    self.current += 8;
+                    self.add_token(TokenType::Warning, true)
                 } else {
                     self.add_text_until_next_markup()
                 }
@@ -247,9 +292,10 @@ impl<'a> Scanner<'a> {
     fn add_text_until_next_markup(&mut self) {
         // "inline" chars that could be markup; the newline condition prevents
         // capturing significant block markup chars
-        // Chars: newline, bold, italic, code, super, subscript, footnote, pass, link, end inline macro, definition list marker, highlighted
+        // Chars: newline, bold, italic, code, super, subscript, footnote, pass, link, end inline macro, definition list marker, highlighted, inline admonition initial chars
         while !vec![
-            '\n', '*', '_', '`', '^', '~', 'f', 'p', 'h', ']', '[', ':', '#',
+            '\n', '*', '_', '`', '^', '~', 'f', 'p', 'h', ']', '[', ':', '#', 'N', 'T', 'I', 'C',
+            'W',
         ]
         .contains(&self.peek())
             && !self.is_at_end()
@@ -366,10 +412,7 @@ mod tests {
     #[case("____\n".to_string(), TokenType::QuoteVerseBlock)]
     #[case("____\n".to_string(), TokenType::QuoteVerseBlock)]
     #[case("--\n".to_string(), TokenType::OpenBlock)]
-    fn fenced_block_delimiter_start(
-        #[case] markup: String,
-        #[case] expected_token: TokenType,
-    ) {
+    fn fenced_block_delimiter_start(#[case] markup: String, #[case] expected_token: TokenType) {
         let expected_tokens = expected_from(
             vec![Token::new(expected_token, markup.clone(), None, 1)],
             &markup,
@@ -384,10 +427,7 @@ mod tests {
     #[case("\n\n____\n".to_string(), TokenType::QuoteVerseBlock)]
     #[case("\n\n////\n".to_string(), TokenType::CommentBlock)]
     #[case("\n\n--\n".to_string(), TokenType::OpenBlock)]
-    fn fenced_block_delimiter_new_block(
-        #[case] markup: String,
-        #[case] expected_token: TokenType,
-    ) {
+    fn fenced_block_delimiter_new_block(#[case] markup: String, #[case] expected_token: TokenType) {
         let expected_tokens = expected_from(
             vec![
                 Token::new(TokenType::NewLineChar, "\n".to_string(), None, 1),
@@ -514,6 +554,11 @@ mod tests {
     #[case("[verse]\n", TokenType::Verse)]
     #[case("[verse, Audre Lorde, A Litany for Survival]\n", TokenType::Verse)]
     #[case("[source]\n", TokenType::Source)]
+    #[case("[NOTE]\n", TokenType::Note)]
+    #[case("[TIP]\n", TokenType::Tip)]
+    #[case("[IMPORTANT]\n", TokenType::Important)]
+    #[case("[CAUTION]\n", TokenType::Caution)]
+    #[case("[WARNING]\n", TokenType::Warning)]
     fn attribute_lines(#[case] markup: &str, #[case] expected_token: TokenType) {
         let expected_tokens = expected_from(
             vec![
@@ -601,10 +646,7 @@ mod tests {
     #[case('^', TokenType::Superscript)]
     #[case('~', TokenType::Subscript)]
     #[case('#', TokenType::Highlighted)]
-    fn inline_formatting_doubles(
-        #[case] markup_char: char,
-        #[case] expected_token: TokenType,
-    ) {
+    fn inline_formatting_doubles(#[case] markup_char: char, #[case] expected_token: TokenType) {
         // TODO make this less ugly
         let markup = format!(
             "Some {}{}bar{}{} bar.",
@@ -664,6 +706,34 @@ mod tests {
                     TokenType::InlineMacroClose,
                     "]".to_string(),
                     Some("]".to_string()),
+                    1,
+                ),
+            ],
+            &markup,
+        );
+        scan_and_assert_eq(&markup, expected_tokens);
+    }
+
+    #[rstest]
+    #[case("NOTE", TokenType::Note)]
+    #[case("TIP", TokenType::Tip)]
+    #[case("IMPORTANT", TokenType::Important)]
+    #[case("CAUTION", TokenType::Caution)]
+    #[case("WARNING", TokenType::Warning)]
+    fn inline_admonitions(#[case] markup_check: &str, #[case] expected_token: TokenType) {
+        let markup = format!("{}: bar.", markup_check);
+        let expected_tokens = expected_from(
+            vec![
+                Token::new(
+                    expected_token,
+                    format!("{}: ", markup_check),
+                    Some(format!("{}: ", markup_check)),
+                    1,
+                ),
+                Token::new(
+                    TokenType::Text,
+                    "bar.".to_string(),
+                    Some("bar.".to_string()),
                     1,
                 ),
             ],

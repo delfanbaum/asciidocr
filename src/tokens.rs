@@ -81,6 +81,12 @@ pub enum TokenType {
     Verse,      // [quote],
     Source,     // [source]
 
+    Note,     // [NOTE]
+    Tip,     // [TIP]
+    Important,     // [IMPORTANT]
+    Caution,     // [CAUTION]
+    Warning,     // [WARNING]
+    
     BlockContinuation, // a "+" all by itself on a line can signal continuation
 
     // INLINES
