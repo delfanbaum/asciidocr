@@ -81,7 +81,6 @@ impl<'a> Scanner<'a> {
                         }
                         '-' => {
                             // check if it's an open block
-                            println!("checks ");
                             if self.starts_new_block() && self.starts_repeated_char_line(c, 2) {
                                 self.current += 2;
                                 self.add_token(TokenType::OpenBlock, false);
