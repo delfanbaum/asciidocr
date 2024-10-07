@@ -304,7 +304,6 @@ impl<'a> Scanner<'a> {
     }
 
     fn starts_new_block(&self) -> bool {
-        println!("{:?}", self);
         self.start == 0
             || self.start >= 2 // guarding against very short, silly documents (tests)
                 && self.source.as_bytes()[self.start - 2] == b'\n'
