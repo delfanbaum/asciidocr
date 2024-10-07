@@ -64,13 +64,21 @@ impl<'a> Scanner<'a> {
                 }
             }
             // potential block delimiter chars get treated similarly
-            '+' | '*' | '-' | '_' | '/' => {
+            '+' | '*' | '-' | '_' | '/' | '=' => {
                 if self.starts_new_block() && self.starts_repeated_char_line(c, 4) {
                     self.current += 4; // the remaining repeated chars and a newline
                     self.add_token(TokenType::block_from_char(c), false);
                     self.line += 1; // since we consume the newline as a part of the block
                 } else {
                     match c {
+                        '=' => {
+                            // possible heading
+                            if self.starts_new_block() {
+                                self.add_heading()
+                            } else {
+                                self.add_text_until_next_markup()
+                            }
+                        }
                         '-' => {
                             // check if it's an open block
                             println!("checks ");
@@ -120,15 +128,6 @@ impl<'a> Scanner<'a> {
                     } else {
                         self.add_token(TokenType::BlockLabel, false);
                     }
-                } else {
-                    self.add_text_until_next_markup()
-                }
-            }
-
-            '=' => {
-                // possible heading
-                if self.starts_new_block() {
-                    self.add_heading()
                 } else {
                     self.add_text_until_next_markup()
                 }
@@ -411,6 +410,7 @@ mod tests {
     #[case("----\n".to_string(), TokenType::SourceBlock)]
     #[case("____\n".to_string(), TokenType::QuoteVerseBlock)]
     #[case("____\n".to_string(), TokenType::QuoteVerseBlock)]
+    #[case("====\n".to_string(), TokenType::AdmonitionBlock)]
     #[case("--\n".to_string(), TokenType::OpenBlock)]
     fn fenced_block_delimiter_start(#[case] markup: String, #[case] expected_token: TokenType) {
         let expected_tokens = expected_from(
@@ -426,6 +426,7 @@ mod tests {
     #[case("\n\n----\n".to_string(), TokenType::SourceBlock)]
     #[case("\n\n____\n".to_string(), TokenType::QuoteVerseBlock)]
     #[case("\n\n////\n".to_string(), TokenType::CommentBlock)]
+    #[case("\n\n====\n".to_string(), TokenType::AdmonitionBlock)]
     #[case("\n\n--\n".to_string(), TokenType::OpenBlock)]
     fn fenced_block_delimiter_new_block(#[case] markup: String, #[case] expected_token: TokenType) {
         let expected_tokens = expected_from(
