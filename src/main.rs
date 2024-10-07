@@ -5,7 +5,7 @@ use asciidocr::scanner::Scanner;
 fn main() {
     // take a single arg for simplicity for now; CLI TK
     let args: Vec<String> = env::args().collect();
-    if args.len() == 1 {
+    if args.len() == 2 {
         run(args[1].clone())
     } else {
         eprintln!("Usage: asciidocr FILE");
