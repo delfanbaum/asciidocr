@@ -17,16 +17,19 @@ pub struct InlineSpan {
     variant: InlineSpanVariant,
     node_form: InlineSpanForm,
     inlines: Vec<Inline>,
+    location: Vec<Location>,
 }
 
 impl InlineSpan {
-    fn new(variant: InlineSpanVariant, node_form: InlineSpanForm) -> Self {
+    fn new(variant: InlineSpanVariant, node_form: InlineSpanForm,     location: Vec<Location>,
+) -> Self {
         InlineSpan {
             name: "span".to_string(),
             node_type: NodeTypes::Inline,
             variant,
             node_form,
             inlines: vec![],
+            location
         }
     }
 }
