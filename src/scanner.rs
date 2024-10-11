@@ -5,7 +5,6 @@ use crate::tokens::{Token, TokenType};
 #[derive(Debug)]
 pub struct Scanner<'a> {
     pub source: &'a str,
-    pub tokens: Vec<Token>,
     start: usize,
     current: usize,
     line: usize,
@@ -27,25 +26,10 @@ impl<'a> Scanner<'a> {
     pub fn new(source: &'a str) -> Self {
         Scanner {
             source,
-            tokens: Vec::new(),
             start: 0,   // beginning of the current lexeme being scanned
             current: 0, // the character we're looking at *now*
             line: 1,
         }
-    }
-
-    // keeping in case we ever just want a jumble of tokens
-    pub fn scan_tokens(&mut self) -> Vec<Token> {
-        while !self.is_at_end() {
-            self.start = self.current;
-            self.scan_token();
-        }
-
-        // end of file
-        self.tokens
-            .push(Token::new(TokenType::Eof, String::new(), None, self.line));
-
-        self.tokens.clone()
     }
 
     fn scan_token(&mut self) -> Token {
