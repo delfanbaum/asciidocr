@@ -17,9 +17,9 @@ fn main() {
 
 fn run(file_path: String) {
     let source = fs::read_to_string(&file_path).expect(&format!("Unable to read file: {}", file_path));
-    let mut s = Scanner::new(&source);
-    s.scan_tokens();
-    println!("{:?}", s.tokens);
+    let s = Scanner::new(&source);
+    let tokens: Vec<asciidocr::tokens::Token> = s.collect();
+    println!("{:?}", tokens);
 }
 
 // generate errors
