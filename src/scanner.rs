@@ -53,18 +53,12 @@ impl<'a> Scanner<'a> {
         self.current += 1; // this instead of the "advance" function in "Crafting Interpreters"
 
         match c {
-            '\n' => {
-                let t = self.add_token(TokenType::NewLineChar, false);
-                self.line += 1;
-                t
-            }
+            '\n' => self.add_token(TokenType::NewLineChar, false, 1),
 
             '\'' => {
                 if self.starts_repeated_char_line(c, 3) {
                     self.current += 3;
-                    let t = self.add_token(TokenType::ThematicBreak, false);
-                    self.line += 1;
-                    t
+                    self.add_token(TokenType::ThematicBreak, false, 1)
                 } else {
                     self.add_text_until_next_markup()
                 }
@@ -72,9 +66,7 @@ impl<'a> Scanner<'a> {
             '<' => {
                 if self.starts_repeated_char_line(c, 3) {
                     self.current += 3;
-                    let t = self.add_token(TokenType::PageBreak, false);
-                    self.line += 1;
-                    t
+                    self.add_token(TokenType::PageBreak, false, 1)
                 } else {
                     self.add_text_until_next_markup()
                 }
@@ -83,9 +75,7 @@ impl<'a> Scanner<'a> {
             '+' | '*' | '-' | '_' | '/' | '=' => {
                 if self.starts_new_block() && self.starts_repeated_char_line(c, 4) {
                     self.current += 4; // the remaining repeated chars and a newline
-                    let t = self.add_token(TokenType::block_from_char(c), false);
-                    self.line += 1; // since we consume the newline as a part of the block
-                    t
+                    self.add_token(TokenType::block_from_char(c), false, 1)
                 } else {
                     match c {
                         '=' => {
@@ -100,9 +90,8 @@ impl<'a> Scanner<'a> {
                             // check if it's an open block
                             if self.starts_new_block() && self.starts_repeated_char_line(c, 2) {
                                 self.current += 2;
-                                let t = self.add_token(TokenType::OpenBlock, false);
-                                self.line += 1; // since we consume the newline as a part of the block
-                                t
+                                // since we consume the newline as a part of the block, add a line
+                                self.add_token(TokenType::OpenBlock, false, 1)
                             } else {
                                 self.add_text_until_next_markup()
                             }
@@ -112,7 +101,7 @@ impl<'a> Scanner<'a> {
                             if self.starts_new_line() && self.peek() == ' ' {
                                 self.add_list_item(TokenType::UnorderedListItem)
                             } else {
-                                self.add_token(TokenType::Bold, false)
+                                self.add_token(TokenType::Bold, false, 0)
                             }
                         }
                         '/' => {
@@ -120,19 +109,19 @@ impl<'a> Scanner<'a> {
                                 while self.peek() != '\n' && !self.is_at_end() {
                                     self.current += 1;
                                 }
-                                self.add_token(TokenType::Comment, true)
+                                self.add_token(TokenType::Comment, true, 0)
                             } else {
                                 self.add_text_until_next_markup()
                             }
                         }
                         '+' => {
                             if self.starts_new_line() && self.peek() == '\n' {
-                                self.add_token(TokenType::BlockContinuation, false)
+                                self.add_token(TokenType::BlockContinuation, false, 0)
                             } else {
                                 self.add_text_until_next_markup()
                             }
                         }
-                        '_' => self.add_token(TokenType::Italic, false),
+                        '_' => self.add_token(TokenType::Italic, false, 0),
                         _ => self.add_text_until_next_markup(),
                     }
                 }
@@ -144,7 +133,7 @@ impl<'a> Scanner<'a> {
                     if self.peek() == ' ' {
                         self.add_list_item(TokenType::OrderedListItem)
                     } else {
-                        self.add_token(TokenType::BlockLabel, false)
+                        self.add_token(TokenType::BlockLabel, false, 0)
                     }
                 } else {
                     self.add_text_until_next_markup()
@@ -155,14 +144,14 @@ impl<'a> Scanner<'a> {
                 // role, quote, verse, source, etc
                 if self.starts_attribute_line() {
                     match self.source.as_bytes()[self.start + 1] as char {
-                        'q' => self.add_token(TokenType::Blockquote, true),
-                        'v' => self.add_token(TokenType::Verse, true),
-                        's' => self.add_token(TokenType::Source, true),
-                        'N' => self.add_token(TokenType::Note, true),
-                        'T' => self.add_token(TokenType::Tip, true),
-                        'I' => self.add_token(TokenType::Important, true),
-                        'C' => self.add_token(TokenType::Caution, true),
-                        'W' => self.add_token(TokenType::Warning, true),
+                        'q' => self.add_token(TokenType::Blockquote, true, 0),
+                        'v' => self.add_token(TokenType::Verse, true, 0),
+                        's' => self.add_token(TokenType::Source, true, 0),
+                        'N' => self.add_token(TokenType::Note, true, 0),
+                        'T' => self.add_token(TokenType::Tip, true, 0),
+                        'I' => self.add_token(TokenType::Important, true, 0),
+                        'C' => self.add_token(TokenType::Caution, true, 0),
+                        'W' => self.add_token(TokenType::Warning, true, 0),
                         _ => self.add_text_until_next_markup(),
                     }
                 } else if self.peek() == '.' {
@@ -172,14 +161,14 @@ impl<'a> Scanner<'a> {
                 }
             }
 
-            '`' => self.add_token(TokenType::Monospace, false),
-            '^' => self.add_token(TokenType::Superscript, false),
-            '~' => self.add_token(TokenType::Subscript, false),
-            '#' => self.add_token(TokenType::Highlighted, false),
+            '`' => self.add_token(TokenType::Monospace, false, 0),
+            '^' => self.add_token(TokenType::Superscript, false, 0),
+            '~' => self.add_token(TokenType::Subscript, false, 0),
+            '#' => self.add_token(TokenType::Highlighted, false, 0),
             ':' => {
                 if self.peek_back() != ' ' && self.peeks_ahead(2) == ": " {
                     self.current += 2;
-                    self.add_token(TokenType::DefListMark, false)
+                    self.add_token(TokenType::DefListMark, false, 0)
                 } else {
                     self.add_text_until_next_markup()
                 }
@@ -188,7 +177,7 @@ impl<'a> Scanner<'a> {
                 // guard against indexing out of range
                 if self.peeks_ahead(9) == "ootnote:[" {
                     self.current += 9;
-                    self.add_token(TokenType::FootnoteMacro, false)
+                    self.add_token(TokenType::FootnoteMacro, false, 0)
                 } else {
                     self.add_text_until_next_markup()
                 }
@@ -196,7 +185,7 @@ impl<'a> Scanner<'a> {
             'p' => {
                 if self.peeks_ahead(5) == "ass:[" {
                     self.current += 5;
-                    self.add_token(TokenType::PassthroughInlineMacro, false)
+                    self.add_token(TokenType::PassthroughInlineMacro, false, 0)
                 } else {
                     self.add_text_until_next_markup()
                 }
@@ -211,7 +200,7 @@ impl<'a> Scanner<'a> {
             'N' => {
                 if self.peeks_ahead(5) == "OTE: " {
                     self.current += 5;
-                    self.add_token(TokenType::Note, true)
+                    self.add_token(TokenType::Note, true, 0)
                 } else {
                     self.add_text_until_next_markup()
                 }
@@ -219,7 +208,7 @@ impl<'a> Scanner<'a> {
             'T' => {
                 if self.peeks_ahead(4) == "IP: " {
                     self.current += 4;
-                    self.add_token(TokenType::Tip, true)
+                    self.add_token(TokenType::Tip, true, 0)
                 } else {
                     self.add_text_until_next_markup()
                 }
@@ -227,7 +216,7 @@ impl<'a> Scanner<'a> {
             'I' => {
                 if self.peeks_ahead(10) == "MPORTANT: " {
                     self.current += 10;
-                    self.add_token(TokenType::Important, true)
+                    self.add_token(TokenType::Important, true, 0)
                 } else {
                     self.add_text_until_next_markup()
                 }
@@ -235,7 +224,7 @@ impl<'a> Scanner<'a> {
             'C' => {
                 if self.peeks_ahead(8) == "AUTION: " {
                     self.current += 8;
-                    self.add_token(TokenType::Caution, true)
+                    self.add_token(TokenType::Caution, true, 0)
                 } else {
                     self.add_text_until_next_markup()
                 }
@@ -243,28 +232,45 @@ impl<'a> Scanner<'a> {
             'W' => {
                 if self.peeks_ahead(8) == "ARNING: " {
                     self.current += 8;
-                    self.add_token(TokenType::Warning, true)
+                    self.add_token(TokenType::Warning, true, 0)
                 } else {
                     self.add_text_until_next_markup()
                 }
             }
             // Assume that these are macro closes; the parser can always reject it
-            ']' => self.add_token(TokenType::InlineMacroClose, true),
+            ']' => self.add_token(TokenType::InlineMacroClose, true, 0),
             _ => self.add_text_until_next_markup(),
         }
     }
 
-    fn add_token(&mut self, token_type: TokenType, include_literal: bool) -> Token {
+    fn add_token(
+        &mut self,
+        token_type: TokenType,
+        include_literal: bool,
+        advance_line_after: usize,
+    ) -> Token {
         let text = &self.source[self.start..self.current];
         let mut literal = None;
         if include_literal {
             literal = Some(text.to_string())
         }
-        Token {
-            token_type,
-            lexeme: text.to_string(),
-            literal,
-            line: self.line,
+        // save an allocation -- worth it?
+        if advance_line_after != 0 {
+            let token_line = self.line;
+            self.line += advance_line_after;
+            Token {
+                token_type,
+                lexeme: text.to_string(),
+                literal,
+                line: token_line,
+            }
+        } else {
+            Token {
+                token_type,
+                lexeme: text.to_string(),
+                literal,
+                line: self.line,
+            }
         }
     }
 
@@ -274,11 +280,11 @@ impl<'a> Scanner<'a> {
         }
         self.current += 1; // add the space to the lexeme, but remove from count
         match self.source.as_bytes()[self.start..self.current - 1].len() {
-            1 => self.add_token(TokenType::Heading1, false),
-            2 => self.add_token(TokenType::Heading2, false),
-            3 => self.add_token(TokenType::Heading3, false),
-            4 => self.add_token(TokenType::Heading4, false),
-            5 => self.add_token(TokenType::Heading5, false),
+            1 => self.add_token(TokenType::Heading1, false, 0),
+            2 => self.add_token(TokenType::Heading2, false, 0),
+            3 => self.add_token(TokenType::Heading3, false, 0),
+            4 => self.add_token(TokenType::Heading4, false, 0),
+            5 => self.add_token(TokenType::Heading5, false, 0),
             _ => panic!("Too many headings"), // TODO
         }
     }
@@ -287,7 +293,7 @@ impl<'a> Scanner<'a> {
     // another list item marker) in an Text
     fn add_list_item(&mut self, list_item_token: TokenType) -> Token {
         self.current += 1; // advance past the space, which we'll include in the token lexeme
-        self.add_token(list_item_token, false)
+        self.add_token(list_item_token, false, 0)
     }
 
     fn add_link(&mut self) -> Token {
@@ -295,7 +301,7 @@ impl<'a> Scanner<'a> {
             self.current += 1
         }
         self.current += 1; // consume the '[' char
-        self.add_token(TokenType::LinkMacro, true)
+        self.add_token(TokenType::LinkMacro, true, 0)
     }
 
     fn add_inline_style(&mut self) -> Token {
@@ -303,7 +309,7 @@ impl<'a> Scanner<'a> {
             self.current += 1
         }
         self.current += 1; // consume the ']' char
-        self.add_token(TokenType::InlineStyle, true)
+        self.add_token(TokenType::InlineStyle, true, 0)
     }
 
     fn add_text_until_next_markup(&mut self) -> Token {
@@ -319,7 +325,7 @@ impl<'a> Scanner<'a> {
         {
             self.current += 1;
         }
-        self.add_token(TokenType::Text, true)
+        self.add_token(TokenType::Text, true, 0)
     }
 
     fn starts_new_block(&self) -> bool {
