@@ -383,11 +383,6 @@ mod tests {
 
     use super::*;
 
-    // utility to make comparison easier given the EOF token
-    fn expected_from(tokens: Vec<Token>) -> Vec<Token> {
-        tokens
-    }
-
     fn scan_and_assert_eq(markup: &str, expected_tokens: Vec<Token>) {
         let s = Scanner::new(markup);
         assert_eq!(expected_tokens, s.collect::<Vec<Token>>());
