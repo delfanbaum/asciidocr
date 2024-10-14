@@ -5,6 +5,8 @@ pub struct Token {
     pub lexeme: String,          // raw string of code
     pub literal: Option<String>, // our literals are only ever strings (or represented as such)
     pub line: usize,
+    pub startcol: usize,
+    pub endcol: usize,
 }
 
 impl Default for Token {
@@ -15,6 +17,8 @@ impl Default for Token {
             lexeme: "\0".to_string(),
             literal: None,
             line: 0,
+            startcol: 1,
+            endcol: 1,
         }
     }
 }
@@ -25,12 +29,16 @@ impl Token {
         lexeme: String,
         literal: Option<String>,
         line: usize,
+        startcol: usize,
+        endcol: usize,
     ) -> Self {
         Token {
             token_type,
             lexeme,
             literal,
             line,
+            startcol,
+            endcol,
         }
     }
 
@@ -59,7 +67,7 @@ pub enum TokenType {
     SourceBlock,      // i.e., "----"
     QuoteVerseBlock,  // i.e., "____"
     CommentBlock,     // i.e., "////"
-    AdmonitionBlock,     // i.e., "===="
+    AdmonitionBlock,  // i.e., "===="
 
     // two-char delimiters as new block
     OpenBlock, // i.e., --
@@ -82,12 +90,12 @@ pub enum TokenType {
     Verse,      // [quote],
     Source,     // [source]
 
-    Note,     // [NOTE]
-    Tip,     // [TIP]
-    Important,     // [IMPORTANT]
-    Caution,     // [CAUTION]
-    Warning,     // [WARNING]
-    
+    Note,      // [NOTE]
+    Tip,       // [TIP]
+    Important, // [IMPORTANT]
+    Caution,   // [CAUTION]
+    Warning,   // [WARNING]
+
     BlockContinuation, // a "+" all by itself on a line can signal continuation
 
     // INLINES
