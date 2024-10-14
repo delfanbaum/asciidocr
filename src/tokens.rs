@@ -1,3 +1,5 @@
+use crate::nodes::Location;
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Token {
     pub token_type: TokenType,
@@ -44,6 +46,21 @@ impl Token {
 
     pub fn token_type(&self) -> TokenType {
         self.token_type
+    }
+
+    pub fn locations(&self) -> Vec<Location> {
+        vec![
+            Location {
+                line: self.line,
+                col: self.startcol,
+                file: None,
+            },
+            Location {
+                line: self.line,
+                col: self.endcol,
+                file: None,
+            },
+        ]
     }
 }
 
