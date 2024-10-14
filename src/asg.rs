@@ -7,9 +7,9 @@ use crate::inlines::Inline;
 use crate::blocks::Block;
 
 
-// roughly meaning to follow
-// https://gitlab.eclipse.org/eclipse/asciidoc-lang/asciidoc-lang/-/blob/main/asg/schema.json
-
+/// Abstract Syntax Graph used to represent an asciidoc document
+/// roughly meaning to follow the "official" schema:
+/// https://gitlab.eclipse.org/eclipse/asciidoc-lang/asciidoc-lang/-/blob/main/asg/schema.json
 #[derive(Serialize)]
 pub struct Asg {
     // abstract syntax graph

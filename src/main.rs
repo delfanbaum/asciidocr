@@ -1,6 +1,6 @@
 use std::{env, fs, process::exit};
 
-use asciidocr::scanner::Scanner;
+use asciidocr::{parser::Parser, scanner::Scanner};
 
 fn main() {
     // take a single arg for simplicity for now; CLI TK
@@ -11,16 +11,11 @@ fn main() {
         eprintln!("Usage: asciidocr FILE");
         exit(1)
     }
-
-    //scan_and_parse(open(file_path).expect("Unable to open the specified file."));
 }
 
 fn run(file_path: String) {
-    let source = fs::read_to_string(&file_path).expect(&format!("Unable to read file: {}", file_path));
-    let s = Scanner::new(&source);
-    let tokens: Vec<asciidocr::tokens::Token> = s.collect();
-    println!("{:?}", tokens);
+    let source =
+        fs::read_to_string(&file_path).expect(&format!("Unable to read file: {}", file_path));
+    let serialized = serde_json::to_string(&Parser::new().parse(Scanner::new(&source)));
+    println!("{}", serialized.unwrap());
 }
-
-// generate errors
-// report errors, separate concerns

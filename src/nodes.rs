@@ -12,6 +12,7 @@ pub enum NodeTypes {
 pub struct Location {
     pub line: usize, // 1-indexed
     pub col: usize,  // 1-indexed
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub file: Option<Vec<String>>, // I *think* this is for includes, though we're not going to handle
                                    // those yet
 }
