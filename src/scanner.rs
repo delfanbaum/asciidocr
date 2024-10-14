@@ -41,7 +41,7 @@ impl<'a> Scanner<'a> {
 
             '\'' => {
                 if self.starts_repeated_char_line(c, 3) {
-                    self.current += 3;
+                    self.current += 2;
                     self.add_token(TokenType::ThematicBreak, false, 1)
                 } else {
                     self.add_text_until_next_markup()
@@ -49,7 +49,7 @@ impl<'a> Scanner<'a> {
             }
             '<' => {
                 if self.starts_repeated_char_line(c, 3) {
-                    self.current += 3;
+                    self.current += 2;
                     self.add_token(TokenType::PageBreak, false, 1)
                 } else {
                     self.add_text_until_next_markup()
@@ -58,7 +58,7 @@ impl<'a> Scanner<'a> {
             // potential block delimiter chars get treated similarly
             '+' | '*' | '-' | '_' | '/' | '=' => {
                 if self.starts_new_block() && self.starts_repeated_char_line(c, 4) {
-                    self.current += 4; // the remaining repeated chars and a newline
+                    self.current += 3; // the remaining repeated chars
                     self.add_token(TokenType::block_from_char(c), false, 1)
                 } else {
                     match c {
@@ -73,7 +73,7 @@ impl<'a> Scanner<'a> {
                         '-' => {
                             // check if it's an open block
                             if self.starts_new_block() && self.starts_repeated_char_line(c, 2) {
-                                self.current += 2;
+                                self.current += 1;
                                 // since we consume the newline as a part of the block, add a line
                                 self.add_token(TokenType::OpenBlock, false, 1)
                             } else {
@@ -407,9 +407,11 @@ mod tests {
     #[case("____\n".to_string(), TokenType::QuoteVerseBlock)]
     #[case("____\n".to_string(), TokenType::QuoteVerseBlock)]
     #[case("====\n".to_string(), TokenType::AdmonitionBlock)]
-    #[case("--\n".to_string(), TokenType::OpenBlock)]
     fn fenced_block_delimiter_start(#[case] markup: String, #[case] expected_token: TokenType) {
-        let expected_tokens = vec![Token::new(expected_token, markup.clone(), None, 1)];
+        let expected_tokens = vec![
+            Token::new(expected_token, markup.clone()[..4].to_string(), None, 1),
+            Token::new(TokenType::NewLineChar, "\n".to_string(), None, 2),
+        ];
         scan_and_assert_eq(&markup, expected_tokens);
     }
 
@@ -420,12 +422,39 @@ mod tests {
     #[case("\n\n____\n".to_string(), TokenType::QuoteVerseBlock)]
     #[case("\n\n////\n".to_string(), TokenType::CommentBlock)]
     #[case("\n\n====\n".to_string(), TokenType::AdmonitionBlock)]
-    #[case("\n\n--\n".to_string(), TokenType::OpenBlock)]
     fn fenced_block_delimiter_new_block(#[case] markup: String, #[case] expected_token: TokenType) {
         let expected_tokens = vec![
             Token::new(TokenType::NewLineChar, "\n".to_string(), None, 1),
             Token::new(TokenType::NewLineChar, "\n".to_string(), None, 2),
-            Token::new(expected_token, markup.clone()[2..].to_string(), None, 3),
+            Token::new(expected_token, markup.clone()[2..6].to_string(), None, 3),
+            Token::new(TokenType::NewLineChar, "\n".to_string(), None, 4),
+        ];
+        scan_and_assert_eq(&markup, expected_tokens);
+    }
+
+    #[test]
+    fn open_block_beginning() {
+        let markup = "--\n".to_string();
+        let expected_tokens = vec![
+            Token::new(
+                TokenType::OpenBlock,
+                markup.clone()[..2].to_string(),
+                None,
+                1,
+            ),
+            Token::new(TokenType::NewLineChar, "\n".to_string(), None, 2),
+        ];
+        scan_and_assert_eq(&markup, expected_tokens);
+    }
+
+    #[test]
+    fn open_block_new_block() {
+        let markup = "\n\n--\n".to_string();
+        let expected_tokens = vec![
+            Token::new(TokenType::NewLineChar, "\n".to_string(), None, 1),
+            Token::new(TokenType::NewLineChar, "\n".to_string(), None, 2),
+            Token::new(TokenType::OpenBlock, "--".to_string(), None, 3),
+            Token::new(TokenType::NewLineChar, "\n".to_string(), None, 4),
         ];
         scan_and_assert_eq(&markup, expected_tokens);
     }
@@ -502,7 +531,8 @@ mod tests {
         let expected_tokens = vec![
             Token::new(TokenType::NewLineChar, "\n".to_string(), None, 1),
             Token::new(TokenType::NewLineChar, "\n".to_string(), None, 2),
-            Token::new(expected_token, markup.clone()[2..].to_string(), None, 3),
+            Token::new(expected_token, markup.clone()[2..5].to_string(), None, 3),
+            Token::new(TokenType::NewLineChar, "\n".to_string(), None, 4),
         ];
         scan_and_assert_eq(&markup, expected_tokens);
     }
