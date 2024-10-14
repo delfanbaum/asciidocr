@@ -7,6 +7,7 @@ pub enum NodeTypes {
     String,
 }
 
+/// A "location" pertaining to a given document object, usually the start or end of something
 #[derive(Serialize)]
 pub struct Location {
     pub line: usize, // 1-indexed
@@ -23,4 +24,14 @@ impl Default for Location {
             file: None,
         }
     }
+}
+
+impl Location {
+    pub fn new(line: usize, col: usize) -> Self {
+        Location {
+            line,
+            col,
+            file: None,
+        }
+    } // handle file later
 }
