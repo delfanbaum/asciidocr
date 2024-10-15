@@ -9,6 +9,7 @@ use crate::{
 };
 
 #[derive(Serialize, Debug)]
+#[serde(untagged)]
 pub enum Inline {
     InlineSpan(InlineSpan),
     InlineRef(InlineRef),

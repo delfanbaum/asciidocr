@@ -10,6 +10,7 @@ use crate::{
 pub enum _ToFindHomesFor {}
 
 #[derive(Serialize, PartialEq)]
+#[serde(untagged)]
 pub enum Block {
     Section, // sort of a special case but prob needs to be included here
     SectionBody,
