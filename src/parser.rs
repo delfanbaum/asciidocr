@@ -10,7 +10,7 @@ use crate::{
 pub struct Parser {
     last_token_type: TokenType,
     open_blocks: Vec<Block>,
-    open_inlines: Vec<Inline>,
+    //open_inlines: Vec<Inline>,
 }
 
 impl Parser {
@@ -18,7 +18,7 @@ impl Parser {
         Parser {
             last_token_type: TokenType::Eof,
             open_blocks: vec![],
-            open_inlines: vec![],
+            //open_inlines: vec![],
         }
     }
 
@@ -54,7 +54,8 @@ impl Parser {
             TokenType::PageBreak => self.parse_page_break(token, asg),
             TokenType::ThematicBreak => self.parse_thematic_break(token, asg),
             TokenType::PassthroughBlock => self.parse_passthrough_block(token, asg),
-            TokenType::Text => self.parse_text(token, asg),
+            TokenType::SourceBlock => self.parse_source_block(token, asg),
+            TokenType::Text => self.parse_text(token),
             TokenType::Comment => self.parse_comment(),
             _ => {}
         }
@@ -102,86 +103,52 @@ impl Parser {
         self.handle_delimited_leaf_block(asg, block)
     }
 
-    fn parse_aside_block(&mut self, token: Token, asg: &mut Asg) {}
-
     fn parse_source_block(&mut self, token: Token, asg: &mut Asg) {
         let block = LeafBlock::new_listing(Some(token.text()), token.first_location());
         self.handle_delimited_leaf_block(asg, block)
     }
 
-    fn parse_quote_verse_block(&mut self, token: Token, asg: &mut Asg) {}
+    //fn parse_aside_block(&mut self, token: Token, asg: &mut Asg) {}
+    //fn parse_quote_verse_block(&mut self, token: Token, asg: &mut Asg) {}
+    //fn parse_comment_block(&mut self, token: Token, asg: &mut Asg) {}
+    //fn parse_admonition_block(&mut self, token: Token, asg: &mut Asg) {}
+    //fn parse_open_block(&mut self, token: Token, asg: &mut Asg) {}
+    //fn parse_ordered_list_item(&mut self, token: Token, asg: &mut Asg) {}
+    //fn parse_unordered_list_item(&mut self, token: Token, asg: &mut Asg) {}
+    //fn parse_block_label(&mut self, token: Token, asg: &mut Asg) {}
+    //fn parse_heading1(&mut self, token: Token, asg: &mut Asg) {}
+    //fn parse_heading2(&mut self, token: Token, asg: &mut Asg) {}
+    //fn parse_heading3(&mut self, token: Token, asg: &mut Asg) {}
+    //fn parse_heading4(&mut self, token: Token, asg: &mut Asg) {}
+    //fn parse_heading5(&mut self, token: Token, asg: &mut Asg) {}
+    //fn parse_blockquote(&mut self, token: Token, asg: &mut Asg) {}
+    //fn parse_verse(&mut self, token: Token, asg: &mut Asg) {}
+    //fn parse_source(&mut self, token: Token, asg: &mut Asg) {}
+    //fn parse_note(&mut self, token: Token, asg: &mut Asg) {}
+    //fn parse_tip(&mut self, token: Token, asg: &mut Asg) {}
+    //fn parse_important(&mut self, token: Token, asg: &mut Asg) {}
+    //fn parse_caution(&mut self, token: Token, asg: &mut Asg) {}
+    //fn parse_warning(&mut self, token: Token, asg: &mut Asg) {}
+    //fn parse_block_continuation(&mut self, token: Token, asg: &mut Asg) {}
+    //fn parse_def_list_mark(&mut self, token: Token, asg: &mut Asg) {}
+    //fn parse_bold(&mut self, token: Token, asg: &mut Asg) {}
+    //fn parse_italic(&mut self, token: Token, asg: &mut Asg) {}
+    //fn parse_monospace(&mut self, token: Token, asg: &mut Asg) {}
+    //fn parse_superscript(&mut self, token: Token, asg: &mut Asg) {}
+    //fn parse_subscript(&mut self, token: Token, asg: &mut Asg) {}
+    //fn parse_highlighted(&mut self, token: Token, asg: &mut Asg) {}
+    //fn parse_link_macro(&mut self, token: Token, asg: &mut Asg) {}
+    //fn parse_footnote_macro(&mut self, token: Token, asg: &mut Asg) {}
+    //fn parse_passthrough_inline_macro(&mut self, token: Token, asg: &mut Asg) {}
+    //fn parse_inline_macro_close(&mut self, token: Token, asg: &mut Asg) {}
+    //fn parse_eof(&mut self, token: Token, asg: &mut Asg) {}
+    //fn parse_inline_style(&mut self, token: Token, asg: &mut Asg) {}
 
-    fn parse_comment_block(&mut self, token: Token, asg: &mut Asg) {}
-
-    fn parse_admonition_block(&mut self, token: Token, asg: &mut Asg) {}
-
-    fn parse_open_block(&mut self, token: Token, asg: &mut Asg) {}
-
-    fn parse_ordered_list_item(&mut self, token: Token, asg: &mut Asg) {}
-
-    fn parse_unordered_list_item(&mut self, token: Token, asg: &mut Asg) {}
-
-    fn parse_block_label(&mut self, token: Token, asg: &mut Asg) {}
-
-    fn parse_heading1(&mut self, token: Token, asg: &mut Asg) {}
-
-    fn parse_heading2(&mut self, token: Token, asg: &mut Asg) {}
-
-    fn parse_heading3(&mut self, token: Token, asg: &mut Asg) {}
-
-    fn parse_heading4(&mut self, token: Token, asg: &mut Asg) {}
-
-    fn parse_heading5(&mut self, token: Token, asg: &mut Asg) {}
-
-    fn parse_blockquote(&mut self, token: Token, asg: &mut Asg) {}
-
-    fn parse_verse(&mut self, token: Token, asg: &mut Asg) {}
-
-    fn parse_source(&mut self, token: Token, asg: &mut Asg) {}
-
-    fn parse_note(&mut self, token: Token, asg: &mut Asg) {}
-
-    fn parse_tip(&mut self, token: Token, asg: &mut Asg) {}
-
-    fn parse_important(&mut self, token: Token, asg: &mut Asg) {}
-
-    fn parse_caution(&mut self, token: Token, asg: &mut Asg) {}
-
-    fn parse_warning(&mut self, token: Token, asg: &mut Asg) {}
-
-    fn parse_block_continuation(&mut self, token: Token, asg: &mut Asg) {}
-
-    fn parse_def_list_mark(&mut self, token: Token, asg: &mut Asg) {}
-
-    fn parse_bold(&mut self, token: Token, asg: &mut Asg) {}
-
-    fn parse_italic(&mut self, token: Token, asg: &mut Asg) {}
-
-    fn parse_monospace(&mut self, token: Token, asg: &mut Asg) {}
-
-    fn parse_superscript(&mut self, token: Token, asg: &mut Asg) {}
-
-    fn parse_subscript(&mut self, token: Token, asg: &mut Asg) {}
-
-    fn parse_highlighted(&mut self, token: Token, asg: &mut Asg) {}
-
-    fn parse_link_macro(&mut self, token: Token, asg: &mut Asg) {}
-
-    fn parse_footnote_macro(&mut self, token: Token, asg: &mut Asg) {}
-
-    fn parse_passthrough_inline_macro(&mut self, token: Token, asg: &mut Asg) {}
-
-    fn parse_inline_macro_close(&mut self, token: Token, asg: &mut Asg) {}
-
-    fn parse_text(&mut self, token: Token, asg: &mut Asg) {
+    fn parse_text(&mut self, token: Token) {
         self.add_inline_to_block_stack(Inline::InlineLiteral(InlineLiteral::new_text_from_token(
             &token,
         )))
     }
-
-    fn parse_eof(&mut self, token: Token, asg: &mut Asg) {}
-
-    fn parse_inline_style(&mut self, token: Token, asg: &mut Asg) {}
 
     fn handle_delimited_leaf_block(&mut self, asg: &mut Asg, block: LeafBlock) {
         if let Some(open_block) = self.open_blocks.last_mut() {
