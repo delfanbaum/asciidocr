@@ -1,3 +1,6 @@
+use core::panic;
+use std::fmt::Display;
+
 use serde::Serialize;
 
 use crate::nodes::{Location, NodeTypes};
@@ -7,6 +10,27 @@ pub enum Inline {
     InlineSpan(InlineSpan),
     InlineRef(InlineRef),
     InlineLiteral(InlineLiteral),
+}
+
+impl Display for Inline {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Inline::InlineSpan(_) => write!(f, "InlineSpan"),
+            Inline::InlineRef(_) => write!(f, "InlineRef"),
+            Inline::InlineLiteral(_) => write!(f, "InlineLiteral"),
+        }
+    }
+}
+
+impl Inline {
+    pub fn push_inline(&mut self, child: Inline) {
+        match self {
+            Inline::InlineSpan(span) => {
+                span.inlines.push(child)
+            }
+            _ => panic!("Inlines of type {} do not accept child inlines!", &self)
+        }
+    }
 }
 
 #[derive(Serialize)]

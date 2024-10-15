@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, fmt::Display};
 
 use serde::Serialize;
 
@@ -7,24 +7,57 @@ use crate::{
     nodes::{Location, NodeTypes},
 };
 
-pub enum _ToFindHomesFor {
-    SectionBody,
-    NonSectionBlockBody,
-}
+pub enum _ToFindHomesFor {}
 
 #[derive(Serialize)]
 pub enum Block {
     Section, // sort of a special case but prob needs to be included here
+    SectionBody,
+    NonSectionBlockBody,
     List(List),
     ListItem(ListItem),
     DList(DList),
     DListItem(DListItem),
-    //DiscreteHeading(DiscreteHeading),
+    DiscreteHeading, // not handled currently
     Break(Break),
     BlockMacro(BlockMacro),
     LeafBlock(LeafBlock),
     ParentBlock(ParentBlock), // Admonitions are hiding in here
     BlockMetadata(BlockMetadata),
+}
+
+impl Display for Block {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Block::Section => write!(f, "Section"),
+            Block::SectionBody => write!(f, "SectionBody"),
+            Block::NonSectionBlockBody => write!(f, "NonSectionBlockBody"),
+            Block::List(_) => write!(f, "List"),
+            Block::ListItem(_) => write!(f, "ListItem"),
+            Block::DList(_) => write!(f, "DList"),
+            Block::DListItem(_) => write!(f, "DListItem"),
+            Block::DiscreteHeading => write!(f, "DiscreteHeading"),
+            Block::Break(_) => write!(f, "Break"),
+            Block::BlockMacro(_) => write!(f, "BlockMacro"),
+            Block::LeafBlock(_) => write!(f, "LeafBlock"),
+            Block::ParentBlock(_) => write!(f, "ParentBlock"),
+            Block::BlockMetadata(_) => write!(f, "BlockMetadata"),
+        }
+    }
+}
+
+impl Block {
+    pub fn push_block(&mut self, _child: Block) {
+        match self {
+            _ => panic!("push_block not implemented for {}", self),
+        }
+    }
+
+    pub fn push_inline(&mut self, _child: Inline) {
+        match self {
+            _ => panic!("push_block not implemented for {}", self),
+        }
+    }
 }
 
 #[derive(Serialize)]
