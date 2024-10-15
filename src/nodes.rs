@@ -29,7 +29,7 @@ pub struct Author {
 }
 
 /// A "location" pertaining to a given document object, usually the start or end of something
-#[derive(Serialize)]
+#[derive(Serialize, Clone)]
 pub struct Location {
     pub line: usize, // 1-indexed
     pub col: usize,  // 1-indexed

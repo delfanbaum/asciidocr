@@ -3,7 +3,10 @@ use std::fmt::Display;
 
 use serde::Serialize;
 
-use crate::nodes::{Location, NodeTypes};
+use crate::{
+    nodes::{Location, NodeTypes},
+    tokens::Token,
+};
 
 #[derive(Serialize)]
 pub enum Inline {
@@ -25,10 +28,15 @@ impl Display for Inline {
 impl Inline {
     pub fn push_inline(&mut self, child: Inline) {
         match self {
-            Inline::InlineSpan(span) => {
-                span.inlines.push(child)
-            }
-            _ => panic!("Inlines of type {} do not accept child inlines!", &self)
+            Inline::InlineSpan(span) => span.inlines.push(child),
+            _ => panic!("Inlines of type {} do not accept child inlines!", &self),
+        }
+    }
+    pub fn locations(&self) -> Vec<Location> {
+        match &self {
+            Inline::InlineSpan(span) => span.location.clone(),
+            Inline::InlineRef(iref) => iref.location.clone(),
+            Inline::InlineLiteral(lit) => lit.location.clone(),
         }
     }
 }
@@ -45,7 +53,11 @@ pub struct InlineSpan {
 }
 
 impl InlineSpan {
-    fn new(variant: InlineSpanVariant, node_form: InlineSpanForm, location: Vec<Location>) -> Self {
+    pub fn new(
+        variant: InlineSpanVariant,
+        node_form: InlineSpanForm,
+        location: Vec<Location>,
+    ) -> Self {
         InlineSpan {
             name: "span".to_string(),
             node_type: NodeTypes::Inline,
@@ -84,7 +96,7 @@ pub struct InlineRef {
 }
 
 impl InlineRef {
-    fn new(variant: InlineRefVariant, target: String, location: Vec<Location>) -> Self {
+    pub fn new(variant: InlineRefVariant, target: String, location: Vec<Location>) -> Self {
         InlineRef {
             name: "ref".to_string(),
             node_type: NodeTypes::Inline,
@@ -112,13 +124,17 @@ pub struct InlineLiteral {
 }
 
 impl InlineLiteral {
-    fn new(name: InlineLiteralName, value: String, location: Vec<Location>) -> Self {
+    pub fn new(name: InlineLiteralName, value: String, location: Vec<Location>) -> Self {
         InlineLiteral {
             name,
             node_type: NodeTypes::String,
             value,
             location,
         }
+    }
+
+    pub fn new_text_from_token(token: &Token) -> Self {
+        InlineLiteral::new(InlineLiteralName::Text, token.text(), token.locations())
     }
 }
 
