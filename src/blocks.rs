@@ -9,21 +9,21 @@ use crate::{
 
 pub enum _ToFindHomesFor {}
 
-#[derive(Serialize)]
+#[derive(Serialize, PartialEq)]
 pub enum Block {
     Section, // sort of a special case but prob needs to be included here
     SectionBody,
     NonSectionBlockBody,
     List(List),
-    ListItem(ListItem),
+    //ListItem(ListItem), // not sure we ever deal with this as a "block"
     DList(DList),
-    DListItem(DListItem),
+    //DListItem(DListItem), // ditto listitem
     DiscreteHeading, // not handled currently
     Break(Break),
     BlockMacro(BlockMacro),
     LeafBlock(LeafBlock),
     ParentBlock(ParentBlock), // Admonitions are hiding in here
-    BlockMetadata(BlockMetadata),
+                              //BlockMetadata(BlockMetadata),
 }
 
 impl Display for Block {
@@ -33,29 +33,59 @@ impl Display for Block {
             Block::SectionBody => write!(f, "SectionBody"),
             Block::NonSectionBlockBody => write!(f, "NonSectionBlockBody"),
             Block::List(_) => write!(f, "List"),
-            Block::ListItem(_) => write!(f, "ListItem"),
+            //Block::ListItem(_) => write!(f, "ListItem"),
             Block::DList(_) => write!(f, "DList"),
-            Block::DListItem(_) => write!(f, "DListItem"),
+            //Block::DListItem(_) => write!(f, "DListItem"),
             Block::DiscreteHeading => write!(f, "DiscreteHeading"),
             Block::Break(_) => write!(f, "Break"),
             Block::BlockMacro(_) => write!(f, "BlockMacro"),
             Block::LeafBlock(_) => write!(f, "LeafBlock"),
             Block::ParentBlock(_) => write!(f, "ParentBlock"),
-            Block::BlockMetadata(_) => write!(f, "BlockMetadata"),
+            //Block::BlockMetadata(_) => write!(f, "BlockMetadata"),
         }
     }
 }
 
 impl Block {
-    pub fn push_block(&mut self, child: &mut Block) {
+    pub fn push_block(&mut self, _child: Block) {
         match self {
             _ => panic!("push_block not implemented for {}", self),
         }
     }
 
-    pub fn push_inline(&mut self, _child: Inline) {
+    pub fn push_inline(&mut self, inline: Inline) {
         match self {
+            Block::LeafBlock(block) => block.inlines.push(inline),
             _ => panic!("push_block not implemented for {}", self),
+        }
+    }
+
+    pub fn consolidate_inlines(&mut self) {
+        match self {
+            Block::LeafBlock(block) => {
+                let mut consolidated: Vec<Inline> = vec![];
+                while let Some(mut inline) = block.inlines.pop() {
+                    if inline.is_literal() {
+                        if let Some(prev_inline) = consolidated.last_mut() {
+                            println!("Inline: {:?}", inline);
+                            if prev_inline.is_literal() {
+                                let extracted_inline = inline.extract_literal();
+                                prev_inline.prepend_literal(extracted_inline)
+                            }
+                        } else {
+                            consolidated.push(inline);
+                            println!("{:?}", consolidated);
+                        }
+                    } else {
+                        consolidated.push(inline);
+                    }
+                }
+                // reverse the list
+                consolidated.reverse();
+                // replace the inlines
+                block.inlines = consolidated;
+            }
+            _ => {}
         }
     }
 }
@@ -71,6 +101,12 @@ pub struct List {
     location: Vec<Location>,
 }
 
+impl PartialEq for List {
+    fn eq(&self, other: &Self) -> bool {
+        self.variant == other.variant
+    }
+}
+
 impl List {
     pub fn new(variant: ListVariant, marker: String, location: Vec<Location>) -> Self {
         List {
@@ -84,7 +120,7 @@ impl List {
     }
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, PartialEq, Eq)]
 pub enum ListVariant {
     Callout,
     Ordered,
@@ -127,6 +163,13 @@ pub struct DList {
     marker: String,
     items: Vec<ListItem>,
     location: Vec<Location>,
+}
+
+impl PartialEq for DList {
+    // all dlists are dlists
+    fn eq(&self, _: &Self) -> bool {
+        true
+    }
 }
 
 impl DList {
@@ -182,7 +225,13 @@ pub struct Break {
     location: Vec<Location>,
 }
 
-#[derive(Serialize)]
+impl PartialEq for Break {
+    fn eq(&self, other: &Self) -> bool {
+        self.variant == other.variant
+    }
+}
+
+#[derive(Serialize, PartialEq, Eq)]
 pub enum BreakVariant {
     Page,
     Thematic,
@@ -209,7 +258,13 @@ pub struct BlockMacro {
     location: Vec<Location>,
 }
 
-#[derive(Serialize)]
+impl PartialEq for BlockMacro {
+    fn eq(&self, other: &Self) -> bool {
+        self.name == other.name
+    }
+}
+
+#[derive(Serialize, PartialEq)]
 pub enum BlockMacroName {
     Audio,
     Video,
@@ -231,7 +286,7 @@ impl BlockMacro {
 
 #[derive(Serialize)]
 pub struct LeafBlock {
-    name: LeafBlockName,
+    pub name: LeafBlockName,
     #[serde(rename = "type")]
     node_type: NodeTypes,
     form: LeafBlockForm,
@@ -241,14 +296,14 @@ pub struct LeafBlock {
     location: Vec<Location>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, PartialEq)]
 pub enum LeafBlockName {
     Listing,
-    Literal,
+    Literal, // TK not handling now
     Paragraph,
     Pass,
-    Stem,
-    Verse,
+    Stem,  // TK not handling now
+    Verse, // TK need to figure handling for quotes
 }
 #[derive(Serialize)]
 pub enum LeafBlockForm {
@@ -257,13 +312,20 @@ pub enum LeafBlockForm {
     Paragraph,
 }
 
+impl PartialEq for LeafBlock {
+    fn eq(&self, other: &Self) -> bool {
+        self.name == other.name
+    }
+}
+
 impl LeafBlock {
     pub fn new(
+        // note that the locations must be calculated later
         name: LeafBlockName,
         form: LeafBlockForm,
         delimiter: Option<String>, // if it's a delimited block, then we provide the delimiter
-        inlines: Vec<Inline>,
         location: Vec<Location>,
+        inlines: Vec<Inline>,
     ) -> Self {
         LeafBlock {
             name,
@@ -274,12 +336,34 @@ impl LeafBlock {
             location,
         }
     }
+    pub fn new_listing(delimiter: Option<String>, start_location: Location) -> Self {
+        Self::new(
+            LeafBlockName::Listing,
+            LeafBlockForm::Delimited,
+            delimiter,
+            vec![start_location],
+            vec![],
+        )
+    }
+    pub fn new_pass(
+        // note that the locations must be calculated later
+        delimiter: Option<String>, // if it's a delimited block, then we provide the delimiter
+        start_location: Location,
+    ) -> Self {
+        Self::new(
+            LeafBlockName::Pass,
+            LeafBlockForm::Delimited,
+            delimiter,
+            vec![start_location],
+            vec![],
+        )
+    }
 }
 
 #[derive(Serialize)]
 pub struct ParentBlock {
     name: ParentBlockName,
-    variant: ParetnBlockVarient,
+    variant: Option<ParentBlockVarient>,
     #[serde(rename = "type")]
     node_type: NodeTypes,
     form: String,
@@ -288,7 +372,21 @@ pub struct ParentBlock {
     location: Vec<Location>,
 }
 
-#[derive(Serialize)]
+impl PartialEq for ParentBlock {
+    fn eq(&self, other: &Self) -> bool {
+        if let Some(variant) = &self.variant {
+            if let Some(other_variant) = &other.variant {
+                variant == other_variant && &self.name == &other.name
+            } else {
+                false
+            }
+        } else {
+            self.name == other.name
+        }
+    }
+}
+
+#[derive(Serialize, PartialEq)]
 pub enum ParentBlockName {
     Admonition,
     Example,
@@ -297,8 +395,8 @@ pub enum ParentBlockName {
     Quote,
 }
 
-#[derive(Serialize)]
-pub enum ParetnBlockVarient {
+#[derive(Serialize, PartialEq)]
+pub enum ParentBlockVarient {
     Caution,
     Important,
     Note,
@@ -309,10 +407,9 @@ pub enum ParetnBlockVarient {
 impl ParentBlock {
     pub fn new(
         name: ParentBlockName,
-        variant: ParetnBlockVarient,
+        variant: Option<ParentBlockVarient>,
         delimiter: String, // if it's a delimited block, then we provide the delimiter
         blocks: Vec<Block>,
-        location: Vec<Location>,
     ) -> Self {
         ParentBlock {
             name,
@@ -321,7 +418,7 @@ impl ParentBlock {
             form: "delimited".to_string(),
             delimiter,
             blocks,
-            location,
+            location: vec![],
         }
     }
 }

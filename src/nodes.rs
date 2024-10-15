@@ -2,7 +2,7 @@ use serde::Serialize;
 
 use crate::inlines::Inline;
 
-#[derive(Clone, Copy, Serialize)]
+#[derive(Clone, Copy, Serialize, Debug)]
 pub enum NodeTypes {
     Block,
     Inline,
@@ -10,7 +10,7 @@ pub enum NodeTypes {
 }
 
 /// Struct containing document header information
-#[derive(Serialize)]
+#[derive(Serialize, Debug)]
 pub struct Header {
     title: Vec<Inline>,
     authors: Option<Vec<Author>>,
@@ -18,7 +18,7 @@ pub struct Header {
 }
 
 /// Struct containing document author information
-#[derive(Serialize)]
+#[derive(Serialize, Debug)]
 pub struct Author {
     fullname: String,
     initials: String,
@@ -29,7 +29,7 @@ pub struct Author {
 }
 
 /// A "location" pertaining to a given document object, usually the start or end of something
-#[derive(Serialize)]
+#[derive(Serialize, Clone, Debug)]
 pub struct Location {
     pub line: usize, // 1-indexed
     pub col: usize,  // 1-indexed

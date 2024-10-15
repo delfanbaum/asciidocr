@@ -48,19 +48,30 @@ impl Token {
         self.token_type
     }
 
+    pub fn text(&self) -> String {
+        if let Some(text) = &self.literal {
+            text.clone()
+        } else {
+            self.lexeme.clone()
+        }
+    }
+
+    pub fn first_location(&self) -> Location {
+        Location {
+            line: self.line,
+            col: self.startcol,
+            file: None,
+        }
+    }
+    pub fn last_location(&self) -> Location {
+        Location {
+            line: self.line,
+            col: self.endcol,
+            file: None,
+        }
+    }
     pub fn locations(&self) -> Vec<Location> {
-        vec![
-            Location {
-                line: self.line,
-                col: self.startcol,
-                file: None,
-            },
-            Location {
-                line: self.line,
-                col: self.endcol,
-                file: None,
-            },
-        ]
+        vec![self.first_location(), self.last_location()]
     }
 }
 
