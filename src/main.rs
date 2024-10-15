@@ -16,6 +16,6 @@ fn main() {
 fn run(file_path: String) {
     let source =
         fs::read_to_string(&file_path).expect(&format!("Unable to read file: {}", file_path));
-    let serialized = serde_json::to_string(&Parser::new().parse(Scanner::new(&source)));
+    let serialized = serde_json::to_string_pretty(&Parser::new().parse(Scanner::new(&source)));
     println!("{}", serialized.unwrap());
 }

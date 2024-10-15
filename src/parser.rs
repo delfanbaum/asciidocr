@@ -33,7 +33,7 @@ impl Parser {
         }
         // TODO get last location in tree -- and other cleanup, probably an asg.consolidate() or
         // something
-
+        asg.consolidate();
         asg
     }
 

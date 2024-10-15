@@ -45,6 +45,12 @@ impl Asg {
         self.blocks.push(block)
     }
 
+    pub fn consolidate(&mut self) {
+        for block in self.blocks.iter_mut() {
+            block.consolidate_inlines()
+        }
+    }
+
     pub fn is_valid(&self) -> bool {
         // more TK
         self.location.len() == 2

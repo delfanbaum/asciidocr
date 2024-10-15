@@ -8,7 +8,7 @@ use crate::{
     tokens::Token,
 };
 
-#[derive(Serialize)]
+#[derive(Serialize, Debug)]
 pub enum Inline {
     InlineSpan(InlineSpan),
     InlineRef(InlineRef),
@@ -39,9 +39,39 @@ impl Inline {
             Inline::InlineLiteral(lit) => lit.location.clone(),
         }
     }
+
+    pub fn is_literal(&self) -> bool {
+        match &self {
+            Inline::InlineLiteral(_) => true,
+            _ => false,
+        }
+    }
+
+    pub fn extract_literal(&mut self) -> InlineLiteral {
+        match &self {
+            Inline::InlineLiteral(literal) => literal.clone(),
+            _ => panic!("Tried to extract an inline literal from the wrong Inline"),
+        }
+    }
+
+    pub fn prepend_literal(&mut self, preceding_literal: InlineLiteral) {
+        match self {
+            Inline::InlineLiteral(literal) => {
+                // combine values
+                literal.value.insert_str(0, &preceding_literal.value);
+                // combine locations
+                if let Some(end_location) = literal.location.pop() {
+                    literal.location = vec![preceding_literal.location[0].clone(), end_location]
+                } else {
+                    literal.location = preceding_literal.location.clone()
+                }
+            }
+            _ => panic!("Tried to prepend an inline literal to the wrong Inline"),
+        }
+    }
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Debug)]
 pub struct InlineSpan {
     name: String,
     #[serde(rename = "type")]
@@ -69,7 +99,7 @@ impl InlineSpan {
     }
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Debug)]
 pub enum InlineSpanVariant {
     Strong,
     Emphasis,
@@ -77,14 +107,14 @@ pub enum InlineSpanVariant {
     Mark,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Debug)]
 pub enum InlineSpanForm {
     Constrainted,
     Unconstrainted,
 }
 
 // REFS NOT CURRENTLY SUPPORTED, this is just saving future work
-#[derive(Serialize)]
+#[derive(Serialize, Debug)]
 pub struct InlineRef {
     name: String,
     #[serde(rename = "type")]
@@ -108,13 +138,13 @@ impl InlineRef {
     }
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Debug)]
 pub enum InlineRefVariant {
     Link,
     Xref,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Clone, Debug)]
 pub struct InlineLiteral {
     name: InlineLiteralName,
     #[serde(rename = "type")]
@@ -138,7 +168,7 @@ impl InlineLiteral {
     }
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Clone, Debug)]
 pub enum InlineLiteralName {
     Text,
     Charref,

@@ -59,6 +59,35 @@ impl Block {
             _ => panic!("push_block not implemented for {}", self),
         }
     }
+
+    pub fn consolidate_inlines(&mut self) {
+        match self {
+            Block::LeafBlock(block) => {
+                let mut consolidated: Vec<Inline> = vec![];
+                while let Some(mut inline) = block.inlines.pop() {
+                    if inline.is_literal() {
+                        if let Some(prev_inline) = consolidated.last_mut() {
+                            println!("Inline: {:?}", inline);
+                            if prev_inline.is_literal() {
+                                let extracted_inline = inline.extract_literal();
+                                prev_inline.prepend_literal(extracted_inline)
+                            }
+                        } else {
+                            consolidated.push(inline);
+                            println!("{:?}", consolidated);
+                        }
+                    } else {
+                        consolidated.push(inline);
+                    }
+                }
+                // reverse the list
+                consolidated.reverse();
+                // replace the inlines
+                block.inlines = consolidated;
+            }
+            _ => {}
+        }
+    }
 }
 
 #[derive(Serialize)]
@@ -273,7 +302,7 @@ pub enum LeafBlockName {
     Literal, // TK not handling now
     Paragraph,
     Pass,
-    Stem, // TK not handling now
+    Stem,  // TK not handling now
     Verse, // TK need to figure handling for quotes
 }
 #[derive(Serialize)]
