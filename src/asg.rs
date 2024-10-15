@@ -2,10 +2,8 @@ use std::collections::HashMap;
 
 use serde::Serialize;
 
-use crate::nodes::{Location, NodeTypes};
-use crate::inlines::Inline;
 use crate::blocks::Block;
-
+use crate::nodes::{Header, Location, NodeTypes};
 
 /// Abstract Syntax Graph used to represent an asciidoc document
 /// roughly meaning to follow the "official" schema:
@@ -13,9 +11,9 @@ use crate::blocks::Block;
 #[derive(Serialize)]
 pub struct Asg {
     // abstract syntax graph
-    pub name: String,                        // is this always "Document?"
+    pub name: String, // is this always "Document?"
     #[serde(rename = "type")]
-    pub node_type: NodeTypes,                // is this always "block"
+    pub node_type: NodeTypes, // is this always "block"
     pub attributes: HashMap<String, String>, // the value can also be a bool; deal with this later
     pub header: Option<Header>,
     pub blocks: Vec<Block>,
@@ -38,26 +36,17 @@ impl Asg {
         }
     }
 
+    pub fn add_header(&mut self, header: Header) {
+        self.header = Some(header)
+    }
+
+    /// Adds a block (tree) to the "root" of the document
+    pub fn push_block(&mut self, block: Block) {
+        self.blocks.push(block)
+    }
+
     pub fn is_valid(&self) -> bool {
         // more TK
         self.location.len() == 2
     }
 }
-
-#[derive(Serialize)]
-pub struct Header {
-    title: Vec<Inline>,
-    authors: Option<Vec<Author>>,
-    location: Vec<Location>,
-}
-
-#[derive(Serialize)]
-pub struct Author {
-    fullname: String,
-    initials: String,
-    firstname: String,
-    middlename: String,
-    lastname: String,
-    address: String,
-}
-

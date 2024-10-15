@@ -1,10 +1,31 @@
 use serde::Serialize;
 
+use crate::inlines::Inline;
+
 #[derive(Clone, Copy, Serialize)]
 pub enum NodeTypes {
     Block,
     Inline,
     String,
+}
+
+/// Struct containing document header information
+#[derive(Serialize)]
+pub struct Header {
+    title: Vec<Inline>,
+    authors: Option<Vec<Author>>,
+    location: Vec<Location>,
+}
+
+/// Struct containing document author information
+#[derive(Serialize)]
+pub struct Author {
+    fullname: String,
+    initials: String,
+    firstname: String,
+    middlename: String,
+    lastname: String,
+    address: String,
 }
 
 /// A "location" pertaining to a given document object, usually the start or end of something

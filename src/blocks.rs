@@ -47,7 +47,7 @@ impl Display for Block {
 }
 
 impl Block {
-    pub fn push_block(&mut self, _child: Block) {
+    pub fn push_block(&mut self, child: &mut Block) {
         match self {
             _ => panic!("push_block not implemented for {}", self),
         }
@@ -72,7 +72,7 @@ pub struct List {
 }
 
 impl List {
-    fn new(variant: ListVariant, marker: String, location: Vec<Location>) -> Self {
+    pub fn new(variant: ListVariant, marker: String, location: Vec<Location>) -> Self {
         List {
             name: "list".to_string(),
             node_type: NodeTypes::Block,
@@ -102,7 +102,7 @@ pub struct ListItem {
 }
 
 impl ListItem {
-    fn new(
+    pub fn new(
         marker: String,
         principal: Option<Vec<Inline>>,
         blocks: Option<Vec<Block>>,
@@ -130,7 +130,7 @@ pub struct DList {
 }
 
 impl DList {
-    fn new(marker: String, location: Vec<Location>) -> Self {
+    pub fn new(marker: String, location: Vec<Location>) -> Self {
         DList {
             name: "dlist".to_string(),
             node_type: NodeTypes::Block,
@@ -154,7 +154,7 @@ pub struct DListItem {
 }
 
 impl DListItem {
-    fn new(
+    pub fn new(
         marker: String,
         terms: Vec<Inline>,
         principal: Option<Vec<Inline>>,
@@ -189,7 +189,7 @@ pub enum BreakVariant {
 }
 
 impl Break {
-    fn new(variant: BreakVariant, location: Vec<Location>) -> Self {
+    pub fn new(variant: BreakVariant, location: Vec<Location>) -> Self {
         Break {
             name: "break".to_string(),
             node_type: NodeTypes::Block,
@@ -218,7 +218,7 @@ pub enum BlockMacroName {
 }
 
 impl BlockMacro {
-    fn new(name: BlockMacroName, target: String, location: Vec<Location>) -> Self {
+    pub fn new(name: BlockMacroName, target: String, location: Vec<Location>) -> Self {
         BlockMacro {
             name,
             node_type: NodeTypes::Block,
@@ -258,7 +258,7 @@ pub enum LeafBlockForm {
 }
 
 impl LeafBlock {
-    fn new(
+    pub fn new(
         name: LeafBlockName,
         form: LeafBlockForm,
         delimiter: Option<String>, // if it's a delimited block, then we provide the delimiter
@@ -307,7 +307,7 @@ pub enum ParetnBlockVarient {
 }
 
 impl ParentBlock {
-    fn new(
+    pub fn new(
         name: ParentBlockName,
         variant: ParetnBlockVarient,
         delimiter: String, // if it's a delimited block, then we provide the delimiter
