@@ -3,6 +3,7 @@ use serde::Serialize;
 use crate::inlines::Inline;
 
 #[derive(Clone, Copy, Serialize, Debug)]
+#[serde(rename_all = "lowercase")]
 pub enum NodeTypes {
     Block,
     Inline,
@@ -13,6 +14,7 @@ pub enum NodeTypes {
 #[derive(Serialize, Clone, Debug)]
 pub struct Header {
     pub title: Vec<Inline>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub authors: Option<Vec<Author>>,
     pub location: Vec<Location>,
 }
@@ -28,6 +30,12 @@ impl Header {
 
     pub fn is_empty(&self) -> bool {
         self.title.is_empty() && self.authors.is_none()
+    }
+
+    pub fn consolidate(&mut self) {
+        if let Some(last_inline) = self.title.last_mut() {
+            self.location = Location::reconcile(self.location.clone(), last_inline.locations())
+        }
     }
 }
 
@@ -95,7 +103,7 @@ impl Location {
         start.extend(other);
         start.sort();
         // remove the middle
-        start.drain(1..start.len()-1);
+        start.drain(1..start.len() - 1);
         start
     }
 }

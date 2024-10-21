@@ -84,6 +84,17 @@ impl Inline {
             _ => panic!("Tried to prepend an inline literal to the wrong Inline"),
         }
     }
+
+    pub fn trim(&mut self) {
+        match self {
+            Inline::InlineLiteral(inline) => {
+                inline.value = inline.value.trim().to_string();
+                println!("{:?}", inline.value)
+            }
+            _ => {}
+        }
+
+    }
 }
 
 #[derive(Serialize, Clone, Debug)]
@@ -112,9 +123,14 @@ impl InlineSpan {
             location,
         }
     }
+    pub fn add_inline(&mut self, inline: Inline) {
+        self.location = Location::reconcile(self.location.clone(), inline.locations());
+        self.inlines.push(inline);
+    }
 }
 
 #[derive(Serialize, Clone, Debug)]
+#[serde(rename_all = "lowercase")]
 pub enum InlineSpanVariant {
     Strong,
     Emphasis,
@@ -123,6 +139,7 @@ pub enum InlineSpanVariant {
 }
 
 #[derive(Serialize, Clone, Debug)]
+#[serde(rename_all = "lowercase")]
 pub enum InlineSpanForm {
     Constrainted,
     Unconstrainted,
@@ -154,6 +171,7 @@ impl InlineRef {
 }
 
 #[derive(Serialize, Clone, Debug)]
+#[serde(rename_all = "lowercase")]
 pub enum InlineRefVariant {
     Link,
     Xref,
@@ -181,9 +199,15 @@ impl InlineLiteral {
     pub fn new_text_from_token(token: &Token) -> Self {
         InlineLiteral::new(InlineLiteralName::Text, token.text(), token.locations())
     }
+
+    pub fn add_text_from_token(&mut self, token: &Token) {
+        self.value.push_str(&token.text());
+        self.location = Location::reconcile(self.location.clone(), token.locations());
+    }
 }
 
 #[derive(Serialize, Clone, Debug)]
+#[serde(rename_all = "lowercase")]
 pub enum InlineLiteralName {
     Text,
     Charref,

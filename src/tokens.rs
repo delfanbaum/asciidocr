@@ -57,18 +57,10 @@ impl Token {
     }
 
     pub fn first_location(&self) -> Location {
-        Location {
-            line: self.line,
-            col: self.startcol,
-            file: None,
-        }
+        Location::new(self.line, self.startcol)
     }
     pub fn last_location(&self) -> Location {
-        Location {
-            line: self.line,
-            col: self.endcol,
-            file: None,
-        }
+        Location::new(self.line, self.endcol)
     }
     pub fn locations(&self) -> Vec<Location> {
         vec![self.first_location(), self.last_location()]

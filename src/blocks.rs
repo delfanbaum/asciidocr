@@ -48,6 +48,13 @@ impl Display for Block {
 }
 
 impl Block {
+    pub fn last_inline(&mut self) -> Option<&mut Inline> {
+        match self {
+            Block::LeafBlock(block) => Some(block.inlines.last_mut()?),
+            _ => None,
+        }
+    }
+
     pub fn push_block(&mut self, block: Block) {
         match self {
             Block::Section(section) => section.blocks.push(block),
@@ -55,6 +62,13 @@ impl Block {
         }
     }
 
+    pub fn takes_inlines(&self) -> bool {
+        match self {
+            Block::Section(_) => true,
+            Block::LeafBlock(_) => true,
+            _ => false,
+        }
+    }
     pub fn push_inline(&mut self, inline: Inline) {
         match self {
             Block::Section(section) => section.title.push(inline),
@@ -63,55 +77,21 @@ impl Block {
         }
     }
 
-    pub fn consolidate_inlines(&mut self) {
+    pub fn consolidate_locations(&mut self) {
         match self {
-            Block::Section(section) => {
-                // consolidate title
-                let mut consolidated: Vec<Inline> = vec![];
-                while let Some(mut inline) = section.title.pop() {
-                    if inline.is_literal() {
-                        if let Some(prev_inline) = consolidated.last_mut() {
-                            if prev_inline.is_literal() {
-                                let extracted_inline = inline.extract_literal();
-                                prev_inline.prepend_literal(extracted_inline)
-                            }
-                        } else {
-                            consolidated.push(inline);
-                        }
-                    } else {
-                        consolidated.push(inline);
-                    }
-                }
-                // reverse the list
-                consolidated.reverse();
-                // replace the title
-                section.title = consolidated;
-
-                // consolidate everything else
-                for block in section.blocks.iter_mut() {
-                    block.consolidate_inlines()
+            Block::LeafBlock(block) => {
+                if let Some(last_inline) = block.inlines.last() {
+                    block.location =
+                        Location::reconcile(block.location.clone(), last_inline.locations())
                 }
             }
+            _ => {}
+        }
+    }
+    pub fn trim_literals(&mut self) {
+        match self {
             Block::LeafBlock(block) => {
-                let mut consolidated: Vec<Inline> = vec![];
-                while let Some(mut inline) = block.inlines.pop() {
-                    if inline.is_literal() {
-                        if let Some(prev_inline) = consolidated.last_mut() {
-                            if prev_inline.is_literal() {
-                                let extracted_inline = inline.extract_literal();
-                                prev_inline.prepend_literal(extracted_inline)
-                            }
-                        } else {
-                            consolidated.push(inline);
-                        }
-                    } else {
-                        consolidated.push(inline);
-                    }
-                }
-                // reverse the list
-                consolidated.reverse();
-                // replace the inlines
-                block.inlines = consolidated;
+                let _ = block.inlines.iter_mut().for_each(|i| i.trim());
             }
             _ => {}
         }
@@ -151,6 +131,23 @@ impl Block {
                 }
             }
             _ => {}
+        }
+    }
+
+    pub fn locations(&self) -> Vec<Location> {
+        match self {
+            Block::Section(block) => block.location.clone(),
+            Block::SectionBody => vec![],
+            Block::NonSectionBlockBody => vec![],
+            Block::List(block) => block.location.clone(),
+            //Block::ListItem(_) => write!(f, "ListItem"),
+            Block::DList(block) => block.location.clone(),
+            //Block::DListItem(_) => write!(f, "DListItem"),
+            Block::DiscreteHeading => vec![],
+            Block::Break(block) => block.location.clone(),
+            Block::BlockMacro(block) => block.location.clone(),
+            Block::LeafBlock(block) => block.location.clone(),
+            Block::ParentBlock(block) => block.location.clone(),
         }
     }
 }
@@ -223,6 +220,7 @@ impl List {
 }
 
 #[derive(Serialize, PartialEq, Eq, Debug)]
+#[serde(rename_all = "lowercase")]
 pub enum ListVariant {
     Callout,
     Ordered,
@@ -334,6 +332,7 @@ impl PartialEq for Break {
 }
 
 #[derive(Serialize, Debug, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
 pub enum BreakVariant {
     Page,
     Thematic,
@@ -367,6 +366,7 @@ impl PartialEq for BlockMacro {
 }
 
 #[derive(Serialize, PartialEq, Debug)]
+#[serde(rename_all = "lowercase")]
 pub enum BlockMacroName {
     Audio,
     Video,
@@ -391,7 +391,9 @@ pub struct LeafBlock {
     pub name: LeafBlockName,
     #[serde(rename = "type")]
     node_type: NodeTypes,
+    #[serde(skip_serializing_if = "LeafBlockForm::is_paragraph")]
     form: LeafBlockForm,
+    #[serde(skip_serializing_if = "Option::is_none")]
     delimiter: Option<String>, // if it's a delimited block, then we provide the delimiter
     inlines: Vec<Inline>,
     //blocks: Vec<Block>, // I'm pretty sure there aren't allowed to have blocks, need to confirm
@@ -399,6 +401,7 @@ pub struct LeafBlock {
 }
 
 #[derive(Serialize, Debug, PartialEq)]
+#[serde(rename_all = "lowercase")]
 pub enum LeafBlockName {
     Listing,
     Literal, // TK not handling now
@@ -408,10 +411,20 @@ pub enum LeafBlockName {
     Verse, // TK need to figure handling for quotes
 }
 #[derive(Serialize, Debug)]
+#[serde(rename_all = "lowercase")]
 pub enum LeafBlockForm {
     Delimited,
     Indented,
     Paragraph,
+}
+
+impl LeafBlockForm {
+    fn is_paragraph(&self) -> bool {
+        match self {
+            LeafBlockForm::Paragraph => true,
+            _ => false,
+        }
+    }
 }
 
 impl PartialEq for LeafBlock {

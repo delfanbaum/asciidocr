@@ -3,7 +3,7 @@ use core::panic;
 use crate::{
     asg::Asg,
     blocks::{Block, Break, LeafBlock, Section},
-    inlines::{Inline, InlineLiteral},
+    inlines::{self, Inline, InlineLiteral},
     nodes::Header,
     tokens::{Token, TokenType},
 };
@@ -39,12 +39,18 @@ impl Parser {
     {
         let mut asg = Asg::new();
         for token in tokens {
-            println!("{}, {:?}", self.token_count, token);
-            self.last_token_type = token.token_type();
+            let token_type = token.token_type();
             self.token_into(token, &mut asg);
+
+            self.last_token_type = token_type;
             self.token_count += 1;
         }
 
+        while !self.open_blocks.is_empty() {
+            if let Some(block) = self.open_blocks.pop() {
+                asg.push_block(block)
+            }
+        }
         // TODO get last location in tree -- and other cleanup, probably an asg.consolidate() or
         // something
         asg.consolidate();
@@ -54,7 +60,7 @@ impl Parser {
     fn token_into(&mut self, token: Token, asg: &mut Asg) {
         // if we are not starting with a document-heading acceptable token, get out
         if self.in_document_header && !token.can_be_in_document_header() {
-            self.in_document_header = false
+            self.in_document_header = false;
         }
 
         match token.token_type() {
@@ -63,7 +69,7 @@ impl Parser {
             TokenType::ThematicBreak => self.parse_thematic_break(token, asg),
             TokenType::PassthroughBlock => self.parse_passthrough_block(token, asg),
             TokenType::SourceBlock => self.parse_source_block(token, asg),
-            TokenType::Text => self.parse_text(token),
+            TokenType::Text => self.parse_text(token, asg),
             TokenType::Comment => self.parse_comment(),
             TokenType::CommentBlock => self.parse_comment_block(),
             TokenType::Heading1 => self.parse_heading1(token, asg),
@@ -78,12 +84,14 @@ impl Parser {
     fn parse_new_line_char(&mut self, token: Token, asg: &mut Asg) {
         if self.in_title_field {
             // newline exits a title, TK line continuation
-            self.in_title_field = false
+            self.in_title_field = false;
         }
-        if self.last_token_type == TokenType::NewLineChar && self.in_document_header {
-            println!("Checking: {:?}", self.document_header.is_empty());
+        if vec![TokenType::NewLineChar, TokenType::Eof].contains(&self.last_token_type)
+            && self.in_document_header
+        {
             if !self.document_header.is_empty() {
-                asg.header = Some(self.document_header.clone())
+                self.document_header.consolidate();
+                asg.add_header(self.document_header.clone())
             }
             self.in_document_header = false
         }
@@ -93,14 +101,16 @@ impl Parser {
                 self.open_blocks.push(last_block);
                 // but as this can signal the end of a "title", we "close" the open parent
                 self.close_parent();
+            // but if it's not a parent and this is a double new line, put the block in place
             } else if self.last_token_type == TokenType::NewLineChar {
                 self.add_to_block_stack_or_graph(asg, last_block);
+            // otherwise put it back on the block stack
+            } else {
+                self.open_blocks.push(last_block);
             }
         }
         // "else", add newline literal to the last block or create a block
-        self.add_inline_to_block_stack(Inline::InlineLiteral(InlineLiteral::new_text_from_token(
-            &token,
-        )))
+        self.add_text_to_last_inline(asg, token)
     }
 
     fn parse_thematic_break(&mut self, token: Token, asg: &mut Asg) {
@@ -156,7 +166,6 @@ impl Parser {
         if self.in_document_header {
             self.document_header.location.extend(token.locations());
             self.in_title_field = true;
-            println!("Header");
         } else {
             if let Some(last_block) = self.open_blocks.pop() {
                 match last_block {
@@ -230,15 +239,26 @@ impl Parser {
     //fn parse_eof(&mut self, token: Token, asg: &mut Asg) {}
     //fn parse_inline_style(&mut self, token: Token, asg: &mut Asg) {}
 
-    fn parse_text(&mut self, token: Token) {
+    fn parse_text(&mut self, token: Token, asg: &mut Asg) {
         if self.in_document_header && self.in_title_field {
-            self.document_header.title.push(Inline::InlineLiteral(
-                InlineLiteral::new_text_from_token(&token),
-            ));
+            if let Some(inline) = self.document_header.title.last_mut() {
+                match inline {
+                    Inline::InlineLiteral(lit) => lit.add_text_from_token(&token),
+                    Inline::InlineSpan(span) => span.add_inline(Inline::InlineLiteral(
+                        InlineLiteral::new_text_from_token(&token),
+                    )),
+                    Inline::InlineRef(_) => {
+                        panic!("Inline references are not allowed in document titles")
+                    }
+                }
+            } else {
+                self.document_header.title.push(Inline::InlineLiteral(
+                    InlineLiteral::new_text_from_token(&token),
+                ));
+            }
+        } else {
+            self.add_text_to_last_inline(asg, token)
         }
-        self.add_inline_to_block_stack(Inline::InlineLiteral(InlineLiteral::new_text_from_token(
-            &token,
-        )))
     }
 
     fn handle_delimited_leaf_block(&mut self, asg: &mut Asg, block: LeafBlock) {
@@ -264,9 +284,42 @@ impl Parser {
         }
     }
 
+    fn add_text_to_last_inline(&mut self, asg: &mut Asg, token: Token) {
+        if let Some(last_block) = self.open_blocks.last_mut() {
+            if let Some(last_inline) = last_block.last_inline() {
+                match last_inline {
+                    Inline::InlineLiteral(lit) => lit.add_text_from_token(&token),
+                    Inline::InlineSpan(span) => span.add_inline(Inline::InlineLiteral(
+                        InlineLiteral::new_text_from_token(&token),
+                    )),
+                    Inline::InlineRef(_) => todo!(),
+                }
+            } else {
+                if last_block.takes_inlines() {
+                    last_block.push_inline(Inline::InlineLiteral(
+                        InlineLiteral::new_text_from_token(&token),
+                    ))
+                } else {
+                    // newlines on their own don't get a paragraph
+                    if token.token_type() != TokenType::NewLineChar {
+                        self.add_inline_to_block_stack(Inline::InlineLiteral(
+                            InlineLiteral::new_text_from_token(&token),
+                        ))
+                    } else {
+                        self.add_last_block_to_graph(asg);
+                    }
+                }
+            }
+        } else {
+            if token.token_type() != TokenType::NewLineChar {
+                self.add_inline_to_block_stack(Inline::InlineLiteral(
+                    InlineLiteral::new_text_from_token(&token),
+                ))
+            }
+        }
+    }
+
     fn add_inline_to_block_stack(&mut self, inline: Inline) {
-        // if we're in the header, add inline to the header
-        // big else for now
         self.open_blocks.push(Block::LeafBlock(LeafBlock::new(
             crate::blocks::LeafBlockName::Paragraph,
             crate::blocks::LeafBlockForm::Paragraph,
@@ -288,6 +341,12 @@ impl Parser {
             // and is closed by its closing condition
             self.open_blocks.push(block)
         } else {
+            asg.push_block(block)
+        }
+    }
+
+    fn add_last_block_to_graph(&mut self, asg: &mut Asg) {
+        if let Some(block) = self.open_blocks.pop() {
             asg.push_block(block)
         }
     }

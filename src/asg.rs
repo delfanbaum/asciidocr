@@ -14,7 +14,9 @@ pub struct Asg {
     pub name: String, // is this always "Document?"
     #[serde(rename = "type")]
     pub node_type: NodeTypes, // is this always "block"
-    pub attributes: HashMap<String, String>, // the value can also be a bool; deal with this later
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub attributes: Option<HashMap<String, String>>, // the value can also be a bool; deal with this later
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub header: Option<Header>,
     pub blocks: Vec<Block>,
     pub location: Vec<Location>, // really a tuple of a "Start" location and an "end" location
@@ -25,29 +27,30 @@ impl Asg {
         Asg {
             name: "document".to_string(),
             node_type: NodeTypes::Block,
-            attributes: HashMap::new(),
+            attributes: None,
             header: None,
             blocks: vec![],
-            location: vec![Location {
-                line: 1,
-                col: 1,
-                file: None,
-            }],
+            location: vec![Location::default()],
         }
     }
 
     pub fn add_header(&mut self, header: Header) {
-        self.header = Some(header)
+        self.attributes = Some(HashMap::new());
+        self.header = Some(header);
+        // add the attributes from the header... later
     }
 
     /// Adds a block (tree) to the "root" of the document
-    pub fn push_block(&mut self, block: Block) {
+    pub fn push_block(&mut self, mut block: Block) {
+        block.consolidate_locations();
+        block.trim_literals();
         self.blocks.push(block)
     }
 
+    /// Consolidates location (and, later, other) information about the tree
     pub fn consolidate(&mut self) {
-        for block in self.blocks.iter_mut() {
-            block.consolidate_inlines()
+        if let Some(last_block) = self.blocks.last_mut() {
+            self.location = Location::reconcile(self.location.clone(), last_block.locations())
         }
     }
 
