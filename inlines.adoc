@@ -1,0 +1,4 @@
+= Inlines Test
+
+This is just a test to see if things get combined. For example, this should all
+be one inline.

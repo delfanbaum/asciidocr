@@ -8,7 +8,7 @@ use crate::{
     tokens::Token,
 };
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Clone, Debug)]
 #[serde(untagged)]
 pub enum Inline {
     InlineSpan(InlineSpan),
@@ -48,6 +48,20 @@ impl Inline {
         }
     }
 
+    pub fn extract_values_to_string(&self) -> String {
+        match &self {
+            Inline::InlineLiteral(literal) => literal.value.clone(),
+            Inline::InlineSpan(span) => {
+                let mut values = String::new();
+                for inline in &span.inlines {
+                    values.push_str(&inline.extract_values_to_string())
+                }
+                values
+            }
+            Inline::InlineRef(_) => todo!(),
+        }
+    }
+
     pub fn extract_literal(&mut self) -> InlineLiteral {
         match &self {
             Inline::InlineLiteral(literal) => literal.clone(),
@@ -72,7 +86,7 @@ impl Inline {
     }
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Clone, Debug)]
 pub struct InlineSpan {
     name: String,
     #[serde(rename = "type")]
@@ -100,7 +114,7 @@ impl InlineSpan {
     }
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Clone, Debug)]
 pub enum InlineSpanVariant {
     Strong,
     Emphasis,
@@ -108,14 +122,14 @@ pub enum InlineSpanVariant {
     Mark,
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Clone, Debug)]
 pub enum InlineSpanForm {
     Constrainted,
     Unconstrainted,
 }
 
 // REFS NOT CURRENTLY SUPPORTED, this is just saving future work
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Clone, Debug)]
 pub struct InlineRef {
     name: String,
     #[serde(rename = "type")]
@@ -139,7 +153,7 @@ impl InlineRef {
     }
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Clone, Debug)]
 pub enum InlineRefVariant {
     Link,
     Xref,

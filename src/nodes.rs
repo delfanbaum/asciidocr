@@ -10,15 +10,29 @@ pub enum NodeTypes {
 }
 
 /// Struct containing document header information
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Clone, Debug)]
 pub struct Header {
-    title: Vec<Inline>,
-    authors: Option<Vec<Author>>,
-    location: Vec<Location>,
+    pub title: Vec<Inline>,
+    pub authors: Option<Vec<Author>>,
+    pub location: Vec<Location>,
+}
+
+impl Header {
+    pub fn new() -> Self {
+        Header {
+            title: vec![],
+            authors: None,
+            location: vec![],
+        }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.title.is_empty() && self.authors.is_none()
+    }
 }
 
 /// Struct containing document author information
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Clone, Debug)]
 pub struct Author {
     fullname: String,
     initials: String,
