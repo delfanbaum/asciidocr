@@ -43,13 +43,13 @@ pub struct Author {
 }
 
 /// A "location" pertaining to a given document object, usually the start or end of something
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Clone, PartialEq, Eq, Debug)]
 pub struct Location {
     pub line: usize, // 1-indexed
     pub col: usize,  // 1-indexed
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub file: Option<Vec<String>>, // I *think* this is for includes, though we're not going to handle
-                                   // those yet
+                     //#[serde(skip_serializing_if = "Option::is_none")]
+                     //pub file: Option<Vec<String>>, // I *think* this is for includes, though we're not going to handle
+                     // those yet
 }
 
 impl Default for Location {
@@ -57,7 +57,27 @@ impl Default for Location {
         Location {
             line: 1,
             col: 1,
-            file: None,
+            //file: None,
+        }
+    }
+}
+
+impl Ord for Location {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        if self.line == other.line {
+            self.col.cmp(&other.col)
+        } else {
+            self.line.cmp(&other.line)
+        }
+    }
+}
+
+impl PartialOrd for Location {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        if self.line == other.line {
+            Some(self.col.cmp(&other.col))
+        } else {
+            Some(self.line.cmp(&other.line))
         }
     }
 }
@@ -67,7 +87,30 @@ impl Location {
         Location {
             line,
             col,
-            file: None,
+            //file: None,
         }
     } // handle file later
+
+    pub fn reconcile(mut start: Vec<Location>, other: Vec<Location>) -> Vec<Location> {
+        start.extend(other);
+        start.sort();
+        // remove the middle
+        start.drain(1..start.len()-1);
+        start
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Location;
+
+    #[test]
+    fn reconcile_locations() {
+        let start = vec![Location::new(1, 1), Location::new(2, 4)];
+        let other = vec![Location::new(1, 1), Location::new(4, 5)];
+        assert_eq!(
+            vec![Location::new(1, 1), Location::new(4, 5)],
+            Location::reconcile(start, other)
+        )
+    }
 }
