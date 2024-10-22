@@ -1,0 +1,5 @@
+= Document Title
+:foo: bar
+:toc:
+
+Text
