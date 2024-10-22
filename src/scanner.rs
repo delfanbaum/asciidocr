@@ -87,7 +87,7 @@ impl<'a> Scanner<'a> {
                             if self.starts_new_line() && self.peek() == ' ' {
                                 self.add_list_item(TokenType::UnorderedListItem)
                             } else {
-                                self.add_token(TokenType::Bold, false, 0)
+                                self.add_token(TokenType::Strong, false, 0)
                             }
                         }
                         '/' => {
@@ -107,7 +107,7 @@ impl<'a> Scanner<'a> {
                                 self.add_text_until_next_markup()
                             }
                         }
-                        '_' => self.add_token(TokenType::Italic, false, 0),
+                        '_' => self.add_token(TokenType::Emphasis, false, 0),
                         _ => self.add_text_until_next_markup(),
                     }
                 }
@@ -150,7 +150,7 @@ impl<'a> Scanner<'a> {
             '`' => self.add_token(TokenType::Monospace, false, 0),
             '^' => self.add_token(TokenType::Superscript, false, 0),
             '~' => self.add_token(TokenType::Subscript, false, 0),
-            '#' => self.add_token(TokenType::Highlighted, false, 0),
+            '#' => self.add_token(TokenType::Mark, false, 0),
             ':' => {
                 if self.starts_new_line() && self.starts_attr() {
                     while self.peek() != '\n' { // TK line continuation
@@ -728,12 +728,12 @@ mod tests {
     }
 
     #[rstest]
-    #[case('*', TokenType::Bold)]
-    #[case('_', TokenType::Italic)]
+    #[case('*', TokenType::Strong)]
+    #[case('_', TokenType::Emphasis)]
     #[case('`', TokenType::Monospace)]
     #[case('^', TokenType::Superscript)]
     #[case('~', TokenType::Subscript)]
-    #[case('#', TokenType::Highlighted)]
+    #[case('#', TokenType::Mark)]
     fn inline_formatting(#[case] markup_char: char, #[case] expected_token: TokenType) {
         let markup = format!("Some {}bar{} bar.", markup_char, markup_char);
         let expected_tokens = vec![
@@ -768,12 +768,12 @@ mod tests {
     }
 
     #[rstest]
-    #[case('*', TokenType::Bold)]
-    #[case('_', TokenType::Italic)]
+    #[case('*', TokenType::Strong)]
+    #[case('_', TokenType::Emphasis)]
     #[case('`', TokenType::Monospace)]
     #[case('^', TokenType::Superscript)]
     #[case('~', TokenType::Subscript)]
-    #[case('#', TokenType::Highlighted)]
+    #[case('#', TokenType::Mark)]
     fn inline_formatting_doubles(#[case] markup_char: char, #[case] expected_token: TokenType) {
         // TODO make this less ugly
         let markup = format!(
@@ -1041,7 +1041,7 @@ mod tests {
                 6,
                 13,
             ),
-            Token::new(TokenType::Highlighted, "#".to_string(), None, 1, 14, 14),
+            Token::new(TokenType::Mark, "#".to_string(), None, 1, 14, 14),
             Token::new(
                 TokenType::Text,
                 "text".to_string(),
@@ -1050,7 +1050,7 @@ mod tests {
                 15,
                 18,
             ),
-            Token::new(TokenType::Highlighted, "#".to_string(), None, 1, 19, 19),
+            Token::new(TokenType::Mark, "#".to_string(), None, 1, 19, 19),
         ];
         scan_and_assert_eq(&markup, expected_tokens);
     }
@@ -1068,7 +1068,7 @@ mod tests {
                 1,
                 8,
             ),
-            Token::new(TokenType::Highlighted, "#".to_string(), None, 2, 9, 9),
+            Token::new(TokenType::Mark, "#".to_string(), None, 2, 9, 9),
             Token::new(
                 TokenType::Text,
                 "text".to_string(),
@@ -1077,7 +1077,7 @@ mod tests {
                 10,
                 13,
             ),
-            Token::new(TokenType::Highlighted, "#".to_string(), None, 2, 14, 14),
+            Token::new(TokenType::Mark, "#".to_string(), None, 2, 14, 14),
         ];
         scan_and_assert_eq(&markup, expected_tokens);
     }
@@ -1095,7 +1095,7 @@ mod tests {
                 1,
                 8,
             ),
-            Token::new(TokenType::Highlighted, "#".to_string(), None, 3, 9, 9),
+            Token::new(TokenType::Mark, "#".to_string(), None, 3, 9, 9),
             Token::new(
                 TokenType::Text,
                 "text".to_string(),
@@ -1104,7 +1104,7 @@ mod tests {
                 10,
                 13,
             ),
-            Token::new(TokenType::Highlighted, "#".to_string(), None, 3, 14, 14),
+            Token::new(TokenType::Mark, "#".to_string(), None, 3, 14, 14),
         ];
         scan_and_assert_eq(&markup, expected_tokens);
     }

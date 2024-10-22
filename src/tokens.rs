@@ -72,10 +72,10 @@ impl Token {
             TokenType::Heading1
                 | TokenType::Comment
                 | TokenType::Text
-                | TokenType::Italic
-                | TokenType::Bold
+                | TokenType::Emphasis
+                | TokenType::Strong
                 | TokenType::Monospace
-                | TokenType::Highlighted
+                | TokenType::Mark
                 | TokenType::NewLineChar
                 | TokenType::Attribute
         )
@@ -138,13 +138,13 @@ pub enum TokenType {
     DefListMark, // just match "::" and the parser can figure it out
 
     // formatting tokens (inline markup)
-    Bold,   // TK Handle bounded characters, e.g., **Some**thing -> <b>Some</b>thing
-    Italic, // same applies above
+    Strong,   // TK Handle bounded characters, e.g., **Some**thing -> <b>Some</b>thing
+    Emphasis, // same applies above
     Monospace,
 
     Superscript, // ^super^
     Subscript,   // ~sub~
-    Highlighted, // #text# or [.class]#text#
+    Mark, // #text# or [.class]#text#
 
     // inline macros
     LinkMacro,

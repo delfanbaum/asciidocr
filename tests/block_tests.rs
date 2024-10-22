@@ -1,4 +1,4 @@
-mod common;
+pub mod common;
 use common::assert_parsed_doc_matches_expected_asg;
 use rstest::rstest;
 
@@ -31,4 +31,3 @@ fn test_lists(#[case] fn_pattern: &str) {
     let asg_json_fn = format!("{}.json", fn_pattern);
     assert_parsed_doc_matches_expected_asg(&adoc_fn, &asg_json_fn)
 }
-

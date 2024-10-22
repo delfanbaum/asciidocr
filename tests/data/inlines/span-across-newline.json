@@ -1,0 +1,65 @@
+{
+    "name": "document",
+    "type": "block",
+    "blocks": [
+        {
+            "name": "paragraph",
+            "type": "block",
+            "inlines": [
+                {
+                    "name": "span",
+                    "type": "inline",
+                    "variant": "VARIANT",
+                    "form": "constrained",
+                    "inlines": [
+                        {
+                            "name": "text",
+                            "type": "string",
+                            "value": "cool\ncat",
+                            "location": [
+                                {
+                                    "line": 1,
+                                    "col": 2
+                                },
+                                {
+                                    "line": 2,
+                                    "col": 3
+                                }
+                            ]
+                        }
+                    ],
+                    "location": [
+                        {
+                            "line": 1,
+                            "col": 1
+                        },
+                        {
+                            "line": 2,
+                            "col": 4
+                        }
+                    ]
+                }
+            ],
+            "location": [
+                {
+                    "line": 1,
+                    "col": 1
+                },
+                {
+                    "line": 2,
+                    "col": 4
+                }
+            ]
+        }
+    ],
+    "location": [
+        {
+            "line": 1,
+            "col": 1
+        },
+        {
+            "line": 2,
+            "col": 4
+        }
+    ]
+}

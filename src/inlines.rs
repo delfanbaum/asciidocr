@@ -27,6 +27,21 @@ impl Display for Inline {
     }
 }
 
+impl PartialEq for Inline {
+    fn eq(&self, other: &Self) -> bool {
+        match self {
+            Inline::InlineSpan(span) => match other {
+                Inline::InlineSpan(other_span) => {
+                    span.variant == other_span.variant && span.node_form == other_span.node_form
+                }
+                _ => false,
+            },
+            Inline::InlineRef(_) => matches!(other, Inline::InlineRef(_)),
+            Inline::InlineLiteral(_) => matches!(other, Inline::InlineLiteral(_)),
+        }
+    }
+}
+
 impl Inline {
     pub fn push_inline(&mut self, child: Inline) {
         match self {
@@ -39,6 +54,20 @@ impl Inline {
             Inline::InlineSpan(span) => span.location.clone(),
             Inline::InlineRef(iref) => iref.location.clone(),
             Inline::InlineLiteral(lit) => lit.location.clone(),
+        }
+    }
+
+    pub fn reconcile_locations(&mut self, other_locs: Vec<Location>) {
+        match self {
+            Inline::InlineSpan(inline) => {
+                inline.location = Location::reconcile(inline.location.clone(), other_locs)
+            }
+            Inline::InlineRef(inline) => {
+                inline.location = Location::reconcile(inline.location.clone(), other_locs)
+            }
+            Inline::InlineLiteral(inline) => {
+                inline.location = Location::reconcile(inline.location.clone(), other_locs)
+            }
         }
     }
 
@@ -88,7 +117,6 @@ impl Inline {
             inline.value = inline.value.trim().to_string();
             println!("{:?}", inline.value)
         }
-
     }
 }
 
@@ -97,8 +125,9 @@ pub struct InlineSpan {
     name: String,
     #[serde(rename = "type")]
     node_type: NodeTypes,
-    variant: InlineSpanVariant,
-    node_form: InlineSpanForm,
+    pub variant: InlineSpanVariant,
+    #[serde(rename = "form")]
+    pub node_form: InlineSpanForm,
     inlines: Vec<Inline>,
     location: Vec<Location>,
 }
@@ -118,13 +147,56 @@ impl InlineSpan {
             location,
         }
     }
+
+    pub fn new_emphasis_span(token: Token) -> Self {
+        Self::new(
+            InlineSpanVariant::Emphasis,
+            InlineSpanForm::Constrained,
+            token.locations(),
+        )
+    }
+    pub fn new_strong_span(token: Token) -> Self {
+        Self::new(
+            InlineSpanVariant::Strong,
+            InlineSpanForm::Constrained,
+            token.locations(),
+        )
+    }
+    pub fn new_code_span(token: Token) -> Self {
+        Self::new(
+            InlineSpanVariant::Code,
+            InlineSpanForm::Constrained,
+            token.locations(),
+        )
+    }
+    pub fn new_mark_span(token: Token) -> Self {
+        Self::new(
+            InlineSpanVariant::Mark,
+            InlineSpanForm::Constrained,
+            token.locations(),
+        )
+    }
+
     pub fn add_inline(&mut self, inline: Inline) {
+        // update the locations
         self.location = Location::reconcile(self.location.clone(), inline.locations());
+        // combine literals if necessary
+        if matches!(inline, Inline::InlineLiteral(_)) {
+            if let Some(last_token) = self.inlines.last_mut() {
+                match last_token {
+                    Inline::InlineLiteral(prior_literal) => {
+                        prior_literal.add_text_from_inline_literal(inline);
+                        return;
+                    }
+                    _ => {} // fall through
+                }
+            }
+        }
         self.inlines.push(inline);
     }
 }
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, PartialEq, Eq, Clone, Debug)]
 #[serde(rename_all = "lowercase")]
 pub enum InlineSpanVariant {
     Strong,
@@ -133,10 +205,10 @@ pub enum InlineSpanVariant {
     Mark,
 }
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, PartialEq, Eq, Clone, Debug)]
 #[serde(rename_all = "lowercase")]
 pub enum InlineSpanForm {
-    Constrainted,
+    Constrained,
     Unconstrainted,
 }
 
@@ -195,10 +267,21 @@ impl InlineLiteral {
         InlineLiteral::new(InlineLiteralName::Text, token.text(), token.locations())
     }
 
+    /// Add text and reconcile location information from a given (text) token
     pub fn add_text_from_token(&mut self, token: &Token) {
         self.value.push_str(&token.text());
         self.location = Location::reconcile(self.location.clone(), token.locations());
     }
+
+    /// Add test from inline literals; should only really be used in reconciling multi-line spans
+    pub fn add_text_from_inline_literal(&mut self, inline: Inline) {
+        match inline {
+            Inline::InlineLiteral(ref literal) => self.value.push_str(&literal.value),
+            _ => panic!("Can't add test from this kind of inline: {:?}", inline),
+        }
+        self.location = Location::reconcile(self.location.clone(), inline.locations().clone());
+    }
+
 }
 
 #[derive(Serialize, Clone, Debug)]
