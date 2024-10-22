@@ -115,7 +115,7 @@ impl<'a> Scanner<'a> {
 
             // ordered list item or section title
             '.' => {
-                if self.starts_new_block() {
+                if self.starts_new_line() {
                     if self.peek() == ' ' {
                         self.add_list_item(TokenType::OrderedListItem)
                     } else {
@@ -504,7 +504,7 @@ mod tests {
     #[rstest]
     #[case("* Foo\n".to_string(), TokenType::UnorderedListItem)]
     #[case(". Foo\n".to_string(), TokenType::OrderedListItem)]
-    fn list_items(#[case] markup: String, #[case] expected_token: TokenType) {
+    fn single_list_items(#[case] markup: String, #[case] expected_token: TokenType) {
         let mut delimiter = markup
             .clone()
             .split_whitespace()
@@ -523,6 +523,41 @@ mod tests {
                 5,
             ),
             Token::new(TokenType::NewLineChar, "\n".to_string(), None, 1, 6, 6),
+        ];
+        scan_and_assert_eq(&markup, expected_tokens);
+    }
+    
+    #[rstest]
+    #[case::unordered("* Foo\n* Bar".to_string(), TokenType::UnorderedListItem)]
+    #[case::ordered(". Foo\n. Bar".to_string(), TokenType::OrderedListItem)]
+    fn multiple_list_items(#[case] markup: String, #[case] expected_token: TokenType) {
+        let mut delimiter = markup
+            .clone()
+            .split_whitespace()
+            .next()
+            .unwrap()
+            .to_string();
+        delimiter.push(' ');
+        let expected_tokens = vec![
+            Token::new(expected_token, delimiter.clone(), None, 1, 1, 2),
+            Token::new(
+                TokenType::Text,
+                "Foo".to_string(),
+                Some("Foo".to_string()),
+                1,
+                3,
+                5,
+            ),
+            Token::new(TokenType::NewLineChar, "\n".to_string(), None, 1, 6, 6),
+            Token::new(expected_token, delimiter, None, 2, 1, 2),
+            Token::new(
+                TokenType::Text,
+                "Bar".to_string(),
+                Some("Bar".to_string()),
+                2,
+                3,
+                5,
+            ),
         ];
         scan_and_assert_eq(&markup, expected_tokens);
     }

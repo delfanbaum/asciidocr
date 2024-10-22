@@ -5,6 +5,7 @@ use crate::{
     asg::Asg,
     blocks::{Block, Break, LeafBlock, Section},
     inlines::{Inline, InlineLiteral},
+    lists::{List, ListItem, ListVariant},
     nodes::Header,
     tokens::{Token, TokenType},
 };
@@ -16,8 +17,8 @@ pub struct Parser {
     open_blocks: Vec<Block>,
     _open_inlines: Vec<Inline>,
     in_document_header: bool,
-    in_title_field: bool,
-    open_parent: bool,
+    /// designates whether we're to be adding inlines to the previous block until a newline
+    in_block_line: bool,
     token_count: usize,
     // used to see if we need to add a newline before new text
     dangling_newline: Option<Token>,
@@ -38,8 +39,7 @@ impl Parser {
             open_blocks: vec![],
             _open_inlines: vec![],
             in_document_header: true,
-            in_title_field: false,
-            open_parent: false,
+            in_block_line: false,
             token_count: 0,
             dangling_newline: None,
         }
@@ -51,6 +51,7 @@ impl Parser {
     {
         let mut asg = Asg::new();
         for token in tokens {
+            println!("{:?}", token);
             let token_type = token.token_type();
             self.token_into(token, &mut asg);
 
@@ -60,7 +61,19 @@ impl Parser {
 
         while !self.open_blocks.is_empty() {
             if let Some(block) = self.open_blocks.pop() {
-                asg.push_block(block)
+                if matches!(block, Block::ListItem(_)) {
+                    // sanity check
+                    if let Some(mut next_last_block) = self.open_blocks.pop() {
+                        if matches!(next_last_block, Block::List(_)) {
+                            next_last_block.push_block(block);
+                            asg.push_block(next_last_block);
+                        } else {
+                            self.open_blocks.push(next_last_block)
+                        }
+                    }
+                } else {
+                    asg.push_block(block)
+                }
             }
         }
         // TODO get last location in tree -- and other cleanup, probably an asg.consolidate() or
@@ -76,22 +89,32 @@ impl Parser {
         }
 
         match token.token_type() {
-            // document header things
+            // document header and heading things
             TokenType::Heading1 => self.parse_heading1(token, asg),
-            TokenType::Attribute => self.parse_attribute(token),
-            // everything else
-            TokenType::NewLineChar => self.parse_new_line_char(token, asg),
-            TokenType::PageBreak => self.parse_page_break(token, asg),
-            TokenType::ThematicBreak => self.parse_thematic_break(token, asg),
-            TokenType::PassthroughBlock => self.parse_passthrough_block(token, asg),
-            TokenType::SourceBlock => self.parse_source_block(token, asg),
-            TokenType::Text => self.parse_text(token, asg),
-            TokenType::Comment => self.parse_comment(),
-            TokenType::CommentBlock => self.parse_comment_block(),
             TokenType::Heading2 => self.parse_heading2(token, asg),
             TokenType::Heading3 => self.parse_heading3(token, asg),
             TokenType::Heading4 => self.parse_heading4(token, asg),
             TokenType::Heading5 => self.parse_heading5(token, asg),
+            TokenType::Attribute => self.parse_attribute(token),
+
+            // inlines
+            TokenType::Text => self.parse_text(token, asg),
+            TokenType::NewLineChar => self.parse_new_line_char(token, asg),
+
+            // breaks
+            TokenType::PageBreak => self.parse_page_break(token, asg),
+            TokenType::ThematicBreak => self.parse_thematic_break(token, asg),
+
+            // delimited blocks
+            TokenType::PassthroughBlock => self.parse_passthrough_block(token, asg),
+            TokenType::SourceBlock => self.parse_source_block(token, asg),
+            TokenType::Comment => self.parse_comment(),
+            TokenType::CommentBlock => self.parse_comment_block(),
+
+            // lists
+            TokenType::UnorderedListItem => self.parse_unordered_list_item(token),
+            TokenType::OrderedListItem => self.parse_ordered_list_item(token),
+
             _ => {}
         }
     }
@@ -114,9 +137,9 @@ impl Parser {
     }
 
     fn parse_new_line_char(&mut self, token: Token, asg: &mut Asg) {
-        if self.in_title_field {
+        if self.in_block_line {
             // newline exits a title, TK line continuation
-            self.in_title_field = false;
+            self.in_block_line = false;
         }
         if [TokenType::NewLineChar, TokenType::Eof].contains(&self.last_token_type)
             && self.in_document_header
@@ -134,11 +157,22 @@ impl Parser {
             if last_block.can_be_parent() {
                 // only new sections/delimiter blocks can close parents, so we just add this back
                 self.open_blocks.push(last_block);
-                // but as this can signal the end of a "title", we "close" the open parent
-                self.close_parent();
             // but if it's not a parent and this is a double new line, put the block in place
             } else if self.last_token_type == TokenType::NewLineChar {
-                self.add_to_block_stack_or_graph(asg, last_block);
+                // if we're the last in a list, we need to push into the list and also close the list
+                if matches!(last_block, Block::ListItem(_)) {
+                    // sanity check
+                    if let Some(mut next_last_block) = self.open_blocks.pop() {
+                        if matches!(next_last_block, Block::List(_)) {
+                            next_last_block.push_block(last_block);
+                            self.add_to_block_stack_or_graph(asg, next_last_block);
+                        } else {
+                            self.open_blocks.push(next_last_block)
+                        }
+                    }
+                } else {
+                    self.add_to_block_stack_or_graph(asg, last_block);
+                }
                 self.dangling_newline = None;
             // otherwise put it back on the block stack
             } else {
@@ -194,14 +228,52 @@ impl Parser {
 
     //fn parse_admonition_block(&mut self, token: Token, asg: &mut Asg) {}
     //fn parse_open_block(&mut self, token: Token, asg: &mut Asg) {}
-    //fn parse_ordered_list_item(&mut self, token: Token, asg: &mut Asg) {}
-    //fn parse_unordered_list_item(&mut self, token: Token, asg: &mut Asg) {}
+
+    fn parse_ordered_list_item(&mut self, token: Token) {
+        // clear any dangling newlines
+        self.dangling_newline = None;
+        let list_item = ListItem::new(token.lexeme.clone(), token.locations());
+        // if there is an appropriate list, we push this onto the open_blocks so inlines can be
+        // added
+        if self.open_blocks.last().is_some() && self.open_blocks.last().unwrap().is_ordered_list() {
+            self.add_last_list_item_to_list()
+        } else {
+            // we need to create the list first
+            self.open_blocks.push(Block::List(List::new(
+                ListVariant::Ordered,
+                token.locations().clone(),
+            )));
+        }
+        // either way, add the new list item
+        self.open_blocks.push(Block::ListItem(list_item));
+    }
+    //
+    fn parse_unordered_list_item(&mut self, token: Token) {
+        // clear any dangling newlines
+        self.dangling_newline = None;
+        let list_item = ListItem::new(token.lexeme.clone(), token.locations());
+        // if there is an appropriate list, we push this onto the open_blocks so inlines can be
+        // added
+        if self.open_blocks.last().is_some() && self.open_blocks.last().unwrap().is_unordered_list()
+        {
+            self.add_last_list_item_to_list()
+        } else {
+            // we need to create the list first
+            self.open_blocks.push(Block::List(List::new(
+                ListVariant::Unordered,
+                token.locations().clone(),
+            )));
+        }
+        // either way, add the new list item
+        self.open_blocks.push(Block::ListItem(list_item));
+    }
+
     //fn parse_block_label(&mut self, token: Token, asg: &mut Asg) {}
 
     fn parse_heading1(&mut self, token: Token, asg: &mut Asg) {
         if self.in_document_header {
             self.document_header.location.extend(token.locations());
-            self.in_title_field = true;
+            self.in_block_line = true;
         } else {
             if let Some(last_block) = self.open_blocks.pop() {
                 match last_block {
@@ -219,7 +291,6 @@ impl Parser {
                 asg,
                 Block::Section(Section::new("".to_string(), 1, token.first_location())),
             );
-            self.open_parent();
         }
     }
 
@@ -228,28 +299,24 @@ impl Parser {
             asg,
             Block::Section(Section::new("".to_string(), 2, token.first_location())),
         );
-        self.open_parent();
     }
     fn parse_heading3(&mut self, token: Token, asg: &mut Asg) {
         self.add_to_block_stack_or_graph(
             asg,
             Block::Section(Section::new("".to_string(), 3, token.first_location())),
         );
-        self.open_parent();
     }
     fn parse_heading4(&mut self, token: Token, asg: &mut Asg) {
         self.add_to_block_stack_or_graph(
             asg,
             Block::Section(Section::new("".to_string(), 4, token.first_location())),
         );
-        self.open_parent();
     }
     fn parse_heading5(&mut self, token: Token, asg: &mut Asg) {
         self.add_to_block_stack_or_graph(
             asg,
             Block::Section(Section::new("".to_string(), 5, token.first_location())),
         );
-        self.open_parent();
     }
 
     //fn parse_blockquote(&mut self, token: Token, asg: &mut Asg) {}
@@ -276,7 +343,7 @@ impl Parser {
     //fn parse_inline_style(&mut self, token: Token, asg: &mut Asg) {}
 
     fn parse_text(&mut self, token: Token, asg: &mut Asg) {
-        if self.in_document_header && self.in_title_field {
+        if self.in_document_header && self.in_block_line {
             if let Some(inline) = self.document_header.title.last_mut() {
                 match inline {
                     Inline::InlineLiteral(lit) => lit.add_text_from_token(&token),
@@ -365,6 +432,20 @@ impl Parser {
         )))
     }
 
+    fn add_last_list_item_to_list(&mut self) {
+        let last_item = self.open_blocks.pop().unwrap();
+        // if the last thing is a list item, add it to the list
+        if matches!(last_item, Block::ListItem(_)) {
+            if let Some(list) = self.open_blocks.last_mut() {
+                list.push_block(last_item)
+            }
+        } else {
+            // otherwise return the list to the open block stack, and create a new unordered
+            // list item
+            self.open_blocks.push(last_item);
+        }
+    }
+
     fn add_to_block_stack_or_graph(&mut self, asg: &mut Asg, mut block: Block) {
         if block.is_section() {
             block.create_id()
@@ -385,12 +466,5 @@ impl Parser {
         if let Some(block) = self.open_blocks.pop() {
             asg.push_block(block)
         }
-    }
-
-    fn open_parent(&mut self) {
-        self.open_parent = true
-    }
-    fn close_parent(&mut self) {
-        self.open_parent = false
     }
 }

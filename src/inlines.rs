@@ -8,6 +8,7 @@ use crate::{
     tokens::Token,
 };
 
+/// Inlines enum containing literals, spans, and references (the latter not implemented)
 #[derive(Serialize, Clone, Debug)]
 #[serde(untagged)]
 pub enum Inline {

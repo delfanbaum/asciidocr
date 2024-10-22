@@ -20,3 +20,15 @@ fn test_document(#[case] fn_pattern: &str) {
     let asg_json_fn = format!("{}.json", fn_pattern);
     assert_parsed_doc_matches_expected_asg(&adoc_fn, &asg_json_fn)
 }
+
+#[rstest]
+#[case::single_unordered("blocks/unordered-list")]
+#[case::many_unordered("blocks/unordered-list-many-items")]
+#[case::single_ordered("blocks/ordered-list")]
+#[case::many_unordered("blocks/ordered-list-many-items")]
+fn test_lists(#[case] fn_pattern: &str) {
+    let adoc_fn = format!("{}.adoc", fn_pattern);
+    let asg_json_fn = format!("{}.json", fn_pattern);
+    assert_parsed_doc_matches_expected_asg(&adoc_fn, &asg_json_fn)
+}
+

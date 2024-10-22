@@ -1,14 +1,17 @@
+use core::panic;
 use std::{collections::HashMap, fmt::Display};
 
 use serde::Serialize;
 
 use crate::{
     inlines::Inline,
+    lists::{DList, List, ListItem, ListVariant},
     nodes::{Location, NodeTypes},
 };
 
 pub enum _ToFindHomesFor {}
 
+/// Blocks enum, containing any tree blocks
 #[derive(Serialize, PartialEq, Debug)]
 #[serde(untagged)]
 pub enum Block {
@@ -16,9 +19,8 @@ pub enum Block {
     SectionBody,
     NonSectionBlockBody,
     List(List),
-    //ListItem(ListItem), // not sure we ever deal with this as a "block"
+    ListItem(ListItem),
     DList(DList),
-    //DListItem(DListItem), // ditto listitem
     DiscreteHeading, // not handled currently
     Break(Break),
     BlockMacro(BlockMacro),
@@ -34,7 +36,7 @@ impl Display for Block {
             Block::SectionBody => write!(f, "SectionBody"),
             Block::NonSectionBlockBody => write!(f, "NonSectionBlockBody"),
             Block::List(_) => write!(f, "List"),
-            //Block::ListItem(_) => write!(f, "ListItem"),
+            Block::ListItem(_) => write!(f, "ListItem"),
             Block::DList(_) => write!(f, "DList"),
             //Block::DListItem(_) => write!(f, "DListItem"),
             Block::DiscreteHeading => write!(f, "DiscreteHeading"),
@@ -58,28 +60,56 @@ impl Block {
     pub fn push_block(&mut self, block: Block) {
         match self {
             Block::Section(section) => section.blocks.push(block),
+            Block::List(list) => list.add_item(block),
             _ => panic!("push_block not implemented for {}", self),
         }
     }
 
     pub fn takes_inlines(&self) -> bool {
-        matches!(self, Block::Section(_) | Block::LeafBlock(_))
+        matches!(
+            self,
+            Block::Section(_) | Block::LeafBlock(_) | Block::ListItem(_)
+        )
     }
 
     pub fn push_inline(&mut self, inline: Inline) {
         match self {
             Block::Section(section) => section.title.push(inline),
             Block::LeafBlock(block) => block.inlines.push(inline),
+            Block::ListItem(list_item) => list_item.add_inline(inline),
             _ => panic!("push_block not implemented for {}", self),
         }
     }
 
     pub fn consolidate_locations(&mut self) {
-        if let Block::LeafBlock(block) = self {
-            if let Some(last_inline) = block.inlines.last() {
-                block.location =
-                    Location::reconcile(block.location.clone(), last_inline.locations())
+        match self {
+            Block::LeafBlock(block) => {
+                if let Some(last_inline) = block.inlines.last() {
+                    block.location =
+                        Location::reconcile(block.location.clone(), last_inline.locations())
+                }
             }
+            Block::List(list) => {
+                for block in &mut list.items {
+                    block.consolidate_locations()
+                }
+                if let Some(last_block) = list.items.last() {
+                    list.location =
+                        Location::reconcile(list.location.clone(), last_block.locations())
+                }
+            }
+            Block::ListItem(block) => {
+                if let Some(last_block) = block.blocks.last() {
+                    block.location =
+                        Location::reconcile(block.location.clone(), last_block.locations())
+                } else {
+                    if let Some(last_inline) = block.principal.last() {
+                        block.location =
+                            Location::reconcile(block.location.clone(), last_inline.locations())
+                    }
+                }
+            }
+            _ => {}
         }
     }
 
@@ -89,6 +119,22 @@ impl Block {
 
     pub fn is_section(&self) -> bool {
         matches!(self, Block::Section(_))
+    }
+
+    pub fn is_ordered_list(&self) -> bool {
+        match self {
+            Block::List(list) => list.variant == ListVariant::Ordered,
+            Block::ListItem(list) => list.marker == String::from("."),
+            _ => false,
+        }
+    }
+
+    pub fn is_unordered_list(&self) -> bool {
+        match self {
+            Block::List(list) => list.variant == ListVariant::Unordered,
+            Block::ListItem(list) => list.marker == String::from("*"),
+            _ => false,
+        }
     }
 
     pub fn has_blocks(&self) -> bool {
@@ -118,7 +164,7 @@ impl Block {
             Block::SectionBody => vec![],
             Block::NonSectionBlockBody => vec![],
             Block::List(block) => block.location.clone(),
-            //Block::ListItem(_) => write!(f, "ListItem"),
+            Block::ListItem(block) => block.location.clone(),
             Block::DList(block) => block.location.clone(),
             //Block::DListItem(_) => write!(f, "DListItem"),
             Block::DiscreteHeading => vec![],
@@ -163,133 +209,6 @@ impl Section {
             level,
             blocks: vec![],
             location: vec![first_location],
-        }
-    }
-}
-
-#[derive(Serialize, Debug)]
-pub struct List {
-    name: String,
-    #[serde(rename = "type")]
-    node_type: NodeTypes,
-    marker: String,
-    variant: ListVariant,
-    items: Vec<ListItem>,
-    location: Vec<Location>,
-}
-
-impl PartialEq for List {
-    fn eq(&self, other: &Self) -> bool {
-        self.variant == other.variant
-    }
-}
-
-impl List {
-    pub fn new(variant: ListVariant, marker: String, location: Vec<Location>) -> Self {
-        List {
-            name: "list".to_string(),
-            node_type: NodeTypes::Block,
-            marker,
-            variant,
-            items: vec![],
-            location,
-        }
-    }
-}
-
-#[derive(Serialize, PartialEq, Eq, Debug)]
-#[serde(rename_all = "lowercase")]
-pub enum ListVariant {
-    Callout,
-    Ordered,
-    Unordered,
-}
-
-#[derive(Serialize, Debug)]
-pub struct ListItem {
-    name: String,
-    node_type: NodeTypes,
-    marker: String,                 // the lexeme with no space
-    principal: Option<Vec<Inline>>, // apparently this can also be optional!
-    blocks: Option<Vec<Block>>,     // a LI can have subsequent blocks, too
-    location: Vec<Location>,
-}
-
-impl ListItem {
-    pub fn new(
-        marker: String,
-        principal: Option<Vec<Inline>>,
-        blocks: Option<Vec<Block>>,
-        location: Vec<Location>,
-    ) -> Self {
-        ListItem {
-            name: "listItem".to_string(),
-            node_type: NodeTypes::Block,
-            marker,
-            principal,
-            blocks,
-            location,
-        }
-    }
-}
-
-#[derive(Serialize, Debug)]
-pub struct DList {
-    name: String,
-    #[serde(rename = "type")]
-    node_type: NodeTypes,
-    marker: String,
-    items: Vec<ListItem>,
-    location: Vec<Location>,
-}
-
-impl PartialEq for DList {
-    // all dlists are dlists
-    fn eq(&self, _: &Self) -> bool {
-        true
-    }
-}
-
-impl DList {
-    pub fn new(marker: String, location: Vec<Location>) -> Self {
-        DList {
-            name: "dlist".to_string(),
-            node_type: NodeTypes::Block,
-            marker,
-            items: vec![],
-            location,
-        }
-    }
-}
-
-#[derive(Serialize, Debug)]
-pub struct DListItem {
-    name: String,
-    #[serde(rename = "type")]
-    node_type: NodeTypes,
-    marker: String, // the lexeme with no space
-    terms: Vec<Inline>,
-    principal: Option<Vec<Inline>>, // apparently this can also be optional!
-    blocks: Option<Vec<Block>>,     // a LI can have subsequent blocks, too
-    location: Vec<Location>,
-}
-
-impl DListItem {
-    pub fn new(
-        marker: String,
-        terms: Vec<Inline>,
-        principal: Option<Vec<Inline>>,
-        blocks: Option<Vec<Block>>,
-        location: Vec<Location>,
-    ) -> Self {
-        DListItem {
-            name: "dlistItem".to_string(),
-            node_type: NodeTypes::Block,
-            marker,
-            terms,
-            principal,
-            blocks,
-            location,
         }
     }
 }
