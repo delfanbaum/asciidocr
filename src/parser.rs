@@ -17,6 +17,8 @@ pub struct Parser {
     in_title_field: bool,
     open_parent: bool,
     token_count: usize,
+    // used to see if we need to add a newline before new text
+    dangling_newline: Option<Token>,
 }
 
 impl Parser {
@@ -30,6 +32,7 @@ impl Parser {
             in_title_field: false,
             open_parent: false,
             token_count: 0,
+            dangling_newline: None,
         }
     }
 
@@ -104,13 +107,14 @@ impl Parser {
             // but if it's not a parent and this is a double new line, put the block in place
             } else if self.last_token_type == TokenType::NewLineChar {
                 self.add_to_block_stack_or_graph(asg, last_block);
+                self.dangling_newline = None;
             // otherwise put it back on the block stack
             } else {
                 self.open_blocks.push(last_block);
             }
         }
         // "else", add newline literal to the last block or create a block
-        self.add_text_to_last_inline(asg, token)
+        self.dangling_newline = Some(token)
     }
 
     fn parse_thematic_break(&mut self, token: Token, asg: &mut Asg) {
@@ -257,6 +261,10 @@ impl Parser {
                 ));
             }
         } else {
+            if let Some(newline_token) = self.dangling_newline.clone() {
+                self.add_text_to_last_inline(asg, newline_token);
+                self.dangling_newline = None;
+            }
             self.add_text_to_last_inline(asg, token)
         }
     }

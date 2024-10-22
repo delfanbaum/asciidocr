@@ -43,7 +43,7 @@ impl Asg {
     /// Adds a block (tree) to the "root" of the document
     pub fn push_block(&mut self, mut block: Block) {
         block.consolidate_locations();
-        block.trim_literals();
+        //block.trim_literals();
         self.blocks.push(block)
     }
 
