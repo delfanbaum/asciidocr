@@ -1,4 +1,5 @@
 use core::panic;
+use std::collections::HashMap;
 
 use crate::{
     asg::Asg,
@@ -10,10 +11,11 @@ use crate::{
 
 pub struct Parser {
     last_token_type: TokenType,
+    document_header: Header,
+    document_attributes: HashMap<String, String>,
     open_blocks: Vec<Block>,
     _open_inlines: Vec<Inline>,
     in_document_header: bool,
-    document_header: Header,
     in_title_field: bool,
     open_parent: bool,
     token_count: usize,
@@ -31,10 +33,11 @@ impl Parser {
     pub fn new() -> Self {
         Parser {
             last_token_type: TokenType::Eof,
+            document_header: Header::new(),
+            document_attributes: HashMap::new(),
             open_blocks: vec![],
             _open_inlines: vec![],
             in_document_header: true,
-            document_header: Header::new(),
             in_title_field: false,
             open_parent: false,
             token_count: 0,
@@ -73,6 +76,10 @@ impl Parser {
         }
 
         match token.token_type() {
+            // document header things
+            TokenType::Heading1 => self.parse_heading1(token, asg),
+            TokenType::Attribute => self.parse_attribute(token),
+            // everything else
             TokenType::NewLineChar => self.parse_new_line_char(token, asg),
             TokenType::PageBreak => self.parse_page_break(token, asg),
             TokenType::ThematicBreak => self.parse_thematic_break(token, asg),
@@ -81,13 +88,29 @@ impl Parser {
             TokenType::Text => self.parse_text(token, asg),
             TokenType::Comment => self.parse_comment(),
             TokenType::CommentBlock => self.parse_comment_block(),
-            TokenType::Heading1 => self.parse_heading1(token, asg),
             TokenType::Heading2 => self.parse_heading2(token, asg),
             TokenType::Heading3 => self.parse_heading3(token, asg),
             TokenType::Heading4 => self.parse_heading4(token, asg),
             TokenType::Heading5 => self.parse_heading5(token, asg),
             _ => {}
         }
+    }
+
+    fn parse_attribute(&mut self, token: Token) {
+        let binding = token.text();
+        let mut attr_components: Vec<&str> = binding.split_terminator(":").collect();
+        attr_components.remove(0); // throw away initial "" in the list
+        if attr_components.is_empty() {
+            // guard clause
+            todo!()
+        }
+        let key = attr_components.first().unwrap().to_string();
+        // values should be trimmed
+        let mut value = attr_components.last().unwrap().trim().to_string();
+        if key == value {
+            value = String::from("")
+        }
+        self.document_attributes.insert(key, value);
     }
 
     fn parse_new_line_char(&mut self, token: Token, asg: &mut Asg) {
@@ -100,7 +123,10 @@ impl Parser {
         {
             if !self.document_header.is_empty() {
                 self.document_header.consolidate();
-                asg.add_header(self.document_header.clone())
+                asg.add_header(
+                    self.document_header.clone(),
+                    self.document_attributes.clone(),
+                )
             }
             self.in_document_header = false
         }
@@ -309,9 +335,9 @@ impl Parser {
                     Inline::InlineRef(_) => todo!(),
                 }
             } else if last_block.takes_inlines() {
-                last_block.push_inline(Inline::InlineLiteral(
-                    InlineLiteral::new_text_from_token(&token),
-                ))
+                last_block.push_inline(Inline::InlineLiteral(InlineLiteral::new_text_from_token(
+                    &token,
+                )))
             } else {
                 // newlines on their own don't get a paragraph
                 if token.token_type() != TokenType::NewLineChar {

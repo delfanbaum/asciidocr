@@ -128,7 +128,7 @@ impl<'a> Scanner<'a> {
 
             '[' => {
                 // role, quote, verse, source, etc
-                if self.starts_attribute_line() {
+                if self.starts_attribution_line() {
                     match self.source.as_bytes()[self.start + 1] as char {
                         'q' => self.add_token(TokenType::Blockquote, true, 0),
                         'v' => self.add_token(TokenType::Verse, true, 0),
@@ -152,7 +152,12 @@ impl<'a> Scanner<'a> {
             '~' => self.add_token(TokenType::Subscript, false, 0),
             '#' => self.add_token(TokenType::Highlighted, false, 0),
             ':' => {
-                if self.peek_back() != ' ' && self.peeks_ahead(2) == ": " {
+                if self.starts_new_line() && self.starts_attr() {
+                    while self.peek() != '\n' { // TK line continuation
+                        self.current +=1
+                    }
+                    self.add_token(TokenType::Attribute, false, 0)
+                } else if self.peek_back() != ' ' && self.peeks_ahead(2) == ": " {
                     self.current += 2;
                     self.add_token(TokenType::DefListMark, false, 0)
                 } else {
@@ -310,8 +315,10 @@ impl<'a> Scanner<'a> {
         // "inline" chars that could be markup; the newline condition prevents
         // capturing significant block markup chars
         // Chars: newline, bold, italic, code, super, subscript, footnote, pass, link, end inline macro, definition list marker, highlighted, inline admonition initial chars
-        while !['\n', '*', '_', '`', '^', '~', 'f', 'p', 'h', ']', '[', ':', '#', 'N', 'T', 'I', 'C',
-            'W']
+        while ![
+            '\n', '*', '_', '`', '^', '~', 'f', 'p', 'h', ']', '[', ':', '#', 'N', 'T', 'I', 'C',
+            'W',
+        ]
         .contains(&self.peek())
             && !self.is_at_end()
         {
@@ -336,12 +343,22 @@ impl<'a> Scanner<'a> {
         expected_block.push('\n');
 
         self.current + delimiter_len <= self.source.len()
-            && self.source[self.start..self.current + delimiter_len]
-                == expected_block
+            && self.source[self.start..self.current + delimiter_len] == expected_block
+    }
+
+    /// Checks for document attribute lines, e.g., ":foo: bar" or ":foo:"
+    fn starts_attr(&mut self) -> bool {
+        let current_placeholder = self.current.clone();
+        while ![' ', '\n', ':'].contains(&self.peek()) && !self.is_at_end() {
+            self.current += 1
+        }
+        let check = self.source.as_bytes()[self.current] as char == ':';
+        self.current = current_placeholder;
+        check
     }
 
     /// Checks for lines such as [quote], [verse, Mary Oliver], [source, python], etc.
-    fn starts_attribute_line(&mut self) -> bool {
+    fn starts_attribution_line(&mut self) -> bool {
         let current_placeholder = self.current;
         while self.peek() != '\n' && !self.is_at_end() {
             self.current += 1;
@@ -367,7 +384,7 @@ impl<'a> Scanner<'a> {
     }
 
     fn peek_back(&self) -> char {
-        if self.is_at_end() {
+        if self.start == 0 {
             return '\0';
         }
         self.source.as_bytes()[self.start - 1] as char
@@ -1053,6 +1070,23 @@ mod tests {
                 13,
             ),
             Token::new(TokenType::Highlighted, "#".to_string(), None, 3, 14, 14),
+        ];
+        scan_and_assert_eq(&markup, expected_tokens);
+    }
+
+    #[test]
+    fn document_attribute_name_value() {
+        let markup = ":foo: bar\n";
+        let expected_tokens = vec![
+            Token::new(
+                TokenType::Attribute,
+                String::from(":foo: bar"),
+                None,
+                1,
+                1,
+                9,
+            ),
+            Token::new(TokenType::NewLineChar, "\n".to_string(), None, 1, 10, 10),
         ];
         scan_and_assert_eq(&markup, expected_tokens);
     }

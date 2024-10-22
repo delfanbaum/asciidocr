@@ -40,10 +40,10 @@ impl Asg {
         }
     }
 
-    pub fn add_header(&mut self, header: Header) {
-        self.attributes = Some(HashMap::new());
+    pub fn add_header(&mut self, header: Header, doc_attributes: HashMap<String, String>) {
         self.header = Some(header);
-        // add the attributes from the header... later
+        // always add attributes if there is a header, even if empty
+        self.attributes = Some(doc_attributes)
     }
 
     /// Adds a block (tree) to the "root" of the document

@@ -22,11 +22,11 @@
           "name": "text",
           "type": "string",
           "value": "Text",
-          "location": [{ "line": 3, "col": 1 }, { "line": 3, "col": 4 }]
+          "location": [{ "line": 5, "col": 1 }, { "line": 5, "col": 4 }]
         }
       ],
-      "location": [{ "line": 3, "col": 1 }, { "line": 3, "col": 4 }]
+      "location": [{ "line": 5, "col": 1 }, { "line": 5, "col": 4 }]
     }
   ],
-  "location": [{ "line": 1, "col": 1 }, { "line": 3, "col": 4 }]
+  "location": [{ "line": 1, "col": 1 }, { "line": 5, "col": 4 }]
 }

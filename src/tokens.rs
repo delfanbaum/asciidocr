@@ -77,6 +77,7 @@ impl Token {
                 | TokenType::Monospace
                 | TokenType::Highlighted
                 | TokenType::NewLineChar
+                | TokenType::Attribute
         )
     }
 }
@@ -153,6 +154,9 @@ pub enum TokenType {
 
     // garden-variety text
     Text,
+
+    // document attributes
+    Attribute,
 
     // End of File Token
     Eof,
