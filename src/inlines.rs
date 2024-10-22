@@ -42,10 +42,7 @@ impl Inline {
     }
 
     pub fn is_literal(&self) -> bool {
-        match &self {
-            Inline::InlineLiteral(_) => true,
-            _ => false,
-        }
+        matches!(self, Inline::InlineLiteral(_))
     }
 
     pub fn extract_values_to_string(&self) -> String {
@@ -86,12 +83,9 @@ impl Inline {
     }
 
     pub fn trim(&mut self) {
-        match self {
-            Inline::InlineLiteral(inline) => {
-                inline.value = inline.value.trim().to_string();
-                println!("{:?}", inline.value)
-            }
-            _ => {}
+        if let Inline::InlineLiteral(inline) = self {
+            inline.value = inline.value.trim().to_string();
+            println!("{:?}", inline.value)
         }
 
     }

@@ -22,6 +22,12 @@ pub struct Asg {
     pub location: Vec<Location>, // really a tuple of a "Start" location and an "end" location
 }
 
+impl Default for Asg {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Asg {
     pub fn new() -> Self {
         Asg {
@@ -43,7 +49,6 @@ impl Asg {
     /// Adds a block (tree) to the "root" of the document
     pub fn push_block(&mut self, mut block: Block) {
         block.consolidate_locations();
-        //block.trim_literals();
         self.blocks.push(block)
     }
 

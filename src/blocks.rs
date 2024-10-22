@@ -63,12 +63,9 @@ impl Block {
     }
 
     pub fn takes_inlines(&self) -> bool {
-        match self {
-            Block::Section(_) => true,
-            Block::LeafBlock(_) => true,
-            _ => false,
-        }
+        matches!(self, Block::Section(_) | Block::LeafBlock(_))
     }
+
     pub fn push_inline(&mut self, inline: Inline) {
         match self {
             Block::Section(section) => section.title.push(inline),
@@ -78,36 +75,20 @@ impl Block {
     }
 
     pub fn consolidate_locations(&mut self) {
-        match self {
-            Block::LeafBlock(block) => {
-                if let Some(last_inline) = block.inlines.last() {
-                    block.location =
-                        Location::reconcile(block.location.clone(), last_inline.locations())
-                }
+        if let Block::LeafBlock(block) = self {
+            if let Some(last_inline) = block.inlines.last() {
+                block.location =
+                    Location::reconcile(block.location.clone(), last_inline.locations())
             }
-            _ => {}
-        }
-    }
-    pub fn trim_literals(&mut self) {
-        match self {
-            Block::LeafBlock(block) => {
-                let _ = block.inlines.iter_mut().for_each(|i| i.trim());
-            }
-            _ => {}
         }
     }
 
     pub fn can_be_parent(&self) -> bool {
-        match self {
-            Block::Section(_) => true,
-            _ => false,
-        }
+        matches!(self, Block::Section(_))
     }
+
     pub fn is_section(&self) -> bool {
-        match self {
-            Block::Section(_) => true,
-            _ => false,
-        }
+        matches!(self, Block::Section(_))
     }
 
     pub fn has_blocks(&self) -> bool {
@@ -119,18 +100,15 @@ impl Block {
     }
 
     pub fn create_id(&mut self) {
-        match self {
-            Block::Section(section) => {
-                if section.id == "".to_string() {
-                    let mut id = String::new();
-                    for inline in &section.title {
-                        id.push_str(&inline.extract_values_to_string())
-                    }
-                    id = id.replace(" ", "-");
-                    section.id = id
+        if let Block::Section(section) = self {
+            if section.id == *"" {
+                let mut id = String::new();
+                for inline in &section.title {
+                    id.push_str(&inline.extract_values_to_string())
                 }
+                id = id.replace(" ", "-");
+                section.id = id
             }
-            _ => {}
         }
     }
 
@@ -420,10 +398,7 @@ pub enum LeafBlockForm {
 
 impl LeafBlockForm {
     fn is_paragraph(&self) -> bool {
-        match self {
-            LeafBlockForm::Paragraph => true,
-            _ => false,
-        }
+        matches!(self, LeafBlockForm::Paragraph)
     }
 }
 
@@ -491,7 +466,7 @@ impl PartialEq for ParentBlock {
     fn eq(&self, other: &Self) -> bool {
         if let Some(variant) = &self.variant {
             if let Some(other_variant) = &other.variant {
-                variant == other_variant && &self.name == &other.name
+                variant == other_variant && self.name == other.name
             } else {
                 false
             }

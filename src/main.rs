@@ -28,6 +28,6 @@ fn run(filename: &str) {
 fn open(filename: &str) -> String {
     match filename {
         "-" => io::read_to_string(io::stdin()).expect("Error reading from stdin"),
-        _ => fs::read_to_string(filename).expect(&format!("Unable to read file: {}", filename)),
+        _ => fs::read_to_string(filename).unwrap_or_else(|_| panic!("Unable to read file: {}", filename)),
     }
 }

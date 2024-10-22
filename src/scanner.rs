@@ -15,7 +15,7 @@ impl<'a> Iterator for Scanner<'a> {
     type Item = Token;
 
     fn next(&mut self) -> Option<Self::Item> {
-        while !self.is_at_end() {
+        if !self.is_at_end() {
             self.start = self.current;
             return Some(self.scan_token());
         }
@@ -310,10 +310,8 @@ impl<'a> Scanner<'a> {
         // "inline" chars that could be markup; the newline condition prevents
         // capturing significant block markup chars
         // Chars: newline, bold, italic, code, super, subscript, footnote, pass, link, end inline macro, definition list marker, highlighted, inline admonition initial chars
-        while !vec![
-            '\n', '*', '_', '`', '^', '~', 'f', 'p', 'h', ']', '[', ':', '#', 'N', 'T', 'I', 'C',
-            'W',
-        ]
+        while !['\n', '*', '_', '`', '^', '~', 'f', 'p', 'h', ']', '[', ':', '#', 'N', 'T', 'I', 'C',
+            'W']
         .contains(&self.peek())
             && !self.is_at_end()
         {
@@ -338,9 +336,8 @@ impl<'a> Scanner<'a> {
         expected_block.push('\n');
 
         self.current + delimiter_len <= self.source.len()
-            && str::from_utf8(&self.source.as_bytes()[self.start..self.current + delimiter_len])
-                .unwrap()
-                == &expected_block
+            && self.source[self.start..self.current + delimiter_len]
+                == expected_block
     }
 
     /// Checks for lines such as [quote], [verse, Mary Oliver], [source, python], etc.

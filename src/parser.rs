@@ -3,7 +3,7 @@ use core::panic;
 use crate::{
     asg::Asg,
     blocks::{Block, Break, LeafBlock, Section},
-    inlines::{self, Inline, InlineLiteral},
+    inlines::{Inline, InlineLiteral},
     nodes::Header,
     tokens::{Token, TokenType},
 };
@@ -11,7 +11,7 @@ use crate::{
 pub struct Parser {
     last_token_type: TokenType,
     open_blocks: Vec<Block>,
-    open_inlines: Vec<Inline>,
+    _open_inlines: Vec<Inline>,
     in_document_header: bool,
     document_header: Header,
     in_title_field: bool,
@@ -21,12 +21,18 @@ pub struct Parser {
     dangling_newline: Option<Token>,
 }
 
+impl Default for Parser {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Parser {
     pub fn new() -> Self {
         Parser {
             last_token_type: TokenType::Eof,
             open_blocks: vec![],
-            open_inlines: vec![],
+            _open_inlines: vec![],
             in_document_header: true,
             document_header: Header::new(),
             in_title_field: false,
@@ -89,7 +95,7 @@ impl Parser {
             // newline exits a title, TK line continuation
             self.in_title_field = false;
         }
-        if vec![TokenType::NewLineChar, TokenType::Eof].contains(&self.last_token_type)
+        if [TokenType::NewLineChar, TokenType::Eof].contains(&self.last_token_type)
             && self.in_document_header
         {
             if !self.document_header.is_empty() {
@@ -302,28 +308,24 @@ impl Parser {
                     )),
                     Inline::InlineRef(_) => todo!(),
                 }
+            } else if last_block.takes_inlines() {
+                last_block.push_inline(Inline::InlineLiteral(
+                    InlineLiteral::new_text_from_token(&token),
+                ))
             } else {
-                if last_block.takes_inlines() {
-                    last_block.push_inline(Inline::InlineLiteral(
+                // newlines on their own don't get a paragraph
+                if token.token_type() != TokenType::NewLineChar {
+                    self.add_inline_to_block_stack(Inline::InlineLiteral(
                         InlineLiteral::new_text_from_token(&token),
                     ))
                 } else {
-                    // newlines on their own don't get a paragraph
-                    if token.token_type() != TokenType::NewLineChar {
-                        self.add_inline_to_block_stack(Inline::InlineLiteral(
-                            InlineLiteral::new_text_from_token(&token),
-                        ))
-                    } else {
-                        self.add_last_block_to_graph(asg);
-                    }
+                    self.add_last_block_to_graph(asg);
                 }
             }
-        } else {
-            if token.token_type() != TokenType::NewLineChar {
-                self.add_inline_to_block_stack(Inline::InlineLiteral(
-                    InlineLiteral::new_text_from_token(&token),
-                ))
-            }
+        } else if token.token_type() != TokenType::NewLineChar {
+            self.add_inline_to_block_stack(Inline::InlineLiteral(
+                InlineLiteral::new_text_from_token(&token),
+            ))
         }
     }
 

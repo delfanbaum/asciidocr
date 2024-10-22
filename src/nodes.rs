@@ -19,6 +19,12 @@ pub struct Header {
     pub location: Vec<Location>,
 }
 
+impl Default for Header {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Header {
     pub fn new() -> Self {
         Header {
@@ -82,11 +88,7 @@ impl Ord for Location {
 
 impl PartialOrd for Location {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        if self.line == other.line {
-            Some(self.col.cmp(&other.col))
-        } else {
-            Some(self.line.cmp(&other.line))
-        }
+        Some(self.cmp(other))
     }
 }
 

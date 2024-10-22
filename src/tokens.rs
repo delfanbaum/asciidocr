@@ -67,17 +67,17 @@ impl Token {
     }
 
     pub fn can_be_in_document_header(&self) -> bool {
-        match self.token_type() {
-            TokenType::Heading1 => true,
-            TokenType::Comment => true,
-            TokenType::Text => true,
-            TokenType::Italic => true,
-            TokenType::Bold => true,
-            TokenType::Monospace => true,
-            TokenType::Highlighted => true,
-            TokenType::NewLineChar => true,
-            _ => false,
-        }
+        matches!(
+            self.token_type(),
+            TokenType::Heading1
+                | TokenType::Comment
+                | TokenType::Text
+                | TokenType::Italic
+                | TokenType::Bold
+                | TokenType::Monospace
+                | TokenType::Highlighted
+                | TokenType::NewLineChar
+        )
     }
 }
 
