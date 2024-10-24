@@ -1,26 +1,33 @@
-use std::{env, fs, process::exit};
+use std::{
+    env,
+    fs::{self},
+    io,
+    process::exit,
+};
 
-use asciidocr::scanner::Scanner;
+use asciidocr::{parser::Parser, scanner::Scanner};
 
 fn main() {
     // take a single arg for simplicity for now; CLI TK
     let args: Vec<String> = env::args().collect();
     if args.len() == 2 {
-        run(args[1].clone())
+        run(&args[1])
     } else {
         eprintln!("Usage: asciidocr FILE");
         exit(1)
     }
-
-    //scan_and_parse(open(file_path).expect("Unable to open the specified file."));
 }
 
-fn run(file_path: String) {
-    let source = fs::read_to_string(&file_path).expect(&format!("Unable to read file: {}", file_path));
-    let s = Scanner::new(&source);
-    let tokens: Vec<asciidocr::tokens::Token> = s.collect();
-    println!("{:?}", tokens);
+fn run(filename: &str) {
+    let source = open(filename);
+    let serialized = serde_json::to_string_pretty(&Parser::new().parse(Scanner::new(&source)));
+    //let serialized = serde_json::to_string(&Parser::new().parse(Scanner::new(&source)));
+    println!("{}", serialized.unwrap());
 }
 
-// generate errors
-// report errors, separate concerns
+fn open(filename: &str) -> String {
+    match filename {
+        "-" => io::read_to_string(io::stdin()).expect("Error reading from stdin"),
+        _ => fs::read_to_string(filename).unwrap_or_else(|_| panic!("Unable to read file: {}", filename)),
+    }
+}

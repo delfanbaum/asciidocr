@@ -1,0 +1,72 @@
+{
+  "name": "document",
+  "type": "block",
+  "blocks": [
+    {
+      "name": "list",
+      "type": "block",
+      "marker": "*",
+      "variant": "unordered",
+      "items": [
+        {
+          "name": "listItem",
+          "type": "block",
+          "marker": "*",
+          "principal": [
+            {
+              "name": "text",
+              "type": "string",
+              "value": "rusty",
+              "location": [ { "line": 1, "col": 3 }, { "line": 1, "col": 7 } ]
+            }
+          ],
+          "location": [ { "line": 1, "col": 1 }, { "line": 1, "col": 7 } ]
+        },
+        {
+          "name": "listItem",
+          "type": "block",
+          "marker": "*",
+          "principal": [
+            {
+              "name": "text",
+              "type": "string",
+              "value": "water",
+              "location": [ { "line": 2, "col": 3 }, { "line": 2, "col": 7 } ]
+            }
+          ],
+          "location": [ { "line": 2, "col": 1 }, { "line": 2, "col": 7 } ]
+        },
+        {
+          "name": "listItem",
+          "type": "block",
+          "marker": "*",
+          "principal": [
+            {
+              "name": "text",
+              "type": "string",
+              "value": "is cool",
+              "location": [ { "line": 3, "col": 3 }, { "line": 3, "col": 9 } ]
+            }
+          ],
+          "location": [ { "line": 3, "col": 1 }, { "line": 3, "col": 9 } ]
+        },
+        {
+          "name": "listItem",
+          "type": "block",
+          "marker": "*",
+          "principal": [
+            {
+              "name": "text",
+              "type": "string",
+              "value": "to drink",
+              "location": [ { "line": 4, "col": 3 }, { "line": 4, "col": 10 } ]
+            }
+          ],
+          "location": [ { "line": 4, "col": 1 }, { "line": 4, "col": 10 } ]
+        }
+      ],
+      "location": [ { "line": 1, "col": 1 }, { "line": 4, "col": 10 } ]
+    }
+  ],
+  "location": [ { "line": 1, "col": 1 }, { "line": 4, "col": 10 } ]
+}

@@ -2,24 +2,30 @@ use std::collections::HashMap;
 
 use serde::Serialize;
 
-use crate::nodes::{Location, NodeTypes};
-use crate::inlines::Inline;
 use crate::blocks::Block;
+use crate::nodes::{Header, Location, NodeTypes};
 
-
-// roughly meaning to follow
-// https://gitlab.eclipse.org/eclipse/asciidoc-lang/asciidoc-lang/-/blob/main/asg/schema.json
-
+/// Abstract Syntax Graph used to represent an asciidoc document
+/// roughly meaning to follow the "official" schema:
+/// https://gitlab.eclipse.org/eclipse/asciidoc-lang/asciidoc-lang/-/blob/main/asg/schema.json
 #[derive(Serialize)]
 pub struct Asg {
     // abstract syntax graph
-    pub name: String,                        // is this always "Document?"
+    pub name: String, // is this always "Document?"
     #[serde(rename = "type")]
-    pub node_type: NodeTypes,                // is this always "block"
-    pub attributes: HashMap<String, String>, // the value can also be a bool; deal with this later
+    pub node_type: NodeTypes, // is this always "block"
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub attributes: Option<HashMap<String, String>>, // the value can also be a bool; deal with this later
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub header: Option<Header>,
     pub blocks: Vec<Block>,
     pub location: Vec<Location>, // really a tuple of a "Start" location and an "end" location
+}
+
+impl Default for Asg {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl Asg {
@@ -27,14 +33,29 @@ impl Asg {
         Asg {
             name: "document".to_string(),
             node_type: NodeTypes::Block,
-            attributes: HashMap::new(),
+            attributes: None,
             header: None,
             blocks: vec![],
-            location: vec![Location {
-                line: 1,
-                col: 1,
-                file: None,
-            }],
+            location: vec![Location::default()],
+        }
+    }
+
+    pub fn add_header(&mut self, header: Header, doc_attributes: HashMap<String, String>) {
+        self.header = Some(header);
+        // always add attributes if there is a header, even if empty
+        self.attributes = Some(doc_attributes)
+    }
+
+    /// Adds a block (tree) to the "root" of the document
+    pub fn push_block(&mut self, mut block: Block) {
+        block.consolidate_locations();
+        self.blocks.push(block)
+    }
+
+    /// Consolidates location (and, later, other) information about the tree
+    pub fn consolidate(&mut self) {
+        if let Some(last_block) = self.blocks.last_mut() {
+            self.location = Location::reconcile(self.location.clone(), last_block.locations())
         }
     }
 
@@ -43,21 +64,3 @@ impl Asg {
         self.location.len() == 2
     }
 }
-
-#[derive(Serialize)]
-pub struct Header {
-    title: Vec<Inline>,
-    authors: Option<Vec<Author>>,
-    location: Vec<Location>,
-}
-
-#[derive(Serialize)]
-pub struct Author {
-    fullname: String,
-    initials: String,
-    firstname: String,
-    middlename: String,
-    lastname: String,
-    address: String,
-}
-
