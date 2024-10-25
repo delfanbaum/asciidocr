@@ -1,0 +1,34 @@
+= asciidocr
+
+A(n in-progress, unstable, incomplete) Rust library for processing Asciidoc files.
+
+== Current State Notes (As of the Last README Commit)
+
+Token scanning is more or less in a pretty good place (and one such that it's
+pretty easy to add new tokens as needed), and parsing is coming along. Right now
+I'm targeting producing a JSON document along the lines of the "official"
+https://gitlab.eclipse.org/eclipse/asciidoc-lang/asciidoc-lang/-/tree/main/asg?ref_type=heads[ASG
+Schema]. The `tests/` directory will describe the most up-to-date current
+capabilities.
+
+My plan at the current moment is to target covering a reasonable amount of the
+ASG Schema (most block types, ignoring includes, probably some reference types),
+after which I'll start building out a basic HTML backend (targeting output more
+along the lines of markdown-output HTML as opposed to what `asciidoctor` produces,
+which I feel is a little too ``div``-happy). The plan is to make the backends
+relatively "pluggable," insofar as it can be anything that consumes the `Asg`
+object produced by the parser.
+
+== Project Goals 
+
+A non-exhaustive list:
+
+* Coverage of the majority, if not all, of the language features, probably
+  initially targeting a set similar to that of the `libasciidoc` project.
+* Clean, simple HTML output as a default
+* Native "document" (`docx` or `odt`, probably `docx`) output; given that part
+  of the goal of this project is to make it easier for non-technical writers to
+  use asciidoc, and given that most publishers, journals, business people, etc.,
+  still want MS Word files, these should be easy to produce. (Also
+  differentiates this project's capabilities from that of `asciidoctor`)
+* PyO3 hooks for use inside Python contexts... eventually
