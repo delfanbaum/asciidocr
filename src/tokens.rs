@@ -144,7 +144,7 @@ pub enum TokenType {
 
     Superscript, // ^super^
     Subscript,   // ~sub~
-    Mark, // #text# or [.class]#text#
+    Mark,        // #text# or [.class]#text#
 
     // inline macros
     LinkMacro,
@@ -155,8 +155,14 @@ pub enum TokenType {
     // garden-variety text
     Text,
 
+    // character reference, such as "&mdash;"
+    CharRef,
+
     // document attributes
     Attribute,
+
+    // attribute reference, e.g., "{my-thing}"
+    AttributeReference,
 
     // End of File Token
     Eof,

@@ -153,8 +153,9 @@ impl<'a> Scanner<'a> {
             '#' => self.add_token(TokenType::Mark, false, 0),
             ':' => {
                 if self.starts_new_line() && self.starts_attr() {
-                    while self.peek() != '\n' { // TK line continuation
-                        self.current +=1
+                    while self.peek() != '\n' {
+                        // TK line continuation
+                        self.current += 1
                     }
                     self.add_token(TokenType::Attribute, false, 0)
                 } else if self.peek_back() != ' ' && self.peeks_ahead(2) == ": " {
@@ -230,6 +231,32 @@ impl<'a> Scanner<'a> {
             }
             // Assume that these are macro closes; the parser can always reject it
             ']' => self.add_token(TokenType::InlineMacroClose, true, 0),
+            // & chars followed by some number of characters ending with ";" should be considered
+            // CharRef tokens... why we need to collect these I'm not entirely sure, but it's in
+            // the spec
+            '&' => {
+                if self.starts_charref() {
+                    while self.peek().is_alphanumeric() && !self.is_at_end() {
+                        self.current += 1
+                    }
+                    self.current += 1; // add the ";" at the end
+                    self.add_token(TokenType::CharRef, true, 0)
+                } else {
+                    self.add_text_until_next_markup()
+                }
+            }
+            '{' => {
+                if self.starts_attribute_reference() {
+                    while (self.peek().is_alphanumeric() || self.peek() == '-') && !self.is_at_end()
+                    {
+                        self.current += 1
+                    }
+                    self.current += 1; // add the "}" at the end
+                    self.add_token(TokenType::AttributeReference, false, 0)
+                } else {
+                    self.add_text_until_next_markup()
+                }
+            }
             _ => self.add_text_until_next_markup(),
         }
     }
@@ -317,7 +344,7 @@ impl<'a> Scanner<'a> {
         // Chars: newline, bold, italic, code, super, subscript, footnote, pass, link, end inline macro, definition list marker, highlighted, inline admonition initial chars
         while ![
             '\n', '*', '_', '`', '^', '~', 'f', 'p', 'h', ']', '[', ':', '#', 'N', 'T', 'I', 'C',
-            'W',
+            'W', '&', '{',
         ]
         .contains(&self.peek())
             && !self.is_at_end()
@@ -353,6 +380,32 @@ impl<'a> Scanner<'a> {
             self.current += 1
         }
         let check = self.source.as_bytes()[self.current] as char == ':';
+        self.current = current_placeholder;
+        check
+    }
+
+    /// Checks for document attribute references, e.g., {my-thing}
+    /// According to the asciidoctor docs, they must be:
+    /// * be at least one character long,
+    /// * begin with a word character (A-Z, a-z, 0-9, or _), and
+    /// * only contain word characters and hyphens.
+    fn starts_attribute_reference(&mut self) -> bool {
+        let current_placeholder = self.current.clone();
+        while (self.peek().is_alphanumeric() || self.peek() == '-') && !self.is_at_end() {
+            self.current += 1
+        }
+        let check = self.source.as_bytes()[self.current] as char == '}';
+        self.current = current_placeholder;
+        check
+    }
+
+    /// Checks for CharRefs, i.e., &plus; type things
+    fn starts_charref(&mut self) -> bool {
+        let current_placeholder = self.current.clone();
+        while self.peek().is_alphanumeric() && !self.is_at_end() {
+            self.current += 1
+        }
+        let check = self.source.as_bytes()[self.current] as char == ';';
         self.current = current_placeholder;
         check
     }
@@ -526,7 +579,7 @@ mod tests {
         ];
         scan_and_assert_eq(&markup, expected_tokens);
     }
-    
+
     #[rstest]
     #[case::unordered("* Foo\n* Bar".to_string(), TokenType::UnorderedListItem)]
     #[case::ordered(". Foo\n. Bar".to_string(), TokenType::OrderedListItem)]
@@ -1110,6 +1163,38 @@ mod tests {
     }
 
     #[test]
+    fn inline_charref() {
+        let markup = "bar&mdash;bar";
+        let expected_tokens = vec![
+            Token::new(
+                TokenType::Text,
+                "bar".to_string(),
+                Some("bar".to_string()),
+                1,
+                1,
+                3,
+            ),
+            Token::new(
+                TokenType::CharRef,
+                "&mdash;".to_string(),
+                Some("&mdash;".to_string()),
+                1,
+                4,
+                10,
+            ),
+            Token::new(
+                TokenType::Text,
+                "bar".to_string(),
+                Some("bar".to_string()),
+                1,
+                11,
+                13,
+            ),
+        ];
+        scan_and_assert_eq(&markup, expected_tokens);
+    }
+
+    #[test]
     fn document_attribute_name_value() {
         let markup = ":foo: bar\n";
         let expected_tokens = vec![
@@ -1122,6 +1207,38 @@ mod tests {
                 9,
             ),
             Token::new(TokenType::NewLineChar, "\n".to_string(), None, 1, 10, 10),
+        ];
+        scan_and_assert_eq(&markup, expected_tokens);
+    }
+
+    #[test]
+    fn inline_attr_reference() {
+        let markup = "bar{foo}bar";
+        let expected_tokens = vec![
+            Token::new(
+                TokenType::Text,
+                "bar".to_string(),
+                Some("bar".to_string()),
+                1,
+                1,
+                3,
+            ),
+            Token::new(
+                TokenType::AttributeReference,
+                "{foo}".to_string(),
+                None,
+                1,
+                4,
+                8,
+            ),
+            Token::new(
+                TokenType::Text,
+                "bar".to_string(),
+                Some("bar".to_string()),
+                1,
+                9,
+                11,
+            ),
         ];
         scan_and_assert_eq(&markup, expected_tokens);
     }
