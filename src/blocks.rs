@@ -109,11 +109,9 @@ impl Block {
                 if let Some(last_block) = block.blocks.last() {
                     block.location =
                         Location::reconcile(block.location.clone(), last_block.locations())
-                } else {
-                    if let Some(last_inline) = block.principal.last() {
-                        block.location =
-                            Location::reconcile(block.location.clone(), last_inline.locations())
-                    }
+                } else if let Some(last_inline) = block.principal.last() {
+                    block.location =
+                        Location::reconcile(block.location.clone(), last_inline.locations())
                 }
             }
             _ => todo!(),
@@ -140,7 +138,7 @@ impl Block {
     pub fn is_ordered_list(&self) -> bool {
         match self {
             Block::List(list) => list.variant == ListVariant::Ordered,
-            Block::ListItem(list) => list.marker == String::from("."),
+            Block::ListItem(list) => list.marker == *".",
             _ => false,
         }
     }
@@ -148,7 +146,7 @@ impl Block {
     pub fn is_unordered_list(&self) -> bool {
         match self {
             Block::List(list) => list.variant == ListVariant::Unordered,
-            Block::ListItem(list) => list.marker == String::from("*"),
+            Block::ListItem(list) => list.marker == *"*",
             _ => false,
         }
     }

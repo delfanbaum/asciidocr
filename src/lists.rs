@@ -26,8 +26,8 @@ impl List {
     pub fn new(variant: ListVariant, location: Vec<Location>) -> Self {
         let mut list_marker = String::new();
         match variant {
-            ListVariant::Unordered => list_marker.push_str("*"),
-            ListVariant::Ordered => list_marker.push_str("."),
+            ListVariant::Unordered => list_marker.push('*'),
+            ListVariant::Ordered => list_marker.push('.'),
             ListVariant::Callout => todo!(),
         }
 

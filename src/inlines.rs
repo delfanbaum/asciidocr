@@ -182,14 +182,9 @@ impl InlineSpan {
         self.location = Location::reconcile(self.location.clone(), inline.locations());
         // combine literals if necessary
         if matches!(inline, Inline::InlineLiteral(_)) {
-            if let Some(last_token) = self.inlines.last_mut() {
-                match last_token {
-                    Inline::InlineLiteral(prior_literal) => {
-                        prior_literal.add_text_from_inline_literal(inline);
-                        return;
-                    }
-                    _ => {} // fall through
-                }
+            if let Some(Inline::InlineLiteral(prior_literal)) = self.inlines.last_mut() {
+                prior_literal.add_text_from_inline_literal(inline);
+                return;
             }
         }
         self.inlines.push(inline);
@@ -281,7 +276,6 @@ impl InlineLiteral {
         }
         self.location = Location::reconcile(self.location.clone(), inline.locations().clone());
     }
-
 }
 
 #[derive(Serialize, Clone, Debug)]

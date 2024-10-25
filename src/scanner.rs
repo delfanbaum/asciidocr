@@ -375,7 +375,7 @@ impl<'a> Scanner<'a> {
 
     /// Checks for document attribute lines, e.g., ":foo: bar" or ":foo:"
     fn starts_attr(&mut self) -> bool {
-        let current_placeholder = self.current.clone();
+        let current_placeholder = self.current;
         while ![' ', '\n', ':'].contains(&self.peek()) && !self.is_at_end() {
             self.current += 1
         }
@@ -390,7 +390,7 @@ impl<'a> Scanner<'a> {
     /// * begin with a word character (A-Z, a-z, 0-9, or _), and
     /// * only contain word characters and hyphens.
     fn starts_attribute_reference(&mut self) -> bool {
-        let current_placeholder = self.current.clone();
+        let current_placeholder = self.current;
         while (self.peek().is_alphanumeric() || self.peek() == '-') && !self.is_at_end() {
             self.current += 1
         }
@@ -401,7 +401,7 @@ impl<'a> Scanner<'a> {
 
     /// Checks for CharRefs, i.e., &plus; type things
     fn starts_charref(&mut self) -> bool {
-        let current_placeholder = self.current.clone();
+        let current_placeholder = self.current;
         while self.peek().is_alphanumeric() && !self.is_at_end() {
             self.current += 1
         }

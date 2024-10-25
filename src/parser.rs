@@ -528,7 +528,6 @@ impl Parser {
                     // sanity check
                     if matches!(next_last_block, Block::List(_)) {
                         next_last_block.push_block(block);
-                        return;
                     } else {
                         panic!("Dangling list item: missing parent list")
                     }
