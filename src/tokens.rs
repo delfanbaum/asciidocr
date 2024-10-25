@@ -48,19 +48,37 @@ impl Token {
         self.token_type
     }
 
+    pub fn text(&self) -> String {
+        if let Some(text) = &self.literal {
+            text.clone()
+        } else {
+            self.lexeme.clone()
+        }
+    }
+
+    pub fn first_location(&self) -> Location {
+        Location::new(self.line, self.startcol)
+    }
+    pub fn last_location(&self) -> Location {
+        Location::new(self.line, self.endcol)
+    }
     pub fn locations(&self) -> Vec<Location> {
-        vec![
-            Location {
-                line: self.line,
-                col: self.startcol,
-                file: None,
-            },
-            Location {
-                line: self.line,
-                col: self.endcol,
-                file: None,
-            },
-        ]
+        vec![self.first_location(), self.last_location()]
+    }
+
+    pub fn can_be_in_document_header(&self) -> bool {
+        matches!(
+            self.token_type(),
+            TokenType::Heading1
+                | TokenType::Comment
+                | TokenType::Text
+                | TokenType::Emphasis
+                | TokenType::Strong
+                | TokenType::Monospace
+                | TokenType::Mark
+                | TokenType::NewLineChar
+                | TokenType::Attribute
+        )
     }
 }
 
@@ -120,13 +138,13 @@ pub enum TokenType {
     DefListMark, // just match "::" and the parser can figure it out
 
     // formatting tokens (inline markup)
-    Bold,   // TK Handle bounded characters, e.g., **Some**thing -> <b>Some</b>thing
-    Italic, // same applies above
+    Strong,   // TK Handle bounded characters, e.g., **Some**thing -> <b>Some</b>thing
+    Emphasis, // same applies above
     Monospace,
 
     Superscript, // ^super^
     Subscript,   // ~sub~
-    Highlighted, // #text# or [.class]#text#
+    Mark,        // #text# or [.class]#text#
 
     // inline macros
     LinkMacro,
@@ -136,6 +154,15 @@ pub enum TokenType {
 
     // garden-variety text
     Text,
+
+    // character reference, such as "&mdash;"
+    CharRef,
+
+    // document attributes
+    Attribute,
+
+    // attribute reference, e.g., "{my-thing}"
+    AttributeReference,
 
     // End of File Token
     Eof,

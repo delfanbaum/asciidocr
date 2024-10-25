@@ -1,0 +1,96 @@
+
+{
+  "name": "document",
+  "type": "block",
+  "blocks": [
+    {
+      "name": "section",
+      "type": "block",
+      "title": [
+        {
+          "name": "text",
+          "type": "string",
+          "value": "Section Title",
+          "location": [{ "line": 1, "col": 4 }, { "line": 1, "col": 16 }]
+        }
+      ],
+      "level": 1,
+      "location": [{ "line": 1, "col": 1 }, { "line": 11, "col": 8 }],
+      "blocks": [
+        {
+          "name": "paragraph",
+          "type": "block",
+          "inlines": [
+            {
+              "name": "text",
+              "type": "string",
+              "value": "Contents",
+              "location": [{ "line": 3, "col": 1 }, { "line": 3, "col": 8 }]
+            }
+          ],
+          "location": [{ "line": 3, "col": 1 }, { "line": 3, "col": 8 }]
+        },
+        {
+          "name": "section",
+          "type": "block",
+          "title": [
+            {
+              "name": "text",
+              "type": "string",
+              "value": "Nested Section Title",
+              "location": [{ "line": 5, "col": 5 }, { "line": 5, "col": 24 }]
+            }
+          ],
+          "level": 2,
+          "location": [{ "line": 5, "col": 1 }, { "line": 7, "col": 8 }],
+          "blocks": [
+            {
+              "name": "paragraph",
+              "type": "block",
+              "inlines": [
+                {
+                  "name": "text",
+                  "type": "string",
+                  "value": "Contents",
+                  "location": [{ "line": 7, "col": 1 }, { "line": 7, "col": 8 }]
+                }
+              ],
+              "location": [{ "line": 7, "col": 1 }, { "line": 7, "col": 8 }]
+            }
+          ]
+        },
+        {
+          "name": "section",
+          "type": "block",
+          "title": [
+            {
+              "name": "text",
+              "type": "string",
+              "value": "Nested Section Title",
+              "location": [{ "line": 9, "col": 5 }, { "line": 9, "col": 24 }]
+            }
+          ],
+          "level": 2,
+          "location": [{ "line": 9, "col": 1 }, { "line": 11, "col": 8 }],
+          "blocks": [
+            {
+              "name": "paragraph",
+              "type": "block",
+              "inlines": [
+                {
+                  "name": "text",
+                  "type": "string",
+                  "value": "Contents",
+                  "location": [{ "line": 11, "col": 1 }, { "line": 11, "col": 8 }]
+                }
+              ],
+              "location": [{ "line": 11, "col": 1 }, { "line": 11, "col": 8 }]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "location": [{ "line": 1, "col": 1 }, { "line": 11, "col": 8 }]
+}
+

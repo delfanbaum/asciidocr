@@ -15,7 +15,7 @@ impl<'a> Iterator for Scanner<'a> {
     type Item = Token;
 
     fn next(&mut self) -> Option<Self::Item> {
-        while !self.is_at_end() {
+        if !self.is_at_end() {
             self.start = self.current;
             return Some(self.scan_token());
         }
@@ -87,7 +87,7 @@ impl<'a> Scanner<'a> {
                             if self.starts_new_line() && self.peek() == ' ' {
                                 self.add_list_item(TokenType::UnorderedListItem)
                             } else {
-                                self.add_token(TokenType::Bold, false, 0)
+                                self.add_token(TokenType::Strong, false, 0)
                             }
                         }
                         '/' => {
@@ -107,7 +107,7 @@ impl<'a> Scanner<'a> {
                                 self.add_text_until_next_markup()
                             }
                         }
-                        '_' => self.add_token(TokenType::Italic, false, 0),
+                        '_' => self.add_token(TokenType::Emphasis, false, 0),
                         _ => self.add_text_until_next_markup(),
                     }
                 }
@@ -115,7 +115,7 @@ impl<'a> Scanner<'a> {
 
             // ordered list item or section title
             '.' => {
-                if self.starts_new_block() {
+                if self.starts_new_line() {
                     if self.peek() == ' ' {
                         self.add_list_item(TokenType::OrderedListItem)
                     } else {
@@ -128,7 +128,7 @@ impl<'a> Scanner<'a> {
 
             '[' => {
                 // role, quote, verse, source, etc
-                if self.starts_attribute_line() {
+                if self.starts_attribution_line() {
                     match self.source.as_bytes()[self.start + 1] as char {
                         'q' => self.add_token(TokenType::Blockquote, true, 0),
                         'v' => self.add_token(TokenType::Verse, true, 0),
@@ -150,9 +150,15 @@ impl<'a> Scanner<'a> {
             '`' => self.add_token(TokenType::Monospace, false, 0),
             '^' => self.add_token(TokenType::Superscript, false, 0),
             '~' => self.add_token(TokenType::Subscript, false, 0),
-            '#' => self.add_token(TokenType::Highlighted, false, 0),
+            '#' => self.add_token(TokenType::Mark, false, 0),
             ':' => {
-                if self.peek_back() != ' ' && self.peeks_ahead(2) == ": " {
+                if self.starts_new_line() && self.starts_attr() {
+                    while self.peek() != '\n' {
+                        // TK line continuation
+                        self.current += 1
+                    }
+                    self.add_token(TokenType::Attribute, false, 0)
+                } else if self.peek_back() != ' ' && self.peeks_ahead(2) == ": " {
                     self.current += 2;
                     self.add_token(TokenType::DefListMark, false, 0)
                 } else {
@@ -225,6 +231,32 @@ impl<'a> Scanner<'a> {
             }
             // Assume that these are macro closes; the parser can always reject it
             ']' => self.add_token(TokenType::InlineMacroClose, true, 0),
+            // & chars followed by some number of characters ending with ";" should be considered
+            // CharRef tokens... why we need to collect these I'm not entirely sure, but it's in
+            // the spec
+            '&' => {
+                if self.starts_charref() {
+                    while self.peek().is_alphanumeric() && !self.is_at_end() {
+                        self.current += 1
+                    }
+                    self.current += 1; // add the ";" at the end
+                    self.add_token(TokenType::CharRef, true, 0)
+                } else {
+                    self.add_text_until_next_markup()
+                }
+            }
+            '{' => {
+                if self.starts_attribute_reference() {
+                    while (self.peek().is_alphanumeric() || self.peek() == '-') && !self.is_at_end()
+                    {
+                        self.current += 1
+                    }
+                    self.current += 1; // add the "}" at the end
+                    self.add_token(TokenType::AttributeReference, false, 0)
+                } else {
+                    self.add_text_until_next_markup()
+                }
+            }
             _ => self.add_text_until_next_markup(),
         }
     }
@@ -310,9 +342,9 @@ impl<'a> Scanner<'a> {
         // "inline" chars that could be markup; the newline condition prevents
         // capturing significant block markup chars
         // Chars: newline, bold, italic, code, super, subscript, footnote, pass, link, end inline macro, definition list marker, highlighted, inline admonition initial chars
-        while !vec![
+        while ![
             '\n', '*', '_', '`', '^', '~', 'f', 'p', 'h', ']', '[', ':', '#', 'N', 'T', 'I', 'C',
-            'W',
+            'W', '&', '{',
         ]
         .contains(&self.peek())
             && !self.is_at_end()
@@ -338,13 +370,48 @@ impl<'a> Scanner<'a> {
         expected_block.push('\n');
 
         self.current + delimiter_len <= self.source.len()
-            && str::from_utf8(&self.source.as_bytes()[self.start..self.current + delimiter_len])
-                .unwrap()
-                == &expected_block
+            && self.source[self.start..self.current + delimiter_len] == expected_block
+    }
+
+    /// Checks for document attribute lines, e.g., ":foo: bar" or ":foo:"
+    fn starts_attr(&mut self) -> bool {
+        let current_placeholder = self.current.clone();
+        while ![' ', '\n', ':'].contains(&self.peek()) && !self.is_at_end() {
+            self.current += 1
+        }
+        let check = self.source.as_bytes()[self.current] as char == ':';
+        self.current = current_placeholder;
+        check
+    }
+
+    /// Checks for document attribute references, e.g., {my-thing}
+    /// According to the asciidoctor docs, they must be:
+    /// * be at least one character long,
+    /// * begin with a word character (A-Z, a-z, 0-9, or _), and
+    /// * only contain word characters and hyphens.
+    fn starts_attribute_reference(&mut self) -> bool {
+        let current_placeholder = self.current.clone();
+        while (self.peek().is_alphanumeric() || self.peek() == '-') && !self.is_at_end() {
+            self.current += 1
+        }
+        let check = self.source.as_bytes()[self.current] as char == '}';
+        self.current = current_placeholder;
+        check
+    }
+
+    /// Checks for CharRefs, i.e., &plus; type things
+    fn starts_charref(&mut self) -> bool {
+        let current_placeholder = self.current.clone();
+        while self.peek().is_alphanumeric() && !self.is_at_end() {
+            self.current += 1
+        }
+        let check = self.source.as_bytes()[self.current] as char == ';';
+        self.current = current_placeholder;
+        check
     }
 
     /// Checks for lines such as [quote], [verse, Mary Oliver], [source, python], etc.
-    fn starts_attribute_line(&mut self) -> bool {
+    fn starts_attribution_line(&mut self) -> bool {
         let current_placeholder = self.current;
         while self.peek() != '\n' && !self.is_at_end() {
             self.current += 1;
@@ -370,7 +437,7 @@ impl<'a> Scanner<'a> {
     }
 
     fn peek_back(&self) -> char {
-        if self.is_at_end() {
+        if self.start == 0 {
             return '\0';
         }
         self.source.as_bytes()[self.start - 1] as char
@@ -490,7 +557,7 @@ mod tests {
     #[rstest]
     #[case("* Foo\n".to_string(), TokenType::UnorderedListItem)]
     #[case(". Foo\n".to_string(), TokenType::OrderedListItem)]
-    fn list_items(#[case] markup: String, #[case] expected_token: TokenType) {
+    fn single_list_items(#[case] markup: String, #[case] expected_token: TokenType) {
         let mut delimiter = markup
             .clone()
             .split_whitespace()
@@ -509,6 +576,41 @@ mod tests {
                 5,
             ),
             Token::new(TokenType::NewLineChar, "\n".to_string(), None, 1, 6, 6),
+        ];
+        scan_and_assert_eq(&markup, expected_tokens);
+    }
+
+    #[rstest]
+    #[case::unordered("* Foo\n* Bar".to_string(), TokenType::UnorderedListItem)]
+    #[case::ordered(". Foo\n. Bar".to_string(), TokenType::OrderedListItem)]
+    fn multiple_list_items(#[case] markup: String, #[case] expected_token: TokenType) {
+        let mut delimiter = markup
+            .clone()
+            .split_whitespace()
+            .next()
+            .unwrap()
+            .to_string();
+        delimiter.push(' ');
+        let expected_tokens = vec![
+            Token::new(expected_token, delimiter.clone(), None, 1, 1, 2),
+            Token::new(
+                TokenType::Text,
+                "Foo".to_string(),
+                Some("Foo".to_string()),
+                1,
+                3,
+                5,
+            ),
+            Token::new(TokenType::NewLineChar, "\n".to_string(), None, 1, 6, 6),
+            Token::new(expected_token, delimiter, None, 2, 1, 2),
+            Token::new(
+                TokenType::Text,
+                "Bar".to_string(),
+                Some("Bar".to_string()),
+                2,
+                3,
+                5,
+            ),
         ];
         scan_and_assert_eq(&markup, expected_tokens);
     }
@@ -679,12 +781,12 @@ mod tests {
     }
 
     #[rstest]
-    #[case('*', TokenType::Bold)]
-    #[case('_', TokenType::Italic)]
+    #[case('*', TokenType::Strong)]
+    #[case('_', TokenType::Emphasis)]
     #[case('`', TokenType::Monospace)]
     #[case('^', TokenType::Superscript)]
     #[case('~', TokenType::Subscript)]
-    #[case('#', TokenType::Highlighted)]
+    #[case('#', TokenType::Mark)]
     fn inline_formatting(#[case] markup_char: char, #[case] expected_token: TokenType) {
         let markup = format!("Some {}bar{} bar.", markup_char, markup_char);
         let expected_tokens = vec![
@@ -719,12 +821,12 @@ mod tests {
     }
 
     #[rstest]
-    #[case('*', TokenType::Bold)]
-    #[case('_', TokenType::Italic)]
+    #[case('*', TokenType::Strong)]
+    #[case('_', TokenType::Emphasis)]
     #[case('`', TokenType::Monospace)]
     #[case('^', TokenType::Superscript)]
     #[case('~', TokenType::Subscript)]
-    #[case('#', TokenType::Highlighted)]
+    #[case('#', TokenType::Mark)]
     fn inline_formatting_doubles(#[case] markup_char: char, #[case] expected_token: TokenType) {
         // TODO make this less ugly
         let markup = format!(
@@ -992,7 +1094,7 @@ mod tests {
                 6,
                 13,
             ),
-            Token::new(TokenType::Highlighted, "#".to_string(), None, 1, 14, 14),
+            Token::new(TokenType::Mark, "#".to_string(), None, 1, 14, 14),
             Token::new(
                 TokenType::Text,
                 "text".to_string(),
@@ -1001,7 +1103,7 @@ mod tests {
                 15,
                 18,
             ),
-            Token::new(TokenType::Highlighted, "#".to_string(), None, 1, 19, 19),
+            Token::new(TokenType::Mark, "#".to_string(), None, 1, 19, 19),
         ];
         scan_and_assert_eq(&markup, expected_tokens);
     }
@@ -1019,7 +1121,7 @@ mod tests {
                 1,
                 8,
             ),
-            Token::new(TokenType::Highlighted, "#".to_string(), None, 2, 9, 9),
+            Token::new(TokenType::Mark, "#".to_string(), None, 2, 9, 9),
             Token::new(
                 TokenType::Text,
                 "text".to_string(),
@@ -1028,7 +1130,7 @@ mod tests {
                 10,
                 13,
             ),
-            Token::new(TokenType::Highlighted, "#".to_string(), None, 2, 14, 14),
+            Token::new(TokenType::Mark, "#".to_string(), None, 2, 14, 14),
         ];
         scan_and_assert_eq(&markup, expected_tokens);
     }
@@ -1046,7 +1148,7 @@ mod tests {
                 1,
                 8,
             ),
-            Token::new(TokenType::Highlighted, "#".to_string(), None, 3, 9, 9),
+            Token::new(TokenType::Mark, "#".to_string(), None, 3, 9, 9),
             Token::new(
                 TokenType::Text,
                 "text".to_string(),
@@ -1055,7 +1157,88 @@ mod tests {
                 10,
                 13,
             ),
-            Token::new(TokenType::Highlighted, "#".to_string(), None, 3, 14, 14),
+            Token::new(TokenType::Mark, "#".to_string(), None, 3, 14, 14),
+        ];
+        scan_and_assert_eq(&markup, expected_tokens);
+    }
+
+    #[test]
+    fn inline_charref() {
+        let markup = "bar&mdash;bar";
+        let expected_tokens = vec![
+            Token::new(
+                TokenType::Text,
+                "bar".to_string(),
+                Some("bar".to_string()),
+                1,
+                1,
+                3,
+            ),
+            Token::new(
+                TokenType::CharRef,
+                "&mdash;".to_string(),
+                Some("&mdash;".to_string()),
+                1,
+                4,
+                10,
+            ),
+            Token::new(
+                TokenType::Text,
+                "bar".to_string(),
+                Some("bar".to_string()),
+                1,
+                11,
+                13,
+            ),
+        ];
+        scan_and_assert_eq(&markup, expected_tokens);
+    }
+
+    #[test]
+    fn document_attribute_name_value() {
+        let markup = ":foo: bar\n";
+        let expected_tokens = vec![
+            Token::new(
+                TokenType::Attribute,
+                String::from(":foo: bar"),
+                None,
+                1,
+                1,
+                9,
+            ),
+            Token::new(TokenType::NewLineChar, "\n".to_string(), None, 1, 10, 10),
+        ];
+        scan_and_assert_eq(&markup, expected_tokens);
+    }
+
+    #[test]
+    fn inline_attr_reference() {
+        let markup = "bar{foo}bar";
+        let expected_tokens = vec![
+            Token::new(
+                TokenType::Text,
+                "bar".to_string(),
+                Some("bar".to_string()),
+                1,
+                1,
+                3,
+            ),
+            Token::new(
+                TokenType::AttributeReference,
+                "{foo}".to_string(),
+                None,
+                1,
+                4,
+                8,
+            ),
+            Token::new(
+                TokenType::Text,
+                "bar".to_string(),
+                Some("bar".to_string()),
+                1,
+                9,
+                11,
+            ),
         ];
         scan_and_assert_eq(&markup, expected_tokens);
     }
