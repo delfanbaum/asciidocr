@@ -58,6 +58,7 @@ impl Block {
     }
 
     pub fn push_block(&mut self, block: Block) {
+        self.consolidate_locations();
         match self {
             Block::Section(section) => section.blocks.push(block),
             Block::List(list) => list.add_item(block),
@@ -83,6 +84,12 @@ impl Block {
 
     pub fn consolidate_locations(&mut self) {
         match self {
+            Block::Section(block) => {
+                if let Some(last_inline) = block.blocks.last() {
+                    block.location =
+                        Location::reconcile(block.location.clone(), last_inline.locations())
+                }
+            }
             Block::LeafBlock(block) => {
                 if let Some(last_inline) = block.inlines.last() {
                     block.location =
@@ -109,7 +116,7 @@ impl Block {
                     }
                 }
             }
-            _ => {}
+            _ => todo!(),
         }
     }
 
@@ -181,9 +188,12 @@ pub struct Section {
     name: String,
     #[serde(rename = "type")]
     node_type: NodeTypes,
+    #[serde(skip_serializing_if = "String::is_empty")]
     pub id: String,
     title: Vec<Inline>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
     reftext: Vec<Inline>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     metadata: Option<BlockMetadata>,
     pub level: usize,
     blocks: Vec<Block>,

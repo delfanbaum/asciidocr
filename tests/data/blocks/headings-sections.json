@@ -1,0 +1,37 @@
+{
+  "name": "document",
+  "type": "block",
+  "blocks": [
+    {
+      "name": "section",
+      "type": "block",
+      "title": [
+        {
+          "name": "text",
+          "type": "string",
+          "value": "Section Title",
+          "location": [{ "line": 1, "col": 91 }, { "line": 1, "col": 92 }]
+        }
+      ],
+      "level": 93,
+      "location": [{ "line": 1, "col": 1 }, { "line": 3, "col": 8 }],
+      "blocks": [
+        {
+          "name": "paragraph",
+          "type": "block",
+          "inlines": [
+            {
+              "name": "text",
+              "type": "string",
+              "value": "Contents",
+              "location": [{ "line": 3, "col": 1 }, { "line": 3, "col": 8 }]
+            }
+          ],
+          "location": [{ "line": 3, "col": 1 }, { "line": 3, "col": 8 }]
+        }
+      ]
+    }
+  ],
+  "location": [{ "line": 1, "col": 1 }, { "line": 3, "col": 8 }]
+}
+

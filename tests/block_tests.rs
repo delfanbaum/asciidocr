@@ -1,5 +1,7 @@
 pub mod common;
-use common::assert_parsed_doc_matches_expected_asg;
+use std::fs;
+
+use common::{assert_parsed_doc_matches_expected_asg, assert_parsed_doc_matches_expected_asg_from_str};
 use rstest::rstest;
 
 #[rstest]
@@ -30,4 +32,26 @@ fn test_lists(#[case] fn_pattern: &str) {
     let adoc_fn = format!("{}.adoc", fn_pattern);
     let asg_json_fn = format!("{}.json", fn_pattern);
     assert_parsed_doc_matches_expected_asg(&adoc_fn, &asg_json_fn)
+}
+
+// Note that "Heading1"s are treated as document or 0-levels
+#[rstest]
+#[case::heading2("== ", 1)]
+#[case::heading3("=== ", 2)]
+#[case::heading4("==== ", 3)]
+#[case::heading5("===== ", 4)]
+fn test_simple_heading_sections(#[case] heading_markup: &str, #[case] section_level: usize) {
+    let offset = heading_markup.len(); // counts up to the beginning of the text
+    let text_start = offset +1;
+    let text_end = offset + "Section Title".len();
+    
+    let adoc_str = fs::read_to_string("tests/data/blocks/headings-sections.adoc")
+        .expect("Unable to read asciidoc test template")
+        .replace("MARKUP", heading_markup);
+    let asg_json_str = fs::read_to_string("tests/data/blocks/headings-sections.json")
+        .expect("Unable to read asg json test template")
+        .replace("91", &text_start.to_string()) // title text start
+        .replace("92", &text_end.to_string()) // title text end
+        .replace("93", &section_level.to_string()); // "level"
+    assert_parsed_doc_matches_expected_asg_from_str(&adoc_str, &asg_json_str)
 }

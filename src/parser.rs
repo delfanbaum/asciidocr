@@ -21,7 +21,11 @@ pub struct Parser {
     in_block_line: bool,
     /// designates whether new literal text should be added to the last span
     in_inline_span: bool,
-    token_count: usize,
+    /// designates whether or not we want to keep a "section" block open to accept new blocks
+    in_section: bool,
+    /// forces a new block when we add inlines; helps distinguish between adding to section.title
+    /// and section.blocks
+    force_new_block: bool,
     // used to see if we need to add a newline before new text
     dangling_newline: Option<Token>,
 }
@@ -43,7 +47,8 @@ impl Parser {
             in_document_header: true,
             in_block_line: false,
             in_inline_span: false,
-            token_count: 0,
+            in_section: false,
+            force_new_block: false,
             dangling_newline: None,
         }
     }
@@ -58,7 +63,6 @@ impl Parser {
             self.token_into(token, &mut asg);
 
             self.last_token_type = token_type;
-            self.token_count += 1;
         }
 
         // add any dangling inlines
@@ -79,12 +83,12 @@ impl Parser {
         }
 
         match token.token_type() {
-            // document header and heading things
-            TokenType::Heading1 => self.parse_heading1(token, asg),
-            TokenType::Heading2 => self.parse_heading2(token, asg),
-            TokenType::Heading3 => self.parse_heading3(token, asg),
-            TokenType::Heading4 => self.parse_heading4(token, asg),
-            TokenType::Heading5 => self.parse_heading5(token, asg),
+            // document header, headings and section parsing
+            TokenType::Heading1 => self.parse_level_0_heading(token, asg),
+            TokenType::Heading2 => self.parse_section_headings(token, asg, 1),
+            TokenType::Heading3 => self.parse_section_headings(token, asg, 2),
+            TokenType::Heading4 => self.parse_section_headings(token, asg, 3),
+            TokenType::Heading5 => self.parse_section_headings(token, asg, 4),
             TokenType::Attribute => self.parse_attribute(token),
 
             // inlines
@@ -152,6 +156,8 @@ impl Parser {
                 // clear out any inlines
                 self.in_inline_span = false;
                 self.add_inlines_to_block_stack();
+                // and then force a new block hereafter
+                self.force_new_block = true;
                 // check for dangling list items
                 if let Some(last_block) = self.open_blocks.pop() {
                     if matches!(last_block, Block::ListItem(_)) {
@@ -172,7 +178,6 @@ impl Parser {
                 }
             }
         } else {
-            // retain the dangling newline
             self.dangling_newline = Some(token)
         }
     }
@@ -258,7 +263,7 @@ impl Parser {
 
     //fn parse_block_label(&mut self, token: Token, asg: &mut Asg) {}
 
-    fn parse_heading1(&mut self, token: Token, asg: &mut Asg) {
+    fn parse_level_0_heading(&mut self, token: Token, asg: &mut Asg) {
         if self.in_document_header {
             self.document_header.location.extend(token.locations());
             self.in_block_line = true;
@@ -282,29 +287,15 @@ impl Parser {
         }
     }
 
-    fn parse_heading2(&mut self, token: Token, asg: &mut Asg) {
+    fn parse_section_headings(&mut self, token: Token, asg: &mut Asg, level: usize) {
         self.add_to_block_stack_or_graph(
             asg,
-            Block::Section(Section::new("".to_string(), 2, token.first_location())),
+            Block::Section(Section::new("".to_string(), level, token.first_location())),
         );
-    }
-    fn parse_heading3(&mut self, token: Token, asg: &mut Asg) {
-        self.add_to_block_stack_or_graph(
-            asg,
-            Block::Section(Section::new("".to_string(), 3, token.first_location())),
-        );
-    }
-    fn parse_heading4(&mut self, token: Token, asg: &mut Asg) {
-        self.add_to_block_stack_or_graph(
-            asg,
-            Block::Section(Section::new("".to_string(), 4, token.first_location())),
-        );
-    }
-    fn parse_heading5(&mut self, token: Token, asg: &mut Asg) {
-        self.add_to_block_stack_or_graph(
-            asg,
-            Block::Section(Section::new("".to_string(), 5, token.first_location())),
-        );
+        // let us know we're in a block line
+        self.in_block_line = true;
+        // let us know that we want to add to the section title for a little bit
+        self.force_new_block = false;
     }
 
     //fn parse_blockquote(&mut self, token: Token, asg: &mut Asg) {}
@@ -458,34 +449,34 @@ impl Parser {
             todo!()
         }
         if let Some(last_block) = self.open_blocks.last_mut() {
-            if last_block.takes_inlines() {
+            if last_block.takes_inlines() && !self.in_block_line && !self.force_new_block {
                 while !self.open_inlines.is_empty() {
                     if let Some(inline) = self.open_inlines.pop_front() {
                         last_block.push_inline(inline)
                     }
                 }
+                return;
             }
-        } else {
-            // create a new para from the locations of the first span (subsequent locations are
-            // consolidated later)
-            let mut para_locations: Vec<Location> = Vec::new();
-            if let Some(first_inline) = self.open_inlines.front() {
-                para_locations = first_inline.locations().clone();
-            }
-            let mut para_block = Block::LeafBlock(LeafBlock::new(
-                crate::blocks::LeafBlockName::Paragraph,
-                crate::blocks::LeafBlockForm::Paragraph,
-                None,
-                para_locations,
-                vec![],
-            ));
-            while !self.open_inlines.is_empty() {
-                if let Some(inline) = self.open_inlines.pop_front() {
-                    para_block.push_inline(inline)
-                }
-            }
-            self.open_blocks.push(para_block)
         }
+        // create a new para from the locations of the first span (subsequent locations are
+        // consolidated later)
+        let mut para_locations: Vec<Location> = Vec::new();
+        if let Some(first_inline) = self.open_inlines.front() {
+            para_locations = first_inline.locations().clone();
+        }
+        let mut para_block = Block::LeafBlock(LeafBlock::new(
+            crate::blocks::LeafBlockName::Paragraph,
+            crate::blocks::LeafBlockForm::Paragraph,
+            None,
+            para_locations,
+            vec![],
+        ));
+        while !self.open_inlines.is_empty() {
+            if let Some(inline) = self.open_inlines.pop_front() {
+                para_block.push_inline(inline)
+            }
+        }
+        self.open_blocks.push(para_block)
     }
 
     fn add_last_list_item_to_list(&mut self) {
@@ -505,10 +496,10 @@ impl Parser {
         }
     }
 
-    fn add_to_block_stack_or_graph(&mut self, asg: &mut Asg, mut block: Block) {
-        if block.is_section() {
-            block.create_id()
-        }
+    fn add_to_block_stack_or_graph(&mut self, asg: &mut Asg, block: Block) {
+        //if block.is_section() {
+        //    block.create_id()
+        //}
         if let Some(last_block) = self.open_blocks.last_mut() {
             if last_block.can_be_parent() {
                 last_block.push_block(block)
@@ -517,13 +508,17 @@ impl Parser {
             // and is closed by its closing condition
             self.open_blocks.push(block)
         } else {
-            asg.push_block(block)
+            if !self.in_section {
+                asg.push_block(block)
+            }
         }
     }
 
     fn add_last_block_to_graph(&mut self, asg: &mut Asg) {
         if let Some(block) = self.open_blocks.pop() {
-            if matches!(block, Block::ListItem(_)) {
+            if let Some(section) = self.open_blocks.last_mut() {
+                section.push_block(block)
+            } else if matches!(block, Block::ListItem(_)) {
                 // sanity check
                 if let Some(mut next_last_block) = self.open_blocks.pop() {
                     if matches!(next_last_block, Block::List(_)) {
