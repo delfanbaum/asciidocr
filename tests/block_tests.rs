@@ -55,3 +55,13 @@ fn test_simple_heading_sections(#[case] heading_markup: &str, #[case] section_le
         .replace("93", &section_level.to_string()); // "level"
     assert_parsed_doc_matches_expected_asg_from_str(&adoc_str, &asg_json_str)
 }
+
+
+#[rstest]
+#[case::nested_two_in_one("blocks/nested-headings")]
+#[case::nested_two_in_one_multiple("blocks/nested-headings-multiple")]
+fn test_nexted_sections(#[case] fn_pattern: &str) {
+    let adoc_fn = format!("{}.adoc", fn_pattern);
+    let asg_json_fn = format!("{}.json", fn_pattern);
+    assert_parsed_doc_matches_expected_asg(&adoc_fn, &asg_json_fn)
+}

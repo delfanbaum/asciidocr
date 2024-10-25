@@ -21,8 +21,6 @@ pub struct Parser {
     in_block_line: bool,
     /// designates whether new literal text should be added to the last span
     in_inline_span: bool,
-    /// designates whether or not we want to keep a "section" block open to accept new blocks
-    in_section: bool,
     /// forces a new block when we add inlines; helps distinguish between adding to section.title
     /// and section.blocks
     force_new_block: bool,
@@ -47,7 +45,6 @@ impl Parser {
             in_document_header: true,
             in_block_line: false,
             in_inline_span: false,
-            in_section: false,
             force_new_block: false,
             dangling_newline: None,
         }
@@ -172,10 +169,12 @@ impl Parser {
                         } else {
                             panic!("Dangling list item");
                         }
-                    } else {
+                    } else if !last_block.is_section() {
                         self.add_to_block_stack_or_graph(asg, last_block);
+                    } else {
+                        self.open_blocks.push(last_block)
                     }
-                }
+                } // if Some(last_block)
             }
         } else {
             self.dangling_newline = Some(token)
@@ -288,10 +287,20 @@ impl Parser {
     }
 
     fn parse_section_headings(&mut self, token: Token, asg: &mut Asg, level: usize) {
-        self.add_to_block_stack_or_graph(
-            asg,
-            Block::Section(Section::new("".to_string(), level, token.first_location())),
-        );
+        // if the last block is a section of the same level, push it up
+        if let Some(last_block) = self.open_blocks.pop() {
+            if last_block.level_check().unwrap_or(999) == level {
+                self.add_to_block_stack_or_graph(asg, last_block)
+            } else {
+                self.open_blocks.push(last_block)
+            }
+        }
+        // always add new sections directly to the block stack
+        self.open_blocks.push(Block::Section(Section::new(
+            "".to_string(),
+            level,
+            token.first_location(),
+        )));
         // let us know we're in a block line
         self.in_block_line = true;
         // let us know that we want to add to the section title for a little bit
@@ -508,25 +517,24 @@ impl Parser {
             // and is closed by its closing condition
             self.open_blocks.push(block)
         } else {
-            if !self.in_section {
-                asg.push_block(block)
-            }
+            asg.push_block(block)
         }
     }
 
     fn add_last_block_to_graph(&mut self, asg: &mut Asg) {
         if let Some(block) = self.open_blocks.pop() {
-            if let Some(section) = self.open_blocks.last_mut() {
-                section.push_block(block)
-            } else if matches!(block, Block::ListItem(_)) {
-                // sanity check
-                if let Some(mut next_last_block) = self.open_blocks.pop() {
+            if let Some(next_last_block) = self.open_blocks.last_mut() {
+                if matches!(block, Block::ListItem(_)) {
+                    // sanity check
                     if matches!(next_last_block, Block::List(_)) {
                         next_last_block.push_block(block);
-                        asg.push_block(next_last_block);
+                        return;
                     } else {
-                        self.open_blocks.push(next_last_block)
+                        panic!("Dangling list item: missing parent list")
                     }
+                } else if next_last_block.is_section() {
+                    next_last_block.push_block(block);
+                    return;
                 }
             } else {
                 asg.push_block(block)

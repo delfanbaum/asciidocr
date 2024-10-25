@@ -58,12 +58,12 @@ impl Block {
     }
 
     pub fn push_block(&mut self, block: Block) {
-        self.consolidate_locations();
         match self {
             Block::Section(section) => section.blocks.push(block),
             Block::List(list) => list.add_item(block),
             _ => panic!("push_block not implemented for {}", self),
         }
+        self.consolidate_locations();
     }
 
     pub fn takes_inlines(&self) -> bool {
@@ -126,6 +126,15 @@ impl Block {
 
     pub fn is_section(&self) -> bool {
         matches!(self, Block::Section(_))
+    }
+
+    pub fn level_check(&self) -> Option<usize> {
+        match self {
+            Block::Section(section) => {
+                Some(section.level)
+            }
+            _ => None
+        }
     }
 
     pub fn is_ordered_list(&self) -> bool {
