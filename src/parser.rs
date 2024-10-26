@@ -159,15 +159,12 @@ impl Parser {
                 if let Some(last_block) = self.open_blocks.pop() {
                     if matches!(last_block, Block::ListItem(_)) {
                         // sanity check
-                        if let Some(mut next_last_block) = self.open_blocks.pop() {
-                            if matches!(next_last_block, Block::List(_)) {
-                                next_last_block.push_block(last_block);
-                                self.add_to_block_stack_or_graph(asg, next_last_block);
-                            } else {
+                        let Some(mut next_last_block) = self.open_blocks.pop() else {
                                 panic!("Dangling list item");
-                            }
-                        } else {
-                            panic!("Dangling list item");
+                        };
+                        if matches!(next_last_block, Block::List(_)) {
+                            next_last_block.push_block(last_block);
+                            self.add_to_block_stack_or_graph(asg, next_last_block);
                         }
                     } else if !last_block.is_section() {
                         self.add_to_block_stack_or_graph(asg, last_block);
@@ -426,11 +423,10 @@ impl Parser {
     }
 
     fn close_last_open_block(&mut self, asg: &mut Asg) {
-        if let Some(block) = self.open_blocks.pop() {
-            self.add_to_block_stack_or_graph(asg, block)
-        } else {
+        let Some(block) = self.open_blocks.pop() else {
             panic!("Unexpected close last block call!")
-        }
+        };
+        self.add_to_block_stack_or_graph(asg, block)
     }
 
     fn add_text_to_last_inline(&mut self, token: Token) {
