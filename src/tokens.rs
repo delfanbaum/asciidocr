@@ -125,11 +125,11 @@ pub enum TokenType {
     Verse,      // [quote],
     Source,     // [source]
 
-    Note,      // [NOTE]
-    Tip,       // [TIP]
-    Important, // [IMPORTANT]
-    Caution,   // [CAUTION]
-    Warning,   // [WARNING]
+    NotePara,      // NOTE: 
+    TipPara,       // TIP: 
+    ImportantPara, // IMPORTANT: 
+    CautionPara,   // CAUTION: 
+    WarningPara,   // WARNING: 
 
     BlockContinuation, // a "+" all by itself on a line can signal continuation
 

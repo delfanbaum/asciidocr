@@ -1,0 +1,3 @@
+NOTE: Notice me!
+
+A paragraph may follow, and should be its own block.

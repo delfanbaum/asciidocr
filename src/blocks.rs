@@ -6,7 +6,8 @@ use serde::Serialize;
 use crate::{
     inlines::Inline,
     lists::{DList, List, ListItem, ListVariant},
-    nodes::{Location, NodeTypes}, tokens::{Token, TokenType},
+    nodes::{Location, NodeTypes},
+    tokens::{Token, TokenType},
 };
 
 pub enum _ToFindHomesFor {}
@@ -397,13 +398,13 @@ impl LeafBlock {
 
 #[derive(Serialize, Debug)]
 pub struct ParentBlock {
-    name: ParentBlockName,
+    pub name: ParentBlockName,
     #[serde(skip_serializing_if = "Option::is_none")]
     variant: Option<ParentBlockVarient>,
     #[serde(rename = "type")]
     node_type: NodeTypes,
     form: String,
-    delimiter: String, // TK how to handle NOTE:: text...
+    delimiter: String, // TK how to handle NOTE: text...
     blocks: Vec<Block>,
     pub location: Vec<Location>,
 }
@@ -446,7 +447,7 @@ impl ParentBlock {
     pub fn new(
         name: ParentBlockName,
         variant: Option<ParentBlockVarient>,
-        delimiter: String, // if it's a delimited block, then we provide the delimiter
+        delimiter: String,
         blocks: Vec<Block>,
         location: Vec<Location>,
     ) -> Self {
@@ -491,7 +492,43 @@ impl ParentBlock {
                 vec![],
                 token.locations(),
             ),
-            _ => panic!("Tried to create a ParentBlock from an invalid Token.")
+            TokenType::NotePara => ParentBlock::new(
+                ParentBlockName::Admonition,
+                Some(ParentBlockVarient::Note),
+                token.text(),
+                vec![],
+                token.locations(),
+            ),
+            TokenType::TipPara => ParentBlock::new(
+                ParentBlockName::Admonition,
+                Some(ParentBlockVarient::Tip),
+                token.text(),
+                vec![],
+                token.locations(),
+            ),
+            TokenType::ImportantPara => ParentBlock::new(
+                ParentBlockName::Admonition,
+                Some(ParentBlockVarient::Important),
+                token.text(),
+                vec![],
+                token.locations(),
+            ),
+            TokenType::CautionPara => ParentBlock::new(
+                ParentBlockName::Admonition,
+                Some(ParentBlockVarient::Caution),
+                token.text(),
+                vec![],
+                token.locations(),
+            ),
+            TokenType::WarningPara => ParentBlock::new(
+                ParentBlockName::Admonition,
+                Some(ParentBlockVarient::Warning),
+                token.text(),
+                vec![],
+                token.locations(),
+            ),
+
+            _ => panic!("Tried to create a ParentBlock from an invalid Token."),
         }
     }
 }

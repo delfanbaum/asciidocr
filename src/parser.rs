@@ -24,6 +24,9 @@ pub struct Parser {
     /// forces a new block when we add inlines; helps distinguish between adding to section.title
     /// and section.blocks
     force_new_block: bool,
+    /// Some parent blocks take only a single child block, so we want an easy way to close these
+    /// after the child gets added
+    close_parent_after_push: bool,
     // used to see if we need to add a newline before new text
     dangling_newline: Option<Token>,
 }
@@ -46,6 +49,7 @@ impl Parser {
             in_block_line: false,
             in_inline_span: false,
             force_new_block: false,
+            close_parent_after_push: false,
             dangling_newline: None,
         }
     }
@@ -56,7 +60,6 @@ impl Parser {
     {
         let mut asg = Asg::new();
         for token in tokens {
-            println!("{:?}", token);
             let token_type = token.token_type();
             self.token_into(token, &mut asg);
 
@@ -116,10 +119,21 @@ impl Parser {
             TokenType::UnorderedListItem => self.parse_unordered_list_item(token),
             TokenType::OrderedListItem => self.parse_ordered_list_item(token),
 
+            // inline admonitions
+            TokenType::NotePara
+            | TokenType::TipPara
+            | TokenType::ImportantPara
+            | TokenType::CautionPara
+            | TokenType::WarningPara => self.parse_admonition_para_syntax(token),
+
             // comments
             TokenType::Comment => self.parse_comment(),
 
-            _ => {}
+            _ => {
+                // self check
+                println!("\"{:?}\" not implemented", token.token_type());
+                todo!()
+            }
         }
     }
 
@@ -177,6 +191,10 @@ impl Parser {
                         }
                     } else if !last_block.is_section() {
                         self.add_to_block_stack_or_graph(asg, last_block);
+                        if self.close_parent_after_push {
+                            self.add_last_to_block_stack_or_graph(asg);
+                            self.close_parent_after_push = false;
+                        }
                     } else {
                         self.open_blocks.push(last_block)
                     }
@@ -316,7 +334,13 @@ impl Parser {
     //fn parse_blockquote(&mut self, token: Token, asg: &mut Asg) {}
     //fn parse_verse(&mut self, token: Token, asg: &mut Asg) {}
     //fn parse_source(&mut self, token: Token, asg: &mut Asg) {}
-    //fn parse_note(&mut self, token: Token, asg: &mut Asg) {}
+
+    fn parse_admonition_para_syntax(&mut self, token: Token) {
+        self.open_blocks
+            .push(Block::ParentBlock(ParentBlock::new_from_token(token)));
+        self.close_parent_after_push = true;
+    }
+
     //fn parse_tip(&mut self, token: Token, asg: &mut Asg) {}
     //fn parse_important(&mut self, token: Token, asg: &mut Asg) {}
     //fn parse_caution(&mut self, token: Token, asg: &mut Asg) {}
@@ -415,6 +439,7 @@ impl Parser {
         }
     }
 
+    // TODO: handle [NOTE]\n==== cases (i.e., some block metadata check)
     fn parse_delimited_block(&mut self, token: Token, asg: &mut Asg) {
         let block = ParentBlock::new_from_token(token);
 
@@ -561,6 +586,20 @@ impl Parser {
             }
         }
         asg.push_block(block)
+    }
+
+    fn add_last_to_block_stack_or_graph(&mut self, asg: &mut Asg) {
+        if let Some(last_block) = self.open_blocks.pop() {
+            if let Some(prior_block) = self.open_blocks.last_mut() {
+                if prior_block.can_be_parent() {
+                    prior_block.push_block(last_block);
+                    return;
+                }
+            }
+            asg.push_block(last_block)
+        } else {
+            panic!("Tried to add last block when block stack was empty.")
+        }
     }
 
     fn add_last_block_to_graph(&mut self, asg: &mut Asg) {

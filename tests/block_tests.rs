@@ -88,3 +88,25 @@ fn test_delimited_blocks_no_meta(#[case] delimiter: &str, #[case] name: &str) {
 
     assert_parsed_doc_matches_expected_asg_from_str(&adoc_str, &asg_json_str)
 }
+
+#[rstest]
+#[case::note("NOTE")]
+#[case::note("TIP")]
+#[case::note("IMPORTANT")]
+#[case::note("CAUTION")]
+#[case::note("WARNING")]
+fn test_admontions_non_delimited(#[case] admonition: &str) {
+    let text_start = admonition.len() + 3;
+    let text_end = text_start + 9; // "Notice me!"
+    let adoc_str = fs::read_to_string("tests/data/blocks/admonition-inline.adoc")
+        .expect("Unable to read asciidoc test template")
+        .replace("NOTE", admonition);
+    let asg_json_str = fs::read_to_string("tests/data/blocks/admonition-inline.json")
+        .expect("Unable to read asg json test template")
+        .replace("TEXT_START", &text_start.to_string())
+        .replace("TEXT_END", &text_end.to_string())
+        .replace("DELIMITER", &format!("{}: ", admonition))
+        .replace("ADMONITION", &admonition.to_lowercase());
+
+    assert_parsed_doc_matches_expected_asg_from_str(&adoc_str, &asg_json_str)
+}

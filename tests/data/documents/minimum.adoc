@@ -1,0 +1,13 @@
+= This Is A Minimum Example.
+
+It should, _in theory_, not fail to parse, i.e., there should be no
+`unimplemented` tokens included in this document. In other words, nothing like
+the example that follows:
+
+----
+    _ => todo!()
+----
+
+NOTE: This is a note.
+
+

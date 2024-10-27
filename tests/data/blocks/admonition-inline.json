@@ -1,0 +1,80 @@
+{
+  "name": "document",
+  "type": "block",
+  "blocks": [
+    {
+      "name": "admonition",
+      "type": "block",
+      "variant": "ADMONITION",
+      "form": "delimited",
+      "delimiter": "DELIMITER",
+      "blocks": [
+    {
+      "name": "paragraph",
+      "type": "block",
+      "inlines": [
+        {
+          "name": "text",
+          "type": "string",
+          "value": "Notice me!",
+          "location": [
+            {
+              "line": 1,
+              "col": TEXT_START
+            },
+            {
+              "line": 1,
+              "col": TEXT_END
+            }
+          ]
+        }
+      ],
+      "location": [
+        {
+          "line": 1,
+          "col": TEXT_START
+        },
+        {
+          "line": 1,
+          "col": TEXT_END
+        }
+      ]
+    }
+      ],
+      "location": [{ "line": 1, "col": 1 }, { "line": 1, "col": TEXT_END }]
+    },
+    {
+      "name": "paragraph",
+      "type": "block",
+      "inlines": [
+        {
+          "name": "text",
+          "type": "string",
+          "value": "A paragraph may follow, and should be its own block.",
+          "location": [
+            {
+              "line": 3,
+              "col": 1
+            },
+            {
+              "line": 3,
+              "col": 52
+            }
+          ]
+        }
+      ],
+      "location": [
+        {
+          "line": 3,
+          "col": 1
+        },
+        {
+          "line": 3,
+          "col": 52
+        }
+      ]
+    }
+  ],
+  "location": [{ "line": 1, "col": 1 }, { "line": 3, "col": 52 }]
+}
+

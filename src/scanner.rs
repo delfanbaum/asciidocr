@@ -133,11 +133,11 @@ impl<'a> Scanner<'a> {
                         'q' => self.add_token(TokenType::Blockquote, true, 0),
                         'v' => self.add_token(TokenType::Verse, true, 0),
                         's' => self.add_token(TokenType::Source, true, 0),
-                        'N' => self.add_token(TokenType::Note, true, 0),
-                        'T' => self.add_token(TokenType::Tip, true, 0),
-                        'I' => self.add_token(TokenType::Important, true, 0),
-                        'C' => self.add_token(TokenType::Caution, true, 0),
-                        'W' => self.add_token(TokenType::Warning, true, 0),
+                        'N' => self.add_token(TokenType::NotePara, true, 0),
+                        'T' => self.add_token(TokenType::TipPara, true, 0),
+                        'I' => self.add_token(TokenType::ImportantPara, true, 0),
+                        'C' => self.add_token(TokenType::CautionPara, true, 0),
+                        'W' => self.add_token(TokenType::WarningPara, true, 0),
                         _ => self.add_text_until_next_markup(),
                     }
                 } else if self.peek() == '.' {
@@ -192,7 +192,7 @@ impl<'a> Scanner<'a> {
             'N' => {
                 if self.peeks_ahead(5) == "OTE: " {
                     self.current += 5;
-                    self.add_token(TokenType::Note, true, 0)
+                    self.add_token(TokenType::NotePara, true, 0)
                 } else {
                     self.add_text_until_next_markup()
                 }
@@ -200,7 +200,7 @@ impl<'a> Scanner<'a> {
             'T' => {
                 if self.peeks_ahead(4) == "IP: " {
                     self.current += 4;
-                    self.add_token(TokenType::Tip, true, 0)
+                    self.add_token(TokenType::TipPara, true, 0)
                 } else {
                     self.add_text_until_next_markup()
                 }
@@ -208,7 +208,7 @@ impl<'a> Scanner<'a> {
             'I' => {
                 if self.peeks_ahead(10) == "MPORTANT: " {
                     self.current += 10;
-                    self.add_token(TokenType::Important, true, 0)
+                    self.add_token(TokenType::ImportantPara, true, 0)
                 } else {
                     self.add_text_until_next_markup()
                 }
@@ -216,7 +216,7 @@ impl<'a> Scanner<'a> {
             'C' => {
                 if self.peeks_ahead(8) == "AUTION: " {
                     self.current += 8;
-                    self.add_token(TokenType::Caution, true, 0)
+                    self.add_token(TokenType::CautionPara, true, 0)
                 } else {
                     self.add_text_until_next_markup()
                 }
@@ -224,7 +224,7 @@ impl<'a> Scanner<'a> {
             'W' => {
                 if self.peeks_ahead(8) == "ARNING: " {
                     self.current += 8;
-                    self.add_token(TokenType::Warning, true, 0)
+                    self.add_token(TokenType::WarningPara, true, 0)
                 } else {
                     self.add_text_until_next_markup()
                 }
@@ -717,11 +717,11 @@ mod tests {
     #[case("[verse]\n", TokenType::Verse)]
     #[case("[verse, Audre Lorde, A Litany for Survival]\n", TokenType::Verse)]
     #[case("[source]\n", TokenType::Source)]
-    #[case("[NOTE]\n", TokenType::Note)]
-    #[case("[TIP]\n", TokenType::Tip)]
-    #[case("[IMPORTANT]\n", TokenType::Important)]
-    #[case("[CAUTION]\n", TokenType::Caution)]
-    #[case("[WARNING]\n", TokenType::Warning)]
+    #[case("[NOTE]\n", TokenType::NotePara)]
+    #[case("[TIP]\n", TokenType::TipPara)]
+    #[case("[IMPORTANT]\n", TokenType::ImportantPara)]
+    #[case("[CAUTION]\n", TokenType::CautionPara)]
+    #[case("[WARNING]\n", TokenType::WarningPara)]
     fn attribute_lines(#[case] markup: &str, #[case] expected_token: TokenType) {
         let markup_len = markup[..markup.len() - 1].len();
         let expected_tokens = vec![
@@ -909,11 +909,11 @@ mod tests {
     }
 
     #[rstest]
-    #[case("NOTE", TokenType::Note)]
-    #[case("TIP", TokenType::Tip)]
-    #[case("IMPORTANT", TokenType::Important)]
-    #[case("CAUTION", TokenType::Caution)]
-    #[case("WARNING", TokenType::Warning)]
+    #[case("NOTE", TokenType::NotePara)]
+    #[case("TIP", TokenType::TipPara)]
+    #[case("IMPORTANT", TokenType::ImportantPara)]
+    #[case("CAUTION", TokenType::CautionPara)]
+    #[case("WARNING", TokenType::WarningPara)]
     fn inline_admonitions(#[case] markup_check: &str, #[case] expected_token: TokenType) {
         let markup = format!("{}: bar.", markup_check);
         let expected_tokens = vec![
