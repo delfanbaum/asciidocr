@@ -59,7 +59,7 @@ impl<'a> Scanner<'a> {
             }
             // potential block delimiter chars get treated similarly
             '+' | '*' | '-' | '_' | '/' | '=' => {
-                if self.starts_new_block() && self.starts_repeated_char_line(c, 4) {
+                if self.starts_new_line() && self.starts_repeated_char_line(c, 4) {
                     self.current += 3; // the remaining repeated chars
                     self.add_token(TokenType::block_from_char(c), false, 0)
                 } else {
@@ -481,7 +481,7 @@ mod tests {
 
     #[rstest]
     #[case("++++\n".to_string(), TokenType::PassthroughBlock)]
-    #[case("****\n".to_string(), TokenType::AsideBlock)]
+    #[case("****\n".to_string(), TokenType::SidebarBlock)]
     #[case("----\n".to_string(), TokenType::SourceBlock)]
     #[case("____\n".to_string(), TokenType::QuoteVerseBlock)]
     #[case("____\n".to_string(), TokenType::QuoteVerseBlock)]
@@ -503,7 +503,7 @@ mod tests {
 
     #[rstest]
     #[case("\n\n++++\n".to_string(), TokenType::PassthroughBlock)]
-    #[case("\n\n****\n".to_string(), TokenType::AsideBlock)]
+    #[case("\n\n****\n".to_string(), TokenType::SidebarBlock)]
     #[case("\n\n----\n".to_string(), TokenType::SourceBlock)]
     #[case("\n\n____\n".to_string(), TokenType::QuoteVerseBlock)]
     #[case("\n\n////\n".to_string(), TokenType::CommentBlock)]

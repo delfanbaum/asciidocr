@@ -102,10 +102,14 @@ impl Location {
     } // handle file later
 
     pub fn reconcile(mut start: Vec<Location>, other: Vec<Location>) -> Vec<Location> {
-        start.extend(other);
-        start.sort();
-        // remove the middle
-        start.drain(1..start.len() - 1);
+        if !other.is_empty() {
+            start.extend(other);
+            start.sort();
+            if start.len() > 1 {
+                // remove the middle
+                start.drain(1..start.len() - 1);
+            }
+        }
         start
     }
 }

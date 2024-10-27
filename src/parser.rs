@@ -3,7 +3,7 @@ use std::collections::{HashMap, VecDeque};
 
 use crate::{
     asg::Asg,
-    blocks::{Block, Break, LeafBlock, Section},
+    blocks::{Block, Break, LeafBlock, ParentBlock, Section},
     inlines::{Inline, InlineLiteral, InlineSpan},
     lists::{List, ListItem, ListVariant},
     nodes::{Header, Location},
@@ -105,6 +105,9 @@ impl Parser {
             TokenType::SourceBlock => self.parse_source_block(token, asg),
             TokenType::Comment => self.parse_comment(),
             TokenType::CommentBlock => self.parse_comment_block(),
+
+            // delimited blocks have test
+            TokenType::SidebarBlock => self.parse_sidebar(token, asg),
 
             // lists
             TokenType::UnorderedListItem => self.parse_unordered_list_item(token),
@@ -376,7 +379,6 @@ impl Parser {
     //fn parse_inline_macro_close(&mut self, token: Token, asg: &mut Asg) {}
     //fn parse_eof(&mut self, token: Token, asg: &mut Asg) {}
     //fn parse_inline_style(&mut self, token: Token, asg: &mut Asg) {}
-    //fn parse_aside_block(&mut self, token: Token, asg: &mut Asg) {}
     //fn parse_quote_verse_block(&mut self, token: Token, asg: &mut Asg) {}
     //fn parse_admonition_block(&mut self, token: Token, asg: &mut Asg) {}
     //fn parse_open_block(&mut self, token: Token, asg: &mut Asg) {}
@@ -405,6 +407,43 @@ impl Parser {
             }
             self.add_text_to_last_inline(token)
         }
+    }
+
+    fn parse_sidebar(&mut self, token: Token, asg: &mut Asg) {
+        let block = ParentBlock::new_sidebar(token.text(), token.locations());
+        self.handle_delimited_parent_block(asg, block)
+    }
+
+    fn handle_delimited_parent_block(&mut self, asg: &mut Asg, block: ParentBlock) {
+        // check for any prior parents in reverse
+        if let Some(parent_block_idx) = self
+            .open_blocks
+            .iter()
+            .rposition(|parent_block| matches!(parent_block, Block::ParentBlock(_)))
+        {
+            let matched_block = self.open_blocks.remove(parent_block_idx);
+            let Block::ParentBlock(mut matched) = matched_block else {
+                panic!("Unexpteced block in Block::ParentBlock")
+            };
+            if matched == block {
+                // update the final location
+                matched.location = Location::reconcile(matched.location.clone(), block.location);
+                // return the parent block
+                self.open_blocks
+                    .insert(parent_block_idx, Block::ParentBlock(matched));
+                // close any dangling inlines
+                self.add_inlines_to_block_stack();
+                // add blocks until we have also added the parent block
+                while self.open_blocks.len() > parent_block_idx {
+                    self.close_last_open_block(asg);
+                }
+                return;
+            } else {
+                self.open_blocks
+                    .insert(parent_block_idx, Block::ParentBlock(matched));
+            }
+        }
+        self.open_blocks.push(Block::ParentBlock(block));
     }
 
     fn handle_delimited_leaf_block(&mut self, asg: &mut Asg, block: LeafBlock) {
@@ -449,16 +488,23 @@ impl Parser {
     }
 
     fn add_inlines_to_block_stack(&mut self) {
+        // guard
+        if self.open_inlines.is_empty() {
+            return;
+        }
+
         if self.in_inline_span {
             // TK HANDLE DANGLING ITALICS
             todo!()
         }
+
         if let Some(last_block) = self.open_blocks.last_mut() {
             if last_block.takes_inlines() && !self.in_block_line && !self.force_new_block {
                 while !self.open_inlines.is_empty() {
-                    if let Some(inline) = self.open_inlines.pop_front() {
-                        last_block.push_inline(inline)
-                    }
+                    let Some(inline) = self.open_inlines.pop_front() else {
+                        panic!("Error getting inline from open queue");
+                    };
+                    last_block.push_inline(inline);
                 }
                 return;
             }
@@ -507,14 +553,11 @@ impl Parser {
         //}
         if let Some(last_block) = self.open_blocks.last_mut() {
             if last_block.can_be_parent() {
-                last_block.push_block(block)
+                last_block.push_block(block);
+                return;
             }
-        } else if block.can_be_parent() {
-            // and is closed by its closing condition
-            self.open_blocks.push(block)
-        } else {
-            asg.push_block(block)
         }
+        asg.push_block(block)
     }
 
     fn add_last_block_to_graph(&mut self, asg: &mut Asg) {

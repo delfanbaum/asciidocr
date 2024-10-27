@@ -61,6 +61,7 @@ impl Block {
         match self {
             Block::Section(section) => section.blocks.push(block),
             Block::List(list) => list.add_item(block),
+            Block::ParentBlock(parent_block) => parent_block.blocks.push(block),
             _ => panic!("push_block not implemented for {}", self),
         }
         self.consolidate_locations();
@@ -114,12 +115,19 @@ impl Block {
                         Location::reconcile(block.location.clone(), last_inline.locations())
                 }
             }
+            Block::ParentBlock(block) => {
+                if let Some(last_inline) = block.blocks.last() {
+                    block.location =
+                        Location::reconcile(block.location.clone(), last_inline.locations())
+                }
+            }
+
             _ => todo!(),
         }
     }
 
     pub fn can_be_parent(&self) -> bool {
-        matches!(self, Block::Section(_))
+        matches!(self, Block::Section(_) | Block::ParentBlock(_) | Block::List(_))
     }
 
     pub fn is_section(&self) -> bool {
@@ -128,10 +136,8 @@ impl Block {
 
     pub fn level_check(&self) -> Option<usize> {
         match self {
-            Block::Section(section) => {
-                Some(section.level)
-            }
-            _ => None
+            Block::Section(section) => Some(section.level),
+            _ => None,
         }
     }
 
@@ -389,13 +395,14 @@ impl LeafBlock {
 #[derive(Serialize, Debug)]
 pub struct ParentBlock {
     name: ParentBlockName,
+    #[serde(skip_serializing_if = "Option::is_none")]
     variant: Option<ParentBlockVarient>,
     #[serde(rename = "type")]
     node_type: NodeTypes,
     form: String,
     delimiter: String, // TK how to handle NOTE:: text...
     blocks: Vec<Block>,
-    location: Vec<Location>,
+    pub location: Vec<Location>,
 }
 
 impl PartialEq for ParentBlock {
@@ -413,6 +420,7 @@ impl PartialEq for ParentBlock {
 }
 
 #[derive(Serialize, Debug, PartialEq)]
+#[serde(rename_all = "lowercase")]
 pub enum ParentBlockName {
     Admonition,
     Example,
@@ -422,6 +430,7 @@ pub enum ParentBlockName {
 }
 
 #[derive(Serialize, Debug, PartialEq)]
+#[serde(rename_all = "lowercase")]
 pub enum ParentBlockVarient {
     Caution,
     Important,
@@ -436,6 +445,7 @@ impl ParentBlock {
         variant: Option<ParentBlockVarient>,
         delimiter: String, // if it's a delimited block, then we provide the delimiter
         blocks: Vec<Block>,
+        location: Vec<Location>,
     ) -> Self {
         ParentBlock {
             name,
@@ -444,8 +454,18 @@ impl ParentBlock {
             form: "delimited".to_string(),
             delimiter,
             blocks,
-            location: vec![],
+            location
         }
+    }
+
+    pub fn new_sidebar(delimiter: String, locations: Vec<Location>) -> Self {
+        ParentBlock::new(
+            ParentBlockName::Sidebar,
+            None,
+            delimiter,
+            vec![],
+            locations,
+        )
     }
 }
 

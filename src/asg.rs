@@ -8,7 +8,7 @@ use crate::nodes::{Header, Location, NodeTypes};
 /// Abstract Syntax Graph used to represent an asciidoc document
 /// roughly meaning to follow the "official" schema:
 /// https://gitlab.eclipse.org/eclipse/asciidoc-lang/asciidoc-lang/-/blob/main/asg/schema.json
-#[derive(Serialize)]
+#[derive(Serialize, Debug)]
 pub struct Asg {
     // abstract syntax graph
     pub name: String, // is this always "Document?"

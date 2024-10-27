@@ -98,7 +98,7 @@ pub enum TokenType {
 
     // four char delimiters at new block
     PassthroughBlock, // i.e., "++++"
-    AsideBlock,       // i.e., "****"
+    SidebarBlock,       // i.e., "****"
     SourceBlock,      // i.e., "----"
     QuoteVerseBlock,  // i.e., "____"
     CommentBlock,     // i.e., "////"
@@ -180,7 +180,7 @@ impl TokenType {
     pub fn block_from_char(c: char) -> Self {
         match c {
             '+' => Self::PassthroughBlock,
-            '*' => Self::AsideBlock,
+            '*' => Self::SidebarBlock,
             '-' => Self::SourceBlock,
             '_' => Self::QuoteVerseBlock,
             '/' => Self::CommentBlock,

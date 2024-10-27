@@ -65,3 +65,11 @@ fn test_nexted_sections(#[case] fn_pattern: &str) {
     let asg_json_fn = format!("{}.json", fn_pattern);
     assert_parsed_doc_matches_expected_asg(&adoc_fn, &asg_json_fn)
 }
+
+#[rstest]
+#[case::delimited_sidebar("blocks/delimited-block")]
+fn test_delimited_blocks_no_meta(#[case] fn_pattern: &str) {
+    let adoc_fn = format!("{}.adoc", fn_pattern);
+    let asg_json_fn = format!("{}.json", fn_pattern);
+    assert_parsed_doc_matches_expected_asg(&adoc_fn, &asg_json_fn)
+}
