@@ -56,6 +56,7 @@ impl Parser {
     {
         let mut asg = Asg::new();
         for token in tokens {
+            println!("{:?}", token);
             let token_type = token.token_type();
             self.token_into(token, &mut asg);
 
@@ -100,18 +101,23 @@ impl Parser {
             TokenType::PageBreak => self.parse_page_break(token, asg),
             TokenType::ThematicBreak => self.parse_thematic_break(token, asg),
 
-            // delimited blocks NEED TESTS
+            // delimited blocks
+            TokenType::SidebarBlock
+            | TokenType::OpenBlock
+            | TokenType::QuoteVerseBlock
+            | TokenType::ExampleBlock => self.parse_delimited_block(token, asg),
+
+            // the following should probably be consumed into the above
             TokenType::PassthroughBlock => self.parse_passthrough_block(token, asg),
             TokenType::SourceBlock => self.parse_source_block(token, asg),
-            TokenType::Comment => self.parse_comment(),
             TokenType::CommentBlock => self.parse_comment_block(),
-
-            // delimited blocks have test
-            TokenType::SidebarBlock => self.parse_sidebar(token, asg),
 
             // lists
             TokenType::UnorderedListItem => self.parse_unordered_list_item(token),
             TokenType::OrderedListItem => self.parse_ordered_list_item(token),
+
+            // comments
+            TokenType::Comment => self.parse_comment(),
 
             _ => {}
         }
@@ -409,12 +415,9 @@ impl Parser {
         }
     }
 
-    fn parse_sidebar(&mut self, token: Token, asg: &mut Asg) {
-        let block = ParentBlock::new_sidebar(token.text(), token.locations());
-        self.handle_delimited_parent_block(asg, block)
-    }
+    fn parse_delimited_block(&mut self, token: Token, asg: &mut Asg) {
+        let block = ParentBlock::new_from_token(token);
 
-    fn handle_delimited_parent_block(&mut self, asg: &mut Asg, block: ParentBlock) {
         // check for any prior parents in reverse
         if let Some(parent_block_idx) = self
             .open_blocks

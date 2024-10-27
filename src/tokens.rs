@@ -102,7 +102,7 @@ pub enum TokenType {
     SourceBlock,      // i.e., "----"
     QuoteVerseBlock,  // i.e., "____"
     CommentBlock,     // i.e., "////"
-    AdmonitionBlock,  // i.e., "===="
+    ExampleBlock,  // i.e., "====" (Also used for admonitions!)
 
     // two-char delimiters as new block
     OpenBlock, // i.e., --
@@ -184,7 +184,7 @@ impl TokenType {
             '-' => Self::SourceBlock,
             '_' => Self::QuoteVerseBlock,
             '/' => Self::CommentBlock,
-            '=' => Self::AdmonitionBlock,
+            '=' => Self::ExampleBlock,
             _ => panic!("Invalid character match to produce block TokenType"),
         }
     }

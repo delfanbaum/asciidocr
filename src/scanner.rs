@@ -74,7 +74,7 @@ impl<'a> Scanner<'a> {
                         }
                         '-' => {
                             // check if it's an open block
-                            if self.starts_new_block() && self.starts_repeated_char_line(c, 2) {
+                            if self.starts_new_line() && self.starts_repeated_char_line(c, 2) {
                                 self.current += 1;
                                 // since we consume the newline as a part of the block, add a line
                                 self.add_token(TokenType::OpenBlock, false, 0)
@@ -485,7 +485,7 @@ mod tests {
     #[case("----\n".to_string(), TokenType::SourceBlock)]
     #[case("____\n".to_string(), TokenType::QuoteVerseBlock)]
     #[case("____\n".to_string(), TokenType::QuoteVerseBlock)]
-    #[case("====\n".to_string(), TokenType::AdmonitionBlock)]
+    #[case("====\n".to_string(), TokenType::ExampleBlock)]
     fn fenced_block_delimiter_start(#[case] markup: String, #[case] expected_token: TokenType) {
         let expected_tokens = vec![
             Token::new(
@@ -507,7 +507,7 @@ mod tests {
     #[case("\n\n----\n".to_string(), TokenType::SourceBlock)]
     #[case("\n\n____\n".to_string(), TokenType::QuoteVerseBlock)]
     #[case("\n\n////\n".to_string(), TokenType::CommentBlock)]
-    #[case("\n\n====\n".to_string(), TokenType::AdmonitionBlock)]
+    #[case("\n\n====\n".to_string(), TokenType::ExampleBlock)]
     fn fenced_block_delimiter_new_block(#[case] markup: String, #[case] expected_token: TokenType) {
         let expected_tokens = vec![
             Token::new(TokenType::NewLineChar, "\n".to_string(), None, 1, 1, 1),

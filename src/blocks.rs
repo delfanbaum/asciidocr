@@ -6,7 +6,7 @@ use serde::Serialize;
 use crate::{
     inlines::Inline,
     lists::{DList, List, ListItem, ListVariant},
-    nodes::{Location, NodeTypes},
+    nodes::{Location, NodeTypes}, tokens::{Token, TokenType},
 };
 
 pub enum _ToFindHomesFor {}
@@ -127,7 +127,10 @@ impl Block {
     }
 
     pub fn can_be_parent(&self) -> bool {
-        matches!(self, Block::Section(_) | Block::ParentBlock(_) | Block::List(_))
+        matches!(
+            self,
+            Block::Section(_) | Block::ParentBlock(_) | Block::List(_)
+        )
     }
 
     pub fn is_section(&self) -> bool {
@@ -454,18 +457,42 @@ impl ParentBlock {
             form: "delimited".to_string(),
             delimiter,
             blocks,
-            location
+            location,
         }
     }
 
-    pub fn new_sidebar(delimiter: String, locations: Vec<Location>) -> Self {
-        ParentBlock::new(
-            ParentBlockName::Sidebar,
-            None,
-            delimiter,
-            vec![],
-            locations,
-        )
+    pub fn new_from_token(token: Token) -> Self {
+        match token.token_type() {
+            TokenType::SidebarBlock => ParentBlock::new(
+                ParentBlockName::Sidebar,
+                None,
+                token.text(),
+                vec![],
+                token.locations(),
+            ),
+            TokenType::ExampleBlock => ParentBlock::new(
+                ParentBlockName::Example,
+                None,
+                token.text(),
+                vec![],
+                token.locations(),
+            ),
+            TokenType::QuoteVerseBlock => ParentBlock::new(
+                ParentBlockName::Quote,
+                None,
+                token.text(),
+                vec![],
+                token.locations(),
+            ),
+            TokenType::OpenBlock => ParentBlock::new(
+                ParentBlockName::Open,
+                None,
+                token.text(),
+                vec![],
+                token.locations(),
+            ),
+            _ => panic!("Tried to create a ParentBlock from an invalid Token.")
+        }
     }
 }
 

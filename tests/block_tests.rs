@@ -1,7 +1,9 @@
 pub mod common;
 use std::fs;
 
-use common::{assert_parsed_doc_matches_expected_asg, assert_parsed_doc_matches_expected_asg_from_str};
+use common::{
+    assert_parsed_doc_matches_expected_asg, assert_parsed_doc_matches_expected_asg_from_str,
+};
 use rstest::rstest;
 
 #[rstest]
@@ -42,9 +44,9 @@ fn test_lists(#[case] fn_pattern: &str) {
 #[case::heading5("===== ", 4)]
 fn test_simple_heading_sections(#[case] heading_markup: &str, #[case] section_level: usize) {
     let offset = heading_markup.len(); // counts up to the beginning of the text
-    let text_start = offset +1;
+    let text_start = offset + 1;
     let text_end = offset + "Section Title".len();
-    
+
     let adoc_str = fs::read_to_string("tests/data/blocks/headings-sections.adoc")
         .expect("Unable to read asciidoc test template")
         .replace("MARKUP", heading_markup);
@@ -56,7 +58,6 @@ fn test_simple_heading_sections(#[case] heading_markup: &str, #[case] section_le
     assert_parsed_doc_matches_expected_asg_from_str(&adoc_str, &asg_json_str)
 }
 
-
 #[rstest]
 #[case::nested_two_in_one("blocks/nested-headings")]
 #[case::nested_two_in_one_multiple("blocks/nested-headings-multiple")]
@@ -67,9 +68,23 @@ fn test_nexted_sections(#[case] fn_pattern: &str) {
 }
 
 #[rstest]
-#[case::delimited_sidebar("blocks/delimited-block")]
-fn test_delimited_blocks_no_meta(#[case] fn_pattern: &str) {
-    let adoc_fn = format!("{}.adoc", fn_pattern);
-    let asg_json_fn = format!("{}.json", fn_pattern);
-    assert_parsed_doc_matches_expected_asg(&adoc_fn, &asg_json_fn)
+#[case::delimited_sidebar("****", "sidebar")]
+#[case::delimited_sidebar("====", "example")]
+#[case::delimited_sidebar("____", "quote")]
+#[case::delimited_sidebar("--", "open")]
+fn test_delimited_blocks_no_meta(#[case] delimiter: &str, #[case] name: &str) {
+    let adoc_str = fs::read_to_string("tests/data/blocks/delimited-block.adoc")
+        .expect("Unable to read asciidoc test template")
+        .replace("****", delimiter);
+    let mut asg_json_str = fs::read_to_string("tests/data/blocks/delimited-block.json")
+        .expect("Unable to read asg json test template")
+        .replace("sidebar", name)
+        .replace("****", delimiter);
+
+    // fix location numbering
+    if name == "open" {
+        asg_json_str = asg_json_str.replace("5, \"col\": 4", "5, \"col\": 2");
+    }
+
+    assert_parsed_doc_matches_expected_asg_from_str(&adoc_str, &asg_json_str)
 }
