@@ -100,6 +100,10 @@ impl Location {
             //file: None,
         }
     } // handle file later
+    //
+    pub fn col(&self) -> usize {
+        self.col.clone()
+    }
 
     pub fn reconcile(mut start: Vec<Location>, other: Vec<Location>) -> Vec<Location> {
         if !other.is_empty() {

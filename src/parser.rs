@@ -104,6 +104,7 @@ impl Parser {
             TokenType::Emphasis => self.parse_emphasis(token),
             TokenType::Monospace => self.parse_code(token),
             TokenType::Mark => self.parse_mark(token),
+            TokenType::AttributeReference => self.parse_attribute_reference(token),
 
             // refs
             TokenType::LinkMacro => self.parse_link_macro(token),
@@ -453,6 +454,28 @@ impl Parser {
     //fn parse_quote_verse_block(&mut self, token: Token, asg: &mut Asg) {}
     //fn parse_admonition_block(&mut self, token: Token, asg: &mut Asg) {}
     //fn parse_open_block(&mut self, token: Token, asg: &mut Asg) {}
+    //
+
+    /// attribute references become literals, but we need to replace them with the appropriate
+    /// values from the document header first
+    fn parse_attribute_reference(&mut self, mut token: Token) {
+        // the "{attribute}"
+        let attribute_ref = token.text();
+        let attribute_target: &str = &attribute_ref[1..attribute_ref.len() - 1];
+        // update the token value
+        if let Some((_, value)) = self.document_attributes.get_key_value(attribute_target) {
+            // update the values
+            token.literal = Some(value.clone());
+            // update the ending col, adding the new value and then subtracting one because of
+            // indexing
+            token.endcol = token.startcol + value.len() - 1;
+        } else {
+            // TODO throw a better warning
+            eprintln!("Missing document attribute: {}", attribute_target);
+        }
+        // then add it as literal text
+        self.parse_text(token);
+    }
 
     fn parse_text(&mut self, token: Token) {
         if self.in_document_header && self.in_block_line {

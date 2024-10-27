@@ -1,4 +1,5 @@
-= This Is A Minimum Example.
+= This Is A Minimum Example
+:replace: thing
 
 It should, _in theory_, not fail to parse, i.e., there should be no
 `unimplemented` tokens included in this document. In other words, nothing like
@@ -10,4 +11,48 @@ the example that follows:
 
 NOTE: This is a note.
 
+== Allows for multiple levels, and `markup` in headings
+
+Of course, there are many things we need to handle, including *bold* text,
+`code` markup, etc., etc.
+
+Also some{replace}ings need to be dealt with, like attributes, and the
+following:
+
+* Unordered lists
+* With things
+
+And ordered:
+
+. Lists
+. With things, such as block continuations.
++
+--
+Such as this.
+--
+
+And really we want to include roles, e.g.,
+
+[role="aside"]
+This paragraph gets an "aside" role.
+
+And open blocks:
+
+[role="open"]
+--
+Some inside the block shit.
+--
+
+Eventually, too, we want to handle images, but maybe later. In the short term,
+maybe we do quotes, like:
+
+[quote, Somebody]
+This is a great idea
+
+And verse:
+
+[verse, Robert Burns]
+____
+My love is like a red, red rose
+____
 

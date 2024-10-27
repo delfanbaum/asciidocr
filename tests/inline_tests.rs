@@ -56,3 +56,13 @@ fn test_links() {
     let asg_json_fn = format!("{}.json", fn_pattern);
     assert_parsed_doc_matches_expected_asg(&adoc_fn, &asg_json_fn)
 }
+
+#[test]
+/// Attribute refs are replaced as a part of a pre-processing step
+fn test_attribute_ref_replacment() {
+    let fn_pattern = "inlines/attribute-ref";
+    let adoc_fn = format!("{}.adoc", fn_pattern);
+    let asg_json_fn = format!("{}.json", fn_pattern);
+    assert_parsed_doc_matches_expected_asg(&adoc_fn, &asg_json_fn)
+
+}
