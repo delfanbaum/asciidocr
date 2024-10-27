@@ -4,12 +4,14 @@ use std::collections::{HashMap, VecDeque};
 use crate::{
     asg::Asg,
     blocks::{Block, Break, LeafBlock, ParentBlock, Section},
-    inlines::{Inline, InlineLiteral, InlineSpan},
+    inlines::{Inline, InlineLiteral, InlineRef, InlineSpan},
     lists::{List, ListItem, ListVariant},
     nodes::{Header, Location},
     tokens::{Token, TokenType},
 };
 
+/// Parses a stream of tokens into an Abstract Syntax Graph, returning the graph once all tokens
+/// have been parsed.
 pub struct Parser {
     last_token_type: TokenType,
     document_header: Header,
@@ -27,8 +29,7 @@ pub struct Parser {
     /// forces a new block when we add inlines; helps distinguish between adding to section.title
     /// and section.blocks
     force_new_block: bool,
-    /// Some parent blocks take only a single child block, so we want an easy way to close these
-    /// after the child gets added
+    /// Some parent elements have non-obvious closing conditions, so we want an easy way to close these
     close_parent_after_push: bool,
     /// Used to see if we need to add a newline before new text; we don't add newlines to the text
     /// literals unless they're continuous (i.e., we never count newline paras as paras)
@@ -103,6 +104,10 @@ impl Parser {
             TokenType::Emphasis => self.parse_emphasis(token),
             TokenType::Monospace => self.parse_code(token),
             TokenType::Mark => self.parse_mark(token),
+
+            // refs
+            TokenType::LinkMacro => self.parse_link_macro(token),
+            TokenType::InlineMacroClose => self.parse_inline_macro_close(token),
 
             // breaks NEED TESTS
             TokenType::PageBreak => self.parse_page_break(token, asg),
@@ -407,10 +412,42 @@ impl Parser {
     //fn parse_superscript(&mut self, token: Token, asg: &mut Asg) {}
     //fn parse_subscript(&mut self, token: Token, asg: &mut Asg) {}
     //fn parse_highlighted(&mut self, token: Token, asg: &mut Asg) {}
-    //fn parse_link_macro(&mut self, token: Token, asg: &mut Asg) {}
+
+    fn parse_link_macro(&mut self, token: Token) {
+        self.inline_stack
+            .push_back(Inline::InlineRef(InlineRef::new_link_from_token(token)))
+    }
+
     //fn parse_footnote_macro(&mut self, token: Token, asg: &mut Asg) {}
     //fn parse_passthrough_inline_macro(&mut self, token: Token, asg: &mut Asg) {}
-    //fn parse_inline_macro_close(&mut self, token: Token, asg: &mut Asg) {}
+
+    fn parse_inline_macro_close(&mut self, token: Token) {
+        if let Some(inline_macro_idx) = self
+            .inline_stack
+            .iter()
+            .rposition(|inline| inline.is_macro())
+        {
+            // consolidate into the inline macro
+            let Some(mut inline_macro) = self.inline_stack.remove(inline_macro_idx) else {
+                panic!("Index error getting inline macro")
+            };
+            while self.inline_stack.len() > inline_macro_idx {
+                let Some(subsequent_inline) = self.inline_stack.remove(inline_macro_idx) else {
+                    panic!("Index error while adding inlines to inline macro")
+                };
+                inline_macro.push_inline(subsequent_inline);
+            }
+            // update the locations
+            inline_macro.consolidate_locations_from_token(token);
+            // add it back to the stack
+            self.inline_stack.push_back(inline_macro);
+            // note that we're now closed
+            self.close_parent_after_push = true;
+        } else {
+            self.add_text_to_last_inline(token);
+        }
+    }
+
     //fn parse_eof(&mut self, token: Token, asg: &mut Asg) {}
     //fn parse_inline_style(&mut self, token: Token, asg: &mut Asg) {}
     //fn parse_quote_verse_block(&mut self, token: Token, asg: &mut Asg) {}
@@ -512,7 +549,13 @@ impl Parser {
                     }
                 }
                 Inline::InlineLiteral(prior_literal) => prior_literal.add_text_from_token(&token),
-                Inline::InlineRef(_) => todo!(),
+                Inline::InlineRef(inline_ref) => {
+                    if !self.close_parent_after_push {
+                        inline_ref.inlines.push(inline_literal)
+                    } else {
+                        self.inline_stack.push_back(inline_literal)
+                    }
+                }
             }
         } else {
             self.inline_stack.push_back(inline_literal)

@@ -46,6 +46,7 @@ impl Inline {
     pub fn push_inline(&mut self, child: Inline) {
         match self {
             Inline::InlineSpan(span) => span.inlines.push(child),
+            Inline::InlineRef(iref) => iref.inlines.push(child),
             _ => panic!("Inlines of type {} do not accept child inlines!", &self),
         }
     }
@@ -73,6 +74,15 @@ impl Inline {
 
     pub fn is_literal(&self) -> bool {
         matches!(self, Inline::InlineLiteral(_))
+    }
+
+    pub fn is_macro(&self) -> bool {
+        match self {
+            Inline::InlineRef(iref) => {
+                iref.variant == InlineRefVariant::Link
+            }
+            _ => false,
+        }
     }
 
     pub fn extract_values_to_string(&self) -> String {
@@ -117,6 +127,16 @@ impl Inline {
             inline.value = inline.value.trim().to_string();
             println!("{:?}", inline.value)
         }
+    }
+    pub fn consolidate_locations_from_token(&mut self, token: Token) {
+        match self {
+            Inline::InlineLiteral(_) => todo!(),
+            Inline::InlineSpan(_) => todo!(),
+            Inline::InlineRef(iref) =>  {
+                iref.location = Location::reconcile(iref.location.clone(), token.locations())
+            }
+        }
+
     }
 }
 
@@ -207,7 +227,6 @@ pub enum InlineSpanForm {
     Unconstrainted,
 }
 
-// REFS NOT CURRENTLY SUPPORTED, this is just saving future work
 #[derive(Serialize, Clone, Debug)]
 pub struct InlineRef {
     name: String,
@@ -215,12 +234,12 @@ pub struct InlineRef {
     node_type: NodeTypes,
     variant: InlineRefVariant,
     target: String,
-    inlines: Vec<Inline>,
+    pub inlines: Vec<Inline>,
     location: Vec<Location>,
 }
 
 impl InlineRef {
-    pub fn new(variant: InlineRefVariant, target: String, location: Vec<Location>) -> Self {
+    fn new(variant: InlineRefVariant, target: String, location: Vec<Location>) -> Self {
         InlineRef {
             name: "ref".to_string(),
             node_type: NodeTypes::Inline,
@@ -230,9 +249,19 @@ impl InlineRef {
             location,
         }
     }
+
+    pub fn new_link_from_token(token: Token) -> Self {
+        let mut target = token.text();
+        target.pop(); // remove trailing '['
+        InlineRef::new(InlineRefVariant::Link, target, token.locations())
+    }
+
+    pub fn is_link(&self) -> bool {
+        self.variant == InlineRefVariant::Link
+    }
 }
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, PartialEq, Clone, Debug)]
 #[serde(rename_all = "lowercase")]
 pub enum InlineRefVariant {
     Link,

@@ -1,7 +1,7 @@
 pub mod common;
 use std::fs;
 
-use common::assert_parsed_doc_matches_expected_asg_from_str;
+use common::{assert_parsed_doc_matches_expected_asg, assert_parsed_doc_matches_expected_asg_from_str};
 use rstest::rstest;
 
 #[rstest]
@@ -47,4 +47,12 @@ fn test_spans_across_newlines(#[case] markup_char: &str, #[case] variant: &str) 
         .expect("Unable to read asg json test template")
         .replace("VARIANT", variant);
     assert_parsed_doc_matches_expected_asg_from_str(&adoc_str, &asg_json_str)
+}
+
+#[test]
+fn test_links() {
+    let fn_pattern = "inlines/links";
+    let adoc_fn = format!("{}.adoc", fn_pattern);
+    let asg_json_fn = format!("{}.json", fn_pattern);
+    assert_parsed_doc_matches_expected_asg(&adoc_fn, &asg_json_fn)
 }
