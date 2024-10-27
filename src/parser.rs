@@ -14,8 +14,11 @@ pub struct Parser {
     last_token_type: TokenType,
     document_header: Header,
     document_attributes: HashMap<String, String>,
-    open_blocks: Vec<Block>,
-    open_inlines: VecDeque<Inline>,
+    /// holding ground for graph blocks until it's time to push to the main graph
+    block_stack: Vec<Block>,
+    /// holding ground for inline elements until it's time to push to the relevant block
+    inline_stack: VecDeque<Inline>,
+    // convenience flags
     in_document_header: bool,
     /// designates whether we're to be adding inlines to the previous block until a newline
     in_block_line: bool,
@@ -27,7 +30,8 @@ pub struct Parser {
     /// Some parent blocks take only a single child block, so we want an easy way to close these
     /// after the child gets added
     close_parent_after_push: bool,
-    // used to see if we need to add a newline before new text
+    /// Used to see if we need to add a newline before new text; we don't add newlines to the text
+    /// literals unless they're continuous (i.e., we never count newline paras as paras)
     dangling_newline: Option<Token>,
 }
 
@@ -43,8 +47,8 @@ impl Parser {
             last_token_type: TokenType::Eof,
             document_header: Header::new(),
             document_attributes: HashMap::new(),
-            open_blocks: vec![],
-            open_inlines: VecDeque::new(),
+            block_stack: vec![],
+            inline_stack: VecDeque::new(),
             in_document_header: true,
             in_block_line: false,
             in_inline_span: false,
@@ -69,7 +73,7 @@ impl Parser {
         // add any dangling inlines
         self.add_inlines_to_block_stack();
         // add any dangling blocks
-        while !self.open_blocks.is_empty() {
+        while !self.block_stack.is_empty() {
             self.add_last_block_to_graph(&mut asg);
         }
         // cleanup the tree
@@ -179,10 +183,10 @@ impl Parser {
                 // and then force a new block hereafter
                 self.force_new_block = true;
                 // check for dangling list items
-                if let Some(last_block) = self.open_blocks.pop() {
+                if let Some(last_block) = self.block_stack.pop() {
                     if matches!(last_block, Block::ListItem(_)) {
                         // sanity check
-                        let Some(mut next_last_block) = self.open_blocks.pop() else {
+                        let Some(mut next_last_block) = self.block_stack.pop() else {
                                 panic!("Dangling list item");
                         };
                         if matches!(next_last_block, Block::List(_)) {
@@ -196,7 +200,7 @@ impl Parser {
                             self.close_parent_after_push = false;
                         }
                     } else {
-                        self.open_blocks.push(last_block)
+                        self.block_stack.push(last_block)
                     }
                 } // if Some(last_block)
             }
@@ -251,17 +255,17 @@ impl Parser {
         let list_item = ListItem::new(token.lexeme.clone(), token.locations());
         // if there is an appropriate list, we push this onto the open_blocks so inlines can be
         // added
-        if self.open_blocks.last().is_some() && self.open_blocks.last().unwrap().is_ordered_list() {
+        if self.block_stack.last().is_some() && self.block_stack.last().unwrap().is_ordered_list() {
             self.add_last_list_item_to_list()
         } else {
             // we need to create the list first
-            self.open_blocks.push(Block::List(List::new(
+            self.block_stack.push(Block::List(List::new(
                 ListVariant::Ordered,
                 token.locations().clone(),
             )));
         }
         // either way, add the new list item
-        self.open_blocks.push(Block::ListItem(list_item));
+        self.block_stack.push(Block::ListItem(list_item));
     }
     //
     fn parse_unordered_list_item(&mut self, token: Token) {
@@ -270,18 +274,18 @@ impl Parser {
         let list_item = ListItem::new(token.lexeme.clone(), token.locations());
         // if there is an appropriate list, we push this onto the open_blocks so inlines can be
         // added
-        if self.open_blocks.last().is_some() && self.open_blocks.last().unwrap().is_unordered_list()
+        if self.block_stack.last().is_some() && self.block_stack.last().unwrap().is_unordered_list()
         {
             self.add_last_list_item_to_list()
         } else {
             // we need to create the list first
-            self.open_blocks.push(Block::List(List::new(
+            self.block_stack.push(Block::List(List::new(
                 ListVariant::Unordered,
                 token.locations().clone(),
             )));
         }
         // either way, add the new list item
-        self.open_blocks.push(Block::ListItem(list_item));
+        self.block_stack.push(Block::ListItem(list_item));
     }
 
     //fn parse_block_label(&mut self, token: Token, asg: &mut Asg) {}
@@ -291,16 +295,16 @@ impl Parser {
             self.document_header.location.extend(token.locations());
             self.in_block_line = true;
         } else {
-            if let Some(last_block) = self.open_blocks.pop() {
+            if let Some(last_block) = self.block_stack.pop() {
                 match last_block {
                     Block::Section(section) => {
                         if section.level == 1 {
                             self.add_to_block_stack_or_graph(asg, Block::Section(section))
                         } else {
-                            self.open_blocks.push(Block::Section(section))
+                            self.block_stack.push(Block::Section(section))
                         }
                     }
-                    _ => self.open_blocks.push(last_block),
+                    _ => self.block_stack.push(last_block),
                 }
             }
             self.add_to_block_stack_or_graph(
@@ -312,15 +316,15 @@ impl Parser {
 
     fn parse_section_headings(&mut self, token: Token, asg: &mut Asg, level: usize) {
         // if the last block is a section of the same level, push it up
-        if let Some(last_block) = self.open_blocks.pop() {
+        if let Some(last_block) = self.block_stack.pop() {
             if last_block.level_check().unwrap_or(999) == level {
                 self.add_to_block_stack_or_graph(asg, last_block)
             } else {
-                self.open_blocks.push(last_block)
+                self.block_stack.push(last_block)
             }
         }
         // always add new sections directly to the block stack
-        self.open_blocks.push(Block::Section(Section::new(
+        self.block_stack.push(Block::Section(Section::new(
             "".to_string(),
             level,
             token.first_location(),
@@ -336,7 +340,7 @@ impl Parser {
     //fn parse_source(&mut self, token: Token, asg: &mut Asg) {}
 
     fn parse_admonition_para_syntax(&mut self, token: Token) {
-        self.open_blocks
+        self.block_stack
             .push(Block::ParentBlock(ParentBlock::new_from_token(token)));
         self.close_parent_after_push = true;
     }
@@ -350,7 +354,7 @@ impl Parser {
 
     fn parse_strong(&mut self, token: Token) {
         let inline = Inline::InlineSpan(InlineSpan::new_strong_span(token));
-        if let Some(last_inline) = self.open_inlines.back_mut() {
+        if let Some(last_inline) = self.inline_stack.back_mut() {
             if inline == *last_inline {
                 last_inline.reconcile_locations(inline.locations());
                 self.in_inline_span = false;
@@ -358,12 +362,12 @@ impl Parser {
             }
         }
         self.in_inline_span = true;
-        self.open_inlines.push_back(inline)
+        self.inline_stack.push_back(inline)
     }
 
     fn parse_emphasis(&mut self, token: Token) {
         let inline = Inline::InlineSpan(InlineSpan::new_emphasis_span(token));
-        if let Some(last_inline) = self.open_inlines.back_mut() {
+        if let Some(last_inline) = self.inline_stack.back_mut() {
             if inline == *last_inline {
                 last_inline.reconcile_locations(inline.locations());
                 self.in_inline_span = false;
@@ -371,12 +375,12 @@ impl Parser {
             }
         }
         self.in_inline_span = true;
-        self.open_inlines.push_back(inline)
+        self.inline_stack.push_back(inline)
     }
 
     fn parse_code(&mut self, token: Token) {
         let inline = Inline::InlineSpan(InlineSpan::new_code_span(token));
-        if let Some(last_inline) = self.open_inlines.back_mut() {
+        if let Some(last_inline) = self.inline_stack.back_mut() {
             if inline == *last_inline {
                 last_inline.reconcile_locations(inline.locations());
                 self.in_inline_span = false;
@@ -384,12 +388,12 @@ impl Parser {
             }
         }
         self.in_inline_span = true;
-        self.open_inlines.push_back(inline)
+        self.inline_stack.push_back(inline)
     }
 
     fn parse_mark(&mut self, token: Token) {
         let inline = Inline::InlineSpan(InlineSpan::new_mark_span(token));
-        if let Some(last_inline) = self.open_inlines.back_mut() {
+        if let Some(last_inline) = self.inline_stack.back_mut() {
             if inline == *last_inline {
                 last_inline.reconcile_locations(inline.locations());
                 self.in_inline_span = false;
@@ -397,7 +401,7 @@ impl Parser {
             }
         }
         self.in_inline_span = true;
-        self.open_inlines.push_back(inline)
+        self.inline_stack.push_back(inline)
     }
 
     //fn parse_superscript(&mut self, token: Token, asg: &mut Asg) {}
@@ -445,11 +449,11 @@ impl Parser {
 
         // check for any prior parents in reverse
         if let Some(parent_block_idx) = self
-            .open_blocks
+            .block_stack
             .iter()
             .rposition(|parent_block| matches!(parent_block, Block::ParentBlock(_)))
         {
-            let matched_block = self.open_blocks.remove(parent_block_idx);
+            let matched_block = self.block_stack.remove(parent_block_idx);
             let Block::ParentBlock(mut matched) = matched_block else {
                 panic!("Unexpteced block in Block::ParentBlock")
             };
@@ -457,25 +461,25 @@ impl Parser {
                 // update the final location
                 matched.location = Location::reconcile(matched.location.clone(), block.location);
                 // return the parent block
-                self.open_blocks
+                self.block_stack
                     .insert(parent_block_idx, Block::ParentBlock(matched));
                 // close any dangling inlines
                 self.add_inlines_to_block_stack();
                 // add blocks until we have also added the parent block
-                while self.open_blocks.len() > parent_block_idx {
+                while self.block_stack.len() > parent_block_idx {
                     self.close_last_open_block(asg);
                 }
                 return;
             } else {
-                self.open_blocks
+                self.block_stack
                     .insert(parent_block_idx, Block::ParentBlock(matched));
             }
         }
-        self.open_blocks.push(Block::ParentBlock(block));
+        self.block_stack.push(Block::ParentBlock(block));
     }
 
     fn handle_delimited_leaf_block(&mut self, asg: &mut Asg, block: LeafBlock) {
-        if let Some(open_block) = self.open_blocks.last_mut() {
+        if let Some(open_block) = self.block_stack.last_mut() {
             match open_block {
                 Block::LeafBlock(leaf) => {
                     if leaf.name == block.name {
@@ -484,13 +488,13 @@ impl Parser {
                         self.add_to_block_stack_or_graph(asg, Block::LeafBlock(block))
                     }
                 }
-                _ => self.open_blocks.push(Block::LeafBlock(block)),
+                _ => self.block_stack.push(Block::LeafBlock(block)),
             }
         }
     }
 
     fn close_last_open_block(&mut self, asg: &mut Asg) {
-        let Some(block) = self.open_blocks.pop() else {
+        let Some(block) = self.block_stack.pop() else {
             panic!("Unexpected close last block call!")
         };
         self.add_to_block_stack_or_graph(asg, block)
@@ -498,26 +502,26 @@ impl Parser {
 
     fn add_text_to_last_inline(&mut self, token: Token) {
         let inline_literal = Inline::InlineLiteral(InlineLiteral::new_text_from_token(&token));
-        if let Some(last_inline) = self.open_inlines.back_mut() {
+        if let Some(last_inline) = self.inline_stack.back_mut() {
             match last_inline {
                 Inline::InlineSpan(span) => {
                     if self.in_inline_span {
                         span.add_inline(inline_literal);
                     } else {
-                        self.open_inlines.push_back(inline_literal)
+                        self.inline_stack.push_back(inline_literal)
                     }
                 }
                 Inline::InlineLiteral(prior_literal) => prior_literal.add_text_from_token(&token),
                 Inline::InlineRef(_) => todo!(),
             }
         } else {
-            self.open_inlines.push_back(inline_literal)
+            self.inline_stack.push_back(inline_literal)
         }
     }
 
     fn add_inlines_to_block_stack(&mut self) {
         // guard
-        if self.open_inlines.is_empty() {
+        if self.inline_stack.is_empty() {
             return;
         }
 
@@ -526,10 +530,10 @@ impl Parser {
             todo!()
         }
 
-        if let Some(last_block) = self.open_blocks.last_mut() {
+        if let Some(last_block) = self.block_stack.last_mut() {
             if last_block.takes_inlines() && !self.in_block_line && !self.force_new_block {
-                while !self.open_inlines.is_empty() {
-                    let Some(inline) = self.open_inlines.pop_front() else {
+                while !self.inline_stack.is_empty() {
+                    let Some(inline) = self.inline_stack.pop_front() else {
                         panic!("Error getting inline from open queue");
                     };
                     last_block.push_inline(inline);
@@ -540,7 +544,7 @@ impl Parser {
         // create a new para from the locations of the first span (subsequent locations are
         // consolidated later)
         let mut para_locations: Vec<Location> = Vec::new();
-        if let Some(first_inline) = self.open_inlines.front() {
+        if let Some(first_inline) = self.inline_stack.front() {
             para_locations = first_inline.locations().clone();
         }
         let mut para_block = Block::LeafBlock(LeafBlock::new(
@@ -550,28 +554,28 @@ impl Parser {
             para_locations,
             vec![],
         ));
-        while !self.open_inlines.is_empty() {
-            if let Some(inline) = self.open_inlines.pop_front() {
+        while !self.inline_stack.is_empty() {
+            if let Some(inline) = self.inline_stack.pop_front() {
                 para_block.push_inline(inline)
             }
         }
-        self.open_blocks.push(para_block)
+        self.block_stack.push(para_block)
     }
 
     fn add_last_list_item_to_list(&mut self) {
         // add the inlines to the list item
         self.add_inlines_to_block_stack();
         // then add it to the list
-        let last_item = self.open_blocks.pop().unwrap();
+        let last_item = self.block_stack.pop().unwrap();
         // if the last thing is a list item, add it to the list
         if matches!(last_item, Block::ListItem(_)) {
-            if let Some(list) = self.open_blocks.last_mut() {
+            if let Some(list) = self.block_stack.last_mut() {
                 list.push_block(last_item)
             }
         } else {
             // otherwise return the list to the open block stack, and create a new unordered
             // list item
-            self.open_blocks.push(last_item);
+            self.block_stack.push(last_item);
         }
     }
 
@@ -579,7 +583,7 @@ impl Parser {
         //if block.is_section() {
         //    block.create_id()
         //}
-        if let Some(last_block) = self.open_blocks.last_mut() {
+        if let Some(last_block) = self.block_stack.last_mut() {
             if last_block.can_be_parent() {
                 last_block.push_block(block);
                 return;
@@ -589,8 +593,8 @@ impl Parser {
     }
 
     fn add_last_to_block_stack_or_graph(&mut self, asg: &mut Asg) {
-        if let Some(last_block) = self.open_blocks.pop() {
-            if let Some(prior_block) = self.open_blocks.last_mut() {
+        if let Some(last_block) = self.block_stack.pop() {
+            if let Some(prior_block) = self.block_stack.last_mut() {
                 if prior_block.can_be_parent() {
                     prior_block.push_block(last_block);
                     return;
@@ -603,8 +607,8 @@ impl Parser {
     }
 
     fn add_last_block_to_graph(&mut self, asg: &mut Asg) {
-        if let Some(block) = self.open_blocks.pop() {
-            if let Some(next_last_block) = self.open_blocks.last_mut() {
+        if let Some(block) = self.block_stack.pop() {
+            if let Some(next_last_block) = self.block_stack.last_mut() {
                 if matches!(block, Block::ListItem(_)) {
                     // sanity check
                     if matches!(next_last_block, Block::List(_)) {
