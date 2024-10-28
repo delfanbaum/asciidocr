@@ -29,6 +29,7 @@ fn test_document(#[case] fn_pattern: &str) {
 #[case::single_unordered("blocks/unordered-list")]
 #[case::many_unordered("blocks/unordered-list-many-items")]
 #[case::complex_unordered("blocks/unordered-list-complex")]
+#[case::complex_unordered_open_block("blocks/unordered-list-complex-open-block")]
 #[case::single_ordered("blocks/ordered-list")]
 #[case::many_unordered("blocks/ordered-list-many-items")]
 fn test_lists(#[case] fn_pattern: &str) {

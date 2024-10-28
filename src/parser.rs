@@ -73,6 +73,7 @@ impl Parser {
     {
         let mut asg = Asg::new();
         for token in tokens {
+            println!("{:?}", token);
             let token_type = token.token_type();
             self.token_into(token, &mut asg);
 
@@ -594,7 +595,9 @@ impl Parser {
     }
 
     fn push_block_to_stack(&mut self, block: Block) {
-        if self.in_block_continuation {
+        // we only want to push on continue if we're not in an open delimited block (which will
+        // close itself, emptying the open_delimited_block_lines)
+        if self.in_block_continuation && self.open_delimited_block_lines.is_empty() {
             let Some(last_block) = self.block_stack.last_mut() else {
                 panic!("Invalid block continuation: no previous block")
             };
