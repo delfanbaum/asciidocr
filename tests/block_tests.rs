@@ -70,14 +70,36 @@ fn test_nexted_sections(#[case] fn_pattern: &str) {
 
 #[rstest]
 #[case::delimited_sidebar("****", "sidebar")]
-#[case::delimited_sidebar("====", "example")]
-#[case::delimited_sidebar("____", "quote")]
-#[case::delimited_sidebar("--", "open")]
+#[case::delimited_example("====", "example")]
+#[case::delimited_quote("____", "quote")]
+#[case::delimited_open("--", "open")]
 fn test_delimited_blocks_no_meta(#[case] delimiter: &str, #[case] name: &str) {
     let adoc_str = fs::read_to_string("tests/data/blocks/delimited-block.adoc")
         .expect("Unable to read asciidoc test template")
         .replace("****", delimiter);
     let mut asg_json_str = fs::read_to_string("tests/data/blocks/delimited-block.json")
+        .expect("Unable to read asg json test template")
+        .replace("sidebar", name)
+        .replace("****", delimiter);
+
+    // fix location numbering
+    if name == "open" {
+        asg_json_str = asg_json_str.replace("5, \"col\": 4", "5, \"col\": 2");
+    }
+
+    assert_parsed_doc_matches_expected_asg_from_str(&adoc_str, &asg_json_str)
+}
+
+#[rstest]
+#[case::delimited_sidebar("****", "sidebar")]
+//#[case::delimited_example("====", "example")]
+//#[case::delimited_quote("____", "quote")]
+//#[case::delimited_open("--", "open")]
+fn test_delimited_blocks_no_meta_spaces(#[case] delimiter: &str, #[case] name: &str) {
+    let adoc_str = fs::read_to_string("tests/data/blocks/delimited-block-spaced.adoc")
+        .expect("Unable to read asciidoc test template")
+        .replace("****", delimiter);
+    let mut asg_json_str = fs::read_to_string("tests/data/blocks/delimited-block-spaced.json")
         .expect("Unable to read asg json test template")
         .replace("sidebar", name)
         .replace("****", delimiter);
