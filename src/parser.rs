@@ -20,6 +20,9 @@ pub struct Parser {
     block_stack: Vec<Block>,
     /// holding ground for inline elements until it's time to push to the relevant block
     inline_stack: VecDeque<Inline>,
+    /// counts in/out delimited blocks by line reference; allows us to warn/error if they are
+    /// unclosed at the end of the document
+    delimited_blocks: Vec<usize>,
     // convenience flags
     in_document_header: bool,
     /// designates whether we're to be adding inlines to the previous block until a newline
@@ -53,6 +56,7 @@ impl Parser {
             document_attributes: HashMap::new(),
             block_stack: vec![],
             inline_stack: VecDeque::new(),
+            delimited_blocks: vec![],
             in_document_header: true,
             in_block_line: false,
             in_inline_span: false,
@@ -219,7 +223,8 @@ impl Parser {
                 } // if Some(last_block)
             }
         } else {
-            if self.in_block_continuation {  // don't add a newline ahead of text
+            if self.in_block_continuation {
+                // don't add a newline ahead of text
                 self.dangling_newline = None;
             } else {
                 self.dangling_newline = Some(token);
@@ -521,6 +526,7 @@ impl Parser {
 
     // TODO: handle [NOTE]\n==== cases (i.e., some block metadata check)
     fn parse_delimited_block(&mut self, token: Token, asg: &mut Asg) {
+        let delimiter_line = token.first_location().line;
         let block = ParentBlock::new_from_token(token);
 
         // check for any prior parents in reverse
@@ -534,6 +540,14 @@ impl Parser {
                 panic!("Unexpteced block in Block::ParentBlock")
             };
             if matched == block {
+                // remove the open delimiter line from the count and confirm we're nested properly
+                let Some(line) = self.delimited_blocks.pop() else {
+                    panic!("Attempted to close a non-existent delimited block")
+                };
+                if line != matched.opening_line() {
+                    // TODO this should be an error, not a panic
+                    panic!("Error nesting delimited blocks, see line {}", line)
+                }
                 // update the final location
                 matched.location = Location::reconcile(matched.location.clone(), block.location);
                 // return the parent block
@@ -551,6 +565,8 @@ impl Parser {
                     .insert(parent_block_idx, Block::ParentBlock(matched));
             }
         }
+        // note the open block line
+        self.delimited_blocks.push(delimiter_line);
         self.push_block_to_stack(Block::ParentBlock(block));
     }
 

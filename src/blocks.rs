@@ -550,6 +550,13 @@ impl ParentBlock {
             _ => panic!("Tried to create a ParentBlock from an invalid Token."),
         }
     }
+
+    pub fn opening_line(&self) -> usize {
+        let Some(first_location) = self.location.first() else {
+            panic!("{}", format!("Missing location information for: {:?}", self))
+        };
+        first_location.line.clone()
+    }
 }
 
 #[derive(Serialize, Debug)]
