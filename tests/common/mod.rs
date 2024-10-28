@@ -18,6 +18,9 @@ pub fn assert_parsed_doc_matches_expected_asg(adoc_fn: &str, asg_json_fn: &str) 
     )
     .unwrap();
 
+    // print the asg for troubleshooting
+    println!("{}", parsed_asg);
+
     assert_json_eq!(parsed_asg, expected_asg);
 }
 
@@ -26,5 +29,6 @@ pub fn assert_parsed_doc_matches_expected_asg(adoc_fn: &str, asg_json_fn: &str) 
 pub fn assert_parsed_doc_matches_expected_asg_from_str(adoc_str: &str, asg_json_str: &str) {
     let parsed_asg = json!(Parser::new().parse(Scanner::new(adoc_str)));
     let expected_asg: Value = serde_json::from_str(asg_json_str).unwrap();
+    println!("{}", parsed_asg);
     assert_json_eq!(parsed_asg, expected_asg);
 }

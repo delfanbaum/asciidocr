@@ -62,6 +62,7 @@ impl Block {
         match self {
             Block::Section(section) => section.blocks.push(block),
             Block::List(list) => list.add_item(block),
+            Block::ListItem(list_item) => list_item.blocks.push(block),
             Block::ParentBlock(parent_block) => parent_block.blocks.push(block),
             _ => panic!("push_block not implemented for {}", self),
         }
@@ -130,7 +131,7 @@ impl Block {
     pub fn can_be_parent(&self) -> bool {
         matches!(
             self,
-            Block::Section(_) | Block::ParentBlock(_) | Block::List(_)
+            Block::Section(_) | Block::ParentBlock(_) | Block::List(_) | Block::ListItem(_)
         )
     }
 
@@ -141,6 +142,13 @@ impl Block {
     pub fn level_check(&self) -> Option<usize> {
         match self {
             Block::Section(section) => Some(section.level),
+            _ => None,
+        }
+    }
+
+    pub fn list_type(&self) -> Option<ListVariant> {
+        match self {
+            Block::List(list) => Some(list.variant.clone()),
             _ => None,
         }
     }
@@ -166,6 +174,17 @@ impl Block {
             Block::Section(section) => !section.blocks.is_empty(),
             Block::LeafBlock(_) => false,
             _ => true,
+        }
+    }
+
+    /// helper when we need to move child blocks from one Block to another
+    pub fn extract_blocks(&mut self) -> Vec<Block> {
+        match self {
+            Block::List(ref mut list) => list.items.drain(..).collect(),
+            _ => {
+                let v: Vec<Block> = Vec::new();
+                v
+            }
         }
     }
 

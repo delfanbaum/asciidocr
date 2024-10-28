@@ -26,6 +26,9 @@ pub struct Parser {
     in_block_line: bool,
     /// designates whether new literal text should be added to the last span
     in_inline_span: bool,
+    /// designates whether, despite newline last_tokens_types, we should append the current block
+    /// to the next
+    in_block_continuation: bool,
     /// forces a new block when we add inlines; helps distinguish between adding to section.title
     /// and section.blocks
     force_new_block: bool,
@@ -53,6 +56,7 @@ impl Parser {
             in_document_header: true,
             in_block_line: false,
             in_inline_span: false,
+            in_block_continuation: false,
             force_new_block: false,
             close_parent_after_push: false,
             dangling_newline: None,
@@ -136,6 +140,10 @@ impl Parser {
             | TokenType::CautionPara
             | TokenType::WarningPara => self.parse_admonition_para_syntax(token),
 
+            // block continuation... I think does nothing, parser-wise, since it simply prevents
+            // the double newline
+            TokenType::BlockContinuation => self.parse_block_continuation(token),
+
             // comments
             TokenType::Comment => self.parse_comment(),
 
@@ -206,12 +214,16 @@ impl Parser {
                             self.close_parent_after_push = false;
                         }
                     } else {
-                        self.block_stack.push(last_block)
+                        self.push_block_to_stack(last_block)
                     }
                 } // if Some(last_block)
             }
         } else {
-            self.dangling_newline = Some(token)
+            if self.in_block_continuation {  // don't add a newline ahead of text
+                self.dangling_newline = None;
+            } else {
+                self.dangling_newline = Some(token);
+            }
         }
     }
 
@@ -265,13 +277,13 @@ impl Parser {
             self.add_last_list_item_to_list()
         } else {
             // we need to create the list first
-            self.block_stack.push(Block::List(List::new(
+            self.push_block_to_stack(Block::List(List::new(
                 ListVariant::Ordered,
                 token.locations().clone(),
             )));
         }
         // either way, add the new list item
-        self.block_stack.push(Block::ListItem(list_item));
+        self.push_block_to_stack(Block::ListItem(list_item));
     }
     //
     fn parse_unordered_list_item(&mut self, token: Token) {
@@ -285,13 +297,13 @@ impl Parser {
             self.add_last_list_item_to_list()
         } else {
             // we need to create the list first
-            self.block_stack.push(Block::List(List::new(
+            self.push_block_to_stack(Block::List(List::new(
                 ListVariant::Unordered,
                 token.locations().clone(),
             )));
         }
         // either way, add the new list item
-        self.block_stack.push(Block::ListItem(list_item));
+        self.push_block_to_stack(Block::ListItem(list_item));
     }
 
     //fn parse_block_label(&mut self, token: Token, asg: &mut Asg) {}
@@ -307,10 +319,10 @@ impl Parser {
                         if section.level == 1 {
                             self.add_to_block_stack_or_graph(asg, Block::Section(section))
                         } else {
-                            self.block_stack.push(Block::Section(section))
+                            self.push_block_to_stack(Block::Section(section))
                         }
                     }
-                    _ => self.block_stack.push(last_block),
+                    _ => self.push_block_to_stack(last_block),
                 }
             }
             self.add_to_block_stack_or_graph(
@@ -326,11 +338,11 @@ impl Parser {
             if last_block.level_check().unwrap_or(999) == level {
                 self.add_to_block_stack_or_graph(asg, last_block)
             } else {
-                self.block_stack.push(last_block)
+                self.push_block_to_stack(last_block)
             }
         }
         // always add new sections directly to the block stack
-        self.block_stack.push(Block::Section(Section::new(
+        self.push_block_to_stack(Block::Section(Section::new(
             "".to_string(),
             level,
             token.first_location(),
@@ -355,7 +367,11 @@ impl Parser {
     //fn parse_important(&mut self, token: Token, asg: &mut Asg) {}
     //fn parse_caution(&mut self, token: Token, asg: &mut Asg) {}
     //fn parse_warning(&mut self, token: Token, asg: &mut Asg) {}
-    //fn parse_block_continuation(&mut self, token: Token, asg: &mut Asg) {}
+    fn parse_block_continuation(&mut self, _token: Token) {
+        self.add_inlines_to_block_stack();
+        self.in_block_continuation = true;
+        self.force_new_block = true;
+    }
     //fn parse_def_list_mark(&mut self, token: Token, asg: &mut Asg) {}
 
     fn parse_strong(&mut self, token: Token) {
@@ -535,7 +551,7 @@ impl Parser {
                     .insert(parent_block_idx, Block::ParentBlock(matched));
             }
         }
-        self.block_stack.push(Block::ParentBlock(block));
+        self.push_block_to_stack(Block::ParentBlock(block));
     }
 
     fn handle_delimited_leaf_block(&mut self, asg: &mut Asg, block: LeafBlock) {
@@ -548,7 +564,7 @@ impl Parser {
                         self.add_to_block_stack_or_graph(asg, Block::LeafBlock(block))
                     }
                 }
-                _ => self.block_stack.push(Block::LeafBlock(block)),
+                _ => self.push_block_to_stack(Block::LeafBlock(block)),
             }
         }
     }
@@ -558,6 +574,18 @@ impl Parser {
             panic!("Unexpected close last block call!")
         };
         self.add_to_block_stack_or_graph(asg, block)
+    }
+
+    fn push_block_to_stack(&mut self, block: Block) {
+        if self.in_block_continuation {
+            let Some(last_block) = self.block_stack.last_mut() else {
+                panic!("Invalid block continuation: no previous block")
+            };
+            last_block.push_block(block);
+            self.in_block_continuation = false;
+        } else {
+            self.block_stack.push(block)
+        }
     }
 
     fn add_text_to_last_inline(&mut self, token: Token) {
@@ -625,7 +653,14 @@ impl Parser {
                 para_block.push_inline(inline)
             }
         }
-        self.block_stack.push(para_block)
+        if self.in_block_continuation {
+            let Some(last_block) = self.block_stack.last_mut() else {
+                panic!("Invalid block continuation: no previous block")
+            };
+            last_block.push_block(para_block);
+        } else {
+            self.push_block_to_stack(para_block)
+        }
     }
 
     fn add_last_list_item_to_list(&mut self) {
@@ -641,7 +676,7 @@ impl Parser {
         } else {
             // otherwise return the list to the open block stack, and create a new unordered
             // list item
-            self.block_stack.push(last_item);
+            self.push_block_to_stack(last_item);
         }
     }
 
@@ -685,6 +720,8 @@ impl Parser {
                 } else if next_last_block.is_section() {
                     next_last_block.push_block(block);
                     return;
+                } else {
+                    asg.push_block(block)
                 }
             } else {
                 asg.push_block(block)

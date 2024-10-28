@@ -28,6 +28,7 @@ fn test_document(#[case] fn_pattern: &str) {
 #[rstest]
 #[case::single_unordered("blocks/unordered-list")]
 #[case::many_unordered("blocks/unordered-list-many-items")]
+#[case::complex_unordered("blocks/unordered-list-complex")]
 #[case::single_ordered("blocks/ordered-list")]
 #[case::many_unordered("blocks/ordered-list-many-items")]
 fn test_lists(#[case] fn_pattern: &str) {

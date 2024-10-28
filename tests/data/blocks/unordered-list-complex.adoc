@@ -1,0 +1,7 @@
+* rusty
+* water
+* is cool
+* to drink
+  I hear
++
+A paragraph may consist of a single line.
