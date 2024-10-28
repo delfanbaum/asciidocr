@@ -22,7 +22,7 @@ pub struct Parser {
     inline_stack: VecDeque<Inline>,
     /// counts in/out delimited blocks by line reference; allows us to warn/error if they are
     /// unclosed at the end of the document
-    delimited_blocks: Vec<usize>,
+    open_delimited_block_lines: Vec<usize>,
     // convenience flags
     in_document_header: bool,
     /// designates whether we're to be adding inlines to the previous block until a newline
@@ -56,7 +56,7 @@ impl Parser {
             document_attributes: HashMap::new(),
             block_stack: vec![],
             inline_stack: VecDeque::new(),
-            delimited_blocks: vec![],
+            open_delimited_block_lines: vec![],
             in_document_header: true,
             in_block_line: false,
             in_inline_span: false,
@@ -205,13 +205,14 @@ impl Parser {
                     if matches!(last_block, Block::ListItem(_)) {
                         // sanity check
                         let Some(mut next_last_block) = self.block_stack.pop() else {
-                                panic!("Dangling list item");
+                            panic!("Dangling list item");
                         };
                         if matches!(next_last_block, Block::List(_)) {
                             next_last_block.push_block(last_block);
                             self.add_to_block_stack_or_graph(asg, next_last_block);
                         }
-                    } else if !last_block.is_section() {
+                    } else if !last_block.is_section() && self.open_delimited_block_lines.is_empty()
+                    {
                         self.add_to_block_stack_or_graph(asg, last_block);
                         if self.close_parent_after_push {
                             self.add_last_to_block_stack_or_graph(asg);
@@ -541,7 +542,7 @@ impl Parser {
             };
             if matched == block {
                 // remove the open delimiter line from the count and confirm we're nested properly
-                let Some(line) = self.delimited_blocks.pop() else {
+                let Some(line) = self.open_delimited_block_lines.pop() else {
                     panic!("Attempted to close a non-existent delimited block")
                 };
                 if line != matched.opening_line() {
@@ -566,7 +567,7 @@ impl Parser {
             }
         }
         // note the open block line
-        self.delimited_blocks.push(delimiter_line);
+        self.open_delimited_block_lines.push(delimiter_line);
         self.push_block_to_stack(Block::ParentBlock(block));
     }
 
@@ -697,9 +698,6 @@ impl Parser {
     }
 
     fn add_to_block_stack_or_graph(&mut self, asg: &mut Asg, block: Block) {
-        //if block.is_section() {
-        //    block.create_id()
-        //}
         if let Some(last_block) = self.block_stack.last_mut() {
             if last_block.can_be_parent() {
                 last_block.push_block(block);
