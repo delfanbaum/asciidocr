@@ -1,7 +1,7 @@
 = This Is A Minimum Example
 :replace: thing
 
-It should, _in theory_, not fail to parse, i.e., there should be no
+It should, in theory, not fail to parse, i.e., there should be no
 `unimplemented` tokens included in this document. In other words, nothing like
 the example that follows:
 
@@ -16,12 +16,11 @@ NOTE: This is a note.
 Of course, there are many things we need to handle, including *bold* text,
 `code` markup, etc., etc.
 
-Also some{replace}ings need to be dealt with, like attributes, and the
+Also some{replace}s need to be dealt with, like attributes, and the
 following:
 
 * Unordered lists
 * With things
-
 And ordered:
 
 . Lists

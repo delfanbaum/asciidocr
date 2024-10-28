@@ -153,17 +153,15 @@ impl Block {
         }
     }
 
-    pub fn is_ordered_list(&self) -> bool {
+    pub fn is_ordered_list_item(&self) -> bool {
         match self {
-            Block::List(list) => list.variant == ListVariant::Ordered,
             Block::ListItem(list) => list.marker == *".",
             _ => false,
         }
     }
 
-    pub fn is_unordered_list(&self) -> bool {
+    pub fn is_unordered_list_item(&self) -> bool {
         match self {
-            Block::List(list) => list.variant == ListVariant::Unordered,
             Block::ListItem(list) => list.marker == *"*",
             _ => false,
         }
@@ -216,6 +214,14 @@ impl Block {
             Block::LeafBlock(block) => block.location.clone(),
             Block::ParentBlock(block) => block.location.clone(),
         }
+    }
+
+    pub fn line(&self) -> usize {
+        let locs = self.locations();
+        let Some(first_location) = locs.first() else {
+            panic!("{:?} is missing location information", self)
+        };
+        first_location.line
     }
 }
 
@@ -553,7 +559,10 @@ impl ParentBlock {
 
     pub fn opening_line(&self) -> usize {
         let Some(first_location) = self.location.first() else {
-            panic!("{}", format!("Missing location information for: {:?}", self))
+            panic!(
+                "{}",
+                format!("Missing location information for: {:?}", self)
+            )
         };
         first_location.line.clone()
     }

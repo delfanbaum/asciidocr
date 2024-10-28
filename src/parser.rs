@@ -73,7 +73,6 @@ impl Parser {
     {
         let mut asg = Asg::new();
         for token in tokens {
-            println!("{:?}", token);
             let token_type = token.token_type();
             self.token_into(token, &mut asg);
 
@@ -203,17 +202,7 @@ impl Parser {
                 self.force_new_block = true;
                 // check for dangling list items
                 if let Some(last_block) = self.block_stack.pop() {
-                    if matches!(last_block, Block::ListItem(_)) {
-                        // sanity check
-                        let Some(mut next_last_block) = self.block_stack.pop() else {
-                            panic!("Dangling list item");
-                        };
-                        if matches!(next_last_block, Block::List(_)) {
-                            next_last_block.push_block(last_block);
-                            self.add_to_block_stack_or_graph(asg, next_last_block);
-                        }
-                    } else if !last_block.is_section() && self.open_delimited_block_lines.is_empty()
-                    {
+                    if !last_block.is_section() && self.open_delimited_block_lines.is_empty() {
                         self.add_to_block_stack_or_graph(asg, last_block);
                         if self.close_parent_after_push {
                             self.add_last_to_block_stack_or_graph(asg);
@@ -280,7 +269,7 @@ impl Parser {
         let list_item = ListItem::new(token.lexeme.clone(), token.locations());
         // if there is an appropriate list, we push this onto the open_blocks so inlines can be
         // added
-        if self.block_stack.last().is_some() && self.block_stack.last().unwrap().is_ordered_list() {
+        if self.block_stack.last().is_some() && self.block_stack.last().unwrap().is_ordered_list_item() {
             self.add_last_list_item_to_list()
         } else {
             // we need to create the list first
@@ -299,7 +288,8 @@ impl Parser {
         let list_item = ListItem::new(token.lexeme.clone(), token.locations());
         // if there is an appropriate list, we push this onto the open_blocks so inlines can be
         // added
-        if self.block_stack.last().is_some() && self.block_stack.last().unwrap().is_unordered_list()
+        if self.block_stack.last().is_some()
+            && self.block_stack.last().unwrap().is_unordered_list_item()
         {
             self.add_last_list_item_to_list()
         } else {
@@ -599,7 +589,10 @@ impl Parser {
         // close itself, emptying the open_delimited_block_lines)
         if self.in_block_continuation && self.open_delimited_block_lines.is_empty() {
             let Some(last_block) = self.block_stack.last_mut() else {
-                panic!("Invalid block continuation: no previous block")
+                panic!(
+                    "Line {}: Invalid block continuation: no previous block",
+                    block.line()
+                )
             };
             last_block.push_block(block);
             self.in_block_continuation = false;
@@ -675,7 +668,10 @@ impl Parser {
         }
         if self.in_block_continuation {
             let Some(last_block) = self.block_stack.last_mut() else {
-                panic!("Invalid block continuation: no previous block")
+                panic!(
+                    "Line {}: Invalid block continuation: no previous block",
+                    para_block.line()
+                )
             };
             last_block.push_block(para_block);
         } else {
@@ -684,6 +680,8 @@ impl Parser {
     }
 
     fn add_last_list_item_to_list(&mut self) {
+        // clear out any forced new blocks
+        self.force_new_block = false;
         // add the inlines to the list item
         self.add_inlines_to_block_stack();
         // then add it to the list
@@ -725,6 +723,7 @@ impl Parser {
     }
 
     fn add_last_block_to_graph(&mut self, asg: &mut Asg) {
+        // consolidate any list items
         if let Some(block) = self.block_stack.pop() {
             if let Some(next_last_block) = self.block_stack.last_mut() {
                 if matches!(block, Block::ListItem(_)) {
@@ -732,7 +731,7 @@ impl Parser {
                     if matches!(next_last_block, Block::List(_)) {
                         next_last_block.push_block(block);
                     } else {
-                        panic!("Dangling list item: missing parent list")
+                        //panic!("Dangling list item: missing parent list: {}", block.line())
                     }
                 } else if next_last_block.is_section() {
                     next_last_block.push_block(block);
