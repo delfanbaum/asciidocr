@@ -20,6 +20,8 @@ pub struct Parser {
     block_stack: Vec<Block>,
     /// holding ground for inline elements until it's time to push to the relevant block
     inline_stack: VecDeque<Inline>,
+    /// holding ground for block metadata, to be applied to the subsequent block
+    block_metadata: Option<Block>,
     /// counts in/out delimited blocks by line reference; allows us to warn/error if they are
     /// unclosed at the end of the document
     open_delimited_block_lines: Vec<usize>,
@@ -56,6 +58,7 @@ impl Parser {
             document_attributes: HashMap::new(),
             block_stack: vec![],
             inline_stack: VecDeque::new(),
+            block_metadata: None,
             open_delimited_block_lines: vec![],
             in_document_header: true,
             in_block_line: false,

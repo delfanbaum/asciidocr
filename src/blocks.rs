@@ -27,7 +27,7 @@ pub enum Block {
     BlockMacro(BlockMacro),
     LeafBlock(LeafBlock),
     ParentBlock(ParentBlock), // Admonitions are hiding in here
-                              //BlockMetadata(BlockMetadata),
+    BlockMetadata(BlockMetadata),
 }
 
 impl Display for Block {
@@ -45,7 +45,7 @@ impl Display for Block {
             Block::BlockMacro(_) => write!(f, "BlockMacro"),
             Block::LeafBlock(_) => write!(f, "LeafBlock"),
             Block::ParentBlock(_) => write!(f, "ParentBlock"),
-            //Block::BlockMetadata(_) => write!(f, "BlockMetadata"),
+            Block::BlockMetadata(_) => write!(f, "BlockMetadata"),
         }
     }
 }
@@ -213,6 +213,7 @@ impl Block {
             Block::BlockMacro(block) => block.location.clone(),
             Block::LeafBlock(block) => block.location.clone(),
             Block::ParentBlock(block) => block.location.clone(),
+            Block::BlockMetadata(block) => block.location.clone(),
         }
     }
 
@@ -568,8 +569,10 @@ impl ParentBlock {
     }
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, PartialEq, Debug)]
 pub struct BlockMetadata {
     attributes: HashMap<String, String>,
+    options: Vec<String>,
+    roles: Vec<String>,
     location: Vec<Location>,
 }
