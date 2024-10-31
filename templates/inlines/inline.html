@@ -1,0 +1,12 @@
+{%- if inline.name == "span" %}
+    {%- if inline.variant == "emphasis" %}
+        {% set tag = "em" %}
+    {%- elif inline.variant == "mark" %}
+        {% set tag = "span" %}
+    {%- else -%}
+        {% set tag = inline.variant %}
+    {% endif -%}
+{% endif -%}
+{%- if tag %}<{{tag}}>{% endif -%}
+{{- inline.value -}}
+{%- if tag %}</{{tag}}>{% endif -%}
