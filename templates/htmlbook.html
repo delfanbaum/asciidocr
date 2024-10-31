@@ -13,6 +13,8 @@
         <link href="css/style.css" rel="stylesheet">
     </head>
     <body>
-    
+        {%- for block in blocks %}
+            {%- include "blocks/block.html" -%}
+        {% endfor -%}
     </body>
 </html>

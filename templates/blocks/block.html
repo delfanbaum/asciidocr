@@ -1,0 +1,8 @@
+{%- if block.name == "paragraph" %}
+    {% set tag = "p" %}
+{% endif -%}
+<{{tag}}>
+    {%- for inline in block.inlines %}
+        {%- include "inlines/inline.html" -%}
+    {% endfor -%}
+</{{tag}}>

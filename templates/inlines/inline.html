@@ -1,12 +1,18 @@
 {%- if inline.name == "span" %}
     {%- if inline.variant == "emphasis" %}
-        {% set tag = "em" %}
+        {% set inline_tag = "em" %}
     {%- elif inline.variant == "mark" %}
-        {% set tag = "span" %}
+        {% set inline_tag = "span" %}
+    {%- elif inline.variant == "link" %}
+        {% set inline_tag = "a" %}
+        {% set ref = inline_tag.target %}
+    {%- elif inline.variant == "xref" %}
+        {% set inline_tag = "a" %}
+        {% set ref = "#" ~ inline_tag.target %}
     {%- else -%}
-        {% set tag = inline.variant %}
+        {% set inline_tag = inline.variant %}
     {% endif -%}
 {% endif -%}
-{%- if tag %}<{{tag}}>{% endif -%}
+{%- if inline_tag %}<{{inline_tag}}>{% endif -%}
 {{- inline.value -}}
-{%- if tag %}</{{tag}}>{% endif -%}
+{%- if inline_tag %}</{{inline_tag}}>{% endif -%}
