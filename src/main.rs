@@ -1,33 +1,41 @@
-use std::{
-    env,
-    fs::{self},
-    io,
-    process::exit,
-};
+use std::{env, fs, io, process::exit};
+use tera::{Context, Tera};
 
 use asciidocr::{parser::Parser, scanner::Scanner};
 
-fn main() {
+fn main() -> Result<(), tera::Error> {
     // take a single arg for simplicity for now; CLI TK
     let args: Vec<String> = env::args().collect();
     if args.len() == 2 {
-        run(&args[1])
+        println!("{}", render(&args[1])?);
+        Ok(())
     } else {
         eprintln!("Usage: asciidocr FILE");
         exit(1)
     }
 }
 
-fn run(filename: &str) {
+fn render(filename: &str) -> Result<String, tera::Error> {
+    // from their docs
+    let tera = match Tera::new("templates/**/*.html") {
+        Ok(t) => t,
+        Err(e) => {
+            println!("Parsing error(s): {}", e);
+            ::std::process::exit(1);
+        }
+    };
+
     let source = open(filename);
-    let serialized = serde_json::to_string_pretty(&Parser::new().parse(Scanner::new(&source)));
+    let graph = Parser::new().parse(Scanner::new(&source));
+    //let serialized = serde_json::to_string_pretty(&Parser::new().parse(Scanner::new(&source)));
     //let serialized = serde_json::to_string(&Parser::new().parse(Scanner::new(&source)));
-    println!("{}", serialized.unwrap());
+    Ok(tera.render("htmlbook.html", &Context::from_serialize(&graph)?)?)
 }
 
 fn open(filename: &str) -> String {
     match filename {
         "-" => io::read_to_string(io::stdin()).expect("Error reading from stdin"),
-        _ => fs::read_to_string(filename).unwrap_or_else(|_| panic!("Unable to read file: {}", filename)),
+        _ => fs::read_to_string(filename)
+            .unwrap_or_else(|_| panic!("Unable to read file: {}", filename)),
     }
 }
