@@ -34,6 +34,9 @@ pub struct Parser {
     /// designates whether, despite newline last_tokens_types, we should append the current block
     /// to the next
     in_block_continuation: bool,
+    /// appends text to block regardless of markup, token, etc. (will need to change if/when we
+    /// handle code callouts)
+    in_literal_or_listing: bool,
     /// forces a new block when we add inlines; helps distinguish between adding to section.title
     /// and section.blocks
     force_new_block: bool,
@@ -64,6 +67,7 @@ impl Parser {
             in_block_line: false,
             in_inline_span: false,
             in_block_continuation: false,
+            in_literal_or_listing: false,
             force_new_block: false,
             close_parent_after_push: false,
             dangling_newline: None,
@@ -129,7 +133,7 @@ impl Parser {
             TokenType::SidebarBlock
             | TokenType::OpenBlock
             | TokenType::QuoteVerseBlock
-            | TokenType::ExampleBlock => self.parse_delimited_block(token, asg),
+            | TokenType::ExampleBlock => self.parse_delimited_parent_block(token, asg),
 
             // the following should probably be consumed into the above
             TokenType::PassthroughBlock => self.parse_passthrough_block(token, asg),
@@ -260,7 +264,9 @@ impl Parser {
 
     fn parse_passthrough_block(&mut self, token: Token, asg: &mut Asg) {
         let block = LeafBlock::new_pass(Some(token.text()), token.first_location());
-        self.handle_delimited_leaf_block(asg, block)
+        self.handle_delimited_leaf_block(asg, block);
+        // fancy syntax toggle
+        self.in_literal_or_listing ^= true;
     }
 
     fn parse_source_block(&mut self, token: Token, asg: &mut Asg) {
@@ -522,7 +528,7 @@ impl Parser {
     }
 
     // TODO: handle [NOTE]\n==== cases (i.e., some block metadata check)
-    fn parse_delimited_block(&mut self, token: Token, asg: &mut Asg) {
+    fn parse_delimited_parent_block(&mut self, token: Token, asg: &mut Asg) {
         let delimiter_line = token.first_location().line;
         let block = ParentBlock::new_from_token(token);
 
