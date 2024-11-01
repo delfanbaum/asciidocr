@@ -2,11 +2,32 @@
 
 A(n in-progress, unstable, incomplete) Rust library for processing Asciidoc files.
 
+== Usage (Command-Line)
+
+Library usage is still TBD. To use the in-progress CLI tool, clone the repo,
+install the crate with `cargo install --path .`. Here's the usage:
+
+----
+$ asciidocr -- help
+A Rust CLI and library for processing Asciidoc files.
+
+Usage: asciidocr [OPTIONS] <FILE>
+
+Arguments:
+  <FILE>  Asciidoc file for processing. To read from standard input (stdin), use "-"
+
+Options:
+  -o, --output-file <OUTPUT>  Optionally, provide a filename for the output. Defaults to FILE.<format>. To send to standard out (stdout), use "-"
+  -a, --tck-adapter           Flag for returning the asciidoc Abstract Syntax Graph (asg); used for validation with the official Asciidoc Technology Compatibility Kit (TCK)
+  -h, --help                  Print help
+----
+
 == Current State Notes (As of the Last README Commit)
 
-_We have output_! You can now convert, for example, this README using the
-`asciidocr` command to a fairly bare-bones HTML more or less along the lines of
-what O'Reilly's https://oreillymedia.github.io/HTMLBook/[HTMLBook] expects.
+_We have output_! You can now convert, for example, this README (minus the usage
+listing block above) using the `asciidocr` command to a fairly bare-bones HTML
+more or less along the lines of what O'Reilly's
+https://oreillymedia.github.io/HTMLBook/[HTMLBook] expects.
 
 There are still plenty of edge-cases and, in fact, tokens to be
 parsed/implemented, but we've got headings, paragraphs, lists, and links, and
@@ -27,3 +48,4 @@ A non-exhaustive list:
   still want MS Word files, these should be easy to produce. (Also
   differentiates this project's capabilities from that of `asciidoctor`)
 * PyO3 hooks for use inside Python contexts... eventually
+
