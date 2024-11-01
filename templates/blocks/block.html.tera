@@ -3,6 +3,16 @@
 {%- if block.name == "section" -%}
 {% set tag = "h" ~ block.level %}
 <section data-type="sect{{block.level}}">
+    {%- elif block.name == "list" -%}
+    {%- if block.variant == "ordered" -%}
+    {%- set tag = "ol" -%}
+    {%- elif block.variant == "unordered" -%}
+    {%- set tag = "ul" -%}
+    {%- endif -%}
+    {% elif block.name == "open" -%}
+    {%- set tag = "div" -%}
+    {%- elif block.name == "listItem" -%}
+    {%- set tag = "li" -%}
     {% elif block.name == "paragraph" -%}
     {%- set tag = "p" -%}
     {%- endif -%}
@@ -11,19 +21,32 @@
         {%- for inline in block.title -%}
         {{- inline_macros::process_inline(inline=inline) -}}
         {%- endfor -%}
+        {%- elif block.name == "list" -%}
+        {%- for item in block.items -%}
+        {{- self::process_block(block=item )-}}
+        {%- endfor -%}
+        {% elif block.name == "listItem" -%}
+        <p>{%- for inline in block.principal -%}
+            {{- inline_macros::process_inline(inline=inline) -}}
+            {%- endfor -%}</p>
         {%- else -%}
+        {% if block.inlines %}
         {%- for inline in block.inlines -%}
         {{- inline_macros::process_inline(inline=inline) -}}
         {%- endfor -%}
         {%- endif -%}
-    </{{tag}}>
-    {% if block.blocks %}
+        {%- endif -%}
+        {% if block.blocks and block.name != "section" %}
+        {% for child_block in block.blocks %}
+        {{- self::process_block(block=child_block )-}}
+        {%- endfor -%}
+        {%- endif %}</{{tag}}>
+    {%- if block.name == "section" %}
+    {%- if block.blocks -%}
     {% for child_block in block.blocks %}
     {{- self::process_block(block=child_block )-}}
     {%- endfor -%}
-
     {%- endif -%}
-    {%- if block.name == "section" %}
 </section>
 {%- endif -%}
 {%- endmacro process_block -%}

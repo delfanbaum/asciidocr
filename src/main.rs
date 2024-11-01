@@ -29,6 +29,7 @@ fn render(filename: &str) -> Result<String, tera::Error> {
     let graph = Parser::new().parse(Scanner::new(&source));
     //let serialized = serde_json::to_string_pretty(&Parser::new().parse(Scanner::new(&source)));
     //let serialized = serde_json::to_string(&Parser::new().parse(Scanner::new(&source)));
+    println!("{}", serde_json::to_string_pretty(&graph).expect("Failed to parse graph"));
     Ok(tera.render("htmlbook.html.tera", &Context::from_serialize(&graph)?)?)
 }
 
