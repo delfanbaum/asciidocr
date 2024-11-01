@@ -4,23 +4,14 @@ A(n in-progress, unstable, incomplete) Rust library for processing Asciidoc file
 
 == Current State Notes (As of the Last README Commit)
 
-Token scanning is more or less in a pretty good place (and one such that it's
-pretty easy to add new tokens as needed), and parsing is coming along. Right now
-I'm targeting producing a JSON document along the lines of the "official"
-https://gitlab.eclipse.org/eclipse/asciidoc-lang/asciidoc-lang/-/tree/main/asg?ref_type=heads[ASG
-Schema]. The `tests/` directory will describe the most up-to-date current
-capabilities.
+_We have output_! You can now convert, for example, this README using the
+`asciidocr` command to a fairly bare-bones HTML more or less along the lines of
+what O'Reilly's https://oreillymedia.github.io/HTMLBook/[HTMLBook] expects.
 
-My plan at the current moment is to target covering a reasonable amount of the
-ASG Schema (most block types, ignoring includes, probably some reference types),
-after which I'll start building out a basic HTML backend (targeting output more
-along the lines of markdown-output HTML as opposed to what `asciidoctor` produces,
-which I feel is a little too ``div``-happy). The plan is to make the backends
-relatively "pluggable," insofar as it can be anything that consumes the `Asg`
-object produced by the parser.
-
-*Update*: Can now produce very basic HTML! TODO next is probably an actual CLI
-for user friendliness.
+There are still plenty of edge-cases and, in fact, tokens to be
+parsed/implemented, but we've got headings, paragraphs, lists, and links, and
+you can go pretty far with those. And frankly I needed a break from the parsing,
+so I figured I'd change lanes for a little bit and work on the HTML output.
 
 == Project Goals 
 
@@ -29,6 +20,7 @@ A non-exhaustive list:
 * Coverage of the majority, if not all, of the language features, probably
   initially targeting a set similar to that of the `libasciidoc` project.
 * Clean, simple HTML output as a default
+* Build-in styles on said html output, but, like, a very small set.
 * Native "document" (`docx` or `odt`, probably `docx`) output; given that part
   of the goal of this project is to make it easier for non-technical writers to
   use asciidoc, and given that most publishers, journals, business people, etc.,

@@ -11,7 +11,6 @@
         {{- inline_macros::process_inline(inline=inline) -}}
         {% endfor -%}
         {% endif -%}</title>
-    <link href="css/style.css" rel="stylesheet">
 </head>
 
 <body>

@@ -1,6 +1,6 @@
 use std::fs;
 
-use asciidocr::{parser::Parser, scanner::Scanner, output::render};
+use asciidocr::{output::render, parser::Parser, scanner::Scanner};
 use assert_json_diff::assert_json_eq;
 use serde_json::{json, Value};
 
@@ -32,10 +32,13 @@ pub fn assert_parsed_doc_matches_expected_asg_from_str(adoc_str: &str, asg_json_
 /// blocks, inlines, etc., are correct
 pub fn assert_rendered_html_matches_expected(adoc_fn: &str, html_fn: &str) {
     let test_dir = "tests/data/";
-    let rendered_html = render(&Parser::new().parse(Scanner::new(
-        &fs::read_to_string(&format!("{}{}", test_dir, adoc_fn)).expect("Unable to find adoc")
-    ))).expect("Unable to render HTML from document").retain(|c| !c.is_whitespace());
-    let expected_html = fs::read_to_string(&format!("{}{}", test_dir, html_fn))
-        .expect("Unable to read expectd html file").retain(|c| !c.is_whitespace());
+    let mut rendered_html = render(&Parser::new().parse(Scanner::new(
+        &fs::read_to_string(&format!("{}{}", test_dir, adoc_fn)).expect("Unable to find adoc"),
+    )))
+    .expect("Unable to render HTML from document");
+    rendered_html.retain(|c| !c.is_whitespace());
+    let mut expected_html = fs::read_to_string(&format!("{}{}", test_dir, html_fn))
+        .expect("Unable to read expectd html file");
+    expected_html.retain(|c| !c.is_whitespace());
     assert_eq!(rendered_html, expected_html);
 }

@@ -4,17 +4,20 @@
             {%- set inline_tag = "em" -%}
         {%- elif inline.variant == "mark" -%}
             {%- set inline_tag = "span" -%}
-        {%- elif inline.variant == "link" -%}
-            {%- set inline_tag = "a" -%}
-            {%- set ref = inline_tag.target -%}
-        {%- elif inline.variant == "xref" -%}
-            {%- set inline_tag = "a" -%}
-            {%- set ref = "#" ~ inline_tag.target -%}
         {%- else -%}
             {%- set inline_tag = inline.variant -%}
         {%- endif -%}
+
+    {%- elif inline.name == "ref" -%}
+        {%- set inline_tag = "a" -%}
+        {%- if inline.variant == "link" -%}
+            {%- set ref = inline.target -%}
+        {%- elif inline.variant == "xref" -%}
+            {%- set ref = "#" ~ inline.target -%}
+        {%- endif -%}
+        {%- set href = 'href="' ~ ref ~ '"' -%}
     {%- endif -%}
-    {%- if inline_tag -%}<{{inline_tag}}>{%- endif -%}
+{%- if inline_tag -%}<{{inline_tag}}{%if href%} {{href}}{%- endif -%}>{%- endif -%}
         {#- Handle recursion -#}
             {%- if inline.inlines -%}
                 {%- for child in inline.inlines -%}

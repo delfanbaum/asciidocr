@@ -552,6 +552,8 @@ impl Parser {
                     .insert(parent_block_idx, Block::ParentBlock(matched));
                 // close any dangling inlines
                 self.add_inlines_to_block_stack();
+                // close any continuations
+                self.in_block_continuation = false;
                 // add blocks until we have also added the parent block
                 while self.block_stack.len() > parent_block_idx {
                     self.close_last_open_block(asg);

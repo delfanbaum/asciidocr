@@ -1,9 +1,7 @@
 use clap::Parser;
 use std::{fs, io};
 
-use asciidocr::{
-    cli::Cli, output::render, parser::Parser as AdocParser, scanner::Scanner,
-};
+use asciidocr::{cli::Cli, output::render, parser::Parser as AdocParser, scanner::Scanner};
 
 fn main() {
     let args = Cli::parse();
