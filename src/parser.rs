@@ -21,7 +21,7 @@ pub struct Parser {
     /// holding ground for inline elements until it's time to push to the relevant block
     inline_stack: VecDeque<Inline>,
     /// holding ground for block metadata, to be applied to the subsequent block
-    block_metadata: Option<Block>,
+    _block_metadata: Option<Block>,
     /// counts in/out delimited blocks by line reference; allows us to warn/error if they are
     /// unclosed at the end of the document
     open_delimited_block_lines: Vec<usize>,
@@ -58,7 +58,7 @@ impl Parser {
             document_attributes: HashMap::new(),
             block_stack: vec![],
             inline_stack: VecDeque::new(),
-            block_metadata: None,
+            _block_metadata: None,
             open_delimited_block_lines: vec![],
             in_document_header: true,
             in_block_line: false,
@@ -216,13 +216,11 @@ impl Parser {
                     }
                 } // if Some(last_block)
             }
+        } else if self.in_block_continuation {
+            // don't add a newline ahead of text
+            self.dangling_newline = None;
         } else {
-            if self.in_block_continuation {
-                // don't add a newline ahead of text
-                self.dangling_newline = None;
-            } else {
-                self.dangling_newline = Some(token);
-            }
+            self.dangling_newline = Some(token);
         }
     }
 
@@ -272,7 +270,9 @@ impl Parser {
         let list_item = ListItem::new(token.lexeme.clone(), token.locations());
         // if there is an appropriate list, we push this onto the open_blocks so inlines can be
         // added
-        if self.block_stack.last().is_some() && self.block_stack.last().unwrap().is_ordered_list_item() {
+        if self.block_stack.last().is_some()
+            && self.block_stack.last().unwrap().is_ordered_list_item()
+        {
             self.add_last_list_item_to_list()
         } else {
             // we need to create the list first

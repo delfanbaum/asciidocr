@@ -566,7 +566,7 @@ impl ParentBlock {
                 format!("Missing location information for: {:?}", self)
             )
         };
-        first_location.line.clone()
+        first_location.line
     }
 }
 

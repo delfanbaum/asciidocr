@@ -1,21 +1,27 @@
-use std::{env, fs, io, process::exit};
+use anyhow::Result;
+use clap::Parser;
+use std::{fs, io};
 use tera::{Context, Tera};
 
-use asciidocr::{parser::Parser, scanner::Scanner};
+use asciidocr::{asg::Asg, cli::Cli, parser::Parser as AdocParser, scanner::Scanner};
 
-fn main() -> Result<(), tera::Error> {
-    // take a single arg for simplicity for now; CLI TK
-    let args: Vec<String> = env::args().collect();
-    if args.len() == 2 {
-        println!("{}", render(&args[1])?);
-        Ok(())
+fn main() {
+    let args = Cli::parse();
+    let graph = AdocParser::new().parse(Scanner::new(&open(&args.file)));
+    if args.adapter {
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&graph).expect("Failed to parse graph")
+        );
     } else {
-        eprintln!("Usage: asciidocr FILE");
-        exit(1)
+        match render(&graph) {
+            Ok(rendered) => println!("{}", rendered),
+            Err(e) => eprintln!("Error: {}", e),
+        }
     }
 }
 
-fn render(filename: &str) -> Result<String, tera::Error> {
+fn render(graph: &Asg) -> Result<String> {
     // from their docs
     let tera = match Tera::new("templates/**/*.html.tera") {
         Ok(t) => t,
@@ -24,13 +30,7 @@ fn render(filename: &str) -> Result<String, tera::Error> {
             ::std::process::exit(1);
         }
     };
-
-    let source = open(filename);
-    let graph = Parser::new().parse(Scanner::new(&source));
-    //let serialized = serde_json::to_string_pretty(&Parser::new().parse(Scanner::new(&source)));
-    //let serialized = serde_json::to_string(&Parser::new().parse(Scanner::new(&source)));
-    println!("{}", serde_json::to_string_pretty(&graph).expect("Failed to parse graph"));
-    Ok(tera.render("htmlbook.html.tera", &Context::from_serialize(&graph)?)?)
+    Ok(tera.render("htmlbook.html.tera", &Context::from_serialize(graph)?)?)
 }
 
 fn open(filename: &str) -> String {

@@ -7,6 +7,7 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0.89"
+clap = {version = "4.5.20", features=["derive"]}
 serde = {version = "1.0.210", features=["derive"]}
 serde_json = "1.0.128"
 tera = {version = "1.20.0", features=["builtins"]}

@@ -102,7 +102,7 @@ impl Location {
     } // handle file later
     
     pub fn col(&self) -> usize {
-        self.col.clone()
+        self.col
     }
 
     pub fn reconcile(mut start: Vec<Location>, other: Vec<Location>) -> Vec<Location> {
