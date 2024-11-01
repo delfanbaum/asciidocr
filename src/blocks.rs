@@ -153,6 +153,13 @@ impl Block {
         }
     }
 
+    pub fn is_list_item(&self) -> bool {
+        match self {
+            Block::ListItem(_) => true,
+            _ => false,
+        }
+    }
+
     pub fn is_ordered_list_item(&self) -> bool {
         match self {
             Block::ListItem(list) => list.marker == *".",

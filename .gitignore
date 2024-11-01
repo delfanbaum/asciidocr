@@ -25,3 +25,4 @@ Cargo.lock
 /target
 notes/
 tester.adoc
+bacon.toml

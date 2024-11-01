@@ -1,0 +1,13 @@
+= This Document Contains Many Lists
+
+For example, an unordered list:
+
+* Some
+* Cool
+* List
+
+Followed by an ordered list:
+
+. One
+. Two
+. Three

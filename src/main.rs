@@ -1,9 +1,9 @@
-use anyhow::Result;
 use clap::Parser;
 use std::{fs, io};
-use tera::{Context, Tera};
 
-use asciidocr::{asg::Asg, cli::Cli, parser::Parser as AdocParser, scanner::Scanner};
+use asciidocr::{
+    cli::Cli, output::render, parser::Parser as AdocParser, scanner::Scanner,
+};
 
 fn main() {
     let args = Cli::parse();
@@ -19,18 +19,6 @@ fn main() {
             Err(e) => eprintln!("Error: {}", e),
         }
     }
-}
-
-fn render(graph: &Asg) -> Result<String> {
-    // from their docs
-    let tera = match Tera::new("templates/**/*.html.tera") {
-        Ok(t) => t,
-        Err(e) => {
-            println!("Parsing error(s): {}", e);
-            ::std::process::exit(1);
-        }
-    };
-    Ok(tera.render("htmlbook.html.tera", &Context::from_serialize(graph)?)?)
 }
 
 fn open(filename: &str) -> String {

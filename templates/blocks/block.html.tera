@@ -15,15 +15,15 @@
     {%- set tag = "li" -%}
     {% elif block.name == "paragraph" -%}
     {%- set tag = "p" -%}
-    {%- endif -%}
+    {%- endif %}
     <{{tag}}>
         {%- if block.name == "section" -%}
         {%- for inline in block.title -%}
         {{- inline_macros::process_inline(inline=inline) -}}
         {%- endfor -%}
         {%- elif block.name == "list" -%}
-        {%- for item in block.items -%}
-        {{- self::process_block(block=item )-}}
+        {% for item in block.items -%}
+        {{ self::process_block(block=item ) }}
         {%- endfor -%}
         {% elif block.name == "listItem" -%}
         <p>{%- for inline in block.principal -%}
@@ -40,11 +40,12 @@
         {% for child_block in block.blocks %}
         {{- self::process_block(block=child_block )-}}
         {%- endfor -%}
-        {%- endif %}</{{tag}}>
-    {%- if block.name == "section" %}
-    {%- if block.blocks -%}
+        {% endif -%}
+    </{{tag}}>
+    {% if block.name == "section" %}
+    {% if block.blocks -%}
     {% for child_block in block.blocks %}
-    {{- self::process_block(block=child_block )-}}
+    {{- self::process_block(block=child_block) -}}
     {%- endfor -%}
     {%- endif -%}
 </section>

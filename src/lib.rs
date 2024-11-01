@@ -7,4 +7,5 @@ pub mod nodes;
 pub mod parser;
 pub mod scanner;
 pub mod tokens;
+pub mod output;
 pub mod cli;

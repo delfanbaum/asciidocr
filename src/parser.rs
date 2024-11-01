@@ -198,13 +198,17 @@ impl Parser {
                 }
                 self.in_document_header = false
             } else {
+                // consolidate any dangling list items
+                if let Some(Block::ListItem(_)) = self.block_stack.last() {
+                    self.add_last_list_item_to_list();
+                }
                 // clear out any inlines
                 self.in_inline_span = false;
                 self.add_inlines_to_block_stack();
                 // and then force a new block hereafter
                 self.force_new_block = true;
-                // check for dangling list items
                 if let Some(last_block) = self.block_stack.pop() {
+                    // check for dangling list items
                     if !last_block.is_section() && self.open_delimited_block_lines.is_empty() {
                         self.add_to_block_stack_or_graph(asg, last_block);
                         if self.close_parent_after_push {
@@ -376,54 +380,46 @@ impl Parser {
 
     fn parse_strong(&mut self, token: Token) {
         let inline = Inline::InlineSpan(InlineSpan::new_strong_span(token));
-        if let Some(last_inline) = self.inline_stack.back_mut() {
-            if inline == *last_inline {
-                last_inline.reconcile_locations(inline.locations());
-                self.in_inline_span = false;
-                return;
-            }
-        }
-        self.in_inline_span = true;
-        self.inline_stack.push_back(inline)
+        self.parse_inline_span(inline);
     }
 
     fn parse_emphasis(&mut self, token: Token) {
         let inline = Inline::InlineSpan(InlineSpan::new_emphasis_span(token));
-        if let Some(last_inline) = self.inline_stack.back_mut() {
-            if inline == *last_inline {
-                last_inline.reconcile_locations(inline.locations());
-                self.in_inline_span = false;
-                return;
-            }
-        }
-        self.in_inline_span = true;
-        self.inline_stack.push_back(inline)
+        self.parse_inline_span(inline);
     }
 
     fn parse_code(&mut self, token: Token) {
         let inline = Inline::InlineSpan(InlineSpan::new_code_span(token));
-        if let Some(last_inline) = self.inline_stack.back_mut() {
-            if inline == *last_inline {
-                last_inline.reconcile_locations(inline.locations());
-                self.in_inline_span = false;
-                return;
-            }
-        }
-        self.in_inline_span = true;
-        self.inline_stack.push_back(inline)
+        self.parse_inline_span(inline);
     }
 
     fn parse_mark(&mut self, token: Token) {
         let inline = Inline::InlineSpan(InlineSpan::new_mark_span(token));
-        if let Some(last_inline) = self.inline_stack.back_mut() {
-            if inline == *last_inline {
-                last_inline.reconcile_locations(inline.locations());
-                self.in_inline_span = false;
-                return;
+        self.parse_inline_span(inline);
+    }
+
+    /// Generic parser for inline spans that close themselves
+    fn parse_inline_span(&mut self, inline: Inline) {
+        if self.in_document_header && self.in_block_line {
+            if let Some(last_inline) = self.document_header.title.last_mut() {
+                if inline == *last_inline {
+                    last_inline.reconcile_locations(inline.locations());
+                    self.in_inline_span = false;
+                    return;
+                }
             }
+            self.document_header.title.push(inline);
+        } else {
+            if let Some(last_inline) = self.inline_stack.back_mut() {
+                if inline == *last_inline {
+                    last_inline.reconcile_locations(inline.locations());
+                    self.in_inline_span = false;
+                    return;
+                }
+            }
+            self.inline_stack.push_back(inline)
         }
         self.in_inline_span = true;
-        self.inline_stack.push_back(inline)
     }
 
     //fn parse_superscript(&mut self, token: Token, asg: &mut Asg) {}
@@ -498,9 +494,15 @@ impl Parser {
             if let Some(inline) = self.document_header.title.last_mut() {
                 match inline {
                     Inline::InlineLiteral(lit) => lit.add_text_from_token(&token),
-                    Inline::InlineSpan(span) => span.add_inline(Inline::InlineLiteral(
-                        InlineLiteral::new_text_from_token(&token),
-                    )),
+                    Inline::InlineSpan(span) => {
+                        let inline_lit =
+                            Inline::InlineLiteral(InlineLiteral::new_text_from_token(&token));
+                        if self.in_inline_span {
+                            span.add_inline(inline_lit)
+                        } else {
+                            self.document_header.title.push(inline_lit)
+                        }
+                    }
                     Inline::InlineRef(_) => {
                         panic!("Inline references are not allowed in document titles")
                     }
