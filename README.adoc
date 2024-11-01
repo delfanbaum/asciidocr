@@ -19,6 +19,9 @@ which I feel is a little too ``div``-happy). The plan is to make the backends
 relatively "pluggable," insofar as it can be anything that consumes the `Asg`
 object produced by the parser.
 
+*Update*: Can now produce very basic HTML! TODO next is probably an actual CLI
+for user friendliness.
+
 == Project Goals 
 
 A non-exhaustive list:
