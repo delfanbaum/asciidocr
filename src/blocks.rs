@@ -78,7 +78,7 @@ impl Block {
 
     pub fn push_inline(&mut self, inline: Inline) {
         match self {
-            Block::Section(section) => section.title.push(inline),
+            Block::Section(section) => section.inlines.push(inline),
             Block::LeafBlock(block) => block.inlines.push(inline),
             Block::ListItem(list_item) => list_item.add_inline(inline),
             _ => panic!("push_block not implemented for {}", self),
@@ -190,7 +190,7 @@ impl Block {
         if let Block::Section(section) = self {
             if section.id == *"" {
                 let mut id = String::new();
-                for inline in &section.title {
+                for inline in &section.inlines {
                     id.push_str(&inline.extract_values_to_string())
                 }
                 id = id.replace(" ", "-");
@@ -233,7 +233,8 @@ pub struct Section {
     node_type: NodeTypes,
     #[serde(skip_serializing_if = "String::is_empty")]
     pub id: String,
-    title: Vec<Inline>,
+    #[serde(rename = "title")]
+    inlines: Vec<Inline>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     reftext: Vec<Inline>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -256,7 +257,7 @@ impl Section {
             name: "section".to_string(),
             node_type: NodeTypes::Block,
             id,
-            title: vec![],   // added later
+            inlines: vec![],   // added later
             reftext: vec![], // added later
             metadata: None,
             level,

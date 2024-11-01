@@ -1,11 +1,29 @@
 {%- import "inlines/inline.html.tera" as inline_macros -%}
 {%- macro process_block(block) -%}
-{%- if block.name == "paragraph" -%}
+{%- if block.name == "section" -%}
+{% set tag = "h" ~ block.level %}
+<section data-type="sect{{block.level}}">
+    {% elif block.name == "paragraph" -%}
     {%- set tag = "p" -%}
-{%- endif -%}
-<{{tag}}>
-    {%- for inline in block.inlines -%}
+    {%- endif -%}
+    <{{tag}}>
+        {%- if block.name == "section" -%}
+        {%- for inline in block.title -%}
         {{- inline_macros::process_inline(inline=inline) -}}
+        {%- endfor -%}
+        {%- else -%}
+        {%- for inline in block.inlines -%}
+        {{- inline_macros::process_inline(inline=inline) -}}
+        {%- endfor -%}
+        {%- endif -%}
+    </{{tag}}>
+    {% if block.blocks %}
+    {% for child_block in block.blocks %}
+    {{- self::process_block(block=child_block )-}}
     {%- endfor -%}
-</{{tag}}>
+
+    {%- endif -%}
+    {%- if block.name == "section" %}
+</section>
+{%- endif -%}
 {%- endmacro process_block -%}
