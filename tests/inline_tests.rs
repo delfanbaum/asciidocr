@@ -50,6 +50,14 @@ fn test_spans_across_newlines(#[case] markup_char: &str, #[case] variant: &str) 
 }
 
 #[test]
+fn test_spans_in_doc_title() {
+    let fn_pattern = "inlines/document-header";
+    let adoc_fn = format!("{}.adoc", fn_pattern);
+    let asg_json_fn = format!("{}.json", fn_pattern);
+    assert_parsed_doc_matches_expected_asg(&adoc_fn, &asg_json_fn)
+}
+
+#[test]
 fn test_links() {
     let fn_pattern = "inlines/links";
     let adoc_fn = format!("{}.adoc", fn_pattern);

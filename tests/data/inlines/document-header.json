@@ -1,0 +1,84 @@
+{
+    "name": "document",
+    "type": "block",
+    "attributes": {},
+    "header": {
+        "title": [
+            {
+                "name": "text",
+                "type": "string",
+                "value": "Document ",
+                "location": [ { "line": 1, "col": 3 }, { "line": 1, "col": 11 } ]
+            },
+            {
+                "name": "span",
+                "type": "inline",
+                "variant": "strong",
+                "form": "constrained",
+                "inlines": [
+                    {
+                        "name": "text",
+                        "type": "string",
+                        "value": "Title",
+                        "location": [
+                            {
+                                "line": 1,
+                                "col": 13
+                            },
+                            {
+                                "line": 1,
+                                "col": 17
+                            }
+                        ]
+                    }
+                ],
+                "location": [ { "line": 1, "col": 12 }, { "line": 1, "col": 18 }
+                ]
+            }
+        ],
+        "location": [ { "line": 1, "col": 1 }, { "line": 1, "col": 18 } ]
+    },
+    "blocks": [
+        {
+            "name": "paragraph",
+            "type": "block",
+            "inlines": [
+                {
+                    "name": "text",
+                    "type": "string",
+                    "value": "Text",
+                    "location": [
+                        {
+                            "line": 3,
+                            "col": 1
+                        },
+                        {
+                            "line": 3,
+                            "col": 4
+                        }
+                    ]
+                }
+            ],
+            "location": [
+                {
+                    "line": 3,
+                    "col": 1
+                },
+                {
+                    "line": 3,
+                    "col": 4
+                }
+            ]
+        }
+    ],
+    "location": [
+        {
+            "line": 1,
+            "col": 1
+        },
+        {
+            "line": 3,
+            "col": 4
+        }
+    ]
+}
