@@ -100,7 +100,7 @@ impl Location {
             //file: None,
         }
     } // handle file later
-    //
+    
     pub fn col(&self) -> usize {
         self.col.clone()
     }

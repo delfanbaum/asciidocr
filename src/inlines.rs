@@ -259,10 +259,6 @@ impl InlineRef {
     pub fn is_link(&self) -> bool {
         self.variant == InlineRefVariant::Link
     }
-
-    pub fn new_attribute_ref(token: Token) -> Self {
-        InlineRef::new(InlineRefVariant::Attribute, String::from("Document Attributes"), token.locations())
-    }
 }
 
 #[derive(Serialize, PartialEq, Clone, Debug)]
@@ -270,7 +266,6 @@ impl InlineRef {
 pub enum InlineRefVariant {
     Link,
     Xref,
-    Attribute, // Note that these will get squished in a pre-processing step
 }
 
 #[derive(Serialize, Clone, Debug)]
