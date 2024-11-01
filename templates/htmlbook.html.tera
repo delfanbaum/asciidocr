@@ -1,0 +1,25 @@
+{% import "inlines/inline.html.tera" as inline_macros %}
+{% import "blocks/block.html.tera" as block_macros %}
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>
+        {%- if header %}
+        {%- for inline in header.title %}
+        {{ inline_macros::process_inline(inline=inline) }}
+        {% endfor -%}
+        {% endif -%}
+    </title>
+    <link href="css/style.css" rel="stylesheet">
+</head>
+
+<body>
+    {% for block in blocks -%}
+        {{ block_macros::process_block(block=block) }}
+    {% endfor %}
+</body>
+
+</html>

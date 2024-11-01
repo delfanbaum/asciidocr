@@ -17,7 +17,7 @@ fn main() -> Result<(), tera::Error> {
 
 fn render(filename: &str) -> Result<String, tera::Error> {
     // from their docs
-    let tera = match Tera::new("templates/**/*.html") {
+    let tera = match Tera::new("templates/**/*.html.tera") {
         Ok(t) => t,
         Err(e) => {
             println!("Parsing error(s): {}", e);
@@ -29,8 +29,7 @@ fn render(filename: &str) -> Result<String, tera::Error> {
     let graph = Parser::new().parse(Scanner::new(&source));
     //let serialized = serde_json::to_string_pretty(&Parser::new().parse(Scanner::new(&source)));
     //let serialized = serde_json::to_string(&Parser::new().parse(Scanner::new(&source)));
-    println!("Graph: {}\n", serde_json::to_string(&graph).expect("Unable to make json"));
-    Ok(tera.render("htmlbook.html", &Context::from_serialize(&graph)?)?)
+    Ok(tera.render("htmlbook.html.tera", &Context::from_serialize(&graph)?)?)
 }
 
 fn open(filename: &str) -> String {

@@ -1,0 +1,11 @@
+{%- import "inlines/inline.html.tera" as inline_macros -%}
+{%- macro process_block(block) -%}
+{%- if block.name == "paragraph" -%}
+    {%- set tag = "p" -%}
+{%- endif -%}
+<{{tag}}>
+    {%- for inline in block.inlines -%}
+        {{- inline_macros::process_inline(inline=inline) -}}
+    {%- endfor -%}
+</{{tag}}>
+{%- endmacro process_block -%}
