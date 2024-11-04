@@ -25,6 +25,10 @@ this should work.
     {%- set tag = "li" -%}
     {% elif block.name == "paragraph" -%}
     {%- set tag = "p" -%}
+    {% elif block.name == "listing" -%}
+    {%- set tag = "pre" -%}
+    {% else %}
+    {%- set tag = "UNHANDLED" -%}
     {%- endif %}
     <{{tag}}>
         {%- if block.name == "section" -%}
@@ -33,7 +37,7 @@ this should work.
         {%- endfor -%}
         {%- elif block.name == "list" -%}
         {% for item in block.items -%}
-        {{ self::process_block(block=item ) }}
+            {{ self::process_block(block=item ) }}
         {%- endfor -%}
         {% elif block.name == "listItem" -%}
         <p>{%- for inline in block.principal -%}

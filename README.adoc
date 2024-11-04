@@ -24,10 +24,9 @@ Options:
 
 == Current State Notes (As of the Last README Commit)
 
-_We have output_! You can now convert, for example, this README (minus the usage
-listing block above) using the `asciidocr` command to a fairly bare-bones HTML
-more or less along the lines of what O'Reilly's
-https://oreillymedia.github.io/HTMLBook/[HTMLBook] expects.
+_We have output_! You can now convert, for example, this entire README using the
+`asciidocr` command to a fairly bare-bones HTML more or less along the lines of
+what O'Reilly's https://oreillymedia.github.io/HTMLBook/[HTMLBook] expects.
 
 There are still plenty of edge-cases and, in fact, tokens to be
 parsed/implemented, but we've got headings, paragraphs, lists, and links, and

@@ -80,6 +80,19 @@ impl Token {
                 | TokenType::Attribute
         )
     }
+    /// Check to see if something should be parsed inside a delimited leaf block; if not, it'll
+    /// just be added as simple text
+    pub fn is_allowed_in_delimited_leaf_block(&self) -> bool {
+        self.can_be_in_document_header()
+            || matches!(
+                self.token_type(),
+                TokenType::QuoteVerseBlock
+                    | TokenType::SourceBlock
+                    | TokenType::PassthroughBlock
+                    | TokenType::CommentBlock
+                    | TokenType::AttributeReference
+            )
+    }
 }
 
 // would later add pub enum Section{Preface, Introduction, etc}
@@ -98,11 +111,11 @@ pub enum TokenType {
 
     // four char delimiters at new block
     PassthroughBlock, // i.e., "++++"
-    SidebarBlock,       // i.e., "****"
+    SidebarBlock,     // i.e., "****"
     SourceBlock,      // i.e., "----"
     QuoteVerseBlock,  // i.e., "____"
     CommentBlock,     // i.e., "////"
-    ExampleBlock,  // i.e., "====" (Also used for admonitions!)
+    ExampleBlock,     // i.e., "====" (Also used for admonitions!)
 
     // two-char delimiters as new block
     OpenBlock, // i.e., --
@@ -125,11 +138,11 @@ pub enum TokenType {
     Verse,      // [quote],
     Source,     // [source]
 
-    NotePara,      // NOTE: 
-    TipPara,       // TIP: 
-    ImportantPara, // IMPORTANT: 
-    CautionPara,   // CAUTION: 
-    WarningPara,   // WARNING: 
+    NotePara,      // NOTE:
+    TipPara,       // TIP:
+    ImportantPara, // IMPORTANT:
+    CautionPara,   // CAUTION:
+    WarningPara,   // WARNING:
 
     BlockContinuation, // a "+" all by itself on a line can signal continuation
 

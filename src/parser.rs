@@ -25,6 +25,9 @@ pub struct Parser {
     /// counts in/out delimited blocks by line reference; allows us to warn/error if they are
     /// unclosed at the end of the document
     open_delimited_block_lines: Vec<usize>,
+    /// appends text to block regardless of markup, token, etc. (will need to change if/when we
+    /// handle code callouts)
+    open_delimited_leaf_bloc_type: Option<TokenType>,
     // convenience flags
     in_document_header: bool,
     /// designates whether we're to be adding inlines to the previous block until a newline
@@ -34,9 +37,6 @@ pub struct Parser {
     /// designates whether, despite newline last_tokens_types, we should append the current block
     /// to the next
     in_block_continuation: bool,
-    /// appends text to block regardless of markup, token, etc. (will need to change if/when we
-    /// handle code callouts)
-    in_literal_or_listing: bool,
     /// forces a new block when we add inlines; helps distinguish between adding to section.title
     /// and section.blocks
     force_new_block: bool,
@@ -67,7 +67,7 @@ impl Parser {
             in_block_line: false,
             in_inline_span: false,
             in_block_continuation: false,
-            in_literal_or_listing: false,
+            open_delimited_leaf_bloc_type: None,
             force_new_block: false,
             close_parent_after_push: false,
             dangling_newline: None,
@@ -103,6 +103,16 @@ impl Parser {
             self.in_document_header = false;
         }
 
+        if let Some(token_type) = self.open_delimited_leaf_bloc_type {
+            if token.token_type() != token_type {
+                self.open_delimited_leaf_bloc_type = Some(token_type);
+                self.parse_text(token);
+                return;
+            } else {
+                self.open_delimited_leaf_bloc_type = Some(token_type)
+            }
+        }
+
         match token.token_type() {
             // document header, headings and section parsing
             TokenType::Heading1 => self.parse_level_0_heading(token, asg),
@@ -136,9 +146,22 @@ impl Parser {
             | TokenType::ExampleBlock => self.parse_delimited_parent_block(token, asg),
 
             // the following should probably be consumed into the above
-            TokenType::PassthroughBlock => self.parse_passthrough_block(token, asg),
-            TokenType::SourceBlock => self.parse_source_block(token, asg),
-            TokenType::CommentBlock => self.parse_comment_block(),
+            TokenType::PassthroughBlock => self.parse_delimited_leaf_block(token),
+            TokenType::SourceBlock => self.parse_delimited_leaf_block(token),
+            TokenType::CommentBlock => {
+                // We treat a CommentBlock like a delimited LeafBlock, but throw away the result if
+                // we've got a match
+                if let Some(open_type) = self.open_delimited_leaf_bloc_type {
+                    if open_type == TokenType::CommentBlock {
+                        self.inline_stack.clear();
+                        self.block_stack.pop();
+                        self.force_new_block = true;
+                        self.open_delimited_leaf_bloc_type = None;
+                    }
+                } else {
+                    self.parse_delimited_leaf_block(token)
+                }
+            }
 
             // lists
             TokenType::UnorderedListItem => self.parse_unordered_list_item(token),
@@ -257,21 +280,6 @@ impl Parser {
     // Comments
     fn parse_comment(&self) {
         // for now, do nothing
-    }
-    fn parse_comment_block(&mut self) {
-        // for now, do nothing
-    }
-
-    fn parse_passthrough_block(&mut self, token: Token, asg: &mut Asg) {
-        let block = LeafBlock::new_pass(Some(token.text()), token.first_location());
-        self.handle_delimited_leaf_block(asg, block);
-        // fancy syntax toggle
-        self.in_literal_or_listing ^= true;
-    }
-
-    fn parse_source_block(&mut self, token: Token, asg: &mut Asg) {
-        let block = LeafBlock::new_listing(Some(token.text()), token.first_location());
-        self.handle_delimited_leaf_block(asg, block)
     }
 
     fn parse_ordered_list_item(&mut self, token: Token) {
@@ -527,6 +535,23 @@ impl Parser {
         }
     }
 
+    /// TODO some magic about the inlines, etc.
+    fn parse_delimited_leaf_block(&mut self, token: Token) {
+        if self.open_delimited_leaf_bloc_type.is_some() {
+            let Some(open_leaf) = self.block_stack.last_mut() else {
+                panic!("Missing last block on the stack")
+            };
+            open_leaf.add_locations(token.locations().clone());
+            self.open_delimited_leaf_bloc_type = None;
+        } else {
+            self.open_delimited_leaf_bloc_type = Some(token.token_type());
+            let block = LeafBlock::new_from_token(token);
+            self.push_block_to_stack(Block::LeafBlock(block));
+            // note that we're to just add
+            self.force_new_block = false;
+        }
+    }
+
     // TODO: handle [NOTE]\n==== cases (i.e., some block metadata check)
     fn parse_delimited_parent_block(&mut self, token: Token, asg: &mut Asg) {
         let delimiter_line = token.first_location().line;
@@ -573,21 +598,6 @@ impl Parser {
         // note the open block line
         self.open_delimited_block_lines.push(delimiter_line);
         self.push_block_to_stack(Block::ParentBlock(block));
-    }
-
-    fn handle_delimited_leaf_block(&mut self, asg: &mut Asg, block: LeafBlock) {
-        if let Some(open_block) = self.block_stack.last_mut() {
-            match open_block {
-                Block::LeafBlock(leaf) => {
-                    if leaf.name == block.name {
-                        self.close_last_open_block(asg)
-                    } else {
-                        self.add_to_block_stack_or_graph(asg, Block::LeafBlock(block))
-                    }
-                }
-                _ => self.push_block_to_stack(Block::LeafBlock(block)),
-            }
-        }
     }
 
     fn close_last_open_block(&mut self, asg: &mut Asg) {
