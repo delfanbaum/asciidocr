@@ -24,6 +24,9 @@ this should work.
     {%- set tag = "div" -%}
     {%- elif block.name == "listItem" -%}
     {%- set tag = "li" -%}
+    {% elif block.name == "admonition" -%}
+    {%- set tag = "div" -%}
+    {%- set data_type = block.variant -%}
     {% elif block.name == "paragraph" -%}
     {%- set tag = "p" -%}
     {% elif block.name == "listing" -%}
@@ -31,8 +34,9 @@ this should work.
     {% else %}
     {%- set tag = "UNHANDLED" -%}
     {%- endif %}
-    <{{tag}} {%- if block.metadata.roles and not block.name=="section" %} class="{{ block.metadata.roles |
-    join(sep=" ")}}" {%- endif -%}>
+    <{{tag}}
+    {%- if block.metadata.roles and not block.name=="section" %} class="{{ block.metadata.roles | join(sep=" ")}}" {%- endif -%}
+    {%- if data_type %} data-type="{{ data_type }}"{%- endif -%}>
         {%- if block.name == "section" -%}
         {%- for inline in block.title -%}
         {{- inline_macros::process_inline(inline=inline) -}}

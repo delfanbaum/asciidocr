@@ -253,6 +253,9 @@ impl Block {
             Block::Section(block) => {
                 block.metadata = Some(metadata)
             }
+            Block::ParentBlock(block) => {
+                block.metadata = Some(metadata)
+            }
             _ => todo!(),
         }
     }

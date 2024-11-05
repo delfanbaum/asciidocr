@@ -5,7 +5,7 @@ use asciidocr::{parser::Parser, scanner::Scanner};
 pub mod common;
 
 
-//#[test]
+#[test]
 ///Smoke test for "have we covered enough" -- will be added to as we go along.
 fn test_targeted_coverage() {
     let adoc_fn = "tests/data/documents/minimum.adoc";

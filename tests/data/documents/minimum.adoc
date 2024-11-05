@@ -45,8 +45,10 @@ Some inside the block shit.
 Eventually, too, we want to handle images, but maybe later. In the short term,
 maybe we do quotes, like:
 
-[quote, Somebody]
+[quote, somebody]
+____
 This is a great idea
+____
 
 And verse:
 

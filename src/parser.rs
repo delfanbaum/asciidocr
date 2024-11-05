@@ -81,7 +81,6 @@ impl Parser {
     {
         let mut asg = Asg::new();
         for token in tokens {
-            //println!("{:?}", token);
             let token_type = token.token_type();
             self.token_into(token, &mut asg);
 
@@ -433,6 +432,11 @@ impl Parser {
                     self.in_inline_span = false;
                     return;
                 }
+            }
+            // handle newline tokens prior to constrained spans
+            if let Some(newline_token) = self.dangling_newline.clone() {
+                self.add_text_to_last_inline(newline_token);
+                self.dangling_newline = None;
             }
             if self.metadata.is_some() {
                 inline.add_metadata(self.metadata.as_ref().unwrap().clone());
