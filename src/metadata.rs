@@ -35,7 +35,7 @@ impl ElementMetadata {
             .split(".")
             .collect::<Vec<&str>>()
             .iter_mut()
-            .filter(|s| **s != "")
+            .filter(|s| !s.is_empty() )
             .map(|s| s.to_string())
             .collect();
 
