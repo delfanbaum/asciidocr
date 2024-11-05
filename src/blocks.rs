@@ -85,49 +85,6 @@ impl Block {
         }
     }
 
-    pub fn consolidate_locations(&mut self) {
-        match self {
-            Block::Section(block) => {
-                if let Some(last_inline) = block.blocks.last() {
-                    block.location =
-                        Location::reconcile(block.location.clone(), last_inline.locations())
-                }
-            }
-            Block::LeafBlock(block) => {
-                if let Some(last_inline) = block.inlines.last() {
-                    block.location =
-                        Location::reconcile(block.location.clone(), last_inline.locations())
-                }
-            }
-            Block::List(list) => {
-                for block in &mut list.items {
-                    block.consolidate_locations()
-                }
-                if let Some(last_block) = list.items.last() {
-                    list.location =
-                        Location::reconcile(list.location.clone(), last_block.locations())
-                }
-            }
-            Block::ListItem(block) => {
-                if let Some(last_block) = block.blocks.last() {
-                    block.location =
-                        Location::reconcile(block.location.clone(), last_block.locations())
-                } else if let Some(last_inline) = block.principal.last() {
-                    block.location =
-                        Location::reconcile(block.location.clone(), last_inline.locations())
-                }
-            }
-            Block::ParentBlock(block) => {
-                if let Some(last_inline) = block.blocks.last() {
-                    block.location =
-                        Location::reconcile(block.location.clone(), last_inline.locations())
-                }
-            }
-
-            _ => todo!(),
-        }
-    }
-
     pub fn can_be_parent(&self) -> bool {
         matches!(
             self,
@@ -221,6 +178,59 @@ impl Block {
         }
     }
 
+    /// adds and reconciles a block location; specifically useful for delimited blocks
+    pub fn add_locations(&mut self, locations: Vec<Location>) {
+        match self {
+            Block::LeafBlock(block) => {
+                block.location = Location::reconcile(block.location.clone(), locations)
+            }
+            _ => todo!(),
+        }
+    }
+
+    pub fn consolidate_locations(&mut self) {
+        match self {
+            Block::Section(block) => {
+                if let Some(last_inline) = block.blocks.last() {
+                    block.location =
+                        Location::reconcile(block.location.clone(), last_inline.locations())
+                }
+            }
+            Block::LeafBlock(block) => {
+                if let Some(last_inline) = block.inlines.last() {
+                    block.location =
+                        Location::reconcile(block.location.clone(), last_inline.locations())
+                }
+            }
+            Block::List(list) => {
+                for block in &mut list.items {
+                    block.consolidate_locations()
+                }
+                if let Some(last_block) = list.items.last() {
+                    list.location =
+                        Location::reconcile(list.location.clone(), last_block.locations())
+                }
+            }
+            Block::ListItem(block) => {
+                if let Some(last_block) = block.blocks.last() {
+                    block.location =
+                        Location::reconcile(block.location.clone(), last_block.locations())
+                } else if let Some(last_inline) = block.principal.last() {
+                    block.location =
+                        Location::reconcile(block.location.clone(), last_inline.locations())
+                }
+            }
+            Block::ParentBlock(block) => {
+                if let Some(last_inline) = block.blocks.last() {
+                    block.location =
+                        Location::reconcile(block.location.clone(), last_inline.locations())
+                }
+            }
+
+            _ => todo!(),
+        }
+    }
+
     pub fn line(&self) -> usize {
         let locs = self.locations();
         let Some(first_location) = locs.first() else {
@@ -261,7 +271,7 @@ impl Section {
             name: "section".to_string(),
             node_type: NodeTypes::Block,
             id,
-            inlines: vec![],   // added later
+            inlines: vec![], // added later
             reftext: vec![], // added later
             metadata: None,
             level,
@@ -362,8 +372,9 @@ pub enum LeafBlockName {
     Literal, // TK not handling now
     Paragraph,
     Pass,
-    Stem,  // TK not handling now
-    Verse, // TK need to figure handling for quotes
+    Stem, // TK not handling now
+    Verse,
+    Comment, // Gets thrown away, but convenient 
 }
 #[derive(Serialize, Debug)]
 #[serde(rename_all = "lowercase")]
@@ -403,27 +414,40 @@ impl LeafBlock {
             location,
         }
     }
-    pub fn new_listing(delimiter: Option<String>, start_location: Location) -> Self {
-        Self::new(
-            LeafBlockName::Listing,
-            LeafBlockForm::Delimited,
-            delimiter,
-            vec![start_location],
-            vec![],
-        )
+
+    fn new_delimited_block(token: Token, name: LeafBlockName) -> Self {
+        LeafBlock {
+            name,
+            node_type: NodeTypes::Block,
+            form: LeafBlockForm::Delimited,
+            delimiter: Some(token.text()),
+            inlines: vec![],
+            location: token.locations(),
+        }
     }
-    pub fn new_pass(
-        // note that the locations must be calculated later
-        delimiter: Option<String>, // if it's a delimited block, then we provide the delimiter
-        start_location: Location,
-    ) -> Self {
-        Self::new(
-            LeafBlockName::Pass,
-            LeafBlockForm::Delimited,
-            delimiter,
-            vec![start_location],
-            vec![],
-        )
+
+    /// Creates a delimited block from based on the token type
+    pub fn new_from_token(token: Token) -> Self {
+        match token.token_type() {
+            TokenType::PassthroughBlock => Self::new_delimited_block(token, LeafBlockName::Pass),
+            TokenType::SourceBlock => Self::new_delimited_block(token, LeafBlockName::Listing),
+            TokenType::CommentBlock => Self::new_delimited_block(token, LeafBlockName::Listing),
+            TokenType::QuoteVerseBlock => Self::new_delimited_block(token, LeafBlockName::Verse),
+            _ => panic!(
+                "Can't create delimited leaf block from this type of token: {:?}",
+                token
+            ),
+        }
+    }
+
+    pub fn opening_line(&self) -> usize {
+        let Some(first_location) = self.location.first() else {
+            panic!(
+                "{}",
+                format!("Missing location information for: {:?}", self)
+            )
+        };
+        first_location.line
     }
 }
 
