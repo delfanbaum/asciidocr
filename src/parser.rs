@@ -27,7 +27,7 @@ pub struct Parser {
     open_delimited_block_lines: Vec<usize>,
     /// appends text to block regardless of markup, token, etc. (will need to change if/when we
     /// handle code callouts)
-    open_delimited_leaf_bloc_type: Option<TokenType>,
+    open_delimited_leaf_type: Option<TokenType>,
     // convenience flags
     in_document_header: bool,
     /// designates whether we're to be adding inlines to the previous block until a newline
@@ -67,7 +67,7 @@ impl Parser {
             in_block_line: false,
             in_inline_span: false,
             in_block_continuation: false,
-            open_delimited_leaf_bloc_type: None,
+            open_delimited_leaf_type: None,
             force_new_block: false,
             close_parent_after_push: false,
             dangling_newline: None,
@@ -103,13 +103,13 @@ impl Parser {
             self.in_document_header = false;
         }
 
-        if let Some(token_type) = self.open_delimited_leaf_bloc_type {
+        if let Some(token_type) = self.open_delimited_leaf_type {
             if token.token_type() != token_type {
-                self.open_delimited_leaf_bloc_type = Some(token_type);
+                self.open_delimited_leaf_type = Some(token_type);
                 self.parse_text(token);
                 return;
             } else {
-                self.open_delimited_leaf_bloc_type = Some(token_type)
+                self.open_delimited_leaf_type = Some(token_type)
             }
         }
 
@@ -151,12 +151,12 @@ impl Parser {
             TokenType::CommentBlock => {
                 // We treat a CommentBlock like a delimited LeafBlock, but throw away the result if
                 // we've got a match
-                if let Some(open_type) = self.open_delimited_leaf_bloc_type {
+                if let Some(open_type) = self.open_delimited_leaf_type {
                     if open_type == TokenType::CommentBlock {
                         self.inline_stack.clear();
                         self.block_stack.pop();
                         self.force_new_block = true;
-                        self.open_delimited_leaf_bloc_type = None;
+                        self.open_delimited_leaf_type = None;
                     }
                 } else {
                     self.parse_delimited_leaf_block(token)
@@ -537,14 +537,14 @@ impl Parser {
 
     /// TODO some magic about the inlines, etc.
     fn parse_delimited_leaf_block(&mut self, token: Token) {
-        if self.open_delimited_leaf_bloc_type.is_some() {
+        if self.open_delimited_leaf_type.is_some() {
             let Some(open_leaf) = self.block_stack.last_mut() else {
                 panic!("Missing last block on the stack")
             };
             open_leaf.add_locations(token.locations().clone());
-            self.open_delimited_leaf_bloc_type = None;
+            self.open_delimited_leaf_type = None;
         } else {
-            self.open_delimited_leaf_bloc_type = Some(token.token_type());
+            self.open_delimited_leaf_type = Some(token.token_type());
             let block = LeafBlock::new_from_token(token);
             self.push_block_to_stack(Block::LeafBlock(block));
             // note that we're to just add
