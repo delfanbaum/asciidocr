@@ -12,7 +12,8 @@ this should work.
 {%- macro process_block(block) -%}
 {%- if block.name == "section" -%}
 {% set tag = "h" ~ block.level %}
-<section data-type="sect{{block.level}}">
+<section data-type="sect{{block.level}}" {%- if block.metadata.roles %} class="{{ block.metadata.roles |
+    join(sep=" ")}}" {%- endif -%}>
     {%- elif block.name == "list" -%}
     {%- if block.variant == "ordered" -%}
     {%- set tag = "ol" -%}
@@ -30,14 +31,15 @@ this should work.
     {% else %}
     {%- set tag = "UNHANDLED" -%}
     {%- endif %}
-    <{{tag}}>
+    <{{tag}} {%- if block.metadata.roles and not block.name=="section" %} class="{{ block.metadata.roles |
+    join(sep=" ")}}" {%- endif -%}>
         {%- if block.name == "section" -%}
         {%- for inline in block.title -%}
         {{- inline_macros::process_inline(inline=inline) -}}
         {%- endfor -%}
         {%- elif block.name == "list" -%}
         {% for item in block.items -%}
-            {{ self::process_block(block=item ) }}
+        {{ self::process_block(block=item ) }}
         {%- endfor -%}
         {% elif block.name == "listItem" -%}
         <p>{%- for inline in block.principal -%}

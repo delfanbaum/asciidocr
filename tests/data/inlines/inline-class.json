@@ -5,48 +5,32 @@
         {
             "name": "paragraph",
             "type": "block",
-            "metadata": {
-                "attributes": {},
-                "options": [],
-                "roles": ["cat"]
-            },
             "inlines": [
                 {
-                    "name": "text",
-                    "type": "string",
-                    "value": "George",
-                    "location": [
-                        {
-                            "line": 1,
-                            "col": 1
-                        },
-                        {
-                            "line": 1,
-                            "col": 6
+                    "name": "span",
+                    "type": "inline",
+                    "variant": "mark",
+                    "form": "constrained",
+                    "inlines": [
+                        { "name": "text",
+                            "type": "string",
+                            "value": "George",
+                            "location": [ { "line": 1, "col": 8 }, { "line": 1, "col": 13 } ]
                         }
-                    ]
+                    ],
+                    "metadata": {
+                        "attributes": {},
+                        "options": [],
+                        "roles": [
+                            "cat"
+                        ],
+                        "location": [ { "line": 1, "col": 1 }, { "line": 1, "col": 6 } ]
+                    },
+                    "location": [ { "line": 1, "col": 7 }, { "line": 1, "col": 14 } ]
                 }
             ],
-            "location": [
-                {
-                    "line": 1,
-                    "col": 1
-                },
-                {
-                    "line": 1,
-                    "col": 6
-                }
-            ]
+            "location": [ { "line": 1, "col": 7 }, { "line": 1, "col": 14 } ]
         }
     ],
-    "location": [
-        {
-            "line": 1,
-            "col": 1
-        },
-        {
-            "line": 1,
-            "col": 6
-        }
-    ]
+    "location": [ { "line": 1, "col": 1 }, { "line": 1, "col": 14 } ]
 }

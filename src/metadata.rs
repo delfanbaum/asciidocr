@@ -7,24 +7,49 @@ use serde::Serialize;
 use crate::{nodes::Location, tokens::Token};
 
 #[derive(Serialize, PartialEq, Clone, Debug)]
-pub struct BlockMetadata {
+pub struct ElementMetadata {
     attributes: HashMap<String, String>,
     options: Vec<String>,
     roles: Vec<String>,
+    /// this is a flag to let us know if it should be applied
+    #[serde(skip)]
+    pub inline_metadata: bool,
     pub location: Vec<Location>,
 }
 
-impl BlockMetadata {
+impl ElementMetadata {
     /// Creates BlockMetadata from an attribute list token, which can have the following format:
     /// [positional, named="value inside named", positional]
-    pub fn new_from_token(token: Token) -> Self {
+    pub fn new_inline_meta_from_token(token: Token) -> Self {
         // Regex for parsing named attributes
-        static RE_NAMED: Lazy<Regex> = Lazy::new(|| Regex::new(r#"(.*?)[=|,]"(.*?)\""#).unwrap());
-
-        let mut new_block_metadata = BlockMetadata {
+        let mut new_block_metadata = ElementMetadata {
             attributes: HashMap::new(),
             options: vec![],
             roles: vec![],
+            inline_metadata: true,
+            location: token.locations().clone(),
+        };
+
+        let class_list = token.lexeme[1..token.lexeme.len() - 1].to_string();
+        new_block_metadata.roles = class_list
+            .split(".")
+            .collect::<Vec<&str>>()
+            .iter_mut()
+            .filter(|s| **s != "")
+            .map(|s| s.to_string())
+            .collect();
+
+        new_block_metadata
+    }
+    pub fn new_block_meta_from_token(token: Token) -> Self {
+        // Regex for parsing named attributes
+        static RE_NAMED: Lazy<Regex> = Lazy::new(|| Regex::new(r#"(.*?)[=|,]"(.*?)\""#).unwrap());
+
+        let mut new_block_metadata = ElementMetadata {
+            attributes: HashMap::new(),
+            options: vec![],
+            roles: vec![],
+            inline_metadata: false,
             location: token.locations().clone(),
         };
 
@@ -46,8 +71,6 @@ impl BlockMetadata {
                 }
             }
         }
-        println!("{:?}", new_block_metadata);
-
         new_block_metadata
     }
 }

@@ -1,6 +1,6 @@
 pub mod asg;
 pub mod blocks;
-pub mod block_metadata;
+pub mod metadata;
 pub mod errors;
 pub mod inlines;
 pub mod lists;

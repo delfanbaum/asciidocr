@@ -3,10 +3,10 @@ use std::collections::{HashMap, VecDeque};
 
 use crate::{
     asg::Asg,
-    block_metadata::BlockMetadata,
     blocks::{Block, Break, LeafBlock, ParentBlock, Section},
     inlines::{Inline, InlineLiteral, InlineRef, InlineSpan},
     lists::{List, ListItem, ListVariant},
+    metadata::ElementMetadata,
     nodes::{Header, Location},
     tokens::{Token, TokenType},
 };
@@ -22,7 +22,7 @@ pub struct Parser {
     /// holding ground for inline elements until it's time to push to the relevant block
     inline_stack: VecDeque<Inline>,
     /// holding ground for block metadata, to be applied to the subsequent block
-    block_metadata: Option<BlockMetadata>,
+    metadata: Option<ElementMetadata>,
     /// counts in/out delimited blocks by line reference; allows us to warn/error if they are
     /// unclosed at the end of the document
     open_delimited_block_lines: Vec<usize>,
@@ -62,7 +62,7 @@ impl Parser {
             document_attributes: HashMap::new(),
             block_stack: vec![],
             inline_stack: VecDeque::new(),
-            block_metadata: None,
+            metadata: None,
             open_delimited_block_lines: vec![],
             in_document_header: true,
             in_block_line: false,
@@ -127,10 +127,11 @@ impl Parser {
             // inlines
             TokenType::NewLineChar => self.parse_new_line_char(token, asg),
             TokenType::Text => self.parse_text(token),
-            TokenType::Strong => self.parse_strong(token),
-            TokenType::Emphasis => self.parse_emphasis(token),
-            TokenType::Monospace => self.parse_code(token),
-            TokenType::Mark => self.parse_mark(token),
+            TokenType::Strong | TokenType::Mark | TokenType::Monospace | TokenType::Emphasis => {
+                self.parse_inline_span(Inline::InlineSpan(InlineSpan::inline_span_from_token(
+                    token,
+                )))
+            }
             TokenType::AttributeReference => self.parse_attribute_reference(token),
 
             // refs
@@ -184,7 +185,8 @@ impl Parser {
             }
 
             // metadata
-            TokenType::ElementAttributes => self.parse_element_attributes(token),
+            TokenType::ElementAttributes => self.parse_block_element_attributes(token),
+            TokenType::InlineStyle => self.parse_inline_element_attributes(token),
 
             _ => {
                 // self check
@@ -212,8 +214,13 @@ impl Parser {
     }
 
     /// parses element attribute lists into self.block_metadata, which then is applied later
-    fn parse_element_attributes(&mut self, token: Token) {
-        self.block_metadata = Some(BlockMetadata::new_from_token(token));
+    fn parse_block_element_attributes(&mut self, token: Token) {
+        self.metadata = Some(ElementMetadata::new_block_meta_from_token(token));
+        self.force_new_block = true;
+    }
+    fn parse_inline_element_attributes(&mut self, token: Token) {
+        self.metadata = Some(ElementMetadata::new_inline_meta_from_token(token));
+        self.force_new_block = true;
     }
 
     /// New line characters are arguably the most significant token "signal" we can get, and as
@@ -404,28 +411,8 @@ impl Parser {
     }
     //fn parse_def_list_mark(&mut self, token: Token, asg: &mut Asg) {}
 
-    fn parse_strong(&mut self, token: Token) {
-        let inline = Inline::InlineSpan(InlineSpan::new_strong_span(token));
-        self.parse_inline_span(inline);
-    }
-
-    fn parse_emphasis(&mut self, token: Token) {
-        let inline = Inline::InlineSpan(InlineSpan::new_emphasis_span(token));
-        self.parse_inline_span(inline);
-    }
-
-    fn parse_code(&mut self, token: Token) {
-        let inline = Inline::InlineSpan(InlineSpan::new_code_span(token));
-        self.parse_inline_span(inline);
-    }
-
-    fn parse_mark(&mut self, token: Token) {
-        let inline = Inline::InlineSpan(InlineSpan::new_mark_span(token));
-        self.parse_inline_span(inline);
-    }
-
     /// Generic parser for inline spans that close themselves
-    fn parse_inline_span(&mut self, inline: Inline) {
+    fn parse_inline_span(&mut self, mut inline: Inline) {
         if self.in_document_header && self.in_block_line {
             if let Some(last_inline) = self.document_header.title.last_mut() {
                 if inline == *last_inline {
@@ -433,6 +420,10 @@ impl Parser {
                     self.in_inline_span = false;
                     return;
                 }
+            }
+            if self.metadata.is_some() {
+                inline.add_metadata(self.metadata.as_ref().unwrap().clone());
+                self.metadata = None;
             }
             self.document_header.title.push(inline);
         } else {
@@ -442,6 +433,10 @@ impl Parser {
                     self.in_inline_span = false;
                     return;
                 }
+            }
+            if self.metadata.is_some() {
+                inline.add_metadata(self.metadata.as_ref().unwrap().clone());
+                self.metadata = None;
             }
             self.inline_stack.push_back(inline)
         }
@@ -632,8 +627,9 @@ impl Parser {
             last_block.push_block(block);
             self.in_block_continuation = false;
         } else {
-            if self.block_metadata.is_some() {
-                block.add_metadata(self.block_metadata.as_ref().unwrap().clone())
+            if self.metadata.is_some() {
+                block.add_metadata(self.metadata.as_ref().unwrap().clone());
+                self.metadata = None;
             }
             self.block_stack.push(block)
         }
@@ -743,8 +739,9 @@ impl Parser {
                 return;
             }
         }
-        if self.block_metadata.is_some() {
-            block.add_metadata(self.block_metadata.as_ref().unwrap().clone())
+        if self.metadata.is_some() {
+            block.add_metadata(self.metadata.as_ref().unwrap().clone());
+            self.metadata = None;
         }
         asg.push_block(block)
     }
@@ -766,8 +763,9 @@ impl Parser {
     fn add_last_block_to_graph(&mut self, asg: &mut Asg) {
         // consolidate any list items
         if let Some(mut block) = self.block_stack.pop() {
-            if self.block_metadata.is_some() {
-                block.add_metadata(self.block_metadata.as_ref().unwrap().clone())
+            if self.metadata.is_some() {
+                block.add_metadata(self.metadata.as_ref().unwrap().clone());
+                self.metadata = None;
             }
             if let Some(next_last_block) = self.block_stack.last_mut() {
                 if matches!(block, Block::ListItem(_)) {

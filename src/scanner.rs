@@ -66,7 +66,7 @@ impl<'a> Scanner<'a> {
                     match c {
                         '=' => {
                             // possible heading
-                            if self.starts_new_block() {
+                            if self.starts_new_line() {
                                 self.add_heading()
                             } else {
                                 self.add_text_until_next_markup()

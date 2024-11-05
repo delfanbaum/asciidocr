@@ -4,8 +4,9 @@ use std::fmt::Display;
 use serde::Serialize;
 
 use crate::{
+    metadata::ElementMetadata,
     nodes::{Location, NodeTypes},
-    tokens::Token,
+    tokens::{Token, TokenType},
 };
 
 /// Inlines enum containing literals, spans, and references (the latter not implemented)
@@ -78,9 +79,7 @@ impl Inline {
 
     pub fn is_macro(&self) -> bool {
         match self {
-            Inline::InlineRef(iref) => {
-                iref.variant == InlineRefVariant::Link
-            }
+            Inline::InlineRef(iref) => iref.variant == InlineRefVariant::Link,
             _ => false,
         }
     }
@@ -132,11 +131,17 @@ impl Inline {
         match self {
             Inline::InlineLiteral(_) => todo!(),
             Inline::InlineSpan(_) => todo!(),
-            Inline::InlineRef(iref) =>  {
+            Inline::InlineRef(iref) => {
                 iref.location = Location::reconcile(iref.location.clone(), token.locations())
             }
         }
+    }
 
+    pub fn add_metadata(&mut self, metadata: ElementMetadata) {
+        match self {
+            Inline::InlineSpan(span) => span.metadata = Some(metadata),
+            _ => panic!("Invalid action: this inline does not take metadata"),
+        }
     }
 }
 
@@ -149,6 +154,8 @@ pub struct InlineSpan {
     #[serde(rename = "form")]
     pub node_form: InlineSpanForm,
     inlines: Vec<Inline>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub metadata: Option<ElementMetadata>,
     location: Vec<Location>,
 }
 
@@ -164,37 +171,38 @@ impl InlineSpan {
             variant,
             node_form,
             inlines: vec![],
+            metadata: None,
             location,
         }
     }
 
-    pub fn new_emphasis_span(token: Token) -> Self {
-        Self::new(
-            InlineSpanVariant::Emphasis,
-            InlineSpanForm::Constrained,
-            token.locations(),
-        )
-    }
-    pub fn new_strong_span(token: Token) -> Self {
-        Self::new(
-            InlineSpanVariant::Strong,
-            InlineSpanForm::Constrained,
-            token.locations(),
-        )
-    }
-    pub fn new_code_span(token: Token) -> Self {
-        Self::new(
-            InlineSpanVariant::Code,
-            InlineSpanForm::Constrained,
-            token.locations(),
-        )
-    }
-    pub fn new_mark_span(token: Token) -> Self {
-        Self::new(
-            InlineSpanVariant::Mark,
-            InlineSpanForm::Constrained,
-            token.locations(),
-        )
+    pub fn inline_span_from_token(token: Token) -> Self {
+        match token.token_type() {
+            TokenType::Strong => Self::new(
+                InlineSpanVariant::Strong,
+                InlineSpanForm::Constrained,
+                token.locations(),
+            ),
+            TokenType::Emphasis => Self::new(
+                InlineSpanVariant::Emphasis,
+                InlineSpanForm::Constrained,
+                token.locations(),
+            ),
+            TokenType::Monospace => Self::new(
+                InlineSpanVariant::Code,
+                InlineSpanForm::Constrained,
+                token.locations(),
+            ),
+            TokenType::Mark => Self::new(
+                InlineSpanVariant::Mark,
+                InlineSpanForm::Constrained,
+                token.locations(),
+            ),
+
+            _ => {
+                panic!("Invalid action: tried to create an inline span from an invalid token type")
+            }
+        }
     }
 
     pub fn add_inline(&mut self, inline: Inline) {

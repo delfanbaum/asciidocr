@@ -4,7 +4,7 @@ use std::fmt::Display;
 use serde::Serialize;
 
 use crate::{
-    block_metadata::BlockMetadata,
+    metadata::ElementMetadata,
     inlines::Inline,
     lists::{DList, List, ListItem, ListVariant},
     nodes::{Location, NodeTypes},
@@ -28,7 +28,7 @@ pub enum Block {
     BlockMacro(BlockMacro),
     LeafBlock(LeafBlock),
     ParentBlock(ParentBlock), // Admonitions are hiding in here
-    BlockMetadata(BlockMetadata),
+    BlockMetadata(ElementMetadata),
 }
 
 impl Display for Block {
@@ -240,9 +240,17 @@ impl Block {
         first_location.line
     }
 
-    pub fn add_metadata(&mut self, metadata: BlockMetadata) {
+    pub fn add_metadata(&mut self, metadata: ElementMetadata) {
+        // guard against invalid inline use 
+        if metadata.inline_metadata {
+            // TODO this is a warning, not a panic
+            panic!("Invalid inline class markup.")
+        }
         match self {
             Block::LeafBlock(block) => {
+                block.metadata = Some(metadata)
+            }
+            Block::Section(block) => {
                 block.metadata = Some(metadata)
             }
             _ => todo!(),
@@ -262,7 +270,7 @@ pub struct Section {
     #[serde(skip_serializing_if = "Vec::is_empty")]
     reftext: Vec<Inline>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    metadata: Option<BlockMetadata>,
+    metadata: Option<ElementMetadata>,
     pub level: usize,
     blocks: Vec<Block>,
     location: Vec<Location>,
@@ -372,7 +380,7 @@ pub struct LeafBlock {
     delimiter: Option<String>, // if it's a delimited block, then we provide the delimiter
     inlines: Vec<Inline>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub metadata: Option<BlockMetadata>,
+    pub metadata: Option<ElementMetadata>,
     location: Vec<Location>,
 }
 
@@ -475,7 +483,7 @@ pub struct ParentBlock {
     delimiter: String, // TK how to handle NOTE: text...
     blocks: Vec<Block>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub metadata: Option<BlockMetadata>,
+    pub metadata: Option<ElementMetadata>,
     pub location: Vec<Location>,
 }
 
