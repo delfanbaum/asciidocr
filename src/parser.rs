@@ -6,6 +6,7 @@ use crate::{
     blocks::{Block, Break, LeafBlock, ParentBlock, Section},
     inlines::{Inline, InlineLiteral, InlineRef, InlineSpan},
     lists::{List, ListItem, ListVariant},
+    metadata::ElementMetadata,
     nodes::{Header, Location},
     tokens::{Token, TokenType},
 };
@@ -21,7 +22,7 @@ pub struct Parser {
     /// holding ground for inline elements until it's time to push to the relevant block
     inline_stack: VecDeque<Inline>,
     /// holding ground for block metadata, to be applied to the subsequent block
-    _block_metadata: Option<Block>,
+    metadata: Option<ElementMetadata>,
     /// counts in/out delimited blocks by line reference; allows us to warn/error if they are
     /// unclosed at the end of the document
     open_delimited_block_lines: Vec<usize>,
@@ -61,7 +62,7 @@ impl Parser {
             document_attributes: HashMap::new(),
             block_stack: vec![],
             inline_stack: VecDeque::new(),
-            _block_metadata: None,
+            metadata: None,
             open_delimited_block_lines: vec![],
             in_document_header: true,
             in_block_line: false,
@@ -80,6 +81,7 @@ impl Parser {
     {
         let mut asg = Asg::new();
         for token in tokens {
+            //println!("{:?}", token);
             let token_type = token.token_type();
             self.token_into(token, &mut asg);
 
@@ -125,10 +127,11 @@ impl Parser {
             // inlines
             TokenType::NewLineChar => self.parse_new_line_char(token, asg),
             TokenType::Text => self.parse_text(token),
-            TokenType::Strong => self.parse_strong(token),
-            TokenType::Emphasis => self.parse_emphasis(token),
-            TokenType::Monospace => self.parse_code(token),
-            TokenType::Mark => self.parse_mark(token),
+            TokenType::Strong | TokenType::Mark | TokenType::Monospace | TokenType::Emphasis => {
+                self.parse_inline_span(Inline::InlineSpan(InlineSpan::inline_span_from_token(
+                    token,
+                )))
+            }
             TokenType::AttributeReference => self.parse_attribute_reference(token),
 
             // refs
@@ -148,20 +151,6 @@ impl Parser {
             // the following should probably be consumed into the above
             TokenType::PassthroughBlock => self.parse_delimited_leaf_block(token),
             TokenType::SourceBlock => self.parse_delimited_leaf_block(token),
-            TokenType::CommentBlock => {
-                // We treat a CommentBlock like a delimited LeafBlock, but throw away the result if
-                // we've got a match
-                if let Some(open_type) = self.open_delimited_leaf_type {
-                    if open_type == TokenType::CommentBlock {
-                        self.inline_stack.clear();
-                        self.block_stack.pop();
-                        self.force_new_block = true;
-                        self.open_delimited_leaf_type = None;
-                    }
-                } else {
-                    self.parse_delimited_leaf_block(token)
-                }
-            }
 
             // lists
             TokenType::UnorderedListItem => self.parse_unordered_list_item(token),
@@ -180,6 +169,24 @@ impl Parser {
 
             // comments
             TokenType::Comment => self.parse_comment(),
+            TokenType::CommentBlock => {
+                // We treat a CommentBlock like a delimited LeafBlock, but throw away the result if
+                // we've got a match
+                if let Some(open_type) = self.open_delimited_leaf_type {
+                    if open_type == TokenType::CommentBlock {
+                        self.inline_stack.clear();
+                        self.block_stack.pop();
+                        self.force_new_block = true;
+                        self.open_delimited_leaf_type = None;
+                    }
+                } else {
+                    self.parse_delimited_leaf_block(token)
+                }
+            }
+
+            // metadata
+            TokenType::ElementAttributes => self.parse_block_element_attributes(token),
+            TokenType::InlineStyle => self.parse_inline_element_attributes(token),
 
             _ => {
                 // self check
@@ -204,6 +211,16 @@ impl Parser {
             value = String::from("")
         }
         self.document_attributes.insert(key, value);
+    }
+
+    /// parses element attribute lists into self.block_metadata, which then is applied later
+    fn parse_block_element_attributes(&mut self, token: Token) {
+        self.metadata = Some(ElementMetadata::new_block_meta_from_token(token));
+        self.force_new_block = true;
+    }
+    fn parse_inline_element_attributes(&mut self, token: Token) {
+        self.metadata = Some(ElementMetadata::new_inline_meta_from_token(token));
+        self.force_new_block = true;
     }
 
     /// New line characters are arguably the most significant token "signal" we can get, and as
@@ -247,8 +264,10 @@ impl Parser {
                     }
                 } // if Some(last_block)
             }
-        } else if self.in_block_continuation {
-            // don't add a newline ahead of text
+        } else if self.in_block_continuation
+            || [TokenType::ElementAttributes].contains(&self.last_token_type)
+        {
+            // don't add a newline ahead of text in these cases
             self.dangling_newline = None;
         } else {
             self.dangling_newline = Some(token);
@@ -392,28 +411,8 @@ impl Parser {
     }
     //fn parse_def_list_mark(&mut self, token: Token, asg: &mut Asg) {}
 
-    fn parse_strong(&mut self, token: Token) {
-        let inline = Inline::InlineSpan(InlineSpan::new_strong_span(token));
-        self.parse_inline_span(inline);
-    }
-
-    fn parse_emphasis(&mut self, token: Token) {
-        let inline = Inline::InlineSpan(InlineSpan::new_emphasis_span(token));
-        self.parse_inline_span(inline);
-    }
-
-    fn parse_code(&mut self, token: Token) {
-        let inline = Inline::InlineSpan(InlineSpan::new_code_span(token));
-        self.parse_inline_span(inline);
-    }
-
-    fn parse_mark(&mut self, token: Token) {
-        let inline = Inline::InlineSpan(InlineSpan::new_mark_span(token));
-        self.parse_inline_span(inline);
-    }
-
     /// Generic parser for inline spans that close themselves
-    fn parse_inline_span(&mut self, inline: Inline) {
+    fn parse_inline_span(&mut self, mut inline: Inline) {
         if self.in_document_header && self.in_block_line {
             if let Some(last_inline) = self.document_header.title.last_mut() {
                 if inline == *last_inline {
@@ -421,6 +420,10 @@ impl Parser {
                     self.in_inline_span = false;
                     return;
                 }
+            }
+            if self.metadata.is_some() {
+                inline.add_metadata(self.metadata.as_ref().unwrap().clone());
+                self.metadata = None;
             }
             self.document_header.title.push(inline);
         } else {
@@ -430,6 +433,10 @@ impl Parser {
                     self.in_inline_span = false;
                     return;
                 }
+            }
+            if self.metadata.is_some() {
+                inline.add_metadata(self.metadata.as_ref().unwrap().clone());
+                self.metadata = None;
             }
             self.inline_stack.push_back(inline)
         }
@@ -607,7 +614,7 @@ impl Parser {
         self.add_to_block_stack_or_graph(asg, block)
     }
 
-    fn push_block_to_stack(&mut self, block: Block) {
+    fn push_block_to_stack(&mut self, mut block: Block) {
         // we only want to push on continue if we're not in an open delimited block (which will
         // close itself, emptying the open_delimited_block_lines)
         if self.in_block_continuation && self.open_delimited_block_lines.is_empty() {
@@ -620,6 +627,10 @@ impl Parser {
             last_block.push_block(block);
             self.in_block_continuation = false;
         } else {
+            if self.metadata.is_some() {
+                block.add_metadata(self.metadata.as_ref().unwrap().clone());
+                self.metadata = None;
+            }
             self.block_stack.push(block)
         }
     }
@@ -721,12 +732,16 @@ impl Parser {
         }
     }
 
-    fn add_to_block_stack_or_graph(&mut self, asg: &mut Asg, block: Block) {
+    fn add_to_block_stack_or_graph(&mut self, asg: &mut Asg, mut block: Block) {
         if let Some(last_block) = self.block_stack.last_mut() {
             if last_block.can_be_parent() {
                 last_block.push_block(block);
                 return;
             }
+        }
+        if self.metadata.is_some() {
+            block.add_metadata(self.metadata.as_ref().unwrap().clone());
+            self.metadata = None;
         }
         asg.push_block(block)
     }
@@ -747,7 +762,11 @@ impl Parser {
 
     fn add_last_block_to_graph(&mut self, asg: &mut Asg) {
         // consolidate any list items
-        if let Some(block) = self.block_stack.pop() {
+        if let Some(mut block) = self.block_stack.pop() {
+            if self.metadata.is_some() {
+                block.add_metadata(self.metadata.as_ref().unwrap().clone());
+                self.metadata = None;
+            }
             if let Some(next_last_block) = self.block_stack.last_mut() {
                 if matches!(block, Block::ListItem(_)) {
                     // sanity check

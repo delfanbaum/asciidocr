@@ -17,3 +17,12 @@ fn many_lines() {
     let html_fn = format!("{}.html", fn_pattern);
     assert_rendered_html_matches_expected(&adoc_fn, &html_fn)
 }
+
+#[test]
+fn roles_added_as_classes() {
+    let fn_pattern = String::from("htmlbook/roles");
+    let adoc_fn = format!("{}.adoc", fn_pattern);
+    let html_fn = format!("{}.html", fn_pattern);
+    assert_rendered_html_matches_expected(&adoc_fn, &html_fn)
+}
+

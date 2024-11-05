@@ -1,0 +1,8 @@
+[role="foo bar"]
+This paragraph should have a "foo" and a "bar" class.
+
+
+[role="foo"]
+== As Should This Section
+
+But not its [.bar]#paragraph#.

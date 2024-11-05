@@ -134,10 +134,7 @@ pub enum TokenType {
     Heading4,
     Heading5,
 
-    Blockquote, // [quote],
-    Verse,      // [quote],
-    Source,     // [source]
-
+    ElementAttributes, // any of: [quote], [quote], [role="foo"], [#foo], etc.
     NotePara,      // NOTE:
     TipPara,       // TIP:
     ImportantPara, // IMPORTANT:

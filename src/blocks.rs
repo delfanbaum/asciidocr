@@ -1,9 +1,10 @@
 use core::panic;
-use std::{collections::HashMap, fmt::Display};
+use std::fmt::Display;
 
 use serde::Serialize;
 
 use crate::{
+    metadata::ElementMetadata,
     inlines::Inline,
     lists::{DList, List, ListItem, ListVariant},
     nodes::{Location, NodeTypes},
@@ -27,7 +28,7 @@ pub enum Block {
     BlockMacro(BlockMacro),
     LeafBlock(LeafBlock),
     ParentBlock(ParentBlock), // Admonitions are hiding in here
-    BlockMetadata(BlockMetadata),
+    BlockMetadata(ElementMetadata),
 }
 
 impl Display for Block {
@@ -238,6 +239,23 @@ impl Block {
         };
         first_location.line
     }
+
+    pub fn add_metadata(&mut self, metadata: ElementMetadata) {
+        // guard against invalid inline use 
+        if metadata.inline_metadata {
+            // TODO this is a warning, not a panic
+            panic!("Invalid inline class markup.")
+        }
+        match self {
+            Block::LeafBlock(block) => {
+                block.metadata = Some(metadata)
+            }
+            Block::Section(block) => {
+                block.metadata = Some(metadata)
+            }
+            _ => todo!(),
+        }
+    }
 }
 
 #[derive(Serialize, Debug)]
@@ -252,7 +270,7 @@ pub struct Section {
     #[serde(skip_serializing_if = "Vec::is_empty")]
     reftext: Vec<Inline>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    metadata: Option<BlockMetadata>,
+    metadata: Option<ElementMetadata>,
     pub level: usize,
     blocks: Vec<Block>,
     location: Vec<Location>,
@@ -361,7 +379,8 @@ pub struct LeafBlock {
     #[serde(skip_serializing_if = "Option::is_none")]
     delimiter: Option<String>, // if it's a delimited block, then we provide the delimiter
     inlines: Vec<Inline>,
-    //blocks: Vec<Block>, // I'm pretty sure there aren't allowed to have blocks, need to confirm
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub metadata: Option<ElementMetadata>,
     location: Vec<Location>,
 }
 
@@ -374,7 +393,7 @@ pub enum LeafBlockName {
     Pass,
     Stem, // TK not handling now
     Verse,
-    Comment, // Gets thrown away, but convenient 
+    Comment, // Gets thrown away, but convenient
 }
 #[derive(Serialize, Debug)]
 #[serde(rename_all = "lowercase")]
@@ -411,6 +430,7 @@ impl LeafBlock {
             form,
             delimiter,
             inlines,
+            metadata: None,
             location,
         }
     }
@@ -422,6 +442,7 @@ impl LeafBlock {
             form: LeafBlockForm::Delimited,
             delimiter: Some(token.text()),
             inlines: vec![],
+            metadata: None,
             location: token.locations(),
         }
     }
@@ -461,6 +482,8 @@ pub struct ParentBlock {
     form: String,
     delimiter: String, // TK how to handle NOTE: text...
     blocks: Vec<Block>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub metadata: Option<ElementMetadata>,
     pub location: Vec<Location>,
 }
 
@@ -513,6 +536,7 @@ impl ParentBlock {
             form: "delimited".to_string(),
             delimiter,
             blocks,
+            metadata: None,
             location,
         }
     }
@@ -596,12 +620,4 @@ impl ParentBlock {
         };
         first_location.line
     }
-}
-
-#[derive(Serialize, PartialEq, Debug)]
-pub struct BlockMetadata {
-    attributes: HashMap<String, String>,
-    options: Vec<String>,
-    roles: Vec<String>,
-    location: Vec<Location>,
 }

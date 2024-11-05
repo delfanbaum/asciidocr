@@ -17,7 +17,12 @@
         {%- endif -%}
         {%- set href = 'href="' ~ ref ~ '"' -%}
     {%- endif -%}
-{%- if inline_tag -%}<{{inline_tag}}{%if href%} {{href}}{%- endif -%}>{%- endif -%}
+{%- if inline_tag -%}<{{inline_tag}}
+    {%- if inline.metadata.roles %} class="{{inline.metadata.roles | join(sep=" ")}}"
+    {%- endif -%}
+    {%- if href%} {{href}}
+    {%- endif -%}>
+{%- endif -%}
         {#- Handle recursion -#}
             {%- if inline.inlines -%}
                 {%- for child in inline.inlines -%}

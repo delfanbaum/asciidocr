@@ -134,3 +134,13 @@ fn test_admontions_non_delimited(#[case] admonition: &str) {
 
     assert_parsed_doc_matches_expected_asg_from_str(&adoc_str, &asg_json_str)
 }
+
+
+#[test]
+/// Block roles (classes) can be applied
+fn test_block_meta() {
+    let fn_pattern = "blocks/metadata-role-para";
+    let adoc_fn = format!("{}.adoc", fn_pattern);
+    let asg_json_fn = format!("{}.json", fn_pattern);
+    assert_parsed_doc_matches_expected_asg(&adoc_fn, &asg_json_fn)
+}
