@@ -1,9 +1,10 @@
 use core::panic;
-use std::{collections::HashMap, fmt::Display};
+use std::fmt::Display;
 
 use serde::Serialize;
 
 use crate::{
+    block_metadata::BlockMetadata,
     inlines::Inline,
     lists::{DList, List, ListItem, ListVariant},
     nodes::{Location, NodeTypes},
@@ -238,6 +239,15 @@ impl Block {
         };
         first_location.line
     }
+
+    pub fn add_metadata(&mut self, metadata: BlockMetadata) {
+        match self {
+            Block::LeafBlock(block) => {
+                block.metadata = Some(metadata)
+            }
+            _ => todo!(),
+        }
+    }
 }
 
 #[derive(Serialize, Debug)]
@@ -361,7 +371,8 @@ pub struct LeafBlock {
     #[serde(skip_serializing_if = "Option::is_none")]
     delimiter: Option<String>, // if it's a delimited block, then we provide the delimiter
     inlines: Vec<Inline>,
-    //blocks: Vec<Block>, // I'm pretty sure there aren't allowed to have blocks, need to confirm
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub metadata: Option<BlockMetadata>,
     location: Vec<Location>,
 }
 
@@ -374,7 +385,7 @@ pub enum LeafBlockName {
     Pass,
     Stem, // TK not handling now
     Verse,
-    Comment, // Gets thrown away, but convenient 
+    Comment, // Gets thrown away, but convenient
 }
 #[derive(Serialize, Debug)]
 #[serde(rename_all = "lowercase")]
@@ -411,6 +422,7 @@ impl LeafBlock {
             form,
             delimiter,
             inlines,
+            metadata: None,
             location,
         }
     }
@@ -422,6 +434,7 @@ impl LeafBlock {
             form: LeafBlockForm::Delimited,
             delimiter: Some(token.text()),
             inlines: vec![],
+            metadata: None,
             location: token.locations(),
         }
     }
@@ -461,6 +474,8 @@ pub struct ParentBlock {
     form: String,
     delimiter: String, // TK how to handle NOTE: text...
     blocks: Vec<Block>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub metadata: Option<BlockMetadata>,
     pub location: Vec<Location>,
 }
 
@@ -513,6 +528,7 @@ impl ParentBlock {
             form: "delimited".to_string(),
             delimiter,
             blocks,
+            metadata: None,
             location,
         }
     }
@@ -596,12 +612,4 @@ impl ParentBlock {
         };
         first_location.line
     }
-}
-
-#[derive(Serialize, PartialEq, Debug)]
-pub struct BlockMetadata {
-    attributes: HashMap<String, String>,
-    options: Vec<String>,
-    roles: Vec<String>,
-    location: Vec<Location>,
 }

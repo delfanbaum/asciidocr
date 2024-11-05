@@ -72,5 +72,22 @@ fn test_attribute_ref_replacment() {
     let adoc_fn = format!("{}.adoc", fn_pattern);
     let asg_json_fn = format!("{}.json", fn_pattern);
     assert_parsed_doc_matches_expected_asg(&adoc_fn, &asg_json_fn)
+}
 
+/// Single words appear as such
+#[test]
+fn test_single_word() {
+    let fn_pattern = "inlines/single-word";
+    let adoc_fn = format!("{}.adoc", fn_pattern);
+    let asg_json_fn = format!("{}.json", fn_pattern);
+    assert_parsed_doc_matches_expected_asg(&adoc_fn, &asg_json_fn)
+}
+
+/// Inline classes can be applied
+#[test]
+fn test_inline_class() {
+    let fn_pattern = "inlines/inline-class";
+    let adoc_fn = format!("{}.adoc", fn_pattern);
+    let asg_json_fn = format!("{}.json", fn_pattern);
+    assert_parsed_doc_matches_expected_asg(&adoc_fn, &asg_json_fn)
 }

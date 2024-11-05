@@ -1,0 +1,52 @@
+{
+    "name": "document",
+    "type": "block",
+    "blocks": [
+        {
+            "name": "paragraph",
+            "type": "block",
+            "metadata": {
+                "attributes": {},
+                "options": [],
+                "roles": ["cat"]
+            },
+            "inlines": [
+                {
+                    "name": "text",
+                    "type": "string",
+                    "value": "George",
+                    "location": [
+                        {
+                            "line": 1,
+                            "col": 1
+                        },
+                        {
+                            "line": 1,
+                            "col": 6
+                        }
+                    ]
+                }
+            ],
+            "location": [
+                {
+                    "line": 1,
+                    "col": 1
+                },
+                {
+                    "line": 1,
+                    "col": 6
+                }
+            ]
+        }
+    ],
+    "location": [
+        {
+            "line": 1,
+            "col": 1
+        },
+        {
+            "line": 1,
+            "col": 6
+        }
+    ]
+}

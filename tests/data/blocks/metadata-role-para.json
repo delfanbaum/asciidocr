@@ -1,0 +1,28 @@
+{
+    "name": "document",
+    "type": "block",
+    "blocks": [
+        {
+            "name": "paragraph",
+            "type": "block",
+            "metadata": {
+                "attributes": {},
+                "options": [],
+                "roles": [
+                    "example"
+                ],
+                "location": [ { "line": 1, "col": 1 }, { "line": 1, "col": 16 } ] 
+            },
+      "inlines": [
+                {
+                    "name": "text",
+                    "type": "string",
+                    "value": "A paragraph may consist of a single line.",
+                    "location": [ { "line": 2, "col": 1 }, { "line": 2, "col": 41 } ]
+                }
+            ],
+            "location": [ { "line": 2, "col": 1 }, { "line": 2, "col": 41 } ]
+        }
+    ],
+    "location": [ { "line": 1, "col": 1 }, { "line": 2, "col": 41 } ]
+}

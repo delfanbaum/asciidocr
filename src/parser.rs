@@ -3,6 +3,7 @@ use std::collections::{HashMap, VecDeque};
 
 use crate::{
     asg::Asg,
+    block_metadata::BlockMetadata,
     blocks::{Block, Break, LeafBlock, ParentBlock, Section},
     inlines::{Inline, InlineLiteral, InlineRef, InlineSpan},
     lists::{List, ListItem, ListVariant},
@@ -21,7 +22,7 @@ pub struct Parser {
     /// holding ground for inline elements until it's time to push to the relevant block
     inline_stack: VecDeque<Inline>,
     /// holding ground for block metadata, to be applied to the subsequent block
-    _block_metadata: Option<Block>,
+    block_metadata: Option<BlockMetadata>,
     /// counts in/out delimited blocks by line reference; allows us to warn/error if they are
     /// unclosed at the end of the document
     open_delimited_block_lines: Vec<usize>,
@@ -61,7 +62,7 @@ impl Parser {
             document_attributes: HashMap::new(),
             block_stack: vec![],
             inline_stack: VecDeque::new(),
-            _block_metadata: None,
+            block_metadata: None,
             open_delimited_block_lines: vec![],
             in_document_header: true,
             in_block_line: false,
@@ -80,6 +81,7 @@ impl Parser {
     {
         let mut asg = Asg::new();
         for token in tokens {
+            //println!("{:?}", token);
             let token_type = token.token_type();
             self.token_into(token, &mut asg);
 
@@ -148,20 +150,6 @@ impl Parser {
             // the following should probably be consumed into the above
             TokenType::PassthroughBlock => self.parse_delimited_leaf_block(token),
             TokenType::SourceBlock => self.parse_delimited_leaf_block(token),
-            TokenType::CommentBlock => {
-                // We treat a CommentBlock like a delimited LeafBlock, but throw away the result if
-                // we've got a match
-                if let Some(open_type) = self.open_delimited_leaf_type {
-                    if open_type == TokenType::CommentBlock {
-                        self.inline_stack.clear();
-                        self.block_stack.pop();
-                        self.force_new_block = true;
-                        self.open_delimited_leaf_type = None;
-                    }
-                } else {
-                    self.parse_delimited_leaf_block(token)
-                }
-            }
 
             // lists
             TokenType::UnorderedListItem => self.parse_unordered_list_item(token),
@@ -180,6 +168,23 @@ impl Parser {
 
             // comments
             TokenType::Comment => self.parse_comment(),
+            TokenType::CommentBlock => {
+                // We treat a CommentBlock like a delimited LeafBlock, but throw away the result if
+                // we've got a match
+                if let Some(open_type) = self.open_delimited_leaf_type {
+                    if open_type == TokenType::CommentBlock {
+                        self.inline_stack.clear();
+                        self.block_stack.pop();
+                        self.force_new_block = true;
+                        self.open_delimited_leaf_type = None;
+                    }
+                } else {
+                    self.parse_delimited_leaf_block(token)
+                }
+            }
+
+            // metadata
+            TokenType::ElementAttributes => self.parse_element_attributes(token),
 
             _ => {
                 // self check
@@ -204,6 +209,11 @@ impl Parser {
             value = String::from("")
         }
         self.document_attributes.insert(key, value);
+    }
+
+    /// parses element attribute lists into self.block_metadata, which then is applied later
+    fn parse_element_attributes(&mut self, token: Token) {
+        self.block_metadata = Some(BlockMetadata::new_from_token(token));
     }
 
     /// New line characters are arguably the most significant token "signal" we can get, and as
@@ -247,8 +257,10 @@ impl Parser {
                     }
                 } // if Some(last_block)
             }
-        } else if self.in_block_continuation {
-            // don't add a newline ahead of text
+        } else if self.in_block_continuation
+            || [TokenType::ElementAttributes].contains(&self.last_token_type)
+        {
+            // don't add a newline ahead of text in these cases
             self.dangling_newline = None;
         } else {
             self.dangling_newline = Some(token);
@@ -607,7 +619,7 @@ impl Parser {
         self.add_to_block_stack_or_graph(asg, block)
     }
 
-    fn push_block_to_stack(&mut self, block: Block) {
+    fn push_block_to_stack(&mut self, mut block: Block) {
         // we only want to push on continue if we're not in an open delimited block (which will
         // close itself, emptying the open_delimited_block_lines)
         if self.in_block_continuation && self.open_delimited_block_lines.is_empty() {
@@ -620,6 +632,9 @@ impl Parser {
             last_block.push_block(block);
             self.in_block_continuation = false;
         } else {
+            if self.block_metadata.is_some() {
+                block.add_metadata(self.block_metadata.as_ref().unwrap().clone())
+            }
             self.block_stack.push(block)
         }
     }
@@ -721,12 +736,15 @@ impl Parser {
         }
     }
 
-    fn add_to_block_stack_or_graph(&mut self, asg: &mut Asg, block: Block) {
+    fn add_to_block_stack_or_graph(&mut self, asg: &mut Asg, mut block: Block) {
         if let Some(last_block) = self.block_stack.last_mut() {
             if last_block.can_be_parent() {
                 last_block.push_block(block);
                 return;
             }
+        }
+        if self.block_metadata.is_some() {
+            block.add_metadata(self.block_metadata.as_ref().unwrap().clone())
         }
         asg.push_block(block)
     }
@@ -747,7 +765,10 @@ impl Parser {
 
     fn add_last_block_to_graph(&mut self, asg: &mut Asg) {
         // consolidate any list items
-        if let Some(block) = self.block_stack.pop() {
+        if let Some(mut block) = self.block_stack.pop() {
+            if self.block_metadata.is_some() {
+                block.add_metadata(self.block_metadata.as_ref().unwrap().clone())
+            }
             if let Some(next_last_block) = self.block_stack.last_mut() {
                 if matches!(block, Block::ListItem(_)) {
                     // sanity check
