@@ -87,7 +87,11 @@ impl<'a> Scanner<'a> {
                             if self.starts_new_line() && self.peek() == ' ' {
                                 self.add_list_item(TokenType::UnorderedListItem)
                             } else {
-                                self.add_token(TokenType::Strong, false, 0)
+                                self.handle_inline_formatting(
+                                    c,
+                                    TokenType::Strong,
+                                    TokenType::UnconstrainedStrong,
+                                )
                             }
                         }
                         '/' => {
@@ -107,7 +111,11 @@ impl<'a> Scanner<'a> {
                                 self.add_text_until_next_markup()
                             }
                         }
-                        '_' => self.add_token(TokenType::Emphasis, false, 0),
+                        '_' => self.handle_inline_formatting(
+                            c,
+                            TokenType::Emphasis,
+                            TokenType::UnconstrainedEmphasis,
+                        ),
                         _ => self.add_text_until_next_markup(),
                     }
                 }
@@ -147,10 +155,14 @@ impl<'a> Scanner<'a> {
                 }
             }
 
-            '`' => self.add_token(TokenType::Monospace, false, 0),
+            '`' => self.handle_inline_formatting(
+                c,
+                TokenType::Monospace,
+                TokenType::UnconstrainedMonospace,
+            ),
             '^' => self.add_token(TokenType::Superscript, false, 0),
             '~' => self.add_token(TokenType::Subscript, false, 0),
-            '#' => self.add_token(TokenType::Mark, false, 0),
+            '#' => self.handle_inline_formatting(c, TokenType::Mark, TokenType::UnconstrainedMark),
             ':' => {
                 if self.starts_new_line() && self.starts_attr() {
                     while self.peek() != '\n' {
@@ -408,6 +420,28 @@ impl<'a> Scanner<'a> {
         let check = self.source.as_bytes()[self.current] as char == ';';
         self.current = current_placeholder;
         check
+    }
+
+    /// Handles inline formatting, constrained or not
+    fn handle_inline_formatting(
+        &mut self,
+        c: char,
+        constrained: TokenType,
+        unconstrained: TokenType,
+    ) -> Token {
+        let allowed_peek = vec![' ', '\0', '.', ',', ';', ':', '\n', ')', '"'];
+        let allowed_peek_back = vec![' ', '\n', '\0', ']', '(', '"'];
+        if allowed_peek.contains(&self.peek())
+            || allowed_peek_back.contains(&self.peek_back()) && self.peek() != c
+        {
+            self.add_token(constrained, false, 0)
+        } else if self.peek() == c {
+            // we've got an unconstrained version
+            self.current += 1;
+            self.add_token(unconstrained, false, 0)
+        } else {
+            self.add_text_until_next_markup()
+        }
     }
 
     /// Checks for lines such as [quote], [verse, Mary Oliver], [source, python], etc.
@@ -715,7 +749,10 @@ mod tests {
     #[case::quote("[quote]\n", TokenType::ElementAttributes)]
     #[case("[quote, Georges Perec]\n", TokenType::ElementAttributes)]
     #[case("[verse]\n", TokenType::ElementAttributes)]
-    #[case("[verse, Audre Lorde, A Litany for Survival]\n", TokenType::ElementAttributes)]
+    #[case(
+        "[verse, Audre Lorde, A Litany for Survival]\n",
+        TokenType::ElementAttributes
+    )]
     #[case("[source]\n", TokenType::ElementAttributes)]
     #[case::role("[role=\"foo\"]\n", TokenType::ElementAttributes)]
     #[case::role_dot("[.foo]\n", TokenType::ElementAttributes)]
@@ -823,46 +860,39 @@ mod tests {
     }
 
     #[rstest]
-    #[case('*', TokenType::Strong)]
-    #[case('_', TokenType::Emphasis)]
-    #[case('`', TokenType::Monospace)]
-    #[case('^', TokenType::Superscript)]
-    #[case('~', TokenType::Subscript)]
-    #[case('#', TokenType::Mark)]
-    fn inline_formatting_doubles(#[case] markup_char: char, #[case] expected_token: TokenType) {
+    #[case::strong(String::from("**"), TokenType::UnconstrainedStrong)]
+    #[case::emphasis(String::from("__"), TokenType::UnconstrainedEmphasis)]
+    #[case::monospace(String::from("``"), TokenType::UnconstrainedMonospace)]
+    #[case::mark(String::from("##"), TokenType::UnconstrainedMark)]
+    fn inline_formatting_doubles(#[case] markup_str: String, #[case] expected_token: TokenType) {
         // TODO make this less ugly
-        let markup = format!(
-            "Some {}{}bar{}{} bar.",
-            markup_char, markup_char, markup_char, markup_char
-        );
+        let markup = format!("Some{}bar{}bar.", markup_str, markup_str);
         let expected_tokens = vec![
             Token::new(
                 TokenType::Text,
-                "Some ".to_string(),
-                Some("Some ".to_string()),
+                "Some".to_string(),
+                Some("Some".to_string()),
                 1,
                 1,
-                5,
+                4,
             ),
-            Token::new(expected_token, markup_char.to_string(), None, 1, 6, 6),
-            Token::new(expected_token, markup_char.to_string(), None, 1, 7, 7),
+            Token::new(expected_token, markup_str.clone(), None, 1, 5, 6),
             Token::new(
                 TokenType::Text,
                 "bar".to_string(),
                 Some("bar".to_string()),
                 1,
-                8,
-                10,
+                7,
+                9,
             ),
-            Token::new(expected_token, markup_char.to_string(), None, 1, 11, 11),
-            Token::new(expected_token, markup_char.to_string(), None, 1, 12, 12),
+            Token::new(expected_token, markup_str, None, 1, 10, 11),
             Token::new(
                 TokenType::Text,
-                " bar.".to_string(),
-                Some(" bar.".to_string()),
+                "bar.".to_string(),
+                Some("bar.".to_string()),
                 1,
-                13,
-                17,
+                12,
+                15,
             ),
         ];
         scan_and_assert_eq(&markup, expected_tokens);

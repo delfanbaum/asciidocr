@@ -127,6 +127,16 @@ impl Inline {
             println!("{:?}", inline.value)
         }
     }
+
+    pub fn is_empty(&self) -> bool {
+        match self {
+            Inline::InlineRef(inline) => inline.inlines.is_empty(),
+            Inline::InlineSpan(inline) => inline.inlines.is_empty(),
+            Inline::InlineLiteral(inline) => inline.value.is_empty(),
+        }
+
+    }
+
     pub fn consolidate_locations_from_token(&mut self, token: Token) {
         match self {
             Inline::InlineLiteral(_) => todo!(),
@@ -153,7 +163,7 @@ pub struct InlineSpan {
     pub variant: InlineSpanVariant,
     #[serde(rename = "form")]
     pub node_form: InlineSpanForm,
-    inlines: Vec<Inline>,
+    pub inlines: Vec<Inline>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub metadata: Option<ElementMetadata>,
     location: Vec<Location>,
@@ -199,6 +209,26 @@ impl InlineSpan {
                 token.locations(),
             ),
 
+            TokenType::UnconstrainedStrong => Self::new(
+                InlineSpanVariant::Strong,
+                InlineSpanForm::Unconstrained,
+                token.locations(),
+            ),
+            TokenType::UnconstrainedEmphasis => Self::new(
+                InlineSpanVariant::Emphasis,
+                InlineSpanForm::Unconstrained,
+                token.locations(),
+            ),
+            TokenType::UnconstrainedMonospace => Self::new(
+                InlineSpanVariant::Code,
+                InlineSpanForm::Unconstrained,
+                token.locations(),
+            ),
+            TokenType::UnconstrainedMark => Self::new(
+                InlineSpanVariant::Mark,
+                InlineSpanForm::Unconstrained,
+                token.locations(),
+            ),
             _ => {
                 panic!("Invalid action: tried to create an inline span from an invalid token type")
             }
@@ -232,7 +262,7 @@ pub enum InlineSpanVariant {
 #[serde(rename_all = "lowercase")]
 pub enum InlineSpanForm {
     Constrained,
-    Unconstrainted,
+    Unconstrained,
 }
 
 #[derive(Serialize, Clone, Debug)]

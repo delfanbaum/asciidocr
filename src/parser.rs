@@ -126,11 +126,16 @@ impl Parser {
             // inlines
             TokenType::NewLineChar => self.parse_new_line_char(token, asg),
             TokenType::Text => self.parse_text(token),
-            TokenType::Strong | TokenType::Mark | TokenType::Monospace | TokenType::Emphasis => {
-                self.parse_inline_span(Inline::InlineSpan(InlineSpan::inline_span_from_token(
-                    token,
-                )))
-            }
+            TokenType::Strong
+            | TokenType::Mark
+            | TokenType::Monospace
+            | TokenType::Emphasis
+            | TokenType::UnconstrainedStrong
+            | TokenType::UnconstrainedMark
+            | TokenType::UnconstrainedMonospace
+            | TokenType::UnconstrainedEmphasis => self.parse_inline_span(Inline::InlineSpan(
+                InlineSpan::inline_span_from_token(token),
+            )),
             TokenType::AttributeReference => self.parse_attribute_reference(token),
 
             // refs
@@ -671,6 +676,7 @@ impl Parser {
         }
 
         if self.in_inline_span {
+            println!("{:?}", self.inline_stack);
             // TK HANDLE DANGLING ITALICS
             todo!()
         }

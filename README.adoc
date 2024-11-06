@@ -33,6 +33,8 @@ parsed/implemented, but we've got headings, paragraphs, lists, and links, and
 you can go pretty far with those. And frankly I needed a break from the parsing,
 so I figured I'd change lanes for a little bit and work on the HTML output.
 
+Bonus: also can now do __un__constrained text formatting!
+
 == Project Goals 
 
 A non-exhaustive list:

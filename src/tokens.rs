@@ -151,11 +151,17 @@ pub enum TokenType {
     Strong,   // TK Handle bounded characters, e.g., **Some**thing -> <b>Some</b>thing
     Emphasis, // same applies above
     Monospace,
+    Mark,        // #text# or [.class]#text#
 
     Superscript, // ^super^
     Subscript,   // ~sub~
-    Mark,        // #text# or [.class]#text#
 
+    // formatting tokens (inline markup)
+    UnconstrainedStrong,   // TK Handle bounded characters, e.g., **Some**thing -> <b>Some</b>thing
+    UnconstrainedEmphasis, // same applies above
+    UnconstrainedMonospace,
+    UnconstrainedMark,        // #text# or [.class]#text#
+    
     // inline macros
     LinkMacro,
     FootnoteMacro, // requires a second pass? OR: do some kind of `self.last_token` check on the
