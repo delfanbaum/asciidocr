@@ -712,9 +712,33 @@ impl Parser {
                 )
             };
             last_block.push_block(para_block);
-        } else {
-            self.push_block_to_stack(para_block)
+            return;
         }
+
+        if self.metadata.is_some() {
+            // check to see if we need to apply metadata to the para block
+            let line_above = para_block.locations().first().unwrap().line + 1;
+            if self.open_delimited_block_lines.last() == Some(&line_above)
+                || self.open_delimited_block_lines.is_empty()
+            {
+                let Some(ref metadata) = self.metadata else {
+                    panic!()
+                };
+                if metadata.declared_type == Some("quote".to_string()) {
+                    let mut quote_block = Block::ParentBlock(ParentBlock::new(
+                        crate::blocks::ParentBlockName::Quote,
+                        None,
+                        "".to_string(),
+                        vec![],
+                        vec![],
+                    ));
+                    quote_block.push_block(para_block);
+                    self.push_block_to_stack(quote_block);
+                    return;
+                }
+            }
+        }
+        self.push_block_to_stack(para_block)
     }
 
     fn add_last_list_item_to_list(&mut self) {

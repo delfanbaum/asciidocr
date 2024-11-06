@@ -16,6 +16,8 @@ pub struct ElementMetadata {
     /// this is a flag to let us know if it should be applied
     #[serde(skip)]
     pub inline_metadata: bool,
+    #[serde(skip)]
+    pub declared_type: Option<String>,
     pub location: Vec<Location>,
 }
 
@@ -29,6 +31,7 @@ impl ElementMetadata {
             options: vec![],
             roles: vec![],
             inline_metadata: true,
+            declared_type: None,
             location: token.locations().clone(),
         };
 
@@ -51,6 +54,7 @@ impl ElementMetadata {
             options: vec![],
             roles: vec![],
             inline_metadata: false,
+            declared_type: None,
             location: token.locations().clone(),
         };
 
@@ -61,11 +65,13 @@ impl ElementMetadata {
         if !attributes.is_empty() {
             match &attributes[0][..4] {
                 "role" => {
+                    new_block_metadata.declared_type = Some(String::from("role"));
                     for role in values_from_named_attribute(attributes[0]) {
                         new_block_metadata.roles.push(role.to_string());
                     }
                 }
                 "sour" => {
+                    new_block_metadata.declared_type = Some(String::from("source"));
                     // if a sour source block, see if there's a language
                     if attributes.len() >= 2 {
                         new_block_metadata
@@ -74,6 +80,7 @@ impl ElementMetadata {
                     }
                 }
                 "quot" | "vers" => {
+                    new_block_metadata.declared_type = Some(String::from(attributes[0]));
                     if attributes.len() >= 2 {
                         for (idx, attr) in attributes[1..].iter().enumerate() {
                             match idx {

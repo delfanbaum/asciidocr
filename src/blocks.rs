@@ -490,8 +490,9 @@ pub struct ParentBlock {
     variant: Option<ParentBlockVarient>,
     #[serde(rename = "type")]
     node_type: NodeTypes,
-    form: String,
-    delimiter: String, // TK how to handle NOTE: text...
+    form: String, // required as "delimited", but really could also be "paragraph"
+    #[serde(skip_serializing_if = "String::is_empty")]
+    delimiter: String, // required, but if it should be "paragraph" it's empty
     blocks: Vec<Block>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub metadata: Option<ElementMetadata>,

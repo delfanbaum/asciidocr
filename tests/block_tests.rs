@@ -152,3 +152,11 @@ fn test_block_meta_source() {
     let asg_json_fn = format!("{}.json", fn_pattern);
     assert_parsed_doc_matches_expected_asg(&adoc_fn, &asg_json_fn)
 }
+
+#[test]
+fn test_block_meta_appropriately_affects_leaf_blocks() {
+    let fn_pattern = "blocks/quotes-no-delimiter";
+    let adoc_fn = format!("{}.adoc", fn_pattern);
+    let asg_json_fn = format!("{}.json", fn_pattern);
+    assert_parsed_doc_matches_expected_asg(&adoc_fn, &asg_json_fn)
+}
