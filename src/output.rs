@@ -3,9 +3,9 @@ use tera::{Context, Tera};
 
 use crate::asg::Asg;
 
-static HTMLBOOK_TEMPLATE: &'static str = include_str!("../templates/htmlbook.html.tera");
-static BLOCKS_TEMPLATE: &'static str = include_str!("../templates/blocks/block.html.tera");
-static INLINES_TEMPLATE: &'static str = include_str!("../templates/inlines/inline.html.tera");
+static HTMLBOOK_TEMPLATE: &str = include_str!("../templates/htmlbook.html.tera");
+static BLOCKS_TEMPLATE: &str = include_str!("../templates/blocks/block.html.tera");
+static INLINES_TEMPLATE: &str = include_str!("../templates/inlines/inline.html.tera");
 
 pub fn render(graph: &Asg) -> Result<String> {
     // from their docs

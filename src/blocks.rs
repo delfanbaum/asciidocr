@@ -4,9 +4,9 @@ use std::fmt::Display;
 use serde::Serialize;
 
 use crate::{
-    metadata::ElementMetadata,
     inlines::Inline,
     lists::{DList, List, ListItem, ListVariant},
+    metadata::ElementMetadata,
     nodes::{Location, NodeTypes},
     tokens::{Token, TokenType},
 };
@@ -64,7 +64,21 @@ impl Block {
             Block::Section(section) => section.blocks.push(block),
             Block::List(list) => list.add_item(block),
             Block::ListItem(list_item) => list_item.blocks.push(block),
-            Block::ParentBlock(parent_block) => parent_block.blocks.push(block),
+            Block::ParentBlock(parent_block) => {
+                if matches!(block, Block::ListItem(_)) {
+                    let Some(last) = parent_block.blocks.last_mut() else {
+                        panic!("Attempted to push dangling ListItem to parent block")
+                    };
+                    if matches!(last, Block::List(_)) {
+                        last.push_block(block);
+                        last.consolidate_locations();
+                    } else {
+                        panic!("Attempted to push dangling ListItem to parent block")
+                    }
+                } else {
+                    parent_block.blocks.push(block)
+                }
+            }
             _ => panic!("push_block not implemented for {}", self),
         }
         self.consolidate_locations();
@@ -241,21 +255,15 @@ impl Block {
     }
 
     pub fn add_metadata(&mut self, metadata: ElementMetadata) {
-        // guard against invalid inline use 
+        // guard against invalid inline use
         if metadata.inline_metadata {
             // TODO this is a warning, not a panic
             panic!("Invalid inline class markup.")
         }
         match self {
-            Block::LeafBlock(block) => {
-                block.metadata = Some(metadata)
-            }
-            Block::Section(block) => {
-                block.metadata = Some(metadata)
-            }
-            Block::ParentBlock(block) => {
-                block.metadata = Some(metadata)
-            }
+            Block::LeafBlock(block) => block.metadata = Some(metadata),
+            Block::Section(block) => block.metadata = Some(metadata),
+            Block::ParentBlock(block) => block.metadata = Some(metadata),
             _ => todo!(),
         }
     }

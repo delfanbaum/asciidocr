@@ -6,6 +6,8 @@ use serde::Serialize;
 
 use crate::{nodes::Location, tokens::Token};
 
+static RE_NAMED: Lazy<Regex> = Lazy::new(|| Regex::new(r#"(.*?)[=|,]"(.*?)\""#).unwrap());
+
 #[derive(Serialize, PartialEq, Clone, Debug)]
 pub struct ElementMetadata {
     attributes: HashMap<String, String>,
@@ -35,7 +37,7 @@ impl ElementMetadata {
             .split('.')
             .collect::<Vec<&str>>()
             .iter_mut()
-            .filter(|s| !s.is_empty() )
+            .filter(|s| !s.is_empty())
             .map(|s| s.to_string())
             .collect();
 
@@ -43,7 +45,6 @@ impl ElementMetadata {
     }
     pub fn new_block_meta_from_token(token: Token) -> Self {
         // Regex for parsing named attributes
-        static RE_NAMED: Lazy<Regex> = Lazy::new(|| Regex::new(r#"(.*?)[=|,]"(.*?)\""#).unwrap());
 
         let mut new_block_metadata = ElementMetadata {
             attributes: HashMap::new(),
@@ -56,21 +57,55 @@ impl ElementMetadata {
         let attribute_list = token.lexeme[1..token.lexeme.len() - 1].to_string();
         let attributes: Vec<&str> = attribute_list.split(',').collect();
 
-        for comp in attributes {
-            // check if it's a named attributes
-            if comp.contains("=\"") {
-                let (_, [named, values_str]) = RE_NAMED.captures(comp).unwrap().extract();
-                match named {
-                    "role" => {
-                        let values: Vec<&str> = values_str.split(' ').collect();
-                        for role in values {
-                            new_block_metadata.roles.push(role.to_string());
+        // determine kind of thing
+        if !attributes.is_empty() {
+            match &attributes[0][..4] {
+                "role" => {
+                    for role in values_from_named_attribute(attributes[0]) {
+                        new_block_metadata.roles.push(role.to_string());
+                    }
+                }
+                "sour" => {
+                    // if a sour source block, see if there's a language
+                    if attributes.len() >= 2 {
+                        new_block_metadata
+                            .attributes
+                            .insert(String::from("language"), attributes[1].trim().into());
+                    }
+                }
+                "quot" | "vers" => {
+                    if attributes.len() >= 2 {
+                        for (idx, attr) in attributes[1..].iter().enumerate() {
+                            match idx {
+                                0 => {
+                                    new_block_metadata
+                                        .attributes
+                                        .insert(String::from("attribution"), attr.trim().into());
+                                }
+                                1 => {
+                                    new_block_metadata
+                                        .attributes
+                                        .insert(String::from("citation"), attr.trim().into());
+                                }
+                                _ => todo!(), // or panic?
+                            }
                         }
                     }
-                    _ => todo!(),
+                }
+                _ => {
+                    todo!()
                 }
             }
         }
+
         new_block_metadata
+    }
+}
+
+fn values_from_named_attribute(attribute: &str) -> Vec<&str> {
+    let (_, [named, values_str]) = RE_NAMED.captures(attribute).unwrap().extract();
+    match named {
+        "role" => values_str.split(' ').collect::<Vec<&str>>(),
+        _ => todo!(),
     }
 }

@@ -1,0 +1,66 @@
+{
+    "name": "document",
+    "type": "block",
+    "blocks": [
+        {
+            "name": "listing",
+            "type": "block",
+            "form": "delimited",
+            "delimiter": "----",
+            "metadata": {
+                "attributes": {
+                    "language": "py"
+                },
+                "options": [],
+                "roles": [],
+                "location": [
+                    {
+                        "line": 1,
+                        "col": 1
+                    },
+                    {
+                        "line": 1,
+                        "col": 12
+                    }
+                ]
+            },
+            "inlines": [
+                {
+                    "name": "text",
+                    "type": "string",
+                    "value": "\ndef hello():\n    print(\"Hello, world!\")\n",
+                    "location": [
+                        {
+                            "line": 2,
+                            "col": 5
+                        },
+                        {
+                            "line": 4,
+                            "col": 27
+                        }
+                    ]
+                }
+            ],
+            "location": [
+                {
+                    "line": 2,
+                    "col": 1
+                },
+                {
+                    "line": 5,
+                    "col": 4
+                }
+            ]
+        }
+    ],
+    "location": [
+        {
+            "line": 1,
+            "col": 1
+        },
+        {
+            "line": 5,
+            "col": 4
+        }
+    ]
+}

@@ -150,7 +150,7 @@ impl Parser {
             TokenType::SidebarBlock
             | TokenType::OpenBlock
             | TokenType::QuoteVerseBlock
-            | TokenType::ExampleBlock => self.parse_delimited_parent_block(token, asg),
+            | TokenType::ExampleBlock => self.parse_delimited_parent_block(token),
 
             // the following should probably be consumed into the above
             TokenType::PassthroughBlock => self.parse_delimited_leaf_block(token),
@@ -569,7 +569,7 @@ impl Parser {
     }
 
     // TODO: handle [NOTE]\n==== cases (i.e., some block metadata check)
-    fn parse_delimited_parent_block(&mut self, token: Token, asg: &mut Asg) {
+    fn parse_delimited_parent_block(&mut self, token: Token) {
         let delimiter_line = token.first_location().line;
         let block = ParentBlock::new_from_token(token);
 
@@ -584,6 +584,8 @@ impl Parser {
                 panic!("Unexpteced block in Block::ParentBlock")
             };
             if matched == block {
+                // close any dangling inlines BEFORE opening the delimited block lines
+                self.add_inlines_to_block_stack();
                 // remove the open delimiter line from the count and confirm we're nested properly
                 let Some(line) = self.open_delimited_block_lines.pop() else {
                     panic!("Attempted to close a non-existent delimited block")
@@ -594,17 +596,17 @@ impl Parser {
                 }
                 // update the final location
                 matched.location = Location::reconcile(matched.location.clone(), block.location);
-                // return the parent block
-                self.block_stack
-                    .insert(parent_block_idx, Block::ParentBlock(matched));
-                // close any dangling inlines
-                self.add_inlines_to_block_stack();
+                // collect subsequent blocks to be added to the parent block
+                let mut blocks_to_add =
+                    VecDeque::from_iter(self.block_stack.drain(parent_block_idx..));
+                //
+                let mut delimited_block = Block::ParentBlock(matched);
+                while !blocks_to_add.is_empty() {
+                    delimited_block.push_block(blocks_to_add.pop_front().unwrap())
+                }
+                self.push_block_to_stack(delimited_block);
                 // close any continuations
                 self.in_block_continuation = false;
-                // add blocks until we have also added the parent block
-                while self.block_stack.len() > parent_block_idx {
-                    self.close_last_open_block(asg);
-                }
                 return;
             } else {
                 self.block_stack
@@ -614,13 +616,6 @@ impl Parser {
         // note the open block line
         self.open_delimited_block_lines.push(delimiter_line);
         self.push_block_to_stack(Block::ParentBlock(block));
-    }
-
-    fn close_last_open_block(&mut self, asg: &mut Asg) {
-        let Some(block) = self.block_stack.pop() else {
-            panic!("Unexpected close last block call!")
-        };
-        self.add_to_block_stack_or_graph(asg, block)
     }
 
     fn push_block_to_stack(&mut self, mut block: Block) {
@@ -676,7 +671,6 @@ impl Parser {
         }
 
         if self.in_inline_span {
-            println!("{:?}", self.inline_stack);
             // TK HANDLE DANGLING ITALICS
             todo!()
         }
@@ -710,7 +704,7 @@ impl Parser {
                 para_block.push_inline(inline)
             }
         }
-        if self.in_block_continuation {
+        if self.in_block_continuation && self.open_delimited_block_lines.is_empty() {
             let Some(last_block) = self.block_stack.last_mut() else {
                 panic!(
                     "Line {}: Invalid block continuation: no previous block",

@@ -27,6 +27,8 @@ this should work.
     {% elif block.name == "admonition" -%}
     {%- set tag = "div" -%}
     {%- set data_type = block.variant -%}
+    {% elif block.name == "quote" -%}
+    {%- set tag = "blockquote" -%}
     {% elif block.name == "paragraph" -%}
     {%- set tag = "p" -%}
     {% elif block.name == "listing" -%}
@@ -61,6 +63,12 @@ this should work.
         {{- self::process_block(block=child_block )-}}
         {%- endfor -%}
         {% endif -%}
+    {%- if block.metadata.attributes.attribution -%}
+    <p data-type="attribution">{{block.metadata.attributes.attribution}}
+        {%- if block.metadata.attributes.citation -%}, {{block.metadata.attributes.citation}}
+        {%- endif -%}
+    </p>
+    {%- endif -%}
     </{{tag}}>
     {% if block.name == "section" %}
     {% if block.blocks -%}
