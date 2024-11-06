@@ -32,7 +32,7 @@ impl ElementMetadata {
 
         let class_list = token.lexeme[1..token.lexeme.len() - 1].to_string();
         new_block_metadata.roles = class_list
-            .split(".")
+            .split('.')
             .collect::<Vec<&str>>()
             .iter_mut()
             .filter(|s| !s.is_empty() )
@@ -54,7 +54,7 @@ impl ElementMetadata {
         };
 
         let attribute_list = token.lexeme[1..token.lexeme.len() - 1].to_string();
-        let attributes: Vec<&str> = attribute_list.split(",").collect();
+        let attributes: Vec<&str> = attribute_list.split(',').collect();
 
         for comp in attributes {
             // check if it's a named attributes
@@ -62,7 +62,7 @@ impl ElementMetadata {
                 let (_, [named, values_str]) = RE_NAMED.captures(comp).unwrap().extract();
                 match named {
                     "role" => {
-                        let values: Vec<&str> = values_str.split(" ").collect();
+                        let values: Vec<&str> = values_str.split(' ').collect();
                         for role in values {
                             new_block_metadata.roles.push(role.to_string());
                         }

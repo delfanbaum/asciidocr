@@ -155,7 +155,7 @@ impl Block {
                 for inline in &section.inlines {
                     id.push_str(&inline.extract_values_to_string())
                 }
-                id = id.replace(" ", "-");
+                id = id.replace(' ', "-");
                 section.id = id
             }
         }

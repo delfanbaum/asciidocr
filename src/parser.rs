@@ -202,7 +202,7 @@ impl Parser {
 
     fn parse_attribute(&mut self, token: Token) {
         let binding = token.text();
-        let mut attr_components: Vec<&str> = binding.split_terminator(":").collect();
+        let mut attr_components: Vec<&str> = binding.split_terminator(':').collect();
         attr_components.remove(0); // throw away initial "" in the list
         if attr_components.is_empty() {
             // guard clause

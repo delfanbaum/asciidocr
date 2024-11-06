@@ -429,10 +429,8 @@ impl<'a> Scanner<'a> {
         constrained: TokenType,
         unconstrained: TokenType,
     ) -> Token {
-        let allowed_peek = vec![' ', '\0', '.', ',', ';', ':', '\n', ')', '"'];
-        let allowed_peek_back = vec![' ', '\n', '\0', ']', '(', '"'];
-        if allowed_peek.contains(&self.peek())
-            || allowed_peek_back.contains(&self.peek_back()) && self.peek() != c
+        if [' ', '\0', '.', ',', ';', ':', '\n', ')', '"'].contains(&self.peek())
+            || [' ', '\n', '\0', ']', '(', '"'].contains(&self.peek_back()) && self.peek() != c
         {
             self.add_token(constrained, false, 0)
         } else if self.peek() == c {
