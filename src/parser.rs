@@ -434,6 +434,7 @@ impl Parser {
             if let Some(last_inline) = self.inline_stack.back_mut() {
                 if inline == *last_inline {
                     last_inline.reconcile_locations(inline.locations());
+                    last_inline.close();
                     self.in_inline_span = false;
                     return;
                 }
@@ -670,9 +671,48 @@ impl Parser {
             return;
         }
 
+        // dangling inlines
         if self.in_inline_span {
-            // TK HANDLE DANGLING ITALICS
-            todo!()
+            // look for the last span in the stack
+            let Some(open_span_idx) = self
+                .inline_stack
+                .iter()
+                .rposition(|inline| inline.is_open())
+            else {
+                panic!()
+            };
+            let mut open_span = self.inline_stack.remove(open_span_idx).unwrap();
+            let open_span_literal = open_span.produce_literal_from_self();
+            // put the literal char into the stack as a literal...
+            let mut children = open_span.extract_child_inlines();
+            // ... by adding it to the next inline
+            if let Some(inline) = children.front_mut() {
+                match inline {
+                    Inline::InlineLiteral(literal) => {
+                        literal.prepend_to_value(open_span_literal, open_span.locations())
+                    }
+                    _ => todo!(),
+                }
+                // put any appended inlines into the stack at the relevant position
+                for child_inline in children {
+                    self.inline_stack.insert(open_span_idx, child_inline)
+                }
+            } else {
+                // ... or if there are no children, to the back
+                // this is hacky, but it is cleaner compared to the rest of the code just to
+                // create a token and reuse the existing function
+                let (line, startcol, endcol) =
+                    Location::destructure_inline_locations(open_span.locations());
+                let reconstituted_token = Token {
+                    token_type: TokenType::Text,
+                    lexeme: open_span_literal.clone(),
+                    literal: Some(open_span_literal),
+                    line,
+                    startcol,
+                    endcol,
+                };
+                self.add_text_to_last_inline(reconstituted_token)
+            }
         }
 
         if let Some(last_block) = self.block_stack.last_mut() {

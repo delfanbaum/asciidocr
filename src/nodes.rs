@@ -100,7 +100,7 @@ impl Location {
             //file: None,
         }
     } // handle file later
-    
+
     pub fn col(&self) -> usize {
         self.col
     }
@@ -115,6 +115,22 @@ impl Location {
             }
         }
         start
+    }
+
+    pub fn destructure_inline_locations(locations: Vec<Location>) -> (usize, usize, usize) {
+        let mut line: usize = 0;
+        let mut startcol: usize = 0;
+        let mut endcol: usize = 0;
+
+        for (idx, location) in locations.iter().enumerate() {
+            if idx == 0 {
+                line = location.line;
+                startcol = location.col;
+            }
+            endcol = location.col
+        }
+
+        (line, startcol, endcol)
     }
 }
 

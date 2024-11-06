@@ -1,7 +1,9 @@
 pub mod common;
 use std::fs;
 
-use common::{assert_parsed_doc_matches_expected_asg, assert_parsed_doc_matches_expected_asg_from_str};
+use common::{
+    assert_parsed_doc_matches_expected_asg, assert_parsed_doc_matches_expected_asg_from_str,
+};
 use rstest::rstest;
 
 #[rstest]
@@ -16,6 +18,32 @@ fn test_spans_single_word(#[case] markup_char: &str, #[case] variant: &str) {
     let asg_json_str = fs::read_to_string("tests/data/inlines/span-single-word.json")
         .expect("Unable to read asg json test template")
         .replace("VARIANT", variant);
+    assert_parsed_doc_matches_expected_asg_from_str(&adoc_str, &asg_json_str)
+}
+
+#[rstest]
+#[case::emphasis("_")]
+#[case::strong("*")]
+#[case::code("`")]
+#[case::mark("#")]
+fn test_spans_dangling_at_front(#[case] markup_char: &str) {
+    let adoc_str = String::from("0cat").replace("0", markup_char);
+    let asg_json_str = fs::read_to_string("tests/data/inlines/span-dangling.json")
+        .expect("Unable to read asg json test template")
+        .replace("TEXT", &adoc_str);
+    assert_parsed_doc_matches_expected_asg_from_str(&adoc_str, &asg_json_str)
+}
+
+#[rstest]
+#[case::emphasis("_")]
+#[case::strong("*")]
+#[case::code("`")]
+#[case::mark("#")]
+fn test_spans_dangling_at_end(#[case] markup_char: &str) {
+    let adoc_str = String::from("cat0").replace("0", markup_char);
+    let asg_json_str = fs::read_to_string("tests/data/inlines/span-dangling.json")
+        .expect("Unable to read asg json test template")
+        .replace("TEXT", &adoc_str);
     assert_parsed_doc_matches_expected_asg_from_str(&adoc_str, &asg_json_str)
 }
 

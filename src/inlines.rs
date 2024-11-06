@@ -1,5 +1,5 @@
 use core::panic;
-use std::fmt::Display;
+use std::{collections::VecDeque, fmt::Display, iter};
 
 use serde::Serialize;
 
@@ -84,6 +84,13 @@ impl Inline {
         }
     }
 
+    pub fn is_open(&self) -> bool {
+        match self {
+            Inline::InlineSpan(span) => span.open,
+            _ => false,
+        }
+    }
+
     pub fn extract_values_to_string(&self) -> String {
         match &self {
             Inline::InlineLiteral(literal) => literal.value.clone(),
@@ -102,6 +109,34 @@ impl Inline {
         match &self {
             Inline::InlineLiteral(literal) => literal.clone(),
             _ => panic!("Tried to extract an inline literal from the wrong Inline"),
+        }
+    }
+
+    pub fn extract_child_inlines(&mut self) -> VecDeque<Inline> {
+        match &self {
+            Inline::InlineSpan(span) => span.inlines.clone().into(),
+            _ => todo!(),
+        }
+    }
+
+    pub fn produce_literal_from_self(&mut self) -> String {
+        match &self {
+            Inline::InlineSpan(span) => {
+                let mut literal = match span.variant {
+                    InlineSpanVariant::Strong => "*".to_string(),
+                    InlineSpanVariant::Emphasis => "_".to_string(),
+                    InlineSpanVariant::Mark => "#".to_string(),
+                    InlineSpanVariant::Code => "`".to_string(),
+                };
+                if span.node_form == InlineSpanForm::Unconstrained {
+                    literal = literal
+                        .chars()
+                        .flat_map(|c| iter::repeat(c).take(2))
+                        .collect::<String>();
+                }
+                literal
+            }
+            _ => todo!(),
         }
     }
 
@@ -134,7 +169,6 @@ impl Inline {
             Inline::InlineSpan(inline) => inline.inlines.is_empty(),
             Inline::InlineLiteral(inline) => inline.value.is_empty(),
         }
-
     }
 
     pub fn consolidate_locations_from_token(&mut self, token: Token) {
@@ -153,6 +187,13 @@ impl Inline {
             _ => panic!("Invalid action: this inline does not take metadata"),
         }
     }
+
+    pub fn close(&mut self) {
+        match self {
+            Inline::InlineSpan(span) => span.open = false,
+            _ => panic!("Invalid action: this inline does not take metadata"),
+        }
+    }
 }
 
 #[derive(Serialize, Clone, Debug)]
@@ -167,6 +208,8 @@ pub struct InlineSpan {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub metadata: Option<ElementMetadata>,
     location: Vec<Location>,
+    #[serde(skip)]
+    pub open: bool,
 }
 
 impl InlineSpan {
@@ -183,6 +226,7 @@ impl InlineSpan {
             inlines: vec![],
             metadata: None,
             location,
+            open: true,
         }
     }
 
@@ -342,6 +386,13 @@ impl InlineLiteral {
             _ => panic!("Can't add test from this kind of inline: {:?}", inline),
         }
         self.location = Location::reconcile(self.location.clone(), inline.locations().clone());
+    }
+
+    pub fn prepend_to_value(&mut self, value: String, value_locations: Vec<Location>) {
+        // add the value
+        self.value.insert_str(0, &value);
+        // update the locations
+        self.location = Location::reconcile(self.location.clone(), value_locations);
     }
 }
 
