@@ -24,6 +24,17 @@ Options:
 
 == Current State Notes (As of the Last README Commit)
 
+=== 0.1.1
+
+I've decided to bump to "0.1.1" as we now function as expected when installed
+and run elsewhere (i.e., out of the crate repo) on the machine. Trick was to
+statically load the templates, as opposed to having them be referenced files.
+
+Easy enough. It's probably at a state where folks can start actually using it a
+little.
+
+=== 0.1.0
+
 _We have output_! You can now convert, for example, this entire README using the
 `asciidocr` command to a fairly bare-bones HTML more or less along the lines of
 what O'Reilly's https://oreillymedia.github.io/HTMLBook/[HTMLBook] expects.
