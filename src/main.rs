@@ -2,7 +2,12 @@ use anyhow::Result;
 use clap::Parser;
 use std::{fs, io, path::PathBuf};
 
-use asciidocr::{cli::Cli, output::render, parser::Parser as AdocParser, scanner::Scanner};
+use asciidocr::{
+    cli::{Backends, Cli},
+    output::{gather_htmlbook_templates, render_from_templates},
+    parser::Parser as AdocParser,
+    scanner::Scanner,
+};
 
 fn main() {
     let args = Cli::parse();
@@ -19,10 +24,9 @@ fn main() {
         None => {
             let mut out_destination = PathBuf::new();
             out_destination.push(args.file.clone());
-            if args.adapter {
-                out_destination.set_extension("json")
-            } else {
-                out_destination.set_extension("html")
+            match args.backend {
+                Backends::Htmlbook => out_destination.set_extension("html"),
+                Backends::Json => out_destination.set_extension("json"),
             };
             Some(out_destination)
         }
@@ -39,10 +43,9 @@ fn main() {
 
 fn run(args: Cli) -> Result<String> {
     let graph = AdocParser::new().parse(Scanner::new(&open(&args.file)));
-    if args.adapter {
-        Ok(serde_json::to_string_pretty(&graph)?)
-    } else {
-        render(&graph)
+    match args.backend {
+        Backends::Htmlbook => render_from_templates(&graph, gather_htmlbook_templates()),
+        Backends::Json => Ok(serde_json::to_string_pretty(&graph)?),
     }
 }
 

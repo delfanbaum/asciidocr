@@ -8,7 +8,7 @@ a long if-else chain. Perhaps there is a smarter way to do this, but for now,
 this should work.
 
 -#}
-{%- import "inlines/inline.html.tera" as inline_macros -%}
+{%- import "inline.html.tera" as inline_macros -%}
 {%- macro process_block(block) -%}
 {%- if block.name == "section" -%}
 {% set tag = "h" ~ block.level %}

@@ -1,5 +1,5 @@
-{% import "inlines/inline.html.tera" as inline_macros %}
-{% import "blocks/block.html.tera" as block_macros %}
+{% import "inline.html.tera" as inline_macros %}
+{% import "block.html.tera" as block_macros %}
 <!DOCTYPE html>
 <html lang="en">
 
