@@ -135,6 +135,7 @@ impl Inline {
                     InlineSpanVariant::Emphasis => "_".to_string(),
                     InlineSpanVariant::Mark => "#".to_string(),
                     InlineSpanVariant::Code => "`".to_string(),
+                    InlineSpanVariant::Footnote => todo!(), // not applicable
                 };
                 if span.node_form == InlineSpanForm::Unconstrained {
                     literal = literal
@@ -183,10 +184,12 @@ impl Inline {
     pub fn consolidate_locations_from_token(&mut self, token: Token) {
         match self {
             Inline::InlineLiteral(_) => todo!(),
-            Inline::InlineSpan(_) => todo!(),
+            Inline::InlineSpan(inline) => {
+                inline.location = Location::reconcile(inline.location.clone(), token.locations())
+            }
             Inline::InlineBreak(_) => todo!(),
-            Inline::InlineRef(iref) => {
-                iref.location = Location::reconcile(iref.location.clone(), token.locations())
+            Inline::InlineRef(inline) => {
+                inline.location = Location::reconcile(inline.location.clone(), token.locations())
             }
         }
     }
@@ -283,6 +286,11 @@ impl InlineSpan {
                 InlineSpanForm::Unconstrained,
                 token.locations(),
             ),
+            TokenType::FootnoteMacro => Self::new(
+                InlineSpanVariant::Footnote,
+                InlineSpanForm::Constrained,
+                token.locations(),
+            ),
             _ => {
                 panic!("Invalid action: tried to create an inline span from an invalid token type")
             }
@@ -310,6 +318,7 @@ pub enum InlineSpanVariant {
     Emphasis,
     Code,
     Mark,
+    Footnote,
 }
 
 #[derive(Serialize, PartialEq, Eq, Clone, Debug)]

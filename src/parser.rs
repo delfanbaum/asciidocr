@@ -1,5 +1,5 @@
 use core::panic;
-use std::collections::{HashMap, VecDeque}; 
+use std::collections::{HashMap, VecDeque};
 
 use crate::{
     asg::Asg,
@@ -26,9 +26,9 @@ pub struct Parser {
     /// counts in/out delimited blocks by line reference; allows us to warn/error if they are
     /// unclosed at the end of the document
     open_delimited_block_lines: Vec<usize>,
-    /// appends text to block regardless of markup, token, etc. (will need to change if/when we
-    /// handle code callouts)
-    open_delimited_leaf_type: Option<TokenType>,
+    /// appends text to block or inline regardless of markup, token, etc. (will need to change
+    /// if/when we handle code callouts)
+    open_parse_after_as_text_type: Option<TokenType>,
     // convenience flags
     in_document_header: bool,
     /// designates whether we're to be adding inlines to the previous block until a newline
@@ -68,7 +68,7 @@ impl Parser {
             in_block_line: false,
             in_inline_span: false,
             in_block_continuation: false,
-            open_delimited_leaf_type: None,
+            open_parse_after_as_text_type: None,
             force_new_block: false,
             close_parent_after_push: false,
             dangling_newline: None,
@@ -104,13 +104,16 @@ impl Parser {
             self.in_document_header = false;
         }
 
-        if let Some(token_type) = self.open_delimited_leaf_type {
-            if token.token_type() != token_type {
-                self.open_delimited_leaf_type = Some(token_type);
+        if let Some(token_type) = self.open_parse_after_as_text_type {
+            if token.token_type() != token_type
+                && [TokenType::PassthroughInlineMacro].contains(&token_type)
+                && token.token_type() != TokenType::InlineMacroClose
+            {
+                self.open_parse_after_as_text_type = Some(token_type);
                 self.parse_text(token);
                 return;
             } else {
-                self.open_delimited_leaf_type = Some(token_type)
+                self.open_parse_after_as_text_type = Some(token_type)
             }
         }
 
@@ -138,9 +141,11 @@ impl Parser {
             )),
             TokenType::AttributeReference => self.parse_attribute_reference(token),
 
-            // refs
+            // inline macros
+            TokenType::FootnoteMacro => self.parse_footnote_macro(token),
             TokenType::LinkMacro => self.parse_link_macro(token),
             TokenType::InlineMacroClose => self.parse_inline_macro_close(token),
+            TokenType::PassthroughInlineMacro => self.parse_passthrough_inline_macro(token),
 
             // breaks NEED TESTS
             TokenType::PageBreak => self.parse_page_break(token, asg),
@@ -179,12 +184,12 @@ impl Parser {
             TokenType::CommentBlock => {
                 // We treat a CommentBlock like a delimited LeafBlock, but throw away the result if
                 // we've got a match
-                if let Some(open_type) = self.open_delimited_leaf_type {
+                if let Some(open_type) = self.open_parse_after_as_text_type {
                     if open_type == TokenType::CommentBlock {
                         self.inline_stack.clear();
                         self.block_stack.pop();
                         self.force_new_block = true;
-                        self.open_delimited_leaf_type = None;
+                        self.open_parse_after_as_text_type = None;
                     }
                 } else {
                     self.parse_delimited_leaf_block(token)
@@ -351,9 +356,8 @@ impl Parser {
     //fn parse_block_label(&mut self, token: Token, asg: &mut Asg) {}
 
     fn parse_level_0_heading(&mut self, token: Token, asg: &mut Asg) {
-        if token.first_location() == (Location {line: 1, col: 1}) {
+        if token.first_location() == (Location { line: 1, col: 1 }) {
             self.in_document_header = true
-
         }
         if self.in_document_header {
             self.document_header.location.extend(token.locations());
@@ -467,11 +471,22 @@ impl Parser {
             .push_back(Inline::InlineRef(InlineRef::new_link_from_token(token)))
     }
 
-    //fn parse_footnote_macro(&mut self, token: Token, asg: &mut Asg) {}
-    //fn parse_passthrough_inline_macro(&mut self, token: Token, asg: &mut Asg) {}
+    fn parse_footnote_macro(&mut self, token: Token) {
+        self.inline_stack
+            .push_back(Inline::InlineSpan(InlineSpan::inline_span_from_token(
+                token,
+            )));
+        self.in_inline_span = true;
+    }
+
+    fn parse_passthrough_inline_macro(&mut self, token: Token) {
+        self.open_parse_after_as_text_type = Some(token.token_type())
+    }
 
     fn parse_inline_macro_close(&mut self, token: Token) {
-        if let Some(inline_macro_idx) = self
+        if let Some(TokenType::PassthroughInlineMacro) = self.open_parse_after_as_text_type {
+            self.open_parse_after_as_text_type = None
+        } else if let Some(inline_macro_idx) = self
             .inline_stack
             .iter()
             .rposition(|inline| inline.is_macro())
@@ -492,6 +507,11 @@ impl Parser {
             self.inline_stack.push_back(inline_macro);
             // note that we're now closed
             self.close_parent_after_push = true;
+        } else if let Some(inline) = self.inline_stack.back_mut() {
+            if matches!(inline, Inline::InlineSpan(_)) {
+                inline.consolidate_locations_from_token(token);
+                self.in_inline_span = false;
+            }
         } else {
             self.add_text_to_last_inline(token);
         }
@@ -562,14 +582,14 @@ impl Parser {
 
     /// TODO some magic about the inlines, etc.
     fn parse_delimited_leaf_block(&mut self, token: Token) {
-        if self.open_delimited_leaf_type.is_some() {
+        if self.open_parse_after_as_text_type.is_some() {
             let Some(open_leaf) = self.block_stack.last_mut() else {
                 panic!("Missing last block on the stack")
             };
             open_leaf.add_locations(token.locations().clone());
-            self.open_delimited_leaf_type = None;
+            self.open_parse_after_as_text_type = None;
         } else {
-            self.open_delimited_leaf_type = Some(token.token_type());
+            self.open_parse_after_as_text_type = Some(token.token_type());
             let block = LeafBlock::new_from_token(token);
             self.push_block_to_stack(Block::LeafBlock(block));
             // note that we're to just add
