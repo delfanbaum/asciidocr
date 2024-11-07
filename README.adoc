@@ -7,6 +7,7 @@ A(n in-progress, unstable, incomplete) Rust library for processing Asciidoc file
 Library usage is still TBD. To use the in-progress CLI tool, clone the repo,
 install the crate with `cargo install --path .`. Here's the usage:
 
+[source, bash]
 ----
 $ asciidocr -- help
 A Rust CLI and library for processing Asciidoc files.

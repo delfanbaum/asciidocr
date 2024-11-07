@@ -33,11 +33,15 @@ this should work.
     {%- set tag = "p" -%}
     {% elif block.name == "listing" -%}
     {%- set tag = "pre" -%}
+        {%- if block.metadata.attributes.language -%}
+        {%- set code_language = block.metadata.attributes.language -%}
+        {%- endif -%}
     {% else %}
     {%- set tag = "UNHANDLED" -%}
     {%- endif %}
     <{{tag}}
     {%- if block.metadata.roles and not block.name=="section" %} class="{{ block.metadata.roles | join(sep=" ")}}" {%- endif -%}
+    {%- if code_language %} data-code-language="{{ code_language }}" {%- endif -%}
     {%- if data_type %} data-type="{{ data_type }}"{%- endif -%}>
         {%- if block.name == "section" -%}
         {%- for inline in block.title -%}
