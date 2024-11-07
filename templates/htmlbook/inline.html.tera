@@ -1,4 +1,7 @@
 {%- macro process_inline(inline) -%}
+{%- if inline.name == "linebreak" -%}
+    <br />
+{%- else -%}
     {%- if inline.name == "span" -%}
         {%- if inline.variant == "emphasis" -%}
             {%- set inline_tag = "em" -%}
@@ -32,4 +35,5 @@
                 {{- inline.value -}}
             {%- endif -%}
     {%- if inline_tag -%}</{{inline_tag}}>{%- endif -%}
+{%- endif -%}
 {%- endmacro process_inline -%}

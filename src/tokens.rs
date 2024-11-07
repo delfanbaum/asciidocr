@@ -102,6 +102,7 @@ pub enum TokenType {
     // BLOCKS
     NewLineChar, // these are effectively semantic, so we should track them. Two in a row indicate
     // a blank line, which often signals the end of a block
+    LineContinuation, // a "+" char at the end of a line; more or less creates a line break.
 
     // breaks
     ThematicBreak,

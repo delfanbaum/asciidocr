@@ -1,10 +1,10 @@
 use core::panic;
-use std::collections::{HashMap, VecDeque};
+use std::collections::{HashMap, VecDeque}; 
 
 use crate::{
     asg::Asg,
     blocks::{Block, Break, LeafBlock, ParentBlock, Section},
-    inlines::{Inline, InlineLiteral, InlineRef, InlineSpan},
+    inlines::{Inline, InlineLiteral, InlineRef, InlineSpan, LineBreak},
     lists::{List, ListItem, ListVariant},
     metadata::ElementMetadata,
     nodes::{Header, Location},
@@ -64,7 +64,7 @@ impl Parser {
             inline_stack: VecDeque::new(),
             metadata: None,
             open_delimited_block_lines: vec![],
-            in_document_header: true,
+            in_document_header: false,
             in_block_line: false,
             in_inline_span: false,
             in_block_continuation: false,
@@ -145,6 +145,9 @@ impl Parser {
             // breaks NEED TESTS
             TokenType::PageBreak => self.parse_page_break(token, asg),
             TokenType::ThematicBreak => self.parse_thematic_break(token, asg),
+            TokenType::LineContinuation => self
+                .inline_stack
+                .push_back(Inline::InlineBreak(LineBreak::new_from_token(token))),
 
             // delimited blocks
             TokenType::SidebarBlock
@@ -279,7 +282,6 @@ impl Parser {
     }
 
     fn parse_thematic_break(&mut self, token: Token, asg: &mut Asg) {
-        // TK does this need to be after a blank line or comment?
         self.add_to_block_stack_or_graph(
             asg,
             Block::Break(Break::new(
@@ -290,7 +292,6 @@ impl Parser {
     }
 
     fn parse_page_break(&mut self, token: Token, asg: &mut Asg) {
-        // TK does this need to be after a blank line or comment?
         self.add_to_block_stack_or_graph(
             asg,
             Block::Break(Break::new(
@@ -350,6 +351,10 @@ impl Parser {
     //fn parse_block_label(&mut self, token: Token, asg: &mut Asg) {}
 
     fn parse_level_0_heading(&mut self, token: Token, asg: &mut Asg) {
+        if token.first_location() == (Location {line: 1, col: 1}) {
+            self.in_document_header = true
+
+        }
         if self.in_document_header {
             self.document_header.location.extend(token.locations());
             self.in_block_line = true;
@@ -537,6 +542,9 @@ impl Parser {
                     Inline::InlineRef(_) => {
                         panic!("Inline references are not allowed in document titles")
                     }
+                    Inline::InlineBreak(_) => {
+                        panic!("Line breaks (+) are not allowed in document titles")
+                    }
                 }
             } else {
                 self.document_header.title.push(Inline::InlineLiteral(
@@ -658,6 +666,10 @@ impl Parser {
                     } else {
                         self.inline_stack.push_back(inline_literal)
                     }
+                }
+                Inline::InlineBreak(_) => {
+                    // can't add to the back, so just add the literal
+                    self.inline_stack.push_back(inline_literal)
                 }
             }
         } else {

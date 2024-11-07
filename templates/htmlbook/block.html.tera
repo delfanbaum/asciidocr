@@ -10,6 +10,14 @@ this should work.
 -#}
 {%- import "inline.html.tera" as inline_macros -%}
 {%- macro process_block(block) -%}
+{#- Handle breaks separately; makes the logic easier -#}
+{%- if block.name == "break"-%}
+    {% if block.variant == "page" %}
+    <div style="page-break-after: always;"></div>
+    {% elif block.variant == "thematic" %}
+    <hr />
+    {%- endif -%}
+{%- else -%}
 {%- if block.name == "section" -%}
 {% set tag = "h" ~ block.level %}
 <section data-type="sect{{block.level}}" {%- if block.metadata.roles %} class="{{ block.metadata.roles |
@@ -81,5 +89,6 @@ this should work.
     {%- endfor -%}
     {%- endif -%}
 </section>
+{%- endif -%}
 {%- endif -%}
 {%- endmacro process_block -%}

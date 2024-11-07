@@ -107,6 +107,8 @@ impl<'a> Scanner<'a> {
                         '+' => {
                             if self.starts_new_line() && self.peek() == '\n' {
                                 self.add_token(TokenType::BlockContinuation, false, 0)
+                            } else if self.peek_back() == ' ' && self.peek() == '\n' {
+                                self.add_token(TokenType::LineContinuation, false, 0)
                             } else {
                                 self.add_text_until_next_markup()
                             }
@@ -356,7 +358,7 @@ impl<'a> Scanner<'a> {
         // Chars: newline, bold, italic, code, super, subscript, footnote, pass, link, end inline macro, definition list marker, highlighted, inline admonition initial chars
         while ![
             '\n', '*', '_', '`', '^', '~', 'f', 'p', 'h', ']', '[', ':', '#', 'N', 'T', 'I', 'C',
-            'W', '&', '{',
+            'W', '&', '{', '+'
         ]
         .contains(&self.peek())
             && !self.is_at_end()
@@ -810,6 +812,32 @@ mod tests {
                 "Bar".to_string(),
                 Some("Bar".to_string()),
                 3,
+                1,
+                3,
+            ),
+        ];
+        scan_and_assert_eq(&markup, expected_tokens);
+    }
+
+    #[test]
+    fn line_continuation() {
+        let markup = "Foo +\nBar".to_string();
+        let expected_tokens = vec![
+            Token::new(
+                TokenType::Text,
+                "Foo ".to_string(),
+                Some("Foo ".to_string()),
+                1,
+                1,
+                4,
+            ),
+            Token::new(TokenType::LineContinuation, "+".to_string(), None, 1, 5, 5),
+            Token::new(TokenType::NewLineChar, "\n".to_string(), None, 1, 6, 6),
+            Token::new(
+                TokenType::Text,
+                "Bar".to_string(),
+                Some("Bar".to_string()),
+                2,
                 1,
                 3,
             ),

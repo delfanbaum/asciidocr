@@ -16,6 +16,7 @@ pub enum Inline {
     InlineSpan(InlineSpan),
     InlineRef(InlineRef),
     InlineLiteral(InlineLiteral),
+    InlineBreak(LineBreak),
 }
 
 impl Display for Inline {
@@ -24,6 +25,7 @@ impl Display for Inline {
             Inline::InlineSpan(_) => write!(f, "InlineSpan"),
             Inline::InlineRef(_) => write!(f, "InlineRef"),
             Inline::InlineLiteral(_) => write!(f, "InlineLiteral"),
+            Inline::InlineBreak(_) => write!(f, "InlineBreak"),
         }
     }
 }
@@ -39,6 +41,7 @@ impl PartialEq for Inline {
             },
             Inline::InlineRef(_) => matches!(other, Inline::InlineRef(_)),
             Inline::InlineLiteral(_) => matches!(other, Inline::InlineLiteral(_)),
+            Inline::InlineBreak(_) => matches!(other, Inline::InlineBreak(_)),
         }
     }
 }
@@ -56,6 +59,7 @@ impl Inline {
             Inline::InlineSpan(span) => span.location.clone(),
             Inline::InlineRef(iref) => iref.location.clone(),
             Inline::InlineLiteral(lit) => lit.location.clone(),
+            Inline::InlineBreak(linebreak) => linebreak.location.clone(),
         }
     }
 
@@ -68,6 +72,9 @@ impl Inline {
                 inline.location = Location::reconcile(inline.location.clone(), other_locs)
             }
             Inline::InlineLiteral(inline) => {
+                inline.location = Location::reconcile(inline.location.clone(), other_locs)
+            }
+            Inline::InlineBreak(inline) => {
                 inline.location = Location::reconcile(inline.location.clone(), other_locs)
             }
         }
@@ -102,6 +109,7 @@ impl Inline {
                 values
             }
             Inline::InlineRef(_) => todo!(),
+            Inline::InlineBreak(_) => todo!(),
         }
     }
 
@@ -168,6 +176,7 @@ impl Inline {
             Inline::InlineRef(inline) => inline.inlines.is_empty(),
             Inline::InlineSpan(inline) => inline.inlines.is_empty(),
             Inline::InlineLiteral(inline) => inline.value.is_empty(),
+            Inline::InlineBreak(_) => todo!(), // shouldn't ever be called
         }
     }
 
@@ -175,6 +184,7 @@ impl Inline {
         match self {
             Inline::InlineLiteral(_) => todo!(),
             Inline::InlineSpan(_) => todo!(),
+            Inline::InlineBreak(_) => todo!(),
             Inline::InlineRef(iref) => {
                 iref.location = Location::reconcile(iref.location.clone(), token.locations())
             }
@@ -402,4 +412,22 @@ pub enum InlineLiteralName {
     Text,
     Charref,
     Raw,
+}
+
+#[derive(Serialize, Clone, Debug)]
+pub struct LineBreak {
+    name: String,
+    #[serde(rename = "type")]
+    node_type: NodeTypes, // always "string"
+    location: Vec<Location>,
+}
+
+impl LineBreak {
+    pub fn new_from_token(token: Token) -> Self {
+        LineBreak {
+            name: "linebreak".to_string(),
+            node_type: NodeTypes::Inline,
+            location: token.locations(),
+        }
+    }
 }

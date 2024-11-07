@@ -1,0 +1,9 @@
+Some text followed by a thematic break.
+
+'''
+
+Some text followed by a page break.
+
+<<<
+
+And the final text.

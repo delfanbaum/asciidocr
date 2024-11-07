@@ -241,7 +241,7 @@ impl Block {
                         Location::reconcile(block.location.clone(), last_inline.locations())
                 }
             }
-
+            Block::Break(_) => {} // do nothing, since there is nothing to do!
             _ => todo!(),
         }
     }

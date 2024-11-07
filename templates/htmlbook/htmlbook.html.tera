@@ -13,8 +13,7 @@
         {% endif -%}</title>
 </head>
 
-<body>
-{% for block in blocks %}
+<body>{% for block in blocks %}
     {{ block_macros::process_block(block=block) -}}
 {% endfor %}
 </body>

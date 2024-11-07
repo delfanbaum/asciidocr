@@ -41,3 +41,19 @@ fn quotes_no_delimiter() {
     let html_fn = format!("{}.html", fn_pattern);
     assert_rendered_html_matches_expected(&adoc_fn, &html_fn)
 }
+
+#[test]
+fn line_continuation_creates_br_tags() {
+    let fn_pattern = String::from("htmlbook/line-continuation");
+    let adoc_fn = format!("{}.adoc", fn_pattern);
+    let html_fn = format!("{}.html", fn_pattern);
+    assert_rendered_html_matches_expected(&adoc_fn, &html_fn)
+}
+
+#[test]
+fn thematic_and_page_breaks() {
+    let fn_pattern = String::from("htmlbook/breaks");
+    let adoc_fn = format!("{}.adoc", fn_pattern);
+    let html_fn = format!("{}.html", fn_pattern);
+    assert_rendered_html_matches_expected(&adoc_fn, &html_fn)
+}
