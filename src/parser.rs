@@ -5,7 +5,7 @@ use crate::{
     asg::Asg,
     blocks::{Block, Break, LeafBlock, ParentBlock, Section},
     inlines::{Inline, InlineLiteral, InlineRef, InlineSpan, LineBreak},
-    lists::{List, ListItem, ListVariant},
+    lists::{DList, DListItem, List, ListItem, ListVariant},
     metadata::ElementMetadata,
     nodes::{Header, Location},
     tokens::{Token, TokenType},
@@ -41,6 +41,9 @@ pub struct Parser {
     /// forces a new block when we add inlines; helps distinguish between adding to section.title
     /// and section.blocks
     force_new_block: bool,
+    /// Temporarily preserves newline characters as separate inline literal tokens (where ambiguous
+    /// blocks, i.e., DListItmes, may require splitting the inline_stack on the newline)
+    preserve_newline_text: bool,
     /// Some parent elements have non-obvious closing conditions, so we want an easy way to close these
     close_parent_after_push: bool,
     /// Used to see if we need to add a newline before new text; we don't add newlines to the text
@@ -68,6 +71,7 @@ impl Parser {
             in_block_line: false,
             in_inline_span: false,
             in_block_continuation: false,
+            preserve_newline_text: false,
             open_parse_after_as_text_type: None,
             force_new_block: false,
             close_parent_after_push: false,
@@ -126,6 +130,8 @@ impl Parser {
             TokenType::Heading3 => self.parse_section_headings(token, asg, 2),
             TokenType::Heading4 => self.parse_section_headings(token, asg, 3),
             TokenType::Heading5 => self.parse_section_headings(token, asg, 4),
+
+            // document attributes
             TokenType::Attribute => self.parse_attribute(token),
 
             // inlines
@@ -171,6 +177,7 @@ impl Parser {
             // lists
             TokenType::UnorderedListItem => self.parse_unordered_list_item(token),
             TokenType::OrderedListItem => self.parse_ordered_list_item(token),
+            TokenType::DescriptionListMarker => self.parse_description_list_term(token),
 
             // inline admonitions
             TokenType::NotePara
@@ -261,6 +268,8 @@ impl Parser {
                 // consolidate any dangling list items
                 if let Some(Block::ListItem(_)) = self.block_stack.last() {
                     self.add_last_list_item_to_list();
+                } else if let Some(Block::DListItem(_)) = self.block_stack.last() {
+                    self.add_last_list_item_to_list();
                 }
                 // clear out any inlines
                 self.in_inline_span = false;
@@ -313,6 +322,50 @@ impl Parser {
     // Comments
     fn parse_comment(&self) {
         // for now, do nothing
+    }
+
+    /// Gathers preceding inlines into the "terms" attribute on DListItem, then adds what follows
+    /// as you would for a normal list
+    fn parse_description_list_term(&mut self, token: Token) {
+        // create the list item
+        let mut dlist_item = DListItem::new_from_token(token);
+
+        // check for splits
+        if let Some(newline_idx) = self
+            .inline_stack
+            .iter()
+            .position(|inline| inline.is_newline())
+        {
+            // remove the inlines that ought to constitute the next term
+            let mut next_terms: VecDeque<Inline> = self.inline_stack.drain(newline_idx..).collect();
+            // remove the newline, since we don't care about that anymore
+            next_terms.pop_front();
+            // add the other inlines
+            self.add_inlines_to_block_stack();
+            // then add the next terms back
+            self.inline_stack.append(&mut next_terms);
+            
+        }
+
+        // collect the inlines
+        while !self.inline_stack.is_empty() {
+            let Some(inline) = self.inline_stack.pop_front() else {
+                panic!("Error getting inline from open queue");
+            };
+            dlist_item.push_term(inline);
+        }
+        if self.block_stack.last().is_some()
+            && self.block_stack.last().unwrap().is_definition_list_item()
+        {
+            self.add_last_list_item_to_list()
+        } else {
+            // we need to create the list first
+            self.push_block_to_stack(Block::DList(DList::new(dlist_item.locations().clone())));
+        }
+        // either way, add the new list item
+        self.push_block_to_stack(Block::DListItem(dlist_item));
+        // preserve newlines for now
+        self.preserve_newline_text = true;
     }
 
     fn parse_ordered_list_item(&mut self, token: Token) {
@@ -574,8 +627,22 @@ impl Parser {
             }
         } else {
             if let Some(newline_token) = self.dangling_newline.clone() {
-                self.add_text_to_last_inline(newline_token);
-                self.dangling_newline = None;
+                if self.preserve_newline_text {
+                    // add the newline as such
+                    self.inline_stack.push_back(Inline::InlineLiteral(
+                        InlineLiteral::new_text_from_token(&newline_token),
+                    ));
+                    // clear the newline
+                    self.dangling_newline = None;
+                    // add the new text separately
+                    self.inline_stack.push_back(Inline::InlineLiteral(
+                        InlineLiteral::new_text_from_token(&token),
+                    ));
+                    return;
+                } else {
+                    self.add_text_to_last_inline(newline_token);
+                    self.dangling_newline = None;
+                }
             }
             self.add_text_to_last_inline(token)
         }
@@ -826,6 +893,10 @@ impl Parser {
             if let Some(list) = self.block_stack.last_mut() {
                 list.push_block(last_item)
             }
+        } else if matches!(last_item, Block::DListItem(_)) {
+            if let Some(list) = self.block_stack.last_mut() {
+                list.push_block(last_item)
+            }
         } else {
             // otherwise return the list to the open block stack, and create a new unordered
             // list item
@@ -862,7 +933,6 @@ impl Parser {
     }
 
     fn add_last_block_to_graph(&mut self, asg: &mut Asg) {
-        // consolidate any list items
         if let Some(mut block) = self.block_stack.pop() {
             if self.metadata.is_some() {
                 block.add_metadata(self.metadata.as_ref().unwrap().clone());
@@ -876,9 +946,9 @@ impl Parser {
                     } else {
                         //panic!("Dangling list item: missing parent list: {}", block.line())
                     }
-                } else if next_last_block.is_section()
-                    || matches!(next_last_block, Block::ParentBlock(_))
-                {
+                } else if matches!(block, Block::DListItem(_)) {
+                    next_last_block.push_block(block);
+                } else if next_last_block.can_be_parent() {
                     next_last_block.push_block(block);
                     return;
                 } else {

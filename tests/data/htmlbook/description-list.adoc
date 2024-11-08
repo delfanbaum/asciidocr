@@ -1,0 +1,6 @@
+Term:: Description of said term.
+Another Term::
++
+--
+And a description inside an open block.
+--

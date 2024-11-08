@@ -11,8 +11,16 @@ fn basic_format() {
 }
 
 #[test]
-fn many_lines() {
+fn many_lists() {
     let fn_pattern = String::from("htmlbook/many-lists");
+    let adoc_fn = format!("{}.adoc", fn_pattern);
+    let html_fn = format!("{}.html", fn_pattern);
+    assert_rendered_html_matches_expected(&adoc_fn, &html_fn)
+}
+
+#[test]
+fn description_list() {
+    let fn_pattern = String::from("htmlbook/description-list");
     let adoc_fn = format!("{}.adoc", fn_pattern);
     let html_fn = format!("{}.html", fn_pattern);
     assert_rendered_html_matches_expected(&adoc_fn, &html_fn)

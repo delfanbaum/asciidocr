@@ -146,7 +146,7 @@ pub enum TokenType {
 
     // INLINES
     // definition lists
-    DefListMark, // just match "::" and the parser can figure it out
+    DescriptionListMarker, // just match "::" and the parser can figure it out
 
     // formatting tokens (inline markup)
     Strong,   // TK Handle bounded characters, e.g., **Some**thing -> <b>Some</b>thing

@@ -2,6 +2,7 @@ use crate::{
     blocks::Block,
     inlines::Inline,
     nodes::{Location, NodeTypes},
+    tokens::Token,
 };
 use serde::Serialize;
 
@@ -59,9 +60,9 @@ pub struct ListItem {
     name: String,
     #[serde(rename = "type")]
     node_type: NodeTypes,
-    pub marker: String,             // the lexeme with no space
-    pub principal: Vec<Inline>,     // apparently this can also be optional!
-    #[serde(skip_serializing_if="Vec::is_empty")]
+    pub marker: String,         // the lexeme with no space
+    pub principal: Vec<Inline>, // apparently this can also be optional!
+    #[serde(skip_serializing_if = "Vec::is_empty")]
     pub blocks: Vec<Block>, // a LI can have subsequent blocks, too
     pub location: Vec<Location>,
 }
@@ -90,13 +91,14 @@ impl ListItem {
     }
 }
 
+/// Functions essentially the same as a list
 #[derive(Serialize, Debug)]
 pub struct DList {
     name: String,
     #[serde(rename = "type")]
     node_type: NodeTypes,
     marker: String,
-    items: Vec<ListItem>,
+    pub items: Vec<Block>,
     pub location: Vec<Location>,
 }
 
@@ -108,14 +110,17 @@ impl PartialEq for DList {
 }
 
 impl DList {
-    pub fn new(marker: String, location: Vec<Location>) -> Self {
+    pub fn new(location: Vec<Location>) -> Self {
         DList {
             name: "dlist".to_string(),
             node_type: NodeTypes::Block,
-            marker,
+            marker: "::".to_string(),
             items: vec![],
             location,
         }
+    }
+    pub fn add_item(&mut self, item: Block) {
+        self.items.push(item)
     }
 }
 
@@ -125,28 +130,45 @@ pub struct DListItem {
     #[serde(rename = "type")]
     node_type: NodeTypes,
     marker: String, // the lexeme with no space
-    terms: Vec<Inline>,
-    principal: Option<Vec<Inline>>, // apparently this can also be optional!
-    blocks: Option<Vec<Block>>,     // a LI can have subsequent blocks, too
-    location: Vec<Location>,
+    pub terms: Vec<Inline>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub principal: Vec<Inline>,     // apparently this can also be optional!
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub blocks: Vec<Block>, // a LI can have subsequent blocks, too
+    pub location: Vec<Location>,
+}
+
+impl PartialEq for DListItem {
+    // all dlistitems are dlist items
+    fn eq(&self, _: &Self) -> bool {
+        true
+    }
 }
 
 impl DListItem {
-    pub fn new(
-        marker: String,
-        terms: Vec<Inline>,
-        principal: Option<Vec<Inline>>,
-        blocks: Option<Vec<Block>>,
-        location: Vec<Location>,
-    ) -> Self {
+    pub fn new_from_token(token: Token) -> Self {
         DListItem {
             name: "dlistItem".to_string(),
             node_type: NodeTypes::Block,
-            marker,
-            terms,
-            principal,
-            blocks,
-            location,
+            marker: "::".to_string(),
+            terms: vec![],
+            principal: vec![],
+            blocks: vec![],
+            location: token.locations(),
         }
+    }
+
+    /// adds inlines to the "terms", and reconciling the locations.
+    pub fn push_term(&mut self, inline: Inline) {
+        self.location = Location::reconcile(self.location.clone(), inline.locations().clone());
+        self.terms.push(inline)
+    }
+
+    pub fn add_inline(&mut self, inline: Inline) {
+        self.principal.push(inline)
+    }
+
+    pub fn locations(&self) -> Vec<Location> {
+        self.location.clone()
     }
 }

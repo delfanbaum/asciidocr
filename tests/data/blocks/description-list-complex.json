@@ -1,0 +1,187 @@
+{
+  "name": "document",
+  "type": "block",
+  "blocks": [
+    {
+      "name": "dlist",
+      "type": "block",
+      "marker": "::",
+      "items": [
+        {
+          "name": "dlistItem",
+          "type": "block",
+          "marker": "::",
+          "terms": [
+            {
+              "name": "text",
+              "type": "string",
+              "value": "Term",
+              "location": [ { "line": 1, "col": 1 }, { "line": 1, "col": 4 } ]
+            }
+          ],
+          "principal": [
+            {
+              "name": "text",
+              "type": "string",
+              "value": "Description",
+              "location": [ { "line": 1, "col": 8 }, { "line": 1, "col": 18 } ]
+            }
+          ],
+          "location": [ { "line": 1, "col": 1 }, { "line": 1, "col": 18 } ]
+        },
+        {
+          "name": "dlistItem",
+          "type": "block",
+          "marker": "::",
+          "terms": [
+            {
+              "name": "text",
+              "type": "string",
+              "value": "Another Term",
+              "location": [ { "line": 2, "col": 1 }, { "line": 2, "col": 12 } ]
+            }
+          ],
+          "principal": [
+            {
+              "name": "text",
+              "type": "string",
+              "value": "    With its description on a separate line",
+              "location": [ { "line": 2, "col": 16 }, { "line": 2, "col": 58 } ]
+            }
+          ],
+          "location": [ { "line": 2, "col": 1 }, { "line": 2, "col": 58 } ]
+        },
+        {
+          "name": "dlistItem",
+          "type": "block",
+          "marker": "::",
+          "terms": [
+            {
+              "name": "text",
+              "type": "string",
+              "value": "Another term",
+              "location": [ { "line": 3, "col": 1 }, { "line": 3, "col": 12 } ]
+            }
+          ],
+          "blocks": [
+            {
+              "name": "open",
+              "type": "block",
+              "form": "delimited",
+              "delimiter": "--",
+              "blocks": [
+                {
+                  "name": "paragraph",
+                  "type": "block",
+                  "inlines": [
+                    {
+                      "name": "text",
+                      "type": "string",
+                      "value": "That's just an open block, ya know? Put lists here if you must:",
+                      "location": [ { "line": 5, "col": 1 }, { "line": 5, "col": 63 } ]
+                    }
+                  ],
+                  "location": [ { "line": 5, "col": 1 }, { "line": 5, "col": 63 } ]
+                },
+                {
+                  "name": "list",
+                  "type": "block",
+                  "marker": "*",
+                  "variant": "unordered",
+                  "items": [
+                    {
+                      "name": "listItem",
+                      "type": "block",
+                      "marker": "*",
+                      "principal": [
+                        {
+                          "name": "text",
+                          "type": "string",
+                          "value": "Item one",
+                          "location": [ { "line": 7, "col": 3 }, { "line": 7, "col": 10 } ]
+                        }
+                      ],
+                      "location": [ { "line": 7, "col": 1 }, { "line": 7, "col": 10 } ]
+                    },
+                    {
+                      "name": "listItem",
+                      "type": "block",
+                      "marker": "*",
+                      "principal": [
+                        {
+                          "name": "text",
+                          "type": "string",
+                          "value": "Item two",
+                          "location": [ { "line": 8, "col": 3 }, { "line": 8, "col": 10 } ]
+                        }
+                      ],
+                      "location": [ { "line": 8, "col": 1 }, { "line": 8, "col": 10 } ]
+                    }
+                  ],
+                  "location": [ { "line": 7, "col": 1 }, { "line": 8, "col": 10 } ]
+                }
+              ],
+              "location": [ { "line": 4, "col": 1 }, { "line": 9, "col": 2 } ]
+            }
+          ],
+          "location": [ { "line": 3, "col": 1 }, { "line": 9, "col": 2 } ]
+        },
+        {
+          "name": "dlistItem",
+          "type": "block",
+          "marker": "::",
+          "terms": [
+            {
+              "name": "text",
+              "type": "string",
+              "value": "And then a term with a list",
+              "location": [ { "line": 10, "col": 1 }, { "line": 10, "col": 27 } ]
+            }
+          ],
+          "blocks": [
+            {
+              "name": "list",
+              "type": "block",
+              "marker": "*",
+              "variant": "unordered",
+              "items": [
+                {
+                  "name": "listItem",
+                  "type": "block",
+                  "marker": "*",
+                  "principal": [
+                    {
+                      "name": "text",
+                      "type": "string",
+                      "value": "One",
+                      "location": [ { "line": 10, "col": 33 }, { "line": 10, "col": 35 } ]
+                    }
+                  ],
+                  "location": [ { "line": 10, "col": 31 }, { "line": 10, "col": 35 } ]
+                },
+                {
+                  "name": "listItem",
+                  "type": "block",
+                  "marker": "*",
+                  "principal": [
+                    {
+                      "name": "text",
+                      "type": "string",
+                      "value": "Two",
+                      "location": [ { "line": 11, "col": 3 }, { "line": 11, "col": 5 } ]
+                    }
+                  ],
+                  "location": [ { "line": 11, "col": 1 }, { "line": 11, "col": 5 } ]
+                }
+              ],
+              "location": [ { "line": 10, "col": 31 }, { "line": 11, "col": 5 } ]
+            }
+          ],
+          "location": [ { "line": 10, "col": 1 }, { "line": 11, "col": 5 } ]
+        }
+      ],
+      "location": [ { "line": 1, "col": 1 }, { "line": 11, "col": 5 } ]
+    }
+  ],
+  "location": [ { "line": 1, "col": 1 }, { "line": 11, "col": 5 } ]
+}

@@ -108,6 +108,14 @@ impl Inline {
         }
     }
 
+    /// Used for checking if a given inline is just a literal "\n"
+    pub fn is_newline(&self) -> bool {
+        match self {
+            Inline::InlineLiteral(lit) => lit.value == "\n".to_string(),
+            _ => false,
+        }
+    }
+
     pub fn extract_values_to_string(&self) -> String {
         match &self {
             Inline::InlineLiteral(literal) => literal.value.clone(),
