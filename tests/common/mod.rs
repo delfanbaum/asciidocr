@@ -1,6 +1,10 @@
 use std::fs;
 
-use asciidocr::{output::{gather_htmlbook_templates, render_from_templates}, parser::Parser, scanner::Scanner};
+use asciidocr::{
+    output::{gather_htmlbook_templates, render_from_templates},
+    parser::Parser,
+    scanner::Scanner,
+};
 use assert_json_diff::assert_json_eq;
 use serde_json::{json, Value};
 
@@ -32,9 +36,12 @@ pub fn assert_parsed_doc_matches_expected_asg_from_str(adoc_str: &str, asg_json_
 /// blocks, inlines, etc., are correct
 pub fn assert_rendered_html_matches_expected(adoc_fn: &str, html_fn: &str) {
     let test_dir = "tests/data/";
-    let mut rendered_html = render_from_templates(&Parser::new().parse(Scanner::new(
-        &fs::read_to_string(&format!("{}{}", test_dir, adoc_fn)).expect("Unable to find adoc"),
-    )), gather_htmlbook_templates())
+    let mut rendered_html = render_from_templates(
+        &Parser::new().parse(Scanner::new(
+            &fs::read_to_string(&format!("{}{}", test_dir, adoc_fn)).expect("Unable to find adoc"),
+        )),
+        gather_htmlbook_templates(),
+    )
     .expect("Unable to render HTML from document");
     rendered_html.retain(|c| !c.is_whitespace());
     let mut expected_html = fs::read_to_string(&format!("{}{}", test_dir, html_fn))

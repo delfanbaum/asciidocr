@@ -876,8 +876,9 @@ impl Parser {
                     } else {
                         //panic!("Dangling list item: missing parent list: {}", block.line())
                     }
-                } else if next_last_block.is_section() ||
-                 matches!(next_last_block, Block::ParentBlock(_)) {
+                } else if next_last_block.is_section()
+                    || matches!(next_last_block, Block::ParentBlock(_))
+                {
                     next_last_block.push_block(block);
                     return;
                 } else {
