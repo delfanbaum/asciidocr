@@ -525,6 +525,8 @@ pub struct ParentBlock {
     #[serde(skip_serializing_if = "String::is_empty")]
     delimiter: String, // required, but if it should be "paragraph" it's empty
     blocks: Vec<Block>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub title: Vec<Inline>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub metadata: Option<ElementMetadata>,
     pub location: Vec<Location>,
@@ -579,6 +581,7 @@ impl ParentBlock {
             form: "delimited".to_string(),
             delimiter,
             blocks,
+            title: vec![],
             metadata: None,
             location,
         }

@@ -1,0 +1,5 @@
+[NOTE]
+.This Is A Titled Note
+====
+This is some important information, you hear?
+====

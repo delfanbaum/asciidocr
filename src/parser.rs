@@ -21,6 +21,8 @@ pub struct Parser {
     block_stack: Vec<Block>,
     /// holding ground for inline elements until it's time to push to the relevant block
     inline_stack: VecDeque<Inline>,
+    /// holding ground for a block title, to be applied to the subsequent block
+    block_title: Option<Vec<Inline>>,
     /// holding ground for block metadata, to be applied to the subsequent block
     metadata: Option<ElementMetadata>,
     /// counts in/out delimited blocks by line reference; allows us to warn/error if they are
@@ -42,7 +44,7 @@ pub struct Parser {
     /// and section.blocks
     force_new_block: bool,
     /// Temporarily preserves newline characters as separate inline literal tokens (where ambiguous
-    /// blocks, i.e., DListItmes, may require splitting the inline_stack on the newline)
+    /// blocks, i.e., DListItems, may require splitting the inline_stack on the newline)
     preserve_newline_text: bool,
     /// Some parent elements have non-obvious closing conditions, so we want an easy way to close these
     close_parent_after_push: bool,
@@ -65,6 +67,7 @@ impl Parser {
             document_attributes: HashMap::new(),
             block_stack: vec![],
             inline_stack: VecDeque::new(),
+            block_title: None,
             metadata: None,
             open_delimited_block_lines: vec![],
             in_document_header: false,
@@ -133,6 +136,15 @@ impl Parser {
 
             // document attributes
             TokenType::Attribute => self.parse_attribute(token),
+
+            // block titles
+            TokenType::BlockLabel => {
+                // open the block title
+                self.block_title = Some(Vec::new());
+                self.in_block_line = true;
+                // clear out any dangling newlines
+                self.dangling_newline = None;
+            }
 
             // inlines
             TokenType::NewLineChar => self.parse_new_line_char(token, asg),
@@ -252,6 +264,16 @@ impl Parser {
         // newline exits a title, TK line continuation
         self.in_block_line = false;
 
+        // if we had a block title, let's clean that out
+        if let Some(ref mut title_stack) = self.block_title {
+            while !self.inline_stack.is_empty() {
+                let Some(inline) = self.inline_stack.pop_front() else {
+                    panic!("Error getting inline from open queue");
+                };
+                title_stack.push(inline);
+            }
+        }
+
         if [TokenType::NewLineChar, TokenType::Eof].contains(&self.last_token_type) {
             // clear any dangling newline
             self.dangling_newline = None;
@@ -344,7 +366,6 @@ impl Parser {
             self.add_inlines_to_block_stack();
             // then add the next terms back
             self.inline_stack.append(&mut next_terms);
-            
         }
 
         // collect the inlines
@@ -668,7 +689,12 @@ impl Parser {
     // TODO: handle [NOTE]\n==== cases (i.e., some block metadata check)
     fn parse_delimited_parent_block(&mut self, token: Token) {
         let delimiter_line = token.first_location().line;
-        let block = ParentBlock::new_from_token(token);
+        let mut block = ParentBlock::new_from_token(token);
+
+        if self.block_title.is_some() {
+            block.title = self.block_title.as_ref().unwrap().clone();
+            self.block_title = None;
+        }
 
         // check for any prior parents in reverse
         if let Some(parent_block_idx) = self
