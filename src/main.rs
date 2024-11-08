@@ -6,8 +6,8 @@ use asciidocr::{
     cli::{read_output, Backends, Cli},
     parser::Parser as AdocParser,
     scanner::Scanner,
-    utils::open_file,
     templates::{gather_htmlbook_templates, render_from_templates},
+    utils::open_file,
 };
 
 fn main() {
