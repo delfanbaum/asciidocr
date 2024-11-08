@@ -1,0 +1,14 @@
+Term:: Description
+Another Term::
+    With its description on a separate line
+Another term::
++
+--
+That's just an open block, ya know? Put lists here if you must:
+
+* Item one
+* Item two
+--
+And then a term with a list::
+* One
+* Two

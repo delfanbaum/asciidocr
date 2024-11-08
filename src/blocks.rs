@@ -5,7 +5,7 @@ use serde::Serialize;
 
 use crate::{
     inlines::Inline,
-    lists::{DList, List, ListItem, ListVariant},
+    lists::{DList, DListItem, List, ListItem, ListVariant},
     metadata::ElementMetadata,
     nodes::{Location, NodeTypes},
     tokens::{Token, TokenType},
@@ -23,6 +23,7 @@ pub enum Block {
     List(List),
     ListItem(ListItem),
     DList(DList),
+    DListItem(DListItem),
     DiscreteHeading, // not handled currently
     Break(Break),
     BlockMacro(BlockMacro),
@@ -40,7 +41,7 @@ impl Display for Block {
             Block::List(_) => write!(f, "List"),
             Block::ListItem(_) => write!(f, "ListItem"),
             Block::DList(_) => write!(f, "DList"),
-            //Block::DListItem(_) => write!(f, "DListItem"),
+            Block::DListItem(_) => write!(f, "DListItem"),
             Block::DiscreteHeading => write!(f, "DiscreteHeading"),
             Block::Break(_) => write!(f, "Break"),
             Block::BlockMacro(_) => write!(f, "BlockMacro"),
@@ -63,7 +64,9 @@ impl Block {
         match self {
             Block::Section(section) => section.blocks.push(block),
             Block::List(list) => list.add_item(block),
+            Block::DList(list) => list.add_item(block),
             Block::ListItem(list_item) => list_item.blocks.push(block),
+            Block::DListItem(list_item) => list_item.blocks.push(block),
             Block::ParentBlock(parent_block) => {
                 if matches!(block, Block::ListItem(_)) {
                     let Some(last) = parent_block.blocks.last_mut() else {
@@ -87,7 +90,7 @@ impl Block {
     pub fn takes_inlines(&self) -> bool {
         matches!(
             self,
-            Block::Section(_) | Block::LeafBlock(_) | Block::ListItem(_)
+            Block::Section(_) | Block::LeafBlock(_) | Block::ListItem(_) | Block::DListItem(_)
         )
     }
 
@@ -96,6 +99,7 @@ impl Block {
             Block::Section(section) => section.inlines.push(inline),
             Block::LeafBlock(block) => block.inlines.push(inline),
             Block::ListItem(list_item) => list_item.add_inline(inline),
+            Block::DListItem(list_item) => list_item.add_inline(inline),
             _ => panic!("push_block not implemented for {}", self),
         }
     }
@@ -103,7 +107,12 @@ impl Block {
     pub fn can_be_parent(&self) -> bool {
         matches!(
             self,
-            Block::Section(_) | Block::ParentBlock(_) | Block::List(_) | Block::ListItem(_)
+            Block::Section(_)
+                | Block::ParentBlock(_)
+                | Block::List(_)
+                | Block::ListItem(_)
+                | Block::DList(_)
+                | Block::DListItem(_)
         )
     }
 
@@ -141,6 +150,10 @@ impl Block {
             Block::ListItem(list) => list.marker == *"*",
             _ => false,
         }
+    }
+
+    pub fn is_definition_list_item(&self) -> bool {
+        matches!(self, Block::DListItem(_))
     }
 
     pub fn has_blocks(&self) -> bool {
@@ -183,7 +196,7 @@ impl Block {
             Block::List(block) => block.location.clone(),
             Block::ListItem(block) => block.location.clone(),
             Block::DList(block) => block.location.clone(),
-            //Block::DListItem(_) => write!(f, "DListItem"),
+            Block::DListItem(block) => block.location.clone(),
             Block::DiscreteHeading => vec![],
             Block::Break(block) => block.location.clone(),
             Block::BlockMacro(block) => block.location.clone(),
@@ -226,7 +239,25 @@ impl Block {
                         Location::reconcile(list.location.clone(), last_block.locations())
                 }
             }
+            Block::DList(list) => {
+                for block in &mut list.items {
+                    block.consolidate_locations()
+                }
+                if let Some(last_block) = list.items.last() {
+                    list.location =
+                        Location::reconcile(list.location.clone(), last_block.locations())
+                }
+            }
             Block::ListItem(block) => {
+                if let Some(last_block) = block.blocks.last() {
+                    block.location =
+                        Location::reconcile(block.location.clone(), last_block.locations())
+                } else if let Some(last_inline) = block.principal.last() {
+                    block.location =
+                        Location::reconcile(block.location.clone(), last_inline.locations())
+                }
+            }
+            Block::DListItem(block) => {
                 if let Some(last_block) = block.blocks.last() {
                     block.location =
                         Location::reconcile(block.location.clone(), last_block.locations())

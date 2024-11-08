@@ -172,9 +172,9 @@ impl<'a> Scanner<'a> {
                         self.current += 1
                     }
                     self.add_token(TokenType::Attribute, false, 0)
-                } else if self.peek_back() != ' ' && self.peeks_ahead(2) == ": " {
+                } else if self.peek_back() != ' ' && [": ", ":\n"].contains(&self.peeks_ahead(2)) {
                     self.current += 2;
-                    self.add_token(TokenType::DefListMark, false, 0)
+                    self.add_token(TokenType::DescriptionListMarker, false, 0)
                 } else {
                     self.add_text_until_next_markup()
                 }
@@ -358,7 +358,7 @@ impl<'a> Scanner<'a> {
         // Chars: newline, bold, italic, code, super, subscript, footnote, pass, link, end inline macro, definition list marker, highlighted, inline admonition initial chars
         while ![
             '\n', '*', '_', '`', '^', '~', 'f', 'p', 'h', ']', '[', ':', '#', 'N', 'T', 'I', 'C',
-            'W', '&', '{', '+'
+            'W', '&', '{', '+',
         ]
         .contains(&self.peek())
             && !self.is_at_end()
@@ -996,7 +996,7 @@ mod tests {
     }
 
     #[test]
-    fn definition_list_mark() {
+    fn description_list_mark_space() {
         let markup = "Term:: Definition";
         let expected_tokens = vec![
             Token::new(
@@ -1007,7 +1007,14 @@ mod tests {
                 1,
                 4,
             ),
-            Token::new(TokenType::DefListMark, ":: ".to_string(), None, 1, 5, 7),
+            Token::new(
+                TokenType::DescriptionListMarker,
+                ":: ".to_string(),
+                None,
+                1,
+                5,
+                7,
+            ),
             Token::new(
                 TokenType::Text,
                 "De".to_string(),
@@ -1027,8 +1034,49 @@ mod tests {
         ];
         scan_and_assert_eq(&markup, expected_tokens);
     }
+
     #[test]
-    fn definition_list_mark_not_if_space_before() {
+    fn description_list_mark_newline() {
+        let markup = "Term::\nDefinition";
+        let expected_tokens = vec![
+            Token::new(
+                TokenType::Text,
+                "Term".to_string(),
+                Some("Term".to_string()),
+                1,
+                1,
+                4,
+            ),
+            Token::new(
+                TokenType::DescriptionListMarker,
+                "::\n".to_string(),
+                None,
+                1,
+                5,
+                7,
+            ),
+            Token::new(
+                TokenType::Text,
+                "De".to_string(),
+                Some("De".to_string()),
+                1,
+                8,
+                9,
+            ),
+            Token::new(
+                TokenType::Text,
+                "finition".to_string(),
+                Some("finition".to_string()),
+                1,
+                10,
+                17,
+            ),
+        ];
+        scan_and_assert_eq(&markup, expected_tokens);
+    }
+
+    #[test]
+    fn description_list_mark_not_if_space_before() {
         let markup = "Term :: bar";
 
         let expected_tokens = vec![

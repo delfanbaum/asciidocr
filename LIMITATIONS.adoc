@@ -47,6 +47,7 @@ non-features.
 * STEM and equations
 * Automatic Tables of Contents
 * Literal monospace 
+* Deeply nested description lists (in the meantime: just use an open block)
 
 == Language Features Not Currently Planned for Inclusion
 
