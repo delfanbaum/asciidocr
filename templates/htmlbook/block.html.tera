@@ -23,6 +23,8 @@ this should work.
 {% set tag = "h" ~ block.level %}
 <section data-type="sect{{block.level}}" {%- if block.metadata.roles %} class="{{ block.metadata.roles |
     join(sep=" ")}}" {%- endif -%}>
+    {%- elif block.name == "dlist" -%}
+    {%- set tag = "dl" -%}
     {%- elif block.name == "list" -%}
     {%- if block.variant == "ordered" -%}
     {%- set tag = "ol" -%}
@@ -33,6 +35,14 @@ this should work.
     {%- set tag = "div" -%}
     {%- elif block.name == "listItem" -%}
     {%- set tag = "li" -%}
+    {%- elif block.name == "dlistItem" -%}
+        {#- just handle the terms here-#}
+        {%- if block.terms %}
+        <dt>{%- for inline in block.terms -%}
+            {{- inline_macros::process_inline(inline=inline) -}}
+        {%- endfor -%}</dt>
+        {% endif -%}
+    {%- set tag = "dd" -%}
     {% elif block.name == "admonition" -%}
     {%- set tag = "div" -%}
     {%- set data_type = block.variant -%}
@@ -63,11 +73,11 @@ this should work.
         {%- for inline in block.title -%}
         {{- inline_macros::process_inline(inline=inline) -}}
         {%- endfor -%}
-        {%- elif block.name == "list" -%}
+        {%- elif block.name == "list" or block.name == "dlist" -%}
         {% for item in block.items -%}
         {{ self::process_block(block=item, skip_tag=local_skip_tag) }}
         {%- endfor -%}
-        {% elif block.name == "listItem" -%}
+        {% elif block.principal -%}
         <p>{%- for inline in block.principal -%}
             {{- inline_macros::process_inline(inline=inline) -}}
             {%- endfor -%}</p>
