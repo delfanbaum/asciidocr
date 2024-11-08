@@ -4,6 +4,7 @@ use std::{fs, path::PathBuf};
 
 use asciidocr::{
     cli::{read_output, Backends, Cli},
+    docx::render_docx,
     parser::Parser as AdocParser,
     scanner::Scanner,
     templates::{gather_htmlbook_templates, render_from_templates},
@@ -34,7 +35,15 @@ fn run(args: Cli) -> Result<()> {
             Ok(())
         }
 
-        Backends::Docx => todo!(),
+        Backends::Docx => {
+            if let Some(output_path) = read_output(args) {
+                render_docx(&graph, &output_path)?;
+                Ok(())
+            } else {
+                eprintln!("Error: can't send docx backend to stdout");
+                std::process::exit(1)
+            }
+        }
     }
 }
 

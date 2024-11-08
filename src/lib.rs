@@ -10,5 +10,6 @@ pub mod parser;
 pub mod scanner;
 pub mod tokens;
 pub mod templates;
+pub mod docx;
 pub mod cli;
 pub mod utils;
