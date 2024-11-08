@@ -33,6 +33,8 @@ fn run(args: Cli) -> Result<()> {
             render_string(serde_json::to_string_pretty(&graph)?, read_output(args));
             Ok(())
         }
+
+        Backends::Docx => todo!(),
     }
 }
 
