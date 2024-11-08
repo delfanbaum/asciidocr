@@ -1,0 +1,8 @@
+An pass:[inline <em>passthrough</em>].
+
+
+++++
+
+<div><p>A block passthrough</p></div>
+
+++++

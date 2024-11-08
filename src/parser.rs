@@ -105,15 +105,17 @@ impl Parser {
         }
 
         if let Some(token_type) = self.open_parse_after_as_text_type {
-            if token.token_type() != token_type
-                && [TokenType::PassthroughInlineMacro].contains(&token_type)
-                && token.token_type() != TokenType::InlineMacroClose
+            if [TokenType::PassthroughInlineMacro].contains(&token_type)
+                && token.token_type() == TokenType::InlineMacroClose
             {
+                // close the open passthrough
+                self.open_parse_after_as_text_type = Some(token_type);
+            } else if token.token_type() != token_type {
                 self.open_parse_after_as_text_type = Some(token_type);
                 self.parse_text(token);
                 return;
             } else {
-                self.open_parse_after_as_text_type = Some(token_type)
+                self.open_parse_after_as_text_type = Some(token_type);
             }
         }
 
@@ -144,8 +146,8 @@ impl Parser {
             // inline macros
             TokenType::FootnoteMacro => self.parse_footnote_macro(token),
             TokenType::LinkMacro => self.parse_link_macro(token),
-            TokenType::InlineMacroClose => self.parse_inline_macro_close(token),
             TokenType::PassthroughInlineMacro => self.parse_passthrough_inline_macro(token),
+            TokenType::InlineMacroClose => self.parse_inline_macro_close(token),
 
             // breaks NEED TESTS
             TokenType::PageBreak => self.parse_page_break(token, asg),
@@ -507,11 +509,8 @@ impl Parser {
             self.inline_stack.push_back(inline_macro);
             // note that we're now closed
             self.close_parent_after_push = true;
-        } else if let Some(inline) = self.inline_stack.back_mut() {
-            if matches!(inline, Inline::InlineSpan(_)) {
-                inline.consolidate_locations_from_token(token);
-                self.in_inline_span = false;
-            }
+            // and that the inline span is ended
+            self.in_inline_span = false;
         } else {
             self.add_text_to_last_inline(token);
         }

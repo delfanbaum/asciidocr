@@ -87,6 +87,16 @@ impl Inline {
     pub fn is_macro(&self) -> bool {
         match self {
             Inline::InlineRef(iref) => iref.variant == InlineRefVariant::Link,
+            Inline::InlineSpan(span) => {
+                span.variant == InlineSpanVariant::Footnote
+            }
+            _ => false,
+        }
+    }
+
+    pub fn is_passthrough(&self) -> bool {
+        match self {
+            Inline::InlineRef(iref) => iref.variant == InlineRefVariant::Link,
             _ => false,
         }
     }

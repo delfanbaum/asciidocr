@@ -1,0 +1,35 @@
+{
+  "name": "document",
+  "type": "block",
+  "blocks": [
+    {
+      "name": "paragraph",
+      "type": "block",
+      "inlines": [
+        {
+          "name": "text",
+          "type": "string",
+          "value": "Test.",
+          "location": [ { "line": 1, "col": 1 }, { "line": 1, "col": 5 } ]
+        },
+        {
+          "name": "span",
+          "type": "inline",
+          "variant": "footnote",
+          "form": "constrained",
+          "inlines": [
+            {
+              "name": "text",
+              "type": "string",
+              "value": "Footnote.",
+              "location": [ { "line": 1, "col": 16 }, { "line": 1, "col": 24 } ]
+            }
+          ],
+          "location": [ { "line": 1, "col": 6 }, { "line": 1, "col": 25 } ]
+        }
+      ],
+      "location": [ { "line": 1, "col": 1 }, { "line": 1, "col": 25 } ]
+    }
+  ],
+  "location": [ { "line": 1, "col": 1 }, { "line": 1, "col": 25 } ]
+}

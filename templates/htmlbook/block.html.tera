@@ -44,13 +44,15 @@ this should work.
         {%- if block.metadata.attributes.language -%}
         {%- set code_language = block.metadata.attributes.language -%}
         {%- endif -%}
+    {% elif block.name == "pass" -%}
+        {#- No tag is applied -#}
     {% else %}
     {%- set tag = "UNHANDLED" -%}
     {%- endif %}
-    <{{tag}}
+        {%- if tag -%}<{{tag}}
     {%- if block.metadata.roles and not block.name=="section" %} class="{{ block.metadata.roles | join(sep=" ")}}" {%- endif -%}
     {%- if code_language %} data-code-language="{{ code_language }}" {%- endif -%}
-    {%- if data_type %} data-type="{{ data_type }}"{%- endif -%}>
+        {%- if data_type %} data-type="{{ data_type }}"{%- endif -%}>{%- endif -%}
         {%- if block.name == "section" -%}
         {%- for inline in block.title -%}
         {{- inline_macros::process_inline(inline=inline) -}}
@@ -81,7 +83,7 @@ this should work.
         {%- endif -%}
     </p>
     {%- endif -%}
-    </{{tag}}>
+    {%- if tag -%}</{{tag}}>{%- endif -%}
     {% if block.name == "section" %}
     {% if block.blocks -%}
     {% for child_block in block.blocks %}

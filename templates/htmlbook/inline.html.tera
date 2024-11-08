@@ -7,6 +7,9 @@
             {%- set inline_tag = "em" -%}
         {%- elif inline.variant == "mark" -%}
             {%- set inline_tag = "span" -%}
+        {%- elif inline.variant == "footnote" -%}
+            {%- set inline_tag = "span" -%}
+            {%- set data_type = "footnote" -%}
         {%- else -%}
             {%- set inline_tag = inline.variant -%}
         {%- endif -%}
@@ -22,6 +25,8 @@
     {%- endif -%}
 {%- if inline_tag -%}<{{inline_tag}}
     {%- if inline.metadata.roles %} class="{{inline.metadata.roles | join(sep=" ")}}"
+    {%- endif -%}
+    {%- if data_type %} data-type="{{data_type}}"
     {%- endif -%}
     {%- if href%} {{href}}
     {%- endif -%}>
