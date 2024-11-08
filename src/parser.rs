@@ -312,7 +312,7 @@ impl Parser {
                 } // if Some(last_block)
             }
         } else if self.in_block_continuation
-            || [TokenType::ElementAttributes].contains(&self.last_token_type)
+            || self.last_token_type.clears_newline_after()
         {
             // don't add a newline ahead of text in these cases
             self.dangling_newline = None;
@@ -690,6 +690,8 @@ impl Parser {
     fn parse_delimited_parent_block(&mut self, token: Token) {
         let delimiter_line = token.first_location().line;
         let mut block = ParentBlock::new_from_token(token);
+        // clear the dangling newline
+        self.dangling_newline = None;
 
         if self.block_title.is_some() {
             block.title = self.block_title.as_ref().unwrap().clone();
