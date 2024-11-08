@@ -1,0 +1,75 @@
+= Known Limitations
+
+This is a rough-and-ready list of current-state features, planned features, and
+non-features.
+
+== Language Features in a Non-Working State
+
+* Definition Lists
+* Example, aside titles
+* Verse
+* Images
+* Figures
+* Inline images
+* Anchors
+* Discrete Headings
+* Cross references 
+* Section IDs are not auto-generated
+* Custom IDs/reference text
+* Titles for admonitions, asides, etc.
+
+== Language Features Planned for Inclusion Later
+
+* Hardbreaks-option attribute (which we shall include for our poet friends who
+  don't want to have to wrap everything in `[verse]`) 
+* Includes
+* Tables
+* https://docs.asciidoctor.org/asciidoc/latest/document/author-information/[Author
+  information]
+* https://docs.asciidoctor.org/asciidoc/latest/document/revision-information/[Revision
+  information]
+* https://docs.asciidoctor.org/asciidoc/latest/document/metadata/[Document
+  metadata]
+* https://docs.asciidoctor.org/asciidoc/latest/document/doctype/[Document types]
+* https://docs.asciidoctor.org/asciidoc/latest/sections/section-ref/[Section
+  Attributes and styles]
+* Paragraph alignment
+* Substitutions
+* Checklists
+* Autolinks (for now, just use the `url[text]` or `url[]` syntax)
+* `mailto:`
+* `Footnote:id` syntax (this may not happen soon)
+* Icons
+* Keyboard/button/etc. macros (I mean to target "writers," first, then
+  "technical writers" at some later point).
+* Syntax highlighting for source blocks
+* Code callous
+* STEM and equations
+* Automatic Tables of Contents
+* Literal monospace 
+
+== Language Features Not Currently Planned for Inclusion
+
+https://docs.asciidoctor.org/asciidoc/latest/macros/audio-and-video/[Audio and
+video]:: Maybe… later? Not part of the current project target(s), which are more
+document-focused.
+
+https://docs.asciidoctor.org/asciidoc/latest/macros/footnote/#externalizing-a-footnote[Externalized
+footnotes]:: I think that it's clearer to include footnote text where it ought
+to go (and don't really believe there are many great footnote reuse use-cases);
+Supporting this would require a second-pass on the attribute parsing, which
+we're not really doing at the moment. Can be added later, but no plans
+currently.
+
+https://docs.asciidoctor.org/asciidoc/latest/attributes/counters/[Counters]::
+Given that these are a "poorly defined feature in Asciidoc," and I've never,
+myself, found a use for them, there are no plans for support.
+
+https://docs.asciidoctor.org/asciidoc/latest/directives/conditionals/[Conditionals]::
+This probably wouldn't be too hard to implement, but (selfishly) I've yet to
+find a need for these, so have no current plans for supporting them. If this is
+of interest, open an issue.
+
+https://docs.asciidoctor.org/asciidoc/latest/blocks/collapsible/[Collapsible
+blocks]:: Again, this feels a more web-oriented feature; at least for the
+moment, we're targeting document creation.

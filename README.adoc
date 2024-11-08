@@ -34,6 +34,9 @@ statically load the templates, as opposed to having them be referenced files.
 Easy enough. It's probably at a state where folks can start actually using it a
 little.
 
+TIP: Check out `LIMITATIONS.adoc` for a better feature list. Probably this
+section will be subsumed into that at some point.
+
 === 0.1.0
 
 _We have output_! You can now convert, for example, this entire README using the
