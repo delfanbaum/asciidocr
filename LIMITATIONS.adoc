@@ -5,7 +5,6 @@ non-features.
 
 == Language Features in a Non-Working State
 
-* Definition Lists
 * Example, aside titles
 * Verse
 * Images
