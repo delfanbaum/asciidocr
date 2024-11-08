@@ -127,3 +127,12 @@ fn test_inline_class() {
     let asg_json_fn = format!("{}.json", fn_pattern);
     assert_parsed_doc_matches_expected_asg(&adoc_fn, &asg_json_fn)
 }
+
+/// Single words appear as such
+#[test]
+fn test_super_and_sub() {
+    let fn_pattern = "inlines/super-subscript";
+    let adoc_fn = format!("{}.adoc", fn_pattern);
+    let asg_json_fn = format!("{}.json", fn_pattern);
+    assert_parsed_doc_matches_expected_asg(&adoc_fn, &asg_json_fn)
+}

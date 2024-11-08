@@ -73,3 +73,19 @@ fn passthroughs() {
     let html_fn = format!("{}.html", fn_pattern);
     assert_rendered_html_matches_expected(&adoc_fn, &html_fn)
 }
+
+#[test]
+fn super_and_subscripts() {
+    let fn_pattern = String::from("htmlbook/super-subscript");
+    let adoc_fn = format!("{}.adoc", fn_pattern);
+    let html_fn = format!("{}.html", fn_pattern);
+    assert_rendered_html_matches_expected(&adoc_fn, &html_fn)
+}
+
+#[test]
+fn admonitions() {
+    let fn_pattern = String::from("htmlbook/admonitions");
+    let adoc_fn = format!("{}.adoc", fn_pattern);
+    let html_fn = format!("{}.html", fn_pattern);
+    assert_rendered_html_matches_expected(&adoc_fn, &html_fn)
+}

@@ -9,7 +9,8 @@ this should work.
 
 -#}
 {%- import "inline.html.tera" as inline_macros -%}
-{%- macro process_block(block) -%}
+{%- macro process_block(block, skip_tag) -%}
+{%- set local_skip_tag = false -%}
 {#- Handle breaks separately; makes the logic easier -#}
 {%- if block.name == "break"-%}
     {% if block.variant == "page" %}
@@ -35,10 +36,15 @@ this should work.
     {% elif block.name == "admonition" -%}
     {%- set tag = "div" -%}
     {%- set data_type = block.variant -%}
+    {%- set local_skip_tag = true -%}
+    {% elif block.name == "example" -%}
+    {%- set tag = "div" -%}
     {% elif block.name == "quote" -%}
     {%- set tag = "blockquote" -%}
     {% elif block.name == "paragraph" -%}
     {%- set tag = "p" -%}
+        {#- we always want to render p tags -#}
+        {%- set skip_tag = false -%}
     {% elif block.name == "listing" -%}
     {%- set tag = "pre" -%}
         {%- if block.metadata.attributes.language -%}
@@ -49,7 +55,7 @@ this should work.
     {% else %}
     {%- set tag = "UNHANDLED" -%}
     {%- endif %}
-        {%- if tag -%}<{{tag}}
+        {%- if tag and not skip_tag -%}<{{tag}}
     {%- if block.metadata.roles and not block.name=="section" %} class="{{ block.metadata.roles | join(sep=" ")}}" {%- endif -%}
     {%- if code_language %} data-code-language="{{ code_language }}" {%- endif -%}
         {%- if data_type %} data-type="{{ data_type }}"{%- endif -%}>{%- endif -%}
@@ -59,7 +65,7 @@ this should work.
         {%- endfor -%}
         {%- elif block.name == "list" -%}
         {% for item in block.items -%}
-        {{ self::process_block(block=item ) }}
+        {{ self::process_block(block=item, skip_tag=local_skip_tag) }}
         {%- endfor -%}
         {% elif block.name == "listItem" -%}
         <p>{%- for inline in block.principal -%}
@@ -74,7 +80,7 @@ this should work.
         {%- endif -%}
         {%- if block.blocks and block.name != "section" %}
         {%- for child_block in block.blocks %}
-        {{- self::process_block(block=child_block )-}}
+        {{- self::process_block(block=child_block, skip_tag=local_skip_tag )-}}
         {%- endfor -%}
         {% endif -%}
     {%- if block.metadata.attributes.attribution -%}
@@ -83,11 +89,11 @@ this should work.
         {%- endif -%}
     </p>
     {%- endif -%}
-    {%- if tag -%}</{{tag}}>{%- endif -%}
+    {%- if tag and not skip_tag -%}</{{tag}}>{%- endif -%}
     {% if block.name == "section" %}
     {% if block.blocks -%}
     {% for child_block in block.blocks %}
-    {{- self::process_block(block=child_block) -}}
+    {{- self::process_block(block=child_block, skip_tag=local_skip_tag) -}}
     {%- endfor -%}
     {%- endif -%}
 </section>

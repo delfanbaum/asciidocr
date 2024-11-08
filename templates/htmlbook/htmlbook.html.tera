@@ -14,7 +14,7 @@
 </head>
 
 <body>{% for block in blocks %}
-    {{ block_macros::process_block(block=block) -}}
+    {{ block_macros::process_block(block=block,skip_tag=false) -}}
 {% endfor %}
 </body>
 

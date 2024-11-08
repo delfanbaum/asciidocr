@@ -1,0 +1,75 @@
+{
+  "name": "document",
+  "type": "block",
+  "blocks": [
+    {
+      "name": "paragraph",
+      "type": "block",
+      "inlines": [
+        {
+          "name": "span",
+          "type": "inline",
+          "variant": "superscript",
+          "form": "constrained",
+          "inlines": [
+            {
+              "name": "text",
+              "type": "string",
+              "value": "Super",
+              "location": [ { "line": 1, "col": 2 }, { "line": 1, "col": 6 } ]
+            }
+          ],
+          "location": [ { "line": 1, "col": 1 }, { "line": 1, "col": 7 } ]
+        },
+        {
+          "name": "text",
+          "type": "string",
+          "value": " and ",
+          "location": [ { "line": 1, "col": 8 }, { "line": 1, "col": 12 } ]
+        },
+        {
+          "name": "span",
+          "type": "inline",
+          "variant": "subscript",
+          "form": "constrained",
+          "inlines": [
+            {
+              "name": "text",
+              "type": "string",
+              "value": "sub",
+              "location": [ { "line": 1, "col": 14 }, { "line": 1, "col": 16 } ] } ],
+          "location": [ { "line": 1, "col": 13 }, { "line": 1, "col": 17 } ]
+        },
+        {
+          "name": "text",
+          "type": "string",
+          "value": ". And water: H",
+          "location": [ { "line": 1, "col": 18 }, { "line": 1, "col": 31 } ]
+        },
+        {
+          "name": "span",
+          "type": "inline",
+          "variant": "subscript",
+          "form": "constrained",
+          "inlines": [
+            {
+              "name": "text",
+              "type": "string",
+              "value": "2",
+              "location": [ { "line": 1, "col": 33 }, { "line": 1, "col": 33 } ]
+            }
+          ],
+          "location": [ { "line": 1, "col": 32 }, { "line": 1, "col": 34 } ]
+        },
+        {
+          "name": "text",
+          "type": "string",
+          "value": "O.",
+          "location": [ { "line": 1, "col": 35 }, { "line": 1, "col": 36 } ]
+        }
+      ],
+      "location": [ { "line": 1, "col": 1 }, { "line": 1, "col": 36 } ]
+    }
+  ],
+  "location": [ { "line": 1, "col": 1 }, { "line": 1, "col": 36 } ]
+}

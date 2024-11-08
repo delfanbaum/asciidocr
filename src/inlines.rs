@@ -145,6 +145,8 @@ impl Inline {
                     InlineSpanVariant::Emphasis => "_".to_string(),
                     InlineSpanVariant::Mark => "#".to_string(),
                     InlineSpanVariant::Code => "`".to_string(),
+                    InlineSpanVariant::Superscript => "^".to_string(),
+                    InlineSpanVariant::Subscript => "~".to_string(),
                     InlineSpanVariant::Footnote => todo!(), // not applicable
                 };
                 if span.node_form == InlineSpanForm::Unconstrained {
@@ -275,7 +277,17 @@ impl InlineSpan {
                 InlineSpanForm::Constrained,
                 token.locations(),
             ),
-
+            TokenType::Superscript => Self::new(
+                InlineSpanVariant::Superscript,
+                InlineSpanForm::Constrained,
+                token.locations(),
+            ),
+            TokenType::Subscript => Self::new(
+                InlineSpanVariant::Subscript,
+                InlineSpanForm::Constrained,
+                token.locations(),
+            ),
+            // Unconstrained variants
             TokenType::UnconstrainedStrong => Self::new(
                 InlineSpanVariant::Strong,
                 InlineSpanForm::Unconstrained,
@@ -328,6 +340,8 @@ pub enum InlineSpanVariant {
     Emphasis,
     Code,
     Mark,
+    Superscript,
+    Subscript,
     Footnote,
 }
 

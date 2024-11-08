@@ -7,6 +7,10 @@
             {%- set inline_tag = "em" -%}
         {%- elif inline.variant == "mark" -%}
             {%- set inline_tag = "span" -%}
+        {%- elif inline.variant == "superscript" -%}
+            {%- set inline_tag = "sup" -%}
+        {%- elif inline.variant == "subscript" -%}
+            {%- set inline_tag = "sub" -%}
         {%- elif inline.variant == "footnote" -%}
             {%- set inline_tag = "span" -%}
             {%- set data_type = "footnote" -%}

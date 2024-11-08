@@ -1,0 +1,15 @@
+NOTE: An inline-styled note.
+
+[WARNING]
+====
+A block syntax warning.
+====
+
+TIP: An inline-styled tip.
+
+[CAUTION]
+====
+A block syntax caution.
+====
+
+IMPORTANT: An inline-styled important.
