@@ -136,11 +136,11 @@ pub enum TokenType {
     Heading5,
 
     ElementAttributes, // any of: [quote], [quote], [role="foo"], [#foo], etc.
-    NotePara,      // NOTE:
-    TipPara,       // TIP:
-    ImportantPara, // IMPORTANT:
-    CautionPara,   // CAUTION:
-    WarningPara,   // WARNING:
+    NotePara,          // NOTE:
+    TipPara,           // TIP:
+    ImportantPara,     // IMPORTANT:
+    CautionPara,       // CAUTION:
+    WarningPara,       // WARNING:
 
     BlockContinuation, // a "+" all by itself on a line can signal continuation
 
@@ -152,17 +152,17 @@ pub enum TokenType {
     Strong,   // TK Handle bounded characters, e.g., **Some**thing -> <b>Some</b>thing
     Emphasis, // same applies above
     Monospace,
-    Mark,        // #text# or [.class]#text#
+    Mark, // #text# or [.class]#text#
 
     Superscript, // ^super^
     Subscript,   // ~sub~
 
     // formatting tokens (inline markup)
-    UnconstrainedStrong,   // TK Handle bounded characters, e.g., **Some**thing -> <b>Some</b>thing
+    UnconstrainedStrong, // TK Handle bounded characters, e.g., **Some**thing -> <b>Some</b>thing
     UnconstrainedEmphasis, // same applies above
     UnconstrainedMonospace,
-    UnconstrainedMark,        // #text# or [.class]#text#
-    
+    UnconstrainedMark, // #text# or [.class]#text#
+
     // inline macros
     LinkMacro,
     FootnoteMacro, // requires a second pass? OR: do some kind of `self.last_token` check on the
@@ -204,5 +204,16 @@ impl TokenType {
             '=' => Self::ExampleBlock,
             _ => panic!("Invalid character match to produce block TokenType"),
         }
+    }
+
+    pub fn clears_newline_after(&self) -> bool {
+        matches!(
+            self,
+            TokenType::ElementAttributes
+                | TokenType::SidebarBlock
+                | TokenType::OpenBlock
+                | TokenType::QuoteVerseBlock
+                | TokenType::ExampleBlock
+        )
     }
 }

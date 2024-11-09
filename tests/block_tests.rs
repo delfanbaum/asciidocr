@@ -170,3 +170,12 @@ fn test_block_meta_appropriately_affects_leaf_blocks() {
     let asg_json_fn = format!("{}.json", fn_pattern);
     assert_parsed_doc_matches_expected_asg(&adoc_fn, &asg_json_fn)
 }
+
+#[test]
+/// Block roles (classes) can be applied
+fn test_block_title_or_label() {
+    let fn_pattern = "blocks/block-label";
+    let adoc_fn = format!("{}.adoc", fn_pattern);
+    let asg_json_fn = format!("{}.json", fn_pattern);
+    assert_parsed_doc_matches_expected_asg(&adoc_fn, &asg_json_fn)
+}
