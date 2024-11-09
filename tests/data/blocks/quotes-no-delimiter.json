@@ -15,65 +15,14 @@
               "name": "text",
               "type": "string",
               "value": "Whoever said \"may you live in interesting times\" was overly optimistic.",
-              "location": [
-                {
-                  "line": 2,
-                  "col": 1
-                },
-                {
-                  "line": 2,
-                  "col": 71
-                }
-              ]
+              "location": [ { "line": 2, "col": 1 }, { "line": 2, "col": 71 } ]
             }
           ],
-          "location": [
-            {
-              "line": 2,
-              "col": 1
-            },
-            {
-              "line": 2,
-              "col": 71
-            }
-          ]
+          "location": [ { "line": 2, "col": 1 }, { "line": 2, "col": 71 } ]
         }
       ],
-      "metadata": {
-        "attributes": {},
-        "options": [],
-        "roles": [],
-        "location": [
-          {
-            "line": 1,
-            "col": 1
-          },
-          {
-            "line": 1,
-            "col": 7
-          }
-        ]
-      },
-      "location": [
-        {
-          "line": 2,
-          "col": 1
-        },
-        {
-          "line": 2,
-          "col": 71
-        }
-      ]
+      "location": [ { "line": 2, "col": 1 }, { "line": 2, "col": 71 } ]
     }
   ],
-  "location": [
-    {
-      "line": 1,
-      "col": 1
-    },
-    {
-      "line": 2,
-      "col": 71
-    }
-  ]
+  "location": [ { "line": 1, "col": 1 }, { "line": 2, "col": 71 } ]
 }

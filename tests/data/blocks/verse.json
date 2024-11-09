@@ -1,0 +1,22 @@
+{
+  "name": "document",
+  "type": "block",
+  "blocks": [
+    {
+      "name": "verse",
+      "type": "block",
+      "form": "delimited",
+      "delimiter": "____",
+      "inlines": [
+        {
+          "name": "text",
+          "type": "string",
+          "value": "And, as I am an honest Puck,\nIf we have unearned luck\nNow to 'scape the serpent's tongue,\nWe will make amends ere long;\nElse the Puck a liar call;\nSo, good night unto you all.",
+          "location": [ { "line": 3, "col": 1 }, { "line": 8, "col": 28 } ]
+        }
+      ],
+      "location": [ { "line": 2, "col": 1 }, { "line": 9, "col": 4 } ]
+    }
+  ],
+  "location": [ { "line": 1, "col": 1 }, { "line": 9, "col": 4 } ]
+}

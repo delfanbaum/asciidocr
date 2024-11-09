@@ -112,17 +112,35 @@ impl Parser {
         }
 
         if let Some(token_type) = self.open_parse_after_as_text_type {
-            if [TokenType::PassthroughInlineMacro].contains(&token_type)
-                && token.token_type() == TokenType::InlineMacroClose
-            {
-                // close the open passthrough
-                self.open_parse_after_as_text_type = Some(token_type);
-            } else if token.token_type() != token_type {
-                self.open_parse_after_as_text_type = Some(token_type);
-                self.parse_text(token);
-                return;
-            } else {
-                self.open_parse_after_as_text_type = Some(token_type);
+            match token_type {
+                TokenType::QuoteVerseBlock => {
+                    if token.token_type() == TokenType::QuoteVerseBlock || token.is_inline() {
+                        self.open_parse_after_as_text_type = Some(token_type);
+                    } else {
+                        self.parse_text(token);
+                        return;
+                    }
+                }
+                TokenType::PassthroughInlineMacro => {
+                    if [
+                        TokenType::PassthroughInlineMacro,
+                        TokenType::InlineMacroClose,
+                    ]
+                    .contains(&token.token_type())
+                    {
+                        self.open_parse_after_as_text_type = Some(token_type)
+                    } else {
+                        self.parse_text(token);
+                        return;
+                    }
+                }
+                TokenType::SourceBlock | TokenType::PassthroughBlock => {
+                    if token.token_type() != token_type {
+                        self.parse_text(token);
+                        return;
+                    }
+                }
+                _ => self.open_parse_after_as_text_type = Some(token_type),
             }
         }
 
@@ -177,10 +195,24 @@ impl Parser {
                 .push_back(Inline::InlineBreak(LineBreak::new_from_token(token))),
 
             // delimited blocks
-            TokenType::SidebarBlock
-            | TokenType::OpenBlock
-            | TokenType::QuoteVerseBlock
-            | TokenType::ExampleBlock => self.parse_delimited_parent_block(token),
+            TokenType::SidebarBlock | TokenType::OpenBlock | TokenType::ExampleBlock => {
+                self.parse_delimited_parent_block(token)
+            }
+
+            TokenType::QuoteVerseBlock => {
+                // check if it's verse
+                if let Some(metadata) = &self.metadata {
+                    if metadata.declared_type == Some("verse".to_string()) {
+                        self.parse_delimited_leaf_block(token);
+                        return;
+                    }
+                } else if self.open_parse_after_as_text_type.is_some() {
+                    self.parse_delimited_leaf_block(token);
+                    return;
+                }
+
+                self.parse_delimited_parent_block(token);
+            }
 
             // the following should probably be consumed into the above
             TokenType::PassthroughBlock => self.parse_delimited_leaf_block(token),
@@ -311,9 +343,7 @@ impl Parser {
                     }
                 } // if Some(last_block)
             }
-        } else if self.in_block_continuation
-            || self.last_token_type.clears_newline_after()
-        {
+        } else if self.in_block_continuation || self.last_token_type.clears_newline_after() {
             // don't add a newline ahead of text in these cases
             self.dangling_newline = None;
         } else {

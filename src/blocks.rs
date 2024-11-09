@@ -286,6 +286,9 @@ impl Block {
     }
 
     pub fn add_metadata(&mut self, metadata: ElementMetadata) {
+        if metadata.is_empty() {
+            return;
+        }
         // guard against invalid inline use
         if metadata.inline_metadata {
             // TODO this is a warning, not a panic

@@ -66,32 +66,28 @@ impl Token {
         vec![self.first_location(), self.last_location()]
     }
 
+    pub fn is_inline(&self) -> bool {
+        matches!(self.token_type(), |TokenType::Comment| TokenType::Text
+            | TokenType::Emphasis
+            | TokenType::Strong
+            | TokenType::Monospace
+            | TokenType::Mark
+            | TokenType::NewLineChar
+            | TokenType::UnconstrainedEmphasis
+            | TokenType::UnconstrainedStrong
+            | TokenType::UnconstrainedMonospace
+            | TokenType::UnconstrainedMark
+            | TokenType::CharRef
+            | TokenType::InlineStyle
+            | TokenType::InlineMacroClose
+        )
+    }
+
     pub fn can_be_in_document_header(&self) -> bool {
         matches!(
             self.token_type(),
-            TokenType::Heading1
-                | TokenType::Comment
-                | TokenType::Text
-                | TokenType::Emphasis
-                | TokenType::Strong
-                | TokenType::Monospace
-                | TokenType::Mark
-                | TokenType::NewLineChar
-                | TokenType::Attribute
-        )
-    }
-    /// Check to see if something should be parsed inside a delimited leaf block; if not, it'll
-    /// just be added as simple text
-    pub fn is_allowed_in_delimited_leaf_block(&self) -> bool {
-        self.can_be_in_document_header()
-            || matches!(
-                self.token_type(),
-                TokenType::QuoteVerseBlock
-                    | TokenType::SourceBlock
-                    | TokenType::PassthroughBlock
-                    | TokenType::CommentBlock
-                    | TokenType::AttributeReference
-            )
+            TokenType::Heading1 | TokenType::Attribute
+        ) || self.is_inline()
     }
 }
 

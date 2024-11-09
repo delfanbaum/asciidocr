@@ -59,6 +59,9 @@ this should work.
         {%- if block.metadata.attributes.language -%}
         {%- set code_language = block.metadata.attributes.language -%}
         {%- endif -%}
+    {% elif block.name == "verse" -%}
+    {%- set tag = "pre" -%}
+        {%- set data_type = "verse" -%}
     {% elif block.name == "pass" -%}
         {#- No tag is applied -#}
     {% else %}

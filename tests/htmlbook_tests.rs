@@ -97,3 +97,11 @@ fn admonitions() {
     let html_fn = format!("{}.html", fn_pattern);
     assert_rendered_html_matches_expected(&adoc_fn, &html_fn)
 }
+
+#[test]
+fn delimited_verse() {
+    let fn_pattern = String::from("htmlbook/verse");
+    let adoc_fn = format!("{}.adoc", fn_pattern);
+    let html_fn = format!("{}.html", fn_pattern);
+    assert_rendered_html_matches_expected(&adoc_fn, &html_fn)
+}

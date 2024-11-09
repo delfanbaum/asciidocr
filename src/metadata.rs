@@ -22,7 +22,12 @@ pub struct ElementMetadata {
 }
 
 impl ElementMetadata {
-    /// Creates BlockMetadata from an attribute list token, which can have the following format:
+    /// used to check if there's any "there there," as sometimes we just need it for the
+    /// declared_type
+    pub fn is_empty(&self) -> bool {
+        self.attributes.is_empty() && self.options.is_empty() && self.roles.is_empty()
+    }
+
     /// [positional, named="value inside named", positional]
     pub fn new_inline_meta_from_token(token: Token) -> Self {
         // Regex for parsing named attributes
