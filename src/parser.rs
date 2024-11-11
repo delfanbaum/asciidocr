@@ -184,6 +184,7 @@ impl Parser {
             // inline macros
             TokenType::FootnoteMacro => self.parse_footnote_macro(token),
             TokenType::LinkMacro => self.parse_link_macro(token),
+            TokenType::InlineImageMacro => self.parse_inline_image_macro(token),
             TokenType::PassthroughInlineMacro => self.parse_passthrough_inline_macro(token),
             TokenType::InlineMacroClose => self.parse_inline_macro_close(token),
 
@@ -579,6 +580,11 @@ impl Parser {
             .push_back(Inline::InlineRef(InlineRef::new_link_from_token(token)))
     }
 
+    fn parse_inline_image_macro(&mut self, token: Token) {
+        self.inline_stack
+            .push_back(Inline::InlineRef(InlineRef::new_inline_image_from_token(token)))
+    }
+
     fn parse_footnote_macro(&mut self, token: Token) {
         self.inline_stack
             .push_back(Inline::InlineSpan(InlineSpan::inline_span_from_token(
@@ -808,7 +814,7 @@ impl Parser {
                 Inline::InlineLiteral(prior_literal) => prior_literal.add_text_from_token(&token),
                 Inline::InlineRef(inline_ref) => {
                     if !self.close_parent_after_push {
-                        inline_ref.inlines.push(inline_literal)
+                        inline_ref.add_text_from_token(token)
                     } else {
                         self.inline_stack.push_back(inline_literal)
                     }

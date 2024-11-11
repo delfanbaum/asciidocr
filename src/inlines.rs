@@ -87,9 +87,7 @@ impl Inline {
     pub fn is_macro(&self) -> bool {
         match self {
             Inline::InlineRef(iref) => iref.variant == InlineRefVariant::Link,
-            Inline::InlineSpan(span) => {
-                span.variant == InlineSpanVariant::Footnote
-            }
+            Inline::InlineSpan(span) => span.variant == InlineSpanVariant::Footnote,
             _ => false,
         }
     }
@@ -389,8 +387,28 @@ impl InlineRef {
         InlineRef::new(InlineRefVariant::Link, target, token.locations())
     }
 
+    pub fn new_inline_image_from_token(token: Token) -> Self {
+        let mut target = token.text()[5..].to_string(); // after image:
+        target.pop(); // remove trailing '['
+
+        InlineRef::new(InlineRefVariant::Image, target, token.locations())
+    }
+
     pub fn is_link(&self) -> bool {
         self.variant == InlineRefVariant::Link
+    }
+
+    pub fn add_text_from_token(&mut self, token: Token) {
+        let inline_literal = Inline::InlineLiteral(InlineLiteral::new_text_from_token(&token));
+        if let Some(last_inline) = self.inlines.last_mut() {
+            match last_inline {
+                Inline::InlineSpan(span) => span.add_inline(inline_literal),
+                Inline::InlineLiteral(prior_literal) => prior_literal.add_text_from_token(&token),
+                _ => panic!("Can't add text to last token in this context"),
+            }
+        } else {
+            self.inlines.push(inline_literal)
+        }
     }
 }
 
@@ -399,6 +417,7 @@ impl InlineRef {
 pub enum InlineRefVariant {
     Link,
     Xref,
+    Image,
 }
 
 #[derive(Serialize, Clone, Debug)]

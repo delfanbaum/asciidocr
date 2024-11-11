@@ -412,6 +412,10 @@ impl BlockMacro {
             location,
         }
     }
+
+    pub fn new_image_from_token(_token: Token) -> Self {
+        todo!()
+    }
 }
 
 #[derive(Serialize, Debug)]
