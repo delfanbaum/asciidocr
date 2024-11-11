@@ -346,21 +346,21 @@ impl<'a> Scanner<'a> {
         self.add_token(list_item_token, false, 0)
     }
 
-    /// Adds the block image, consuming the target but not any attributes
+    /// Adds the block image, consuming the target as well as any attributes
     fn add_block_image(&mut self) -> Token {
-        while self.peek() != '[' {
+        while self.peek() != ']' {
             self.current += 1
         }
-        self.current += 1; // consume the '[' char
+        self.current += 1; // consume the ']' char
         self.add_token(TokenType::BlockImageMacro, true, 0)
     }
 
-    /// Adds the block image, consuming the target but not any attributes
+    /// Adds the block image, consuming the target as well as any attributes
     fn add_inline_image(&mut self) -> Token {
-        while self.peek() != '[' {
+        while self.peek() != ']' {
             self.current += 1
         }
-        self.current += 1; // consume the '[' char
+        self.current += 1; // consume the ']' char
         self.add_token(TokenType::InlineImageMacro, true, 0)
     }
 
@@ -387,7 +387,7 @@ impl<'a> Scanner<'a> {
         // Chars: newline, bold, italic, code, super, subscript, footnote, pass, link, end inline macro, definition list marker, highlighted, inline admonition initial chars, inline images
         while ![
             '\n', '*', '_', '`', '^', '~', 'f', 'p', 'h', ']', '[', ':', '#', 'N', 'T', 'I', 'C',
-            'W', '&', '{', '+', 'i'
+            'W', '&', '{', '+', 'i',
         ]
         .contains(&self.peek())
             && !self.is_at_end()
@@ -1053,7 +1053,7 @@ mod tests {
                 1,
                 8,
                 9,
-            )
+            ),
         ];
         scan_and_assert_eq(&markup, expected_tokens);
     }
@@ -1202,26 +1202,10 @@ mod tests {
         let expected_tokens = vec![
             Token::new(
                 TokenType::BlockImageMacro,
-                "image::path/to/img.png[".to_string(),
-                Some("image::path/to/img.png[".to_string()),
+                "image::path/to/img.png[alt text]".to_string(),
+                Some("image::path/to/img.png[alt text]".to_string()),
                 1,
                 1,
-                23,
-            ),
-            Token::new(
-                TokenType::Text,
-                "alt text".to_string(),
-                Some("alt text".to_string()),
-                1,
-                24,
-                31,
-            ),
-            Token::new(
-                TokenType::InlineMacroClose,
-                "]".to_string(),
-                Some("]".to_string()),
-                1,
-                32,
                 32,
             ),
         ];
@@ -1242,20 +1226,12 @@ mod tests {
             ),
             Token::new(
                 TokenType::InlineImageMacro,
-                "image:path/to/img.png[".to_string(),
-                Some("image:path/to/img.png[".to_string()),
+                "image:path/to/img.png[]".to_string(),
+                Some("image:path/to/img.png[]".to_string()),
                 1,
                 6,
-                27,
-            ),
-            Token::new(
-                TokenType::InlineMacroClose,
-                "]".to_string(),
-                Some("]".to_string()),
-                1,
                 28,
-                28,
-            ),
+            )
         ];
         scan_and_assert_eq(&markup, expected_tokens);
     }
