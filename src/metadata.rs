@@ -1,23 +1,45 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, fmt::Debug};
 
+use anyhow::{anyhow, Result};
 use once_cell::sync::Lazy;
 use regex::Regex;
 use serde::Serialize;
 
 use crate::{nodes::Location, tokens::Token};
 
-static RE_NAMED: Lazy<Regex> = Lazy::new(|| Regex::new(r#"(.*?)[=|,]"(.*?)\""#).unwrap());
+static RE_NAMED: Lazy<Regex> = Lazy::new(|| Regex::new(r#"(.*?)[=|,](.*)"#).unwrap());
+
+#[derive(PartialEq, Clone, Debug)]
+pub enum AttributeType {
+    Role,
+    Quote,
+    Verse,
+    Source,
+}
+
+impl AttributeType {
+    fn from_str(s: &str) -> Option<Self> {
+        println!("string to attribue: {}", s);
+        match s {
+            "role" => Some(AttributeType::Role),
+            "quote" => Some(AttributeType::Quote),
+            "verse" => Some(AttributeType::Verse),
+            "source" => Some(AttributeType::Source),
+            _ => None,
+        }
+    }
+}
 
 #[derive(Serialize, PartialEq, Clone, Debug)]
 pub struct ElementMetadata {
-    attributes: HashMap<String, String>,
-    options: Vec<String>,
-    roles: Vec<String>,
+    pub attributes: HashMap<String, String>,
+    pub options: Vec<String>,
+    pub roles: Vec<String>,
     /// this is a flag to let us know if it should be applied
     #[serde(skip)]
     pub inline_metadata: bool,
     #[serde(skip)]
-    pub declared_type: Option<String>,
+    pub declared_type: Option<AttributeType>,
     pub location: Vec<Location>,
 }
 
@@ -65,59 +87,100 @@ impl ElementMetadata {
 
         let attribute_list = token.lexeme[1..token.lexeme.len() - 1].to_string();
         let attributes: Vec<&str> = attribute_list.split(',').collect();
+        new_block_metadata.process_attributes(attributes);
 
-        // determine kind of thing
-        if !attributes.is_empty() {
-            match &attributes[0][..4] {
-                "role" => {
-                    new_block_metadata.declared_type = Some(String::from("role"));
-                    for role in values_from_named_attribute(attributes[0]) {
-                        new_block_metadata.roles.push(role.to_string());
+        new_block_metadata
+    }
+
+    pub fn process_attributes(&mut self, attributes: Vec<&str>) {
+        for (idx, attribute) in attributes.iter().enumerate() {
+            match key_values_from_named_attribute(attribute) {
+                Ok((key, values)) => {
+                    if key == "role".to_string() {
+                        for role in values {
+                            self.roles.push(role.to_string());
+                        }
+                    } else {
+                        self.attributes.insert(key, values.join(" "));
                     }
                 }
-                "sour" => {
-                    new_block_metadata.declared_type = Some(String::from("source"));
-                    // if a sour source block, see if there's a language
-                    if attributes.len() >= 2 {
-                        new_block_metadata
-                            .attributes
-                            .insert(String::from("language"), attributes[1].trim().into());
-                    }
-                }
-                "quot" | "vers" => {
-                    new_block_metadata.declared_type = Some(String::from(attributes[0]));
-                    if attributes.len() >= 2 {
-                        for (idx, attr) in attributes[1..].iter().enumerate() {
-                            match idx {
-                                0 => {
-                                    new_block_metadata
-                                        .attributes
-                                        .insert(String::from("attribution"), attr.trim().into());
+                Err(_) => {
+                    // i.e., is not a named attribute
+                    if attribute.len() > 2 {
+                        match &attribute[..2] {
+                            "so" | "qu" | "ve" => {
+                                self.declared_type = AttributeType::from_str(attribute);
+                            }
+                            _ => {
+                                match self.declared_type {
+                                    Some(AttributeType::Source) => {
+                                        if idx == 1 {
+                                            self.attributes.insert(
+                                                String::from("language"),
+                                                attributes[1].trim().into(),
+                                            );
+                                        }
+                                    }
+                                    Some(AttributeType::Quote) | Some(AttributeType::Verse) => {
+                                        if idx == 1 {
+                                            self.attributes.insert(
+                                                String::from("attribution"),
+                                                String::from(attribute.trim()),
+                                            );
+                                        } else if idx == 2 {
+                                            self.attributes.insert(
+                                                String::from("citation"),
+                                                String::from(attribute.trim()),
+                                            );
+                                        } else {
+                                            todo!(); // or panic?
+                                        }
+                                    }
+                                    _ => (),
                                 }
-                                1 => {
-                                    new_block_metadata
-                                        .attributes
-                                        .insert(String::from("citation"), attr.trim().into());
-                                }
-                                _ => todo!(), // or panic?
                             }
                         }
                     }
                 }
-                _ => {
-                    todo!()
-                }
             }
         }
-
-        new_block_metadata
     }
 }
 
-fn values_from_named_attribute(attribute: &str) -> Vec<&str> {
-    let (_, [named, values_str]) = RE_NAMED.captures(attribute).unwrap().extract();
-    match named {
-        "role" => values_str.split(' ').collect::<Vec<&str>>(),
-        _ => todo!(),
+fn key_values_from_named_attribute(attribute: &str) -> Result<(String, Vec<&str>)> {
+    match RE_NAMED.captures(attribute) {
+        Some(captures) => {
+            let (_, [named, mut values_str]) = captures.extract();
+            // remove quotes values
+            if values_str.starts_with('"') {
+                values_str = &values_str[1..values_str.len() - 1]
+            }
+            Ok((
+                named.to_string(),
+                values_str.split(' ').collect::<Vec<&str>>(),
+            ))
+        }
+        None => Err(anyhow!("Not a named attribute")),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::metadata::key_values_from_named_attribute;
+
+    #[test]
+    fn values_from_named_attribute_role() {
+        assert_eq!(
+            ("role".to_string(), vec!["foo", "bar"]),
+            key_values_from_named_attribute("role=\"foo bar\"").unwrap()
+        )
+    }
+
+    #[test]
+    fn values_from_named_attribute_any() {
+        assert_eq!(
+            ("foo".to_string(), vec!["bar"]),
+            key_values_from_named_attribute("foo=\"bar\"").unwrap()
+        )
     }
 }
