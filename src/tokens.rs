@@ -160,6 +160,8 @@ pub enum TokenType {
     UnconstrainedMark, // #text# or [.class]#text#
 
     // inline macros
+    BlockImageMacro,
+    InlineImageMacro,
     LinkMacro,
     FootnoteMacro, // requires a second pass? OR: do some kind of `self.last_token` check on the
     PassthroughInlineMacro,

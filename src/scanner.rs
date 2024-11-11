@@ -203,6 +203,16 @@ impl<'a> Scanner<'a> {
                     self.add_text_until_next_markup()
                 }
             }
+            'i' => {
+                if self.starts_new_line() && self.peeks_ahead(6) == "mage::" {
+                    self.add_block_image()
+                // double colons after just parse as regular text per asciidoctor implementation
+                } else if self.peeks_ahead(5) == "mage:" && self.peeks_ahead(6) != "mage::" {
+                    self.add_inline_image()
+                } else {
+                    self.add_text_until_next_markup()
+                }
+            }
             'N' => {
                 if self.peeks_ahead(5) == "OTE: " {
                     self.current += 5;
@@ -329,13 +339,32 @@ impl<'a> Scanner<'a> {
         }
     }
 
-    // adds the list item token, then includes the rest of the list item (until a new block or
-    // another list item marker) in an Text
+    /// adds the list item token, then includes the rest of the list item (until a new block or
+    /// another list item marker) in an Text
     fn add_list_item(&mut self, list_item_token: TokenType) -> Token {
         self.current += 1; // advance past the space, which we'll include in the token lexeme
         self.add_token(list_item_token, false, 0)
     }
 
+    /// Adds the block image, consuming the target but not any attributes
+    fn add_block_image(&mut self) -> Token {
+        while self.peek() != '[' {
+            self.current += 1
+        }
+        self.current += 1; // consume the '[' char
+        self.add_token(TokenType::BlockImageMacro, true, 0)
+    }
+
+    /// Adds the block image, consuming the target but not any attributes
+    fn add_inline_image(&mut self) -> Token {
+        while self.peek() != '[' {
+            self.current += 1
+        }
+        self.current += 1; // consume the '[' char
+        self.add_token(TokenType::InlineImageMacro, true, 0)
+    }
+
+    /// Adds the link, consuming the target but not any attributes
     fn add_link(&mut self) -> Token {
         while self.peek() != '[' {
             self.current += 1
@@ -355,10 +384,10 @@ impl<'a> Scanner<'a> {
     fn add_text_until_next_markup(&mut self) -> Token {
         // "inline" chars that could be markup; the newline condition prevents
         // capturing significant block markup chars
-        // Chars: newline, bold, italic, code, super, subscript, footnote, pass, link, end inline macro, definition list marker, highlighted, inline admonition initial chars
+        // Chars: newline, bold, italic, code, super, subscript, footnote, pass, link, end inline macro, definition list marker, highlighted, inline admonition initial chars, inline images
         while ![
             '\n', '*', '_', '`', '^', '~', 'f', 'p', 'h', ']', '[', ':', '#', 'N', 'T', 'I', 'C',
-            'W', '&', '{', '+',
+            'W', '&', '{', '+', 'i'
         ]
         .contains(&self.peek())
             && !self.is_at_end()
@@ -651,12 +680,13 @@ mod tests {
 
     #[test]
     fn block_introduction() {
-        let markup = ".Some title\n".to_string();
-        let title = "Some title".to_string();
+        // skip the "i"
+        let markup = ".Some ttle\n".to_string();
+        let title = "Some ttle".to_string();
         let expected_tokens = vec![
             Token::new(TokenType::BlockLabel, ".".to_string(), None, 1, 1, 1),
-            Token::new(TokenType::Text, title.clone(), Some(title), 1, 2, 11),
-            Token::new(TokenType::NewLineChar, "\n".to_string(), None, 1, 12, 12),
+            Token::new(TokenType::Text, title.clone(), Some(title), 1, 2, 10),
+            Token::new(TokenType::NewLineChar, "\n".to_string(), None, 1, 11, 11),
         ];
         scan_and_assert_eq(&markup, expected_tokens);
     }
@@ -997,7 +1027,8 @@ mod tests {
 
     #[test]
     fn description_list_mark_space() {
-        let markup = "Term:: Definition";
+        // make it "DS" instead of "Description" to avoid the "i" delimiting the text
+        let markup = "Term:: DS";
         let expected_tokens = vec![
             Token::new(
                 TokenType::Text,
@@ -1017,27 +1048,20 @@ mod tests {
             ),
             Token::new(
                 TokenType::Text,
-                "De".to_string(),
-                Some("De".to_string()),
+                "DS".to_string(),
+                Some("DS".to_string()),
                 1,
                 8,
                 9,
-            ),
-            Token::new(
-                TokenType::Text,
-                "finition".to_string(),
-                Some("finition".to_string()),
-                1,
-                10,
-                17,
-            ),
+            )
         ];
         scan_and_assert_eq(&markup, expected_tokens);
     }
 
     #[test]
     fn description_list_mark_newline() {
-        let markup = "Term::\nDefinition";
+        // make it "DS" instead of "Description" to avoid the "i" delimiting the text
+        let markup = "Term::\nDS";
         let expected_tokens = vec![
             Token::new(
                 TokenType::Text,
@@ -1057,19 +1081,11 @@ mod tests {
             ),
             Token::new(
                 TokenType::Text,
-                "De".to_string(),
-                Some("De".to_string()),
+                "DS".to_string(),
+                Some("DS".to_string()),
                 1,
                 8,
                 9,
-            ),
-            Token::new(
-                TokenType::Text,
-                "finition".to_string(),
-                Some("finition".to_string()),
-                1,
-                10,
-                17,
             ),
         ];
         scan_and_assert_eq(&markup, expected_tokens);
@@ -1175,6 +1191,134 @@ mod tests {
                 1,
                 25,
                 25,
+            ),
+        ];
+        scan_and_assert_eq(&markup, expected_tokens);
+    }
+
+    #[test]
+    fn block_image_with_alt() {
+        let markup = "image::path/to/img.png[alt text]";
+        let expected_tokens = vec![
+            Token::new(
+                TokenType::BlockImageMacro,
+                "image::path/to/img.png[".to_string(),
+                Some("image::path/to/img.png[".to_string()),
+                1,
+                1,
+                23,
+            ),
+            Token::new(
+                TokenType::Text,
+                "alt text".to_string(),
+                Some("alt text".to_string()),
+                1,
+                24,
+                31,
+            ),
+            Token::new(
+                TokenType::InlineMacroClose,
+                "]".to_string(),
+                Some("]".to_string()),
+                1,
+                32,
+                32,
+            ),
+        ];
+        scan_and_assert_eq(&markup, expected_tokens);
+    }
+
+    #[test]
+    fn inline_image() {
+        let markup = "Some image:path/to/img.png[]";
+        let expected_tokens = vec![
+            Token::new(
+                TokenType::Text,
+                "Some ".to_string(),
+                Some("Some ".to_string()),
+                1,
+                1,
+                5,
+            ),
+            Token::new(
+                TokenType::InlineImageMacro,
+                "image:path/to/img.png[".to_string(),
+                Some("image:path/to/img.png[".to_string()),
+                1,
+                6,
+                27,
+            ),
+            Token::new(
+                TokenType::InlineMacroClose,
+                "]".to_string(),
+                Some("]".to_string()),
+                1,
+                28,
+                28,
+            ),
+        ];
+        scan_and_assert_eq(&markup, expected_tokens);
+    }
+
+    #[test]
+    fn no_inline_image_if_double_colon() {
+        let markup = "Some image::bar.png[]";
+        let expected_tokens = vec![
+            Token::new(
+                TokenType::Text,
+                "Some ".to_string(),
+                Some("Some ".to_string()),
+                1,
+                1,
+                5,
+            ),
+            Token::new(
+                TokenType::Text,
+                "image".to_string(),
+                Some("image".to_string()),
+                1,
+                6,
+                10,
+            ),
+            Token::new(
+                TokenType::Text,
+                ":".to_string(),
+                Some(":".to_string()),
+                1,
+                11,
+                11,
+            ),
+            Token::new(
+                TokenType::Text,
+                ":bar.".to_string(),
+                Some(":bar.".to_string()),
+                1,
+                12,
+                16,
+            ),
+            Token::new(
+                TokenType::Text,
+                "png".to_string(),
+                Some("png".to_string()),
+                1,
+                17,
+                19,
+            ),
+            Token::new(
+                TokenType::Text,
+                "[".to_string(),
+                Some("[".to_string()),
+                1,
+                20,
+                20,
+            ),
+            Token::new(
+                TokenType::InlineMacroClose,
+                "]".to_string(),
+                Some("]".to_string()),
+                1,
+                21,
+                21,
             ),
         ];
         scan_and_assert_eq(&markup, expected_tokens);
