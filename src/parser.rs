@@ -6,7 +6,7 @@ use crate::{
     blocks::{Block, Break, LeafBlock, ParentBlock, Section},
     inlines::{Inline, InlineLiteral, InlineRef, InlineSpan, LineBreak},
     lists::{DList, DListItem, List, ListItem, ListVariant},
-    metadata::ElementMetadata,
+    metadata::{AttributeType, ElementMetadata},
     nodes::{Header, Location},
     tokens::{Token, TokenType},
 };
@@ -203,7 +203,7 @@ impl Parser {
             TokenType::QuoteVerseBlock => {
                 // check if it's verse
                 if let Some(metadata) = &self.metadata {
-                    if metadata.declared_type == Some("verse".to_string()) {
+                    if metadata.declared_type == Some(AttributeType::Verse) {
                         self.parse_delimited_leaf_block(token);
                         return;
                     }
@@ -581,8 +581,10 @@ impl Parser {
     }
 
     fn parse_inline_image_macro(&mut self, token: Token) {
-        self.inline_stack
-            .push_back(Inline::InlineRef(InlineRef::new_inline_image_from_token(token)))
+        // We probably actually want to take the attribute list into the token after all here; 
+        // trying to use the existing plumbing will over-complicate the code, I think.
+        self.inline_stack.push_back(Inline::InlineRef(InlineRef::new_inline_image_from_token(token)));
+        self.close_parent_after_push = true;
     }
 
     fn parse_footnote_macro(&mut self, token: Token) {
@@ -843,6 +845,7 @@ impl Parser {
                 .iter()
                 .rposition(|inline| inline.is_open())
             else {
+                println!("This inline opening has not been handled!");
                 panic!()
             };
             let mut open_span = self.inline_stack.remove(open_span_idx).unwrap();
@@ -928,7 +931,7 @@ impl Parser {
                 let Some(ref metadata) = self.metadata else {
                     panic!()
                 };
-                if metadata.declared_type == Some("quote".to_string()) {
+                if metadata.declared_type == Some(AttributeType::Quote) {
                     let mut quote_block = Block::ParentBlock(ParentBlock::new(
                         crate::blocks::ParentBlockName::Quote,
                         None,

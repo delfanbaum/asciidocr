@@ -1,5 +1,9 @@
 use core::panic;
-use std::{collections::VecDeque, fmt::Display, iter};
+use std::{
+    collections::{HashMap, VecDeque},
+    fmt::Display,
+    iter,
+};
 
 use serde::Serialize;
 
@@ -366,6 +370,8 @@ pub struct InlineRef {
     variant: InlineRefVariant,
     target: String,
     pub inlines: Vec<Inline>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    metadata: Option<ElementMetadata>,
     location: Vec<Location>,
 }
 
@@ -377,6 +383,7 @@ impl InlineRef {
             variant,
             target,
             inlines: vec![],
+            metadata: None,
             location,
         }
     }
@@ -388,10 +395,33 @@ impl InlineRef {
     }
 
     pub fn new_inline_image_from_token(token: Token) -> Self {
-        let mut target = token.text()[5..].to_string(); // after image:
-        target.pop(); // remove trailing '['
-
-        InlineRef::new(InlineRefVariant::Image, target, token.locations())
+        let target_and_attrs = token.text()[6..].to_string(); // after image:
+        println!("{:?}", token.text());
+        let target: String = target_and_attrs.chars().take_while(|c| c != &'[').collect();
+        // get rid of the "[]" chars
+        let attributes = target_and_attrs[target.len() + 1..target_and_attrs.len() - 1].to_string();
+        if !attributes.is_empty() {
+            let mut image_meta = ElementMetadata {
+                attributes: HashMap::new(),
+                options: vec![],
+                roles: vec![],
+                inline_metadata: true,
+                declared_type: None,
+                location: vec![],
+            };
+            image_meta.process_attributes(attributes.split(',').collect());
+            InlineRef {
+                name: "ref".to_string(),
+                node_type: NodeTypes::Inline,
+                variant: InlineRefVariant::Image,
+                target,
+                inlines: vec![],
+                metadata: Some(image_meta),
+                location: token.locations(),
+            }
+        } else {
+            InlineRef::new(InlineRefVariant::Image, target, token.locations())
+        }
     }
 
     pub fn is_link(&self) -> bool {
@@ -488,6 +518,48 @@ impl LineBreak {
             name: "linebreak".to_string(),
             node_type: NodeTypes::Inline,
             location: token.locations(),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::tokens::Token;
+
+    use super::InlineRef;
+
+    #[test]
+    fn image_from_token() {
+        let token = Token::new(
+            crate::tokens::TokenType::InlineImageMacro,
+            "image:path/to/img.png[]".to_string(),
+            Some("image:path/to/img.png[]".to_string()),
+            1,
+            1,
+            23,
+        );
+        let img_ref = InlineRef::new_inline_image_from_token(token);
+        assert_eq!(img_ref.target, "path/to/img.png".to_string())
+    }
+    #[test]
+    fn image_from_token_title() {
+        let token = Token::new(
+            crate::tokens::TokenType::InlineImageMacro,
+            "image:path/to/img.png[title=Pause]".to_string(),
+            Some("image:path/to/img.png[title=Pause]".to_string()),
+            1,
+            1,
+            23,
+        );
+        let img_ref = InlineRef::new_inline_image_from_token(token);
+        assert_eq!(img_ref.target, "path/to/img.png".to_string());
+        assert!(img_ref.metadata.is_some());
+        if let Some(metadata) = img_ref.metadata {
+            assert!(metadata.inline_metadata);
+            assert_eq!(
+                metadata.attributes.get("title").unwrap(),
+                &"Pause".to_string()
+            )
         }
     }
 }

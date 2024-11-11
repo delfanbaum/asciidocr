@@ -207,7 +207,7 @@ impl<'a> Scanner<'a> {
                 if self.starts_new_line() && self.peeks_ahead(6) == "mage::" {
                     self.add_block_image()
                 // double colons after just parse as regular text per asciidoctor implementation
-                } else if self.peeks_ahead(5) == "mage:" && self.peeks_ahead(6) != "mage::" {
+                } else if self.peeks_ahead(5) == "mage:" && self.peeks_ahead(6) != "mage::" && self.peeks_ahead(6) != "mage: "{
                     self.add_inline_image()
                 } else {
                     self.add_text_until_next_markup()
