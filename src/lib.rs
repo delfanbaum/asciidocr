@@ -1,6 +1,7 @@
 pub mod asg;
 pub mod blocks;
 pub mod metadata;
+pub mod macros;
 pub mod errors;
 pub mod inlines;
 pub mod lists;

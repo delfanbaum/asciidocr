@@ -92,8 +92,8 @@ impl ElementMetadata {
         new_block_metadata
     }
 
-    pub fn process_attributes(&mut self, attributes: Vec<&str>) {
-        for (idx, attribute) in attributes.iter().enumerate() {
+    pub fn process_attributes(&mut self, mut attributes: Vec<&str>) {
+        for (idx, attribute) in attributes.iter_mut().enumerate() {
             match key_values_from_named_attribute(attribute) {
                 Ok((key, values)) => {
                     if key == "role".to_string() {
@@ -117,7 +117,7 @@ impl ElementMetadata {
                                         if idx == 1 {
                                             self.attributes.insert(
                                                 String::from("language"),
-                                                attributes[1].trim().into(),
+                                                attribute.trim().into(),
                                             );
                                         }
                                     }
@@ -136,7 +136,15 @@ impl ElementMetadata {
                                             todo!(); // or panic?
                                         }
                                     }
-                                    _ => (),
+                                    _ => {
+                                        if attribute.starts_with('"') {
+                                            *attribute = &attribute[1..attribute.len() - 1]
+                                        }
+                                        self.attributes.insert(
+                                            format!("positional_{}", idx + 1),
+                                            attribute.to_string(),
+                                        );
+                                    }
                                 }
                             }
                         }

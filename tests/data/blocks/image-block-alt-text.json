@@ -1,0 +1,40 @@
+{
+    "name": "document",
+    "type": "block",
+    "blocks": [
+        {
+            "name": "image",
+            "type": "block",
+            "form": "macro",
+            "target": "path/to/image.png",
+            "metadata": {
+                "attributes": {
+                    "positional_1": "Some alt text"
+                },
+                "options": [],
+                "roles": [],
+                "location": []
+            },
+            "location": [
+                {
+                    "line": 1,
+                    "col": 1
+                },
+                {
+                    "line": 1,
+                    "col": 41
+                }
+            ]
+        }
+    ],
+    "location": [
+        {
+            "line": 1,
+            "col": 1
+        },
+        {
+            "line": 1,
+            "col": 41
+        }
+    ]
+}

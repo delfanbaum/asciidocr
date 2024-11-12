@@ -1,0 +1,3 @@
+.Figure Title
+[#image_id]
+image::path/to/image.png[]

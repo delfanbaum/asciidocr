@@ -6,6 +6,7 @@ use serde::Serialize;
 use crate::{
     inlines::Inline,
     lists::{DList, DListItem, List, ListItem, ListVariant},
+    macros::target_and_attrs_from_token,
     metadata::ElementMetadata,
     nodes::{Location, NodeTypes},
     tokens::{Token, TokenType},
@@ -273,6 +274,8 @@ impl Block {
                 }
             }
             Block::Break(_) => {} // do nothing, since there is nothing to do!
+            Block::BlockMacro(_) => {} // do nothing for now; maybe we include the meta
+            // locations? 
             _ => todo!(),
         }
     }
@@ -384,6 +387,8 @@ pub struct BlockMacro {
     node_type: NodeTypes,
     form: String,
     target: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    metadata: Option<ElementMetadata>,
     location: Vec<Location>,
 }
 
@@ -403,18 +408,25 @@ pub enum BlockMacroName {
 }
 
 impl BlockMacro {
-    pub fn new(name: BlockMacroName, target: String, location: Vec<Location>) -> Self {
+    pub fn new(
+        name: BlockMacroName,
+        target: String,
+        metadata: Option<ElementMetadata>,
+        location: Vec<Location>,
+    ) -> Self {
         BlockMacro {
             name,
             node_type: NodeTypes::Block,
             form: "macro".to_string(),
             target,
+            metadata,
             location,
         }
     }
 
-    pub fn new_image_from_token(_token: Token) -> Self {
-        todo!()
+    pub fn new_image_from_token(token: Token) -> Self {
+        let (target, metadata) = target_and_attrs_from_token(&token);
+        BlockMacro::new(BlockMacroName::Image, target, metadata, token.locations())
     }
 }
 

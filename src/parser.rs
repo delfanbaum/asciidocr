@@ -3,7 +3,7 @@ use std::collections::{HashMap, VecDeque};
 
 use crate::{
     asg::Asg,
-    blocks::{Block, Break, LeafBlock, ParentBlock, Section},
+    blocks::{Block, BlockMacro, Break, LeafBlock, ParentBlock, Section},
     inlines::{Inline, InlineLiteral, InlineRef, InlineSpan, LineBreak},
     lists::{DList, DListItem, List, ListItem, ListVariant},
     metadata::{AttributeType, ElementMetadata},
@@ -218,6 +218,9 @@ impl Parser {
             // the following should probably be consumed into the above
             TokenType::PassthroughBlock => self.parse_delimited_leaf_block(token),
             TokenType::SourceBlock => self.parse_delimited_leaf_block(token),
+
+            // block macros
+            TokenType::BlockImageMacro => self.parse_block_image(token, asg),
 
             // lists
             TokenType::UnorderedListItem => self.parse_unordered_list_item(token),
@@ -580,9 +583,12 @@ impl Parser {
             .push_back(Inline::InlineRef(InlineRef::new_link_from_token(token)))
     }
 
+    fn parse_block_image(&mut self, token: Token, asg: &mut Asg) {
+        let image_block = BlockMacro::new_image_from_token(token);
+        self.add_to_block_stack_or_graph(asg, Block::BlockMacro(image_block));
+    }
+
     fn parse_inline_image_macro(&mut self, token: Token) {
-        // We probably actually want to take the attribute list into the token after all here; 
-        // trying to use the existing plumbing will over-complicate the code, I think.
         self.inline_stack.push_back(Inline::InlineRef(InlineRef::new_inline_image_from_token(token)));
         self.close_parent_after_push = true;
     }

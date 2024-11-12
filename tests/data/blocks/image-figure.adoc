@@ -1,0 +1,3 @@
+.Titled Figure
+[#recommended_id_styling]
+image::path/to/figure.png[]

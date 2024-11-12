@@ -1,13 +1,10 @@
 use core::panic;
-use std::{
-    collections::{HashMap, VecDeque},
-    fmt::Display,
-    iter,
-};
+use std::{collections::VecDeque, fmt::Display, iter};
 
 use serde::Serialize;
 
 use crate::{
+    macros::target_and_attrs_from_token,
     metadata::ElementMetadata,
     nodes::{Location, NodeTypes},
     tokens::{Token, TokenType},
@@ -395,28 +392,15 @@ impl InlineRef {
     }
 
     pub fn new_inline_image_from_token(token: Token) -> Self {
-        let target_and_attrs = token.text()[6..].to_string(); // after image:
-        println!("{:?}", token.text());
-        let target: String = target_and_attrs.chars().take_while(|c| c != &'[').collect();
-        // get rid of the "[]" chars
-        let attributes = target_and_attrs[target.len() + 1..target_and_attrs.len() - 1].to_string();
-        if !attributes.is_empty() {
-            let mut image_meta = ElementMetadata {
-                attributes: HashMap::new(),
-                options: vec![],
-                roles: vec![],
-                inline_metadata: true,
-                declared_type: None,
-                location: vec![],
-            };
-            image_meta.process_attributes(attributes.split(',').collect());
+        let (target, metadata) = target_and_attrs_from_token(&token);
+        if metadata.is_some() {
             InlineRef {
                 name: "ref".to_string(),
                 node_type: NodeTypes::Inline,
                 variant: InlineRefVariant::Image,
                 target,
                 inlines: vec![],
-                metadata: Some(image_meta),
+                metadata,
                 location: token.locations(),
             }
         } else {
