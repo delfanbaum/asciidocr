@@ -53,6 +53,8 @@ impl<'a> Scanner<'a> {
                 if self.starts_repeated_char_line(c, 3) {
                     self.current += 2;
                     self.add_token(TokenType::PageBreak, false, 0)
+                } else if self.peek() == '<' {
+                    self.add_cross_reference()
                 } else {
                     self.add_text_until_next_markup()
                 }
@@ -137,8 +139,10 @@ impl<'a> Scanner<'a> {
             }
 
             '[' => {
-                // role, quote, verse, source, etc
-                if self.starts_attribution_line() {
+                // block anchor, role, quote, verse, source, etc. TK add for generic options
+                if self.starts_new_line() && self.peek() == '[' {
+                    self.add_block_anchor()
+                } else if self.starts_attribution_line() {
                     match self.source.as_bytes()[self.start + 1] as char {
                         'v' | 's' | 'r' | '.' | 'q' => {
                             self.add_token(TokenType::ElementAttributes, true, 0)
@@ -207,7 +211,10 @@ impl<'a> Scanner<'a> {
                 if self.starts_new_line() && self.peeks_ahead(6) == "mage::" {
                     self.add_block_image()
                 // double colons after just parse as regular text per asciidoctor implementation
-                } else if self.peeks_ahead(5) == "mage:" && self.peeks_ahead(6) != "mage::" && self.peeks_ahead(6) != "mage: "{
+                } else if self.peeks_ahead(5) == "mage:"
+                    && self.peeks_ahead(6) != "mage::"
+                    && self.peeks_ahead(6) != "mage: "
+                {
                     self.add_inline_image()
                 } else {
                     self.add_text_until_next_markup()
@@ -297,13 +304,14 @@ impl<'a> Scanner<'a> {
             literal = Some(text.to_string())
         }
         let token_start = self.startcol;
+        let mut token: Token;
 
         // save an allocation for the line bumping
         if advance_line_after != 0 {
             let token_line = self.line;
             self.line += advance_line_after;
             self.startcol = 1;
-            Token {
+            token = Token {
                 token_type,
                 lexeme: text.to_string(),
                 literal,
@@ -313,7 +321,7 @@ impl<'a> Scanner<'a> {
             }
         } else {
             self.startcol = token_start + text.len();
-            Token {
+            token = Token {
                 token_type,
                 lexeme: text.to_string(),
                 literal,
@@ -322,6 +330,8 @@ impl<'a> Scanner<'a> {
                 endcol: token_start + text.len() - 1, // to account for the start char
             }
         }
+        token.validate();
+        token
     }
 
     fn add_heading(&mut self) -> Token {
@@ -379,6 +389,24 @@ impl<'a> Scanner<'a> {
         }
         self.current += 1; // consume the ']' char
         self.add_token(TokenType::InlineStyle, true, 0)
+    }
+
+    // adds block anchors, e.g., "\n[[some_block_id]]\n"
+    fn add_cross_reference(&mut self) -> Token {
+        while self.peeks_ahead(2) != ">>" && !self.is_at_end() {
+            self.current += 1
+        }
+        self.current += 2; // consume the '>>' chars
+        self.add_token(TokenType::CrossReference, true, 0)
+    }
+
+    // adds block anchors, e.g., "\n[[some_block_id]]\n"
+    fn add_block_anchor(&mut self) -> Token {
+        while self.peeks_ahead(3) != "]]\n" && !self.is_at_end() {
+            self.current += 1
+        }
+        self.current += 2; // consume the ']]' chars, NOT newline
+        self.add_token(TokenType::BlockAnchor, true, 0)
     }
 
     fn add_text_until_next_markup(&mut self) -> Token {
@@ -1199,16 +1227,14 @@ mod tests {
     #[test]
     fn block_image_with_alt() {
         let markup = "image::path/to/img.png[alt text]";
-        let expected_tokens = vec![
-            Token::new(
-                TokenType::BlockImageMacro,
-                "image::path/to/img.png[alt text]".to_string(),
-                Some("image::path/to/img.png[alt text]".to_string()),
-                1,
-                1,
-                32,
-            ),
-        ];
+        let expected_tokens = vec![Token::new(
+            TokenType::BlockImageMacro,
+            "image::path/to/img.png[alt text]".to_string(),
+            Some("image::path/to/img.png[alt text]".to_string()),
+            1,
+            1,
+            32,
+        )];
         scan_and_assert_eq(&markup, expected_tokens);
     }
 
@@ -1231,7 +1257,7 @@ mod tests {
                 1,
                 6,
                 28,
-            )
+            ),
         ];
         scan_and_assert_eq(&markup, expected_tokens);
     }
@@ -1466,6 +1492,61 @@ mod tests {
                 11,
             ),
         ];
+        scan_and_assert_eq(&markup, expected_tokens);
+    }
+
+    #[test]
+    fn cross_reference() {
+        let markup = "<<foo_bar>>";
+        let expected_tokens = vec![
+            Token::new(
+                TokenType::CrossReference,
+                "<<foo_bar>>".to_string(),
+                Some("<<foo_bar>>".to_string()),
+                1,
+                1,
+                11,
+            )
+        ];
+        scan_and_assert_eq(&markup, expected_tokens);
+    }
+
+    #[rstest]
+    #[case::newline("\n")]
+    #[case::start_of_file("")]
+    fn block_anchor(#[case] beginning: &str) {
+        let mut addition: usize = 0;
+        let mut expected_tokens: Vec<Token> = vec![];
+        if beginning == "\n" {
+            addition = 1;
+            expected_tokens = vec![Token::new(
+                TokenType::NewLineChar,
+                "\n".to_string(),
+                None,
+                1,
+                1,
+                1,
+            )];
+        }
+        let markup = format!("{beginning}[[foo]]\n");
+        expected_tokens.extend(vec![
+            Token::new(
+                TokenType::BlockAnchor,
+                "[[foo]]".to_string(),
+                Some("[[foo]]".to_string()),
+                1 + addition,
+                1,
+                7,
+            ),
+            Token::new(
+                TokenType::NewLineChar,
+                "\n".to_string(),
+                None,
+                1 + addition,
+                8,
+                8,
+            ),
+        ]);
         scan_and_assert_eq(&markup, expected_tokens);
     }
 }

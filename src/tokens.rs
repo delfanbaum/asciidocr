@@ -79,8 +79,7 @@ impl Token {
             | TokenType::UnconstrainedMark
             | TokenType::CharRef
             | TokenType::InlineStyle
-            | TokenType::InlineMacroClose
-        )
+            | TokenType::InlineMacroClose)
     }
 
     pub fn can_be_in_document_header(&self) -> bool {
@@ -88,6 +87,20 @@ impl Token {
             self.token_type(),
             TokenType::Heading1 | TokenType::Attribute
         ) || self.is_inline()
+    }
+
+    /// Performs some sanity-check validations; currently checking for characters that aren't
+    /// allowed in, for example, IDs
+    pub fn validate(&mut self) {
+        match self.token_type() {
+            TokenType::BlockAnchor | TokenType::CrossReference => {
+                // no spaces or newlines inside
+                if self.lexeme.contains(' ') || self.lexeme.contains('\n') {
+                    self.token_type = TokenType::Text
+                }
+            }
+            _ => {}
+        }
     }
 }
 
@@ -131,12 +144,11 @@ pub enum TokenType {
     Heading4,
     Heading5,
 
-    ElementAttributes, // any of: [quote], [quote], [role="foo"], [#foo], etc.
-    NotePara,          // NOTE:
-    TipPara,           // TIP:
-    ImportantPara,     // IMPORTANT:
-    CautionPara,       // CAUTION:
-    WarningPara,       // WARNING:
+    NotePara,      // NOTE:
+    TipPara,       // TIP:
+    ImportantPara, // IMPORTANT:
+    CautionPara,   // CAUTION:
+    WarningPara,   // WARNING:
 
     BlockContinuation, // a "+" all by itself on a line can signal continuation
 
@@ -184,11 +196,16 @@ pub enum TokenType {
 
     InlineStyle, // i.e., [.some_class], usually [.x]#applied here#
 
-                 // references, cross references TK
-                 // math blocks TK
-                 //Include,
-                 //StartTag, // tag::[]
-                 //EndTag,
+    // references, cross references TK
+    // math blocks TK
+    //Include,
+    //StartTag, // tag::[]
+    //EndTag,
+
+    // Attributes, anchors and references
+    BlockAnchor,
+    ElementAttributes, // any of: [quote], [quote], [role="foo"], [#foo], etc.
+    CrossReference,
 }
 
 impl TokenType {
@@ -213,5 +230,21 @@ impl TokenType {
                 | TokenType::QuoteVerseBlock
                 | TokenType::ExampleBlock
         )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Token, TokenType};
+    use rstest::rstest;
+
+
+    #[rstest]
+    #[case::cross_references(TokenType::CrossReference)]
+    #[case::block_anchor(TokenType::BlockAnchor)]
+    fn invalid_space_invalidates_to_text(#[case] token_type: TokenType){
+        let mut token = Token::new(token_type, " ".to_string(), None, 1, 1, 1);
+        token.validate();
+        assert_eq!(token.token_type(), TokenType::Text)
     }
 }

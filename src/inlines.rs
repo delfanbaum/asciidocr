@@ -525,6 +525,7 @@ mod tests {
         let img_ref = InlineRef::new_inline_image_from_token(token);
         assert_eq!(img_ref.target, "path/to/img.png".to_string())
     }
+
     #[test]
     fn image_from_token_title() {
         let token = Token::new(
