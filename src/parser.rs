@@ -3,10 +3,10 @@ use std::collections::{HashMap, VecDeque};
 
 use crate::{
     asg::Asg,
-    blocks::{Block, Break, LeafBlock, ParentBlock, Section},
+    blocks::{Block, BlockMacro, Break, LeafBlock, ParentBlock, Section},
     inlines::{Inline, InlineLiteral, InlineRef, InlineSpan, LineBreak},
     lists::{DList, DListItem, List, ListItem, ListVariant},
-    metadata::ElementMetadata,
+    metadata::{AttributeType, ElementMetadata},
     nodes::{Header, Location},
     tokens::{Token, TokenType},
 };
@@ -184,6 +184,7 @@ impl Parser {
             // inline macros
             TokenType::FootnoteMacro => self.parse_footnote_macro(token),
             TokenType::LinkMacro => self.parse_link_macro(token),
+            TokenType::InlineImageMacro => self.parse_inline_image_macro(token),
             TokenType::PassthroughInlineMacro => self.parse_passthrough_inline_macro(token),
             TokenType::InlineMacroClose => self.parse_inline_macro_close(token),
 
@@ -202,7 +203,7 @@ impl Parser {
             TokenType::QuoteVerseBlock => {
                 // check if it's verse
                 if let Some(metadata) = &self.metadata {
-                    if metadata.declared_type == Some("verse".to_string()) {
+                    if metadata.declared_type == Some(AttributeType::Verse) {
                         self.parse_delimited_leaf_block(token);
                         return;
                     }
@@ -217,6 +218,9 @@ impl Parser {
             // the following should probably be consumed into the above
             TokenType::PassthroughBlock => self.parse_delimited_leaf_block(token),
             TokenType::SourceBlock => self.parse_delimited_leaf_block(token),
+
+            // block macros
+            TokenType::BlockImageMacro => self.parse_block_image(token, asg),
 
             // lists
             TokenType::UnorderedListItem => self.parse_unordered_list_item(token),
@@ -579,6 +583,16 @@ impl Parser {
             .push_back(Inline::InlineRef(InlineRef::new_link_from_token(token)))
     }
 
+    fn parse_block_image(&mut self, token: Token, asg: &mut Asg) {
+        let image_block = BlockMacro::new_image_from_token(token);
+        self.add_to_block_stack_or_graph(asg, Block::BlockMacro(image_block));
+    }
+
+    fn parse_inline_image_macro(&mut self, token: Token) {
+        self.inline_stack.push_back(Inline::InlineRef(InlineRef::new_inline_image_from_token(token)));
+        self.close_parent_after_push = true;
+    }
+
     fn parse_footnote_macro(&mut self, token: Token) {
         self.inline_stack
             .push_back(Inline::InlineSpan(InlineSpan::inline_span_from_token(
@@ -808,7 +822,7 @@ impl Parser {
                 Inline::InlineLiteral(prior_literal) => prior_literal.add_text_from_token(&token),
                 Inline::InlineRef(inline_ref) => {
                     if !self.close_parent_after_push {
-                        inline_ref.inlines.push(inline_literal)
+                        inline_ref.add_text_from_token(token)
                     } else {
                         self.inline_stack.push_back(inline_literal)
                     }
@@ -837,6 +851,7 @@ impl Parser {
                 .iter()
                 .rposition(|inline| inline.is_open())
             else {
+                println!("This inline opening has not been handled!");
                 panic!()
             };
             let mut open_span = self.inline_stack.remove(open_span_idx).unwrap();
@@ -922,7 +937,7 @@ impl Parser {
                 let Some(ref metadata) = self.metadata else {
                     panic!()
                 };
-                if metadata.declared_type == Some("quote".to_string()) {
+                if metadata.declared_type == Some(AttributeType::Quote) {
                     let mut quote_block = Block::ParentBlock(ParentBlock::new(
                         crate::blocks::ParentBlockName::Quote,
                         None,

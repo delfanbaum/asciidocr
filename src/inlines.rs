@@ -4,6 +4,7 @@ use std::{collections::VecDeque, fmt::Display, iter};
 use serde::Serialize;
 
 use crate::{
+    macros::target_and_attrs_from_token,
     metadata::ElementMetadata,
     nodes::{Location, NodeTypes},
     tokens::{Token, TokenType},
@@ -87,9 +88,7 @@ impl Inline {
     pub fn is_macro(&self) -> bool {
         match self {
             Inline::InlineRef(iref) => iref.variant == InlineRefVariant::Link,
-            Inline::InlineSpan(span) => {
-                span.variant == InlineSpanVariant::Footnote
-            }
+            Inline::InlineSpan(span) => span.variant == InlineSpanVariant::Footnote,
             _ => false,
         }
     }
@@ -368,6 +367,8 @@ pub struct InlineRef {
     variant: InlineRefVariant,
     target: String,
     pub inlines: Vec<Inline>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    metadata: Option<ElementMetadata>,
     location: Vec<Location>,
 }
 
@@ -379,6 +380,7 @@ impl InlineRef {
             variant,
             target,
             inlines: vec![],
+            metadata: None,
             location,
         }
     }
@@ -389,8 +391,38 @@ impl InlineRef {
         InlineRef::new(InlineRefVariant::Link, target, token.locations())
     }
 
+    pub fn new_inline_image_from_token(token: Token) -> Self {
+        let (target, metadata) = target_and_attrs_from_token(&token);
+        if metadata.is_some() {
+            InlineRef {
+                name: "ref".to_string(),
+                node_type: NodeTypes::Inline,
+                variant: InlineRefVariant::Image,
+                target,
+                inlines: vec![],
+                metadata,
+                location: token.locations(),
+            }
+        } else {
+            InlineRef::new(InlineRefVariant::Image, target, token.locations())
+        }
+    }
+
     pub fn is_link(&self) -> bool {
         self.variant == InlineRefVariant::Link
+    }
+
+    pub fn add_text_from_token(&mut self, token: Token) {
+        let inline_literal = Inline::InlineLiteral(InlineLiteral::new_text_from_token(&token));
+        if let Some(last_inline) = self.inlines.last_mut() {
+            match last_inline {
+                Inline::InlineSpan(span) => span.add_inline(inline_literal),
+                Inline::InlineLiteral(prior_literal) => prior_literal.add_text_from_token(&token),
+                _ => panic!("Can't add text to last token in this context"),
+            }
+        } else {
+            self.inlines.push(inline_literal)
+        }
     }
 }
 
@@ -399,6 +431,7 @@ impl InlineRef {
 pub enum InlineRefVariant {
     Link,
     Xref,
+    Image,
 }
 
 #[derive(Serialize, Clone, Debug)]
@@ -469,6 +502,48 @@ impl LineBreak {
             name: "linebreak".to_string(),
             node_type: NodeTypes::Inline,
             location: token.locations(),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::tokens::Token;
+
+    use super::InlineRef;
+
+    #[test]
+    fn image_from_token() {
+        let token = Token::new(
+            crate::tokens::TokenType::InlineImageMacro,
+            "image:path/to/img.png[]".to_string(),
+            Some("image:path/to/img.png[]".to_string()),
+            1,
+            1,
+            23,
+        );
+        let img_ref = InlineRef::new_inline_image_from_token(token);
+        assert_eq!(img_ref.target, "path/to/img.png".to_string())
+    }
+    #[test]
+    fn image_from_token_title() {
+        let token = Token::new(
+            crate::tokens::TokenType::InlineImageMacro,
+            "image:path/to/img.png[title=Pause]".to_string(),
+            Some("image:path/to/img.png[title=Pause]".to_string()),
+            1,
+            1,
+            23,
+        );
+        let img_ref = InlineRef::new_inline_image_from_token(token);
+        assert_eq!(img_ref.target, "path/to/img.png".to_string());
+        assert!(img_ref.metadata.is_some());
+        if let Some(metadata) = img_ref.metadata {
+            assert!(metadata.inline_metadata);
+            assert_eq!(
+                metadata.attributes.get("title").unwrap(),
+                &"Pause".to_string()
+            )
         }
     }
 }

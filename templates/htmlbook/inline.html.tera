@@ -22,19 +22,27 @@
         {%- set inline_tag = "a" -%}
         {%- if inline.variant == "link" -%}
             {%- set ref = inline.target -%}
+            {%- set target_attr = "href" -%}
         {%- elif inline.variant == "xref" -%}
             {%- set ref = "#" ~ inline.target -%}
+            {%- set target_attr = "href" -%}
+        {%- elif inline.variant == "image" -%}
+            {%- set inline_tag = "img" -%}
+            {%- set ref = inline.target -%}
+            {%- set self_close = True -%}
+            {%- set target_attr = "src" -%}
         {%- endif -%}
-        {%- set href = 'href="' ~ ref ~ '"' -%}
+        {%- set target = target_attr ~ '="' ~ ref ~ '"' -%}
     {%- endif -%}
 {%- if inline_tag -%}<{{inline_tag}}
     {%- if inline.metadata.roles %} class="{{inline.metadata.roles | join(sep=" ")}}"
     {%- endif -%}
     {%- if data_type %} data-type="{{data_type}}"
     {%- endif -%}
-    {%- if href%} {{href}}
-    {%- endif -%}>
+    {%- if target %} {{target}}
+    {%- endif -%}{%-if self_close%} /{%-endif-%}>
 {%- endif -%}
+    {%- if not self_close -%}
         {#- Handle recursion -#}
             {%- if inline.inlines -%}
                 {%- for child in inline.inlines -%}
@@ -44,5 +52,6 @@
                 {{- inline.value -}}
             {%- endif -%}
     {%- if inline_tag -%}</{{inline_tag}}>{%- endif -%}
+    {%- endif -%}
 {%- endif -%}
 {%- endmacro process_inline -%}

@@ -187,3 +187,19 @@ fn test_block_title_or_label() {
     let asg_json_fn = format!("{}.json", fn_pattern);
     assert_parsed_doc_matches_expected_asg(&adoc_fn, &asg_json_fn)
 }
+
+#[test]
+fn test_block_image() {
+    let fn_pattern = "blocks/image-block";
+    let adoc_fn = format!("{}.adoc", fn_pattern);
+    let asg_json_fn = format!("{}.json", fn_pattern);
+    assert_parsed_doc_matches_expected_asg(&adoc_fn, &asg_json_fn)
+}
+
+#[test]
+fn test_block_image_alt_text() {
+    let fn_pattern = "blocks/image-block-alt-text";
+    let adoc_fn = format!("{}.adoc", fn_pattern);
+    let asg_json_fn = format!("{}.json", fn_pattern);
+    assert_parsed_doc_matches_expected_asg(&adoc_fn, &asg_json_fn)
+}

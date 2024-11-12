@@ -136,3 +136,13 @@ fn test_super_and_sub() {
     let asg_json_fn = format!("{}.json", fn_pattern);
     assert_parsed_doc_matches_expected_asg(&adoc_fn, &asg_json_fn)
 }
+
+
+/// Inline images
+#[test]
+fn test_image_no_attributes() {
+    let fn_pattern = "inlines/image";
+    let adoc_fn = format!("{}.adoc", fn_pattern);
+    let asg_json_fn = format!("{}.json", fn_pattern);
+    assert_parsed_doc_matches_expected_asg(&adoc_fn, &asg_json_fn)
+}

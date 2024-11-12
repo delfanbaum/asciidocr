@@ -5,15 +5,14 @@ non-features.
 
 == Language Features in a Non-Working State
 
-* Images
-* Figures
-* Inline images
 * Anchors
-* Discrete Headings
 * Cross references 
+* Titles for admonitions, asides, etc.
+* Figures (block images are supported, but figure captions/titles are not yet)
+* Inline images
+* Discrete Headings
 * Section IDs are not auto-generated
 * Custom IDs/reference text
-* Titles for admonitions, asides, etc.
 
 == Language Features Planned for Inclusion Later
 

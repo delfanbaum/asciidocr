@@ -105,3 +105,19 @@ fn delimited_verse() {
     let html_fn = format!("{}.html", fn_pattern);
     assert_rendered_html_matches_expected(&adoc_fn, &html_fn)
 }
+
+#[test]
+fn inline_images() {
+    let fn_pattern = String::from("htmlbook/inline-image");
+    let adoc_fn = format!("{}.adoc", fn_pattern);
+    let html_fn = format!("{}.html", fn_pattern);
+    assert_rendered_html_matches_expected(&adoc_fn, &html_fn)
+}
+
+#[test]
+fn block_images() {
+    let fn_pattern = String::from("htmlbook/image-block-alt-text");
+    let adoc_fn = format!("{}.adoc", fn_pattern);
+    let html_fn = format!("{}.html", fn_pattern);
+    assert_rendered_html_matches_expected(&adoc_fn, &html_fn)
+}
