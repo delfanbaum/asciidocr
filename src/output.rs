@@ -14,7 +14,7 @@ pub fn render_from_templates(
     // from their docs
     let mut tera = Tera::default();
     tera.add_raw_templates(templates)?;
-    Ok(tera.render("htmlbook.html.tera", &Context::from_serialize(graph)?)?)
+    Ok(tera.render("htmlbook.html.tera", &Context::from_serialize(graph)?).expect("failure"))
 }
 
 pub fn gather_htmlbook_templates() -> Vec<(&'static str, &'static str)> {

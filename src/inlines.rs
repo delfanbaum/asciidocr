@@ -385,6 +385,11 @@ impl InlineRef {
         }
     }
 
+    pub fn new_xref_from_token(token: Token) -> Self {
+        let target = token.text()[2..token.text().len() - 2].to_string();
+        InlineRef::new(InlineRefVariant::Xref, target, token.locations())
+    }
+
     pub fn new_link_from_token(token: Token) -> Self {
         let mut target = token.text();
         target.pop(); // remove trailing '['
@@ -508,9 +513,29 @@ impl LineBreak {
 
 #[cfg(test)]
 mod tests {
-    use crate::tokens::Token;
+
+    use crate::{
+        inlines::InlineRefVariant,
+        tokens::{Token, TokenType},
+    };
 
     use super::InlineRef;
+
+    #[test]
+    fn xref_from_token() {
+        let reference = "<<foo>>".to_string();
+        let token = Token {
+            token_type: TokenType::CrossReference,
+            lexeme: reference.clone(),
+            literal: Some(reference),
+            line: 1,
+            startcol: 1,
+            endcol: 1,
+        };
+        let inline = InlineRef::new_xref_from_token(token);
+        assert_eq!(inline.variant, InlineRefVariant::Xref);
+        assert_eq!(inline.target, "foo".to_string());
+    }
 
     #[test]
     fn image_from_token() {

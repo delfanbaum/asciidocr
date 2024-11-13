@@ -415,7 +415,7 @@ impl<'a> Scanner<'a> {
         // Chars: newline, bold, italic, code, super, subscript, footnote, pass, link, end inline macro, definition list marker, highlighted, inline admonition initial chars, inline images
         while ![
             '\n', '*', '_', '`', '^', '~', 'f', 'p', 'h', ']', '[', ':', '#', 'N', 'T', 'I', 'C',
-            'W', '&', '{', '+', 'i',
+            'W', '&', '{', '+', 'i', '<'
         ]
         .contains(&self.peek())
             && !self.is_at_end()

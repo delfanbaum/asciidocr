@@ -1,0 +1,34 @@
+{
+    "name": "document",
+    "type": "block",
+    "blocks": [
+        {
+            "name": "paragraph",
+            "type": "block",
+            "inlines": [
+                {
+                    "name": "text",
+                    "type": "string",
+                    "value": "This is a ",
+                    "location": [ { "line": 1, "col": 1 }, { "line": 1, "col": 10 } ]
+                },
+                {
+                    "name": "ref",
+                    "type": "inline",
+                    "variant": "xref",
+                    "target": "cross_ref",
+                    "inlines": [],
+                    "location": [ { "line": 1, "col": 11 }, { "line": 1, "col": 23 } ]
+                },
+                {
+                    "name": "text",
+                    "type": "string",
+                    "value": ".",
+                    "location": [ { "line": 1, "col": 24 }, { "line": 1, "col": 24 } ]
+                }
+            ],
+            "location": [ { "line": 1, "col": 1 }, { "line": 1, "col": 24 } ]
+        }
+    ],
+    "location": [ { "line": 1, "col": 1 }, { "line": 1, "col": 24 } ]
+}

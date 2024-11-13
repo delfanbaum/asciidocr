@@ -179,7 +179,10 @@ impl Parser {
             | TokenType::UnconstrainedEmphasis => self.parse_inline_span(Inline::InlineSpan(
                 InlineSpan::inline_span_from_token(token),
             )),
+
+            // references
             TokenType::AttributeReference => self.parse_attribute_reference(token),
+            TokenType::CrossReference => self.parse_cross_reference(token),
 
             // inline macros
             TokenType::FootnoteMacro => self.parse_footnote_macro(token),
@@ -662,6 +665,12 @@ impl Parser {
         }
         // then add it as literal text
         self.parse_text(token);
+    }
+
+    
+    fn parse_cross_reference(&mut self, token: Token) {
+        self.inline_stack.push_back(Inline::InlineRef(InlineRef::new_xref_from_token(token)));
+        self.close_parent_after_push = true;
     }
 
     fn parse_text(&mut self, token: Token) {
