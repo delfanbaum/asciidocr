@@ -8,10 +8,11 @@ non-features.
 * Cross reference checking and text
 * Section IDs are not auto-generated
 * Custom IDs/reference text
-* attribute list markup for figures, etc.
 
 == Language Features Planned for Inclusion Later
 
+* https://docs.asciidoctor.org/asciidoc/latest/attributes/positional-and-named-attributes/#block-style-and-attribute-shorthand[block style
+attribute short hand] -- I'm both not a fan (just use `role=` and `[[id]]`, etc.!) and parsing this is going to be semi-annoying so I shall put it off.
 * Hardbreaks-option attribute (which we shall include for our poet friends who
   don't want to have to wrap everything in `[verse]`) 
 * Includes
@@ -25,12 +26,12 @@ non-features.
 * https://docs.asciidoctor.org/asciidoc/latest/document/doctype/[Document types]
 * https://docs.asciidoctor.org/asciidoc/latest/sections/section-ref/[Section
   Attributes and styles]
-* Paragraph alignment
+* Paragraph alignment and indented blocks 
 * Substitutions
 * Checklists
 * Autolinks (for now, just use the `url[text]` or `url[]` syntax)
 * `mailto:`
-* `Footnote:id` syntax (this may not happen soon)
+* `Footnote:id` syntax (this may not happen)
 * Icons
 * Keyboard/button/etc. macros (I mean to target "writers," first, then
   "technical writers" at some later point).

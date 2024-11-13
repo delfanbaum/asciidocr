@@ -144,15 +144,12 @@ impl<'a> Scanner<'a> {
                     self.add_block_anchor()
                 } else if self.starts_attribution_line() {
                     match self.source.as_bytes()[self.start + 1] as char {
-                        'v' | 's' | 'r' | '.' | 'q' => {
-                            self.add_token(TokenType::ElementAttributes, true, 0)
-                        }
                         'N' => self.add_token(TokenType::NotePara, true, 0),
                         'T' => self.add_token(TokenType::TipPara, true, 0),
                         'I' => self.add_token(TokenType::ImportantPara, true, 0),
                         'C' => self.add_token(TokenType::CautionPara, true, 0),
                         'W' => self.add_token(TokenType::WarningPara, true, 0),
-                        _ => self.add_text_until_next_markup(),
+                        _ => self.add_token(TokenType::ElementAttributes, true, 0)
                     }
                 } else if self.peek() == '.' {
                     self.add_inline_style()
@@ -805,6 +802,7 @@ mod tests {
 
     #[rstest]
     #[case::quote("[quote]\n", TokenType::ElementAttributes)]
+    #[case::quote("[#class.role]\n", TokenType::ElementAttributes)]
     #[case("[quote, Georges Perec]\n", TokenType::ElementAttributes)]
     #[case("[verse]\n", TokenType::ElementAttributes)]
     #[case(

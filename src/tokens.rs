@@ -185,11 +185,6 @@ pub enum TokenType {
     // character reference, such as "&mdash;"
     CharRef,
 
-    // document attributes
-    Attribute,
-
-    // attribute reference, e.g., "{my-thing}"
-    AttributeReference,
 
     // End of File Token
     Eof,
@@ -206,6 +201,8 @@ pub enum TokenType {
     BlockAnchor,
     ElementAttributes, // any of: [quote], [quote], [role="foo"], [#foo], etc.
     CrossReference,
+    Attribute,
+    AttributeReference,
 }
 
 impl TokenType {
