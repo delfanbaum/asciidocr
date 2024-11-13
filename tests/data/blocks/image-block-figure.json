@@ -1,0 +1,66 @@
+{
+  "name": "document",
+  "type": "block",
+  "blocks": [
+    {
+      "name": "image",
+      "type": "block",
+      "form": "macro",
+      "target": "path/to/image.png",
+      "caption": [
+        {
+          "name": "text",
+          "type": "string",
+          "value": "Figure Title",
+          "location": [
+            {
+              "line": 2,
+              "col": 2
+            },
+            {
+              "line": 2,
+              "col": 13
+            }
+          ]
+        }
+      ],
+      "metadata": {
+        "attributes": {
+          "id": "image_id"
+        },
+        "options": [],
+        "roles": [],
+        "location": [
+          {
+            "line": 1,
+            "col": 1
+          },
+          {
+            "line": 1,
+            "col": 12
+          }
+        ]
+      },
+      "location": [
+        {
+          "line": 3,
+          "col": 1
+        },
+        {
+          "line": 3,
+          "col": 26
+        }
+      ]
+    }
+  ],
+  "location": [
+    {
+      "line": 1,
+      "col": 1
+    },
+    {
+      "line": 3,
+      "col": 26
+    }
+  ]
+}

@@ -985,7 +985,6 @@ impl Parser {
 
     /// Adds data to an existing ElementMetadata object, or creates one
     fn add_metadata_from_token(&mut self, token: Token) {
-        println!("{:?}, {:?}", self.metadata, token);
         match self.metadata {
             Some(ref mut metadata) => metadata.add_metadata_from_token(token),
             None => {

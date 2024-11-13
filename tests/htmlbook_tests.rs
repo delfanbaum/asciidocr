@@ -123,6 +123,14 @@ fn block_images() {
 }
 
 #[test]
+fn block_figures() {
+    let fn_pattern = String::from("htmlbook/image-block-figure");
+    let adoc_fn = format!("{}.adoc", fn_pattern);
+    let html_fn = format!("{}.html", fn_pattern);
+    assert_rendered_html_matches_expected(&adoc_fn, &html_fn)
+}
+
+#[test]
 /// Note that eventually we'll want to change the ref text
 fn cross_references() {
     let fn_pattern = String::from("htmlbook/cross-ref");

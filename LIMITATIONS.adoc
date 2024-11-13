@@ -6,9 +6,9 @@ non-features.
 == Language Features in a Non-Working State
 
 * Cross reference checking and text
-* Figures (block images are supported, but figure captions/titles are not yet)
 * Section IDs are not auto-generated
 * Custom IDs/reference text
+* attribute list markup for figures, etc.
 
 == Language Features Planned for Inclusion Later
 
