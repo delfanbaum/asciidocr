@@ -5,12 +5,8 @@ non-features.
 
 == Language Features in a Non-Working State
 
-* Anchors
-* Cross references 
-* Titles for admonitions, asides, etc.
+* Cross reference checking and text
 * Figures (block images are supported, but figure captions/titles are not yet)
-* Inline images
-* Discrete Headings
 * Section IDs are not auto-generated
 * Custom IDs/reference text
 
@@ -44,6 +40,7 @@ non-features.
 * Automatic Tables of Contents
 * Literal monospace 
 * Deeply nested description lists (in the meantime: just use an open block)
+* Discrete Headings
 
 == Language Features Not Currently Planned for Inclusion
 

@@ -275,7 +275,7 @@ impl Block {
             }
             Block::Break(_) => {} // do nothing, since there is nothing to do!
             Block::BlockMacro(_) => {} // do nothing for now; maybe we include the meta
-            // locations? 
+            // locations?
             _ => todo!(),
         }
     }
@@ -301,6 +301,7 @@ impl Block {
             Block::LeafBlock(block) => block.metadata = Some(metadata),
             Block::Section(block) => block.metadata = Some(metadata),
             Block::ParentBlock(block) => block.metadata = Some(metadata),
+            Block::BlockMacro(block) => block.metadata = Some(metadata),
             _ => todo!(),
         }
     }
@@ -427,6 +428,14 @@ impl BlockMacro {
     pub fn new_image_from_token(token: Token) -> Self {
         let (target, metadata) = target_and_attrs_from_token(&token);
         BlockMacro::new(BlockMacroName::Image, target, metadata, token.locations())
+    }
+
+    pub fn add_metadata(mut self, incoming_metadata: &ElementMetadata) -> Self {
+        match self.metadata {
+            Some(ref mut metadata) => metadata.add_metadata_from_other(incoming_metadata),
+            None => self.metadata = Some(incoming_metadata.clone())
+        }
+        self
     }
 }
 

@@ -20,8 +20,9 @@ this should work.
     {%- endif -%}
 {%- else -%}
 {%- if block.name == "section" -%}
-<section data-type="sect{{block.level}}" {%- if block.metadata.roles %} class="{{ block.metadata.roles |
-    join(sep=" ")}}" {%- endif -%}>
+<section data-type="sect{{block.level}}"
+        {%- if block.metadata.roles %} class="{{ block.metadata.roles | join(sep=" ")}}" {%- endif -%}
+        {%- if block.metadata.attributes.id %} id="{{ block.metadata.attributes.id }}" {%- endif -%}>
     {%- elif block.name == "dlist" -%}
     {%- set tag = "dl" -%}
     {%- elif block.name == "list" -%}
@@ -67,17 +68,24 @@ this should work.
         {%- if block.metadata.attributes.positional_1 -%}
         {%- set alt_text = block.metadata.attributes.positional_1 -%}
         {%- endif -%}
+        {%- if block.metadata.attributes.id -%}
+        {%- set id = block.metadata.attributes.id -%}
+        {%- endif -%}
     {% elif block.name == "pass" -%}
         {#- No tag is applied -#}
+    {% elif block.name == "sidebar" -%}
+        {%- set tag = "aside" -%}
+        {%- set data_type = "sidebar" -%}
     {% else %}
     {%- set tag = "UNHANDLED" -%}
     {%- endif %}
         {%- if tag and not skip_tag -%}<{{tag}}
     {%- if block.metadata.roles and not block.name=="section" %} class="{{ block.metadata.roles | join(sep=" ")}}" {%- endif -%}
     {%- if code_language %} data-code-language="{{ code_language }}" {%- endif -%}
-        {%- if data_type %} data-type="{{ data_type }}"{%- endif -%}>{%- endif -%}
+    {%- if id %} id="{{ id }}" {%- endif -%}
+    {%- if data_type %} data-type="{{ data_type }}"{%- endif -%}>{%- endif -%}
         {%- if block.title -%}
-            {%- if block.name == "example "-%}
+            {%- if block.name in ["example", "sidebar"]-%}
                 {%- set title_heading_level = 5 -%}
             {%- else -%}
                 {%- set title_heading_level = 1 -%}

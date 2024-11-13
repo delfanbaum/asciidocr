@@ -155,7 +155,7 @@ impl Parser {
             // document attributes
             TokenType::Attribute => self.parse_attribute(token),
 
-            // block titles
+            // block titles, metadata, etc.
             TokenType::BlockLabel => {
                 // open the block title
                 self.block_title = Some(Vec::new());
@@ -163,6 +163,11 @@ impl Parser {
                 // clear out any dangling newlines
                 self.dangling_newline = None;
             }
+            TokenType::BlockAnchor => self.parse_block_anchor_attributes(token),
+            TokenType::ElementAttributes => self.parse_block_element_attributes(token),
+
+            // inline metadata
+            TokenType::InlineStyle => self.parse_inline_element_attributes(token),
 
             // inlines
             TokenType::NewLineChar => self.parse_new_line_char(token, asg),
@@ -258,10 +263,6 @@ impl Parser {
                 }
             }
 
-            // metadata
-            TokenType::ElementAttributes => self.parse_block_element_attributes(token),
-            TokenType::InlineStyle => self.parse_inline_element_attributes(token),
-
             _ => {
                 // self check
                 println!("\"{:?}\" not implemented", token.token_type());
@@ -287,9 +288,14 @@ impl Parser {
         self.document_attributes.insert(key, value);
     }
 
+    fn parse_block_anchor_attributes(&mut self, token: Token) {
+        self.add_metadata_from_token(token);
+        self.force_new_block = true;
+    }
+
     /// parses element attribute lists into self.block_metadata, which then is applied later
     fn parse_block_element_attributes(&mut self, token: Token) {
-        self.metadata = Some(ElementMetadata::new_block_meta_from_token(token));
+        self.add_metadata_from_token(token);
         self.force_new_block = true;
     }
     fn parse_inline_element_attributes(&mut self, token: Token) {
@@ -514,6 +520,8 @@ impl Parser {
         )));
         // let us know we're in a block line
         self.in_block_line = true;
+        // clear any dangling newlines, since we don't want these added to the title
+        self.dangling_newline = None;
         // let us know that we want to add to the section title for a little bit
         self.force_new_block = false;
     }
@@ -587,12 +595,20 @@ impl Parser {
     }
 
     fn parse_block_image(&mut self, token: Token, asg: &mut Asg) {
-        let image_block = BlockMacro::new_image_from_token(token);
+        let mut image_block = BlockMacro::new_image_from_token(token);
+        if let Some(metadata) = &self.metadata {
+            // TODO see if there is a cleaner way to manage the borrowing here.
+            image_block = image_block.add_metadata(metadata);
+            self.metadata = None;
+        }
         self.add_to_block_stack_or_graph(asg, Block::BlockMacro(image_block));
     }
 
     fn parse_inline_image_macro(&mut self, token: Token) {
-        self.inline_stack.push_back(Inline::InlineRef(InlineRef::new_inline_image_from_token(token)));
+        self.inline_stack
+            .push_back(Inline::InlineRef(InlineRef::new_inline_image_from_token(
+                token,
+            )));
         self.close_parent_after_push = true;
     }
 
@@ -667,9 +683,9 @@ impl Parser {
         self.parse_text(token);
     }
 
-    
     fn parse_cross_reference(&mut self, token: Token) {
-        self.inline_stack.push_back(Inline::InlineRef(InlineRef::new_xref_from_token(token)));
+        self.inline_stack
+            .push_back(Inline::InlineRef(InlineRef::new_xref_from_token(token)));
         self.close_parent_after_push = true;
     }
 
@@ -961,6 +977,17 @@ impl Parser {
             }
         }
         self.push_block_to_stack(para_block)
+    }
+
+    /// Adds data to an existing ElementMetadata object, or creates one
+    fn add_metadata_from_token(&mut self, token: Token) {
+        println!("{:?}, {:?}", self.metadata, token);
+        match self.metadata {
+            Some(ref mut metadata) => metadata.add_metadata_from_token(token),
+            None => {
+                self.metadata = Some(ElementMetadata::new_block_meta_from_token(token));
+            }
+        }
     }
 
     fn add_last_list_item_to_list(&mut self) {

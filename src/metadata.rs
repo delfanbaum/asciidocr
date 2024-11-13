@@ -5,7 +5,10 @@ use once_cell::sync::Lazy;
 use regex::Regex;
 use serde::Serialize;
 
-use crate::{nodes::Location, tokens::Token};
+use crate::{
+    nodes::Location,
+    tokens::{Token, TokenType},
+};
 
 static RE_NAMED: Lazy<Regex> = Lazy::new(|| Regex::new(r#"(.*?)[=|,](.*)"#).unwrap());
 
@@ -75,7 +78,6 @@ impl ElementMetadata {
     }
     pub fn new_block_meta_from_token(token: Token) -> Self {
         // Regex for parsing named attributes
-
         let mut new_block_metadata = ElementMetadata {
             attributes: HashMap::new(),
             options: vec![],
@@ -84,12 +86,42 @@ impl ElementMetadata {
             declared_type: None,
             location: token.locations().clone(),
         };
-
-        let attribute_list = token.lexeme[1..token.lexeme.len() - 1].to_string();
-        let attributes: Vec<&str> = attribute_list.split(',').collect();
-        new_block_metadata.process_attributes(attributes);
-
+        if matches!(token.token_type(), TokenType::BlockAnchor) {
+            let id = token.lexeme[2..token.lexeme.len() - 2].to_string(); // skip the "[[" and "]]"
+            new_block_metadata.attributes.insert("id".to_string(), id);
+        } else {
+            let attribute_list = token.lexeme[1..token.lexeme.len() - 1].to_string();
+            let attributes: Vec<&str> = attribute_list.split(',').collect();
+            new_block_metadata.process_attributes(attributes);
+        }
         new_block_metadata
+    }
+
+    pub fn add_metadata_from_token(&mut self, token: Token) {
+        if matches!(token.token_type(), TokenType::BlockAnchor) {
+            let id = token.lexeme[2..token.lexeme.len() - 2].to_string(); // skip the "[[" and "]]"
+            if !self.attributes.contains_key("id") {
+                self.attributes.insert("id".to_string(), id);
+            }
+        } else {
+            let attribute_list = token.lexeme[1..token.lexeme.len() - 1].to_string();
+            let attributes: Vec<&str> = attribute_list.split(',').collect();
+            self.process_attributes(attributes);
+        }
+    }
+
+    pub fn add_metadata_from_other(&mut self, incoming: &ElementMetadata) {
+        // combine attributes, deferring to incoming in the case of duplicate keys
+        for (key, value) in incoming.attributes.iter() {
+            if let Some(extant_key) = self.attributes.get_mut(key) {
+                *extant_key = value.to_string()
+            } else {
+                self.attributes.insert(key.to_string(), value.to_string());
+            }
+        }
+        // combine options and roles
+        self.options.extend(incoming.options.clone());
+        self.roles.extend(incoming.options.clone());
     }
 
     pub fn process_attributes(&mut self, mut attributes: Vec<&str>) {
