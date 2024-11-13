@@ -1,0 +1,42 @@
+{
+    "name": "document",
+    "type": "block",
+    "blocks": [
+        {
+            "name": "section",
+            "type": "block",
+            "title": [
+                {
+                    "name": "text",
+                    "type": "string",
+                    "value": "Section with unique_id",
+                    "location": [ { "line": 2, "col": 4 }, { "line": 2, "col": 25 } ]
+                }
+            ],
+            "level": 1,
+            "metadata": {
+                "attributes": {"id": "unique_id"},
+                "options": [],
+                "roles": [],
+                "location": [ { "line": 1, "col": 1 }, { "line": 1, "col": 13 } ]
+            },
+            "blocks": [
+                {
+                    "name": "paragraph",
+                    "type": "block",
+                    "inlines": [
+                        {
+                            "name": "text",
+                            "type": "string",
+                            "value": "Some text.",
+                            "location": [ { "line": 4, "col": 1 }, { "line": 4, "col": 10 } ]
+                        }
+                    ],
+                    "location": [ { "line": 4, "col": 1 }, { "line": 4, "col": 10 } ]
+                }
+            ],
+            "location": [ { "line": 2, "col": 1 }, { "line": 4, "col": 10 } ]
+        }
+    ],
+    "location": [ { "line": 1, "col": 1 }, { "line": 4, "col": 10 } ]
+}

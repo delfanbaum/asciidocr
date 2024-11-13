@@ -1,0 +1,4 @@
+[[unique_id]]
+== Section with unique_id
+
+Some text.

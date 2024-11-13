@@ -388,6 +388,8 @@ pub struct BlockMacro {
     node_type: NodeTypes,
     form: String,
     target: String,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub caption: Vec<Inline>,
     #[serde(skip_serializing_if = "Option::is_none")]
     metadata: Option<ElementMetadata>,
     location: Vec<Location>,
@@ -420,6 +422,7 @@ impl BlockMacro {
             node_type: NodeTypes::Block,
             form: "macro".to_string(),
             target,
+            caption: vec![],
             metadata,
             location,
         }

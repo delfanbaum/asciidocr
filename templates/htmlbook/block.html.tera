@@ -95,6 +95,11 @@ this should work.
         {% endif -%}
         {%- if block.name == "image" %}
         <img src="{{block.target}}"{%- if alt_text %} alt="{{alt_text}}"{%- endif -%} />
+        {%- if block.caption %}
+        <figcaption>{%- for inline in block.caption -%}
+            {{- inline_macros::process_inline(inline=inline) -}}
+            {%- endfor -%}</figcaption>
+        {%- endif %}
     {% endif -%}
         {%- if block.name == "list" or block.name == "dlist" -%}
         {% for item in block.items -%}

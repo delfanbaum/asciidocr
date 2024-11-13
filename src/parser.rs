@@ -601,6 +601,10 @@ impl Parser {
             image_block = image_block.add_metadata(metadata);
             self.metadata = None;
         }
+        if let Some(caption) = &self.block_title {
+            image_block.caption = caption.clone();
+            self.block_title = None
+        }
         self.add_to_block_stack_or_graph(asg, Block::BlockMacro(image_block));
     }
 
