@@ -1,0 +1,229 @@
+{
+  "name": "document",
+  "type": "block",
+  "blocks": [
+    {
+      "name": "paragraph",
+      "type": "block",
+      "inlines": [
+        {
+          "name": "text",
+          "type": "string",
+          "value": "Here is a paragraph, followed by an include.",
+          "location": [ { "line": 1, "col": 1 }, { "line": 1, "col": 44 } ]
+        }
+      ],
+      "location": [ { "line": 1, "col": 1 }, { "line": 1, "col": 44 } ]
+    },
+    {
+      "name": "section",
+      "type": "block",
+      "title": [
+        {
+          "name": "text",
+          "type": "string",
+          "value": "Section Title",
+          "location": [
+            { "line": 1, "col": 4,
+              "file": [ "tests/data/blocks/nested-headings-multiple.adoc"
+              ]
+            },
+            {
+              "line": 1, "col": 16, "file": [
+                "tests/data/blocks/nested-headings-multiple.adoc"
+              ]
+            }
+          ]
+        }
+      ],
+      "level": 1,
+      "blocks": [
+        {
+          "name": "paragraph",
+          "type": "block",
+          "inlines": [
+            {
+              "name": "text",
+              "type": "string",
+              "value": "Contents",
+              "location": [
+                { "line": 3, "col": 1, "file": [
+                    "tests/data/blocks/nested-headings-multiple.adoc"
+                  ]
+                },
+                { "line": 3, "col": 8, "file": [
+                    "tests/data/blocks/nested-headings-multiple.adoc"
+                  ]
+                }
+              ]
+            }
+          ],
+          "location": [
+            { "line": 3, "col": 1, "file": [
+                "tests/data/blocks/nested-headings-multiple.adoc"
+              ]
+            },
+            { "line": 3, "col": 8, "file": [
+                "tests/data/blocks/nested-headings-multiple.adoc"
+              ]
+            }
+          ]
+        },
+        {
+          "name": "section",
+          "type": "block",
+          "title": [
+            {
+              "name": "text",
+              "type": "string",
+              "value": "Nested Section Title",
+              "location": [
+                { "line": 5, "col": 5, "file": [
+                    "tests/data/blocks/nested-headings-multiple.adoc"
+                  ]
+                },
+                { "line": 5, "col": 24, "file": [
+                    "tests/data/blocks/nested-headings-multiple.adoc"
+                  ]
+                }
+              ]
+            }
+          ],
+          "level": 2,
+          "blocks": [
+            {
+              "name": "paragraph",
+              "type": "block",
+              "inlines": [
+                {
+                  "name": "text",
+                  "type": "string",
+                  "value": "Contents",
+                  "location": [
+                    { "line": 7, "col": 1, "file": [
+                        "tests/data/blocks/nested-headings-multiple.adoc"
+                      ]
+                    },
+                    { "line": 7, "col": 8, "file": [
+                        "tests/data/blocks/nested-headings-multiple.adoc"
+                      ]
+                    }
+                  ]
+                }
+              ],
+              "location": [
+                { "line": 7, "col": 1, "file": [
+                    "tests/data/blocks/nested-headings-multiple.adoc"
+                  ]
+                },
+                { "line": 7, "col": 8, "file": [
+                    "tests/data/blocks/nested-headings-multiple.adoc"
+                  ]
+                }
+              ]
+            }
+          ],
+          "location": [
+            { "line": 5, "col": 1, "file": [
+                "tests/data/blocks/nested-headings-multiple.adoc"
+              ]
+            },
+            { "line": 7, "col": 8, "file": [
+                "tests/data/blocks/nested-headings-multiple.adoc"
+              ]
+            }
+          ]
+        },
+        {
+          "name": "section",
+          "type": "block",
+          "title": [
+            {
+              "name": "text",
+              "type": "string",
+              "value": "Nested Section Title",
+              "location": [
+                { "line": 9, "col": 5, "file": [
+                    "tests/data/blocks/nested-headings-multiple.adoc"
+                  ]
+                },
+                { "line": 9, "col": 24, "file": [
+                    "tests/data/blocks/nested-headings-multiple.adoc"
+                  ]
+                }
+              ]
+            }
+          ],
+          "level": 2,
+          "blocks": [
+            {
+              "name": "paragraph",
+              "type": "block",
+              "inlines": [
+                {
+                  "name": "text",
+                  "type": "string",
+                  "value": "Contents",
+                  "location": [
+                    { "line": 11, "col": 1, "file": [
+                        "tests/data/blocks/nested-headings-multiple.adoc"
+                      ]
+                    },
+                    { "line": 11, "col": 8, "file": [
+                        "tests/data/blocks/nested-headings-multiple.adoc"
+                      ]
+                    }
+                  ]
+                }
+              ],
+              "location": [
+                { "line": 11, "col": 1, "file": [
+                    "tests/data/blocks/nested-headings-multiple.adoc"
+                  ]
+                },
+                { "line": 11, "col": 8, "file": [
+                    "tests/data/blocks/nested-headings-multiple.adoc"
+                  ]
+                }
+              ]
+            }
+          ],
+          "location": [
+            { "line": 9, "col": 1, "file": [
+                "tests/data/blocks/nested-headings-multiple.adoc"
+              ]
+            },
+            { "line": 11, "col": 8, "file": [
+                "tests/data/blocks/nested-headings-multiple.adoc"
+              ]
+            }
+          ]
+        }
+      ],
+      "location": [
+        { "line": 1, "col": 1, "file": [
+            "tests/data/blocks/nested-headings-multiple.adoc"
+          ]
+        },
+        { "line": 11, "col": 8, "file": [
+            "tests/data/blocks/nested-headings-multiple.adoc"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "paragraph",
+      "type": "block",
+      "inlines": [
+        {
+          "name": "text",
+          "type": "string",
+          "value": "And then some final content back in the original file.",
+          "location": [ { "line": 5, "col": 1 }, { "line": 5, "col": 54 } ]
+        }
+      ],
+      "location": [ { "line": 5, "col": 1 }, { "line": 5, "col": 54 } ]
+    }
+  ],
+  "location": [ { "line": 1, "col": 1 }, { "line": 5, "col": 54 } ]
+}

@@ -9,6 +9,8 @@ pub struct Token {
     pub line: usize,
     pub startcol: usize,
     pub endcol: usize,
+    // the file's source, if it's an include 
+    pub file_stack: Vec<String>
 }
 
 impl Default for Token {
@@ -21,12 +23,34 @@ impl Default for Token {
             line: 0,
             startcol: 1,
             endcol: 1,
+            file_stack:vec![]
         }
     }
 }
 
 impl Token {
     pub fn new(
+        token_type: TokenType,
+        lexeme: String,
+        literal: Option<String>,
+        line: usize,
+        startcol: usize,
+        endcol: usize,
+        file_stack: Vec<String>,
+    ) -> Self {
+        Token {
+            token_type,
+            lexeme,
+            literal,
+            line,
+            startcol,
+            endcol,
+            file_stack
+        }
+    }
+
+    /// Testing helper; new but ignoring the file stack part
+    pub fn new_default(
         token_type: TokenType,
         lexeme: String,
         literal: Option<String>,
@@ -41,6 +65,7 @@ impl Token {
             line,
             startcol,
             endcol,
+            file_stack: vec![]
         }
     }
 
@@ -57,13 +82,16 @@ impl Token {
     }
 
     pub fn first_location(&self) -> Location {
-        Location::new(self.line, self.startcol)
+        Location::new(self.line, self.startcol, self.file_stack.clone())
     }
     pub fn last_location(&self) -> Location {
-        Location::new(self.line, self.endcol)
+        Location::new(self.line, self.endcol, self.file_stack.clone())
     }
     pub fn locations(&self) -> Vec<Location> {
-        vec![self.first_location(), self.last_location()]
+        vec![
+            self.first_location(),
+            self.last_location(),
+        ]
     }
 
     pub fn is_inline(&self) -> bool {
@@ -185,17 +213,16 @@ pub enum TokenType {
     // character reference, such as "&mdash;"
     CharRef,
 
-
     // End of File Token
     Eof,
 
     InlineStyle, // i.e., [.some_class], usually [.x]#applied here#
 
-    // references, cross references TK
-    // math blocks TK
-    //Include,
+    // file and tag references
+    Include,
     //StartTag, // tag::[]
     //EndTag,
+    // math blocks TK
 
     // Attributes, anchors and references
     BlockAnchor,
@@ -235,12 +262,11 @@ mod tests {
     use super::{Token, TokenType};
     use rstest::rstest;
 
-
     #[rstest]
     #[case::cross_references(TokenType::CrossReference)]
     #[case::block_anchor(TokenType::BlockAnchor)]
-    fn invalid_space_invalidates_to_text(#[case] token_type: TokenType){
-        let mut token = Token::new(token_type, " ".to_string(), None, 1, 1, 1);
+    fn invalid_space_invalidates_to_text(#[case] token_type: TokenType) {
+        let mut token = Token::new(token_type, " ".to_string(), None, 1, 1, 1, vec![]);
         token.validate();
         assert_eq!(token.token_type(), TokenType::Text)
     }

@@ -9,6 +9,7 @@ pub struct Scanner<'a> {
     startcol: usize,
     current: usize,
     line: usize,
+    file_stack: Vec<String>,
 }
 
 impl<'a> Iterator for Scanner<'a> {
@@ -31,6 +32,18 @@ impl<'a> Scanner<'a> {
             startcol: 1, // because asciidoc spec wants start/end locations
             current: 0,  // the character we're looking at *now*
             line: 1,
+            file_stack: vec![],
+        }
+    }
+
+    pub fn new_with_stack(source: &'a str, file_stack: Vec<String>) -> Self {
+        Scanner {
+            source,
+            start: 0,    // beginning of the current lexeme being scanned
+            startcol: 1, // because asciidoc spec wants start/end locations
+            current: 0,  // the character we're looking at *now*
+            line: 1,
+            file_stack,
         }
     }
 
@@ -149,7 +162,7 @@ impl<'a> Scanner<'a> {
                         'I' => self.add_token(TokenType::ImportantPara, true, 0),
                         'C' => self.add_token(TokenType::CautionPara, true, 0),
                         'W' => self.add_token(TokenType::WarningPara, true, 0),
-                        _ => self.add_token(TokenType::ElementAttributes, true, 0)
+                        _ => self.add_token(TokenType::ElementAttributes, true, 0),
                     }
                 } else if self.peek() == '.' {
                     self.add_inline_style()
@@ -205,7 +218,9 @@ impl<'a> Scanner<'a> {
                 }
             }
             'i' => {
-                if self.starts_new_line() && self.peeks_ahead(6) == "mage::" {
+                if self.starts_new_line() && self.peeks_ahead(8) == "nclude::" {
+                    self.add_include()
+                } else if self.starts_new_line() && self.peeks_ahead(6) == "mage::" {
                     self.add_block_image()
                 // double colons after just parse as regular text per asciidoctor implementation
                 } else if self.peeks_ahead(5) == "mage:"
@@ -315,6 +330,7 @@ impl<'a> Scanner<'a> {
                 line: token_line,
                 startcol: token_start,
                 endcol: token_start + text.len() - 1, // to account for the start char
+                file_stack: self.file_stack.clone(),
             }
         } else {
             self.startcol = token_start + text.len();
@@ -325,6 +341,7 @@ impl<'a> Scanner<'a> {
                 line: self.line,
                 startcol: token_start,
                 endcol: token_start + text.len() - 1, // to account for the start char
+                file_stack: self.file_stack.clone(),
             }
         }
         token.validate();
@@ -371,6 +388,15 @@ impl<'a> Scanner<'a> {
         self.add_token(TokenType::InlineImageMacro, true, 0)
     }
 
+    /// Adds the include image, consuming the target as well as any attributes
+    fn add_include(&mut self) -> Token {
+        while self.peek() != ']' {
+            self.current += 1
+        }
+        self.current += 1; // consume the ']' char
+        self.add_token(TokenType::Include, true, 0)
+    }
+
     /// Adds the link, consuming the target but not any attributes
     fn add_link(&mut self) -> Token {
         while self.peek() != '[' {
@@ -412,7 +438,7 @@ impl<'a> Scanner<'a> {
         // Chars: newline, bold, italic, code, super, subscript, footnote, pass, link, end inline macro, definition list marker, highlighted, inline admonition initial chars, inline images
         while ![
             '\n', '*', '_', '`', '^', '~', 'f', 'p', 'h', ']', '[', ':', '#', 'N', 'T', 'I', 'C',
-            'W', '&', '{', '+', 'i', '<'
+            'W', '&', '{', '+', 'i', '<',
         ]
         .contains(&self.peek())
             && !self.is_at_end()
@@ -556,7 +582,7 @@ mod tests {
     #[test]
     fn newline() {
         let markup = "\n".to_string();
-        let expected_tokens = vec![Token::new(
+        let expected_tokens = vec![Token::new_default(
             TokenType::NewLineChar,
             "\n".to_string(),
             None,
@@ -576,7 +602,7 @@ mod tests {
     #[case("====\n".to_string(), TokenType::ExampleBlock)]
     fn fenced_block_delimiter_start(#[case] markup: String, #[case] expected_token: TokenType) {
         let expected_tokens = vec![
-            Token::new(
+            Token::new_default(
                 expected_token,
                 markup.clone()[..4].to_string(),
                 None,
@@ -584,7 +610,7 @@ mod tests {
                 1,
                 4,
             ),
-            Token::new(TokenType::NewLineChar, "\n".to_string(), None, 1, 5, 5),
+            Token::new_default(TokenType::NewLineChar, "\n".to_string(), None, 1, 5, 5),
         ];
         scan_and_assert_eq(&markup, expected_tokens);
     }
@@ -598,9 +624,9 @@ mod tests {
     #[case("\n\n====\n".to_string(), TokenType::ExampleBlock)]
     fn fenced_block_delimiter_new_block(#[case] markup: String, #[case] expected_token: TokenType) {
         let expected_tokens = vec![
-            Token::new(TokenType::NewLineChar, "\n".to_string(), None, 1, 1, 1),
-            Token::new(TokenType::NewLineChar, "\n".to_string(), None, 2, 1, 1),
-            Token::new(
+            Token::new_default(TokenType::NewLineChar, "\n".to_string(), None, 1, 1, 1),
+            Token::new_default(TokenType::NewLineChar, "\n".to_string(), None, 2, 1, 1),
+            Token::new_default(
                 expected_token,
                 markup.clone()[2..6].to_string(),
                 None,
@@ -608,7 +634,7 @@ mod tests {
                 1,
                 4,
             ),
-            Token::new(TokenType::NewLineChar, "\n".to_string(), None, 3, 5, 5),
+            Token::new_default(TokenType::NewLineChar, "\n".to_string(), None, 3, 5, 5),
         ];
         scan_and_assert_eq(&markup, expected_tokens);
     }
@@ -617,7 +643,7 @@ mod tests {
     fn open_block_beginning() {
         let markup = "--\n".to_string();
         let expected_tokens = vec![
-            Token::new(
+            Token::new_default(
                 TokenType::OpenBlock,
                 markup.clone()[..2].to_string(),
                 None,
@@ -625,7 +651,7 @@ mod tests {
                 1,
                 2,
             ),
-            Token::new(TokenType::NewLineChar, "\n".to_string(), None, 1, 3, 3),
+            Token::new_default(TokenType::NewLineChar, "\n".to_string(), None, 1, 3, 3),
         ];
         scan_and_assert_eq(&markup, expected_tokens);
     }
@@ -634,10 +660,10 @@ mod tests {
     fn open_block_new_block() {
         let markup = "\n\n--\n".to_string();
         let expected_tokens = vec![
-            Token::new(TokenType::NewLineChar, "\n".to_string(), None, 1, 1, 1),
-            Token::new(TokenType::NewLineChar, "\n".to_string(), None, 2, 1, 1),
-            Token::new(TokenType::OpenBlock, "--".to_string(), None, 3, 1, 2),
-            Token::new(TokenType::NewLineChar, "\n".to_string(), None, 3, 3, 3),
+            Token::new_default(TokenType::NewLineChar, "\n".to_string(), None, 1, 1, 1),
+            Token::new_default(TokenType::NewLineChar, "\n".to_string(), None, 2, 1, 1),
+            Token::new_default(TokenType::OpenBlock, "--".to_string(), None, 3, 1, 2),
+            Token::new_default(TokenType::NewLineChar, "\n".to_string(), None, 3, 3, 3),
         ];
         scan_and_assert_eq(&markup, expected_tokens);
     }
@@ -654,8 +680,8 @@ mod tests {
             .to_string();
         delimiter.push(' ');
         let expected_tokens = vec![
-            Token::new(expected_token, delimiter, None, 1, 1, 2),
-            Token::new(
+            Token::new_default(expected_token, delimiter, None, 1, 1, 2),
+            Token::new_default(
                 TokenType::Text,
                 "Foo".to_string(),
                 Some("Foo".to_string()),
@@ -663,7 +689,7 @@ mod tests {
                 3,
                 5,
             ),
-            Token::new(TokenType::NewLineChar, "\n".to_string(), None, 1, 6, 6),
+            Token::new_default(TokenType::NewLineChar, "\n".to_string(), None, 1, 6, 6),
         ];
         scan_and_assert_eq(&markup, expected_tokens);
     }
@@ -680,8 +706,8 @@ mod tests {
             .to_string();
         delimiter.push(' ');
         let expected_tokens = vec![
-            Token::new(expected_token, delimiter.clone(), None, 1, 1, 2),
-            Token::new(
+            Token::new_default(expected_token, delimiter.clone(), None, 1, 1, 2),
+            Token::new_default(
                 TokenType::Text,
                 "Foo".to_string(),
                 Some("Foo".to_string()),
@@ -689,9 +715,9 @@ mod tests {
                 3,
                 5,
             ),
-            Token::new(TokenType::NewLineChar, "\n".to_string(), None, 1, 6, 6),
-            Token::new(expected_token, delimiter, None, 2, 1, 2),
-            Token::new(
+            Token::new_default(TokenType::NewLineChar, "\n".to_string(), None, 1, 6, 6),
+            Token::new_default(expected_token, delimiter, None, 2, 1, 2),
+            Token::new_default(
                 TokenType::Text,
                 "Bar".to_string(),
                 Some("Bar".to_string()),
@@ -709,9 +735,9 @@ mod tests {
         let markup = ".Some ttle\n".to_string();
         let title = "Some ttle".to_string();
         let expected_tokens = vec![
-            Token::new(TokenType::BlockLabel, ".".to_string(), None, 1, 1, 1),
-            Token::new(TokenType::Text, title.clone(), Some(title), 1, 2, 10),
-            Token::new(TokenType::NewLineChar, "\n".to_string(), None, 1, 11, 11),
+            Token::new_default(TokenType::BlockLabel, ".".to_string(), None, 1, 1, 1),
+            Token::new_default(TokenType::Text, title.clone(), Some(title), 1, 2, 10),
+            Token::new_default(TokenType::NewLineChar, "\n".to_string(), None, 1, 11, 11),
         ];
         scan_and_assert_eq(&markup, expected_tokens);
     }
@@ -730,10 +756,10 @@ mod tests {
         let mut lexeme = "=".to_string().repeat(heading_level);
         lexeme.push(' ');
         let expected_tokens = vec![
-            Token::new(TokenType::NewLineChar, "\n".to_string(), None, 1, 1, 1),
-            Token::new(TokenType::NewLineChar, "\n".to_string(), None, 2, 1, 1),
-            Token::new(expected_token, lexeme.clone(), None, 3, 1, lexeme.len()),
-            Token::new(
+            Token::new_default(TokenType::NewLineChar, "\n".to_string(), None, 1, 1, 1),
+            Token::new_default(TokenType::NewLineChar, "\n".to_string(), None, 2, 1, 1),
+            Token::new_default(expected_token, lexeme.clone(), None, 3, 1, lexeme.len()),
+            Token::new_default(
                 TokenType::Text,
                 "Foo".to_string(),
                 Some("Foo".to_string()),
@@ -741,7 +767,7 @@ mod tests {
                 lexeme.len() + 1,
                 lexeme.len() + 3,
             ),
-            Token::new(
+            Token::new_default(
                 TokenType::NewLineChar,
                 "\n".to_string(),
                 None,
@@ -759,9 +785,9 @@ mod tests {
     fn breaks(#[case] markup: String, #[case] expected_token: TokenType) {
         // these should always be after a block, and the 'start' case is tested elsewhere
         let expected_tokens = vec![
-            Token::new(TokenType::NewLineChar, "\n".to_string(), None, 1, 1, 1),
-            Token::new(TokenType::NewLineChar, "\n".to_string(), None, 2, 1, 1),
-            Token::new(
+            Token::new_default(TokenType::NewLineChar, "\n".to_string(), None, 1, 1, 1),
+            Token::new_default(TokenType::NewLineChar, "\n".to_string(), None, 2, 1, 1),
+            Token::new_default(
                 expected_token,
                 markup.clone()[2..5].to_string(),
                 None,
@@ -769,7 +795,7 @@ mod tests {
                 1,
                 3,
             ),
-            Token::new(TokenType::NewLineChar, "\n".to_string(), None, 3, 4, 4),
+            Token::new_default(TokenType::NewLineChar, "\n".to_string(), None, 3, 4, 4),
         ];
         scan_and_assert_eq(&markup, expected_tokens);
     }
@@ -779,8 +805,8 @@ mod tests {
         let comment_line = "// Some text or other".to_string();
         let markup = "\n".to_string() + &comment_line + "\n";
         let expected_tokens = vec![
-            Token::new(TokenType::NewLineChar, "\n".to_string(), None, 1, 1, 1),
-            Token::new(
+            Token::new_default(TokenType::NewLineChar, "\n".to_string(), None, 1, 1, 1),
+            Token::new_default(
                 TokenType::Comment,
                 comment_line.clone(),
                 Some(comment_line.clone()),
@@ -788,7 +814,7 @@ mod tests {
                 1,
                 comment_line.len(),
             ),
-            Token::new(
+            Token::new_default(
                 TokenType::NewLineChar,
                 "\n".to_string(),
                 None,
@@ -820,7 +846,7 @@ mod tests {
     fn attribute_lines(#[case] markup: &str, #[case] expected_token: TokenType) {
         let markup_len = markup[..markup.len() - 1].len();
         let expected_tokens = vec![
-            Token::new(
+            Token::new_default(
                 expected_token,
                 markup[..markup.len() - 1].to_string(),
                 Some(markup[..markup.len() - 1].to_string()),
@@ -828,7 +854,7 @@ mod tests {
                 1,
                 markup_len,
             ),
-            Token::new(
+            Token::new_default(
                 TokenType::NewLineChar,
                 "\n".to_string(),
                 None,
@@ -844,7 +870,7 @@ mod tests {
     fn block_continuation() {
         let markup = "* Foo\n+\nBar".to_string();
         let expected_tokens = vec![
-            Token::new(
+            Token::new_default(
                 TokenType::UnorderedListItem,
                 "* ".to_string(),
                 None,
@@ -852,7 +878,7 @@ mod tests {
                 1,
                 2,
             ),
-            Token::new(
+            Token::new_default(
                 TokenType::Text,
                 "Foo".to_string(),
                 Some("Foo".to_string()),
@@ -860,10 +886,10 @@ mod tests {
                 3,
                 5,
             ),
-            Token::new(TokenType::NewLineChar, "\n".to_string(), None, 1, 6, 6),
-            Token::new(TokenType::BlockContinuation, "+".to_string(), None, 2, 1, 1),
-            Token::new(TokenType::NewLineChar, "\n".to_string(), None, 2, 2, 2),
-            Token::new(
+            Token::new_default(TokenType::NewLineChar, "\n".to_string(), None, 1, 6, 6),
+            Token::new_default(TokenType::BlockContinuation, "+".to_string(), None, 2, 1, 1),
+            Token::new_default(TokenType::NewLineChar, "\n".to_string(), None, 2, 2, 2),
+            Token::new_default(
                 TokenType::Text,
                 "Bar".to_string(),
                 Some("Bar".to_string()),
@@ -879,7 +905,7 @@ mod tests {
     fn line_continuation() {
         let markup = "Foo +\nBar".to_string();
         let expected_tokens = vec![
-            Token::new(
+            Token::new_default(
                 TokenType::Text,
                 "Foo ".to_string(),
                 Some("Foo ".to_string()),
@@ -887,9 +913,9 @@ mod tests {
                 1,
                 4,
             ),
-            Token::new(TokenType::LineContinuation, "+".to_string(), None, 1, 5, 5),
-            Token::new(TokenType::NewLineChar, "\n".to_string(), None, 1, 6, 6),
-            Token::new(
+            Token::new_default(TokenType::LineContinuation, "+".to_string(), None, 1, 5, 5),
+            Token::new_default(TokenType::NewLineChar, "\n".to_string(), None, 1, 6, 6),
+            Token::new_default(
                 TokenType::Text,
                 "Bar".to_string(),
                 Some("Bar".to_string()),
@@ -911,7 +937,7 @@ mod tests {
     fn inline_formatting(#[case] markup_char: char, #[case] expected_token: TokenType) {
         let markup = format!("Some {}bar{} bar.", markup_char, markup_char);
         let expected_tokens = vec![
-            Token::new(
+            Token::new_default(
                 TokenType::Text,
                 "Some ".to_string(),
                 Some("Some ".to_string()),
@@ -919,8 +945,8 @@ mod tests {
                 1,
                 5,
             ),
-            Token::new(expected_token, markup_char.to_string(), None, 1, 6, 6),
-            Token::new(
+            Token::new_default(expected_token, markup_char.to_string(), None, 1, 6, 6),
+            Token::new_default(
                 TokenType::Text,
                 "bar".to_string(),
                 Some("bar".to_string()),
@@ -928,8 +954,8 @@ mod tests {
                 7,
                 9,
             ),
-            Token::new(expected_token, markup_char.to_string(), None, 1, 10, 10),
-            Token::new(
+            Token::new_default(expected_token, markup_char.to_string(), None, 1, 10, 10),
+            Token::new_default(
                 TokenType::Text,
                 " bar.".to_string(),
                 Some(" bar.".to_string()),
@@ -950,7 +976,7 @@ mod tests {
         // TODO make this less ugly
         let markup = format!("Some{}bar{}bar.", markup_str, markup_str);
         let expected_tokens = vec![
-            Token::new(
+            Token::new_default(
                 TokenType::Text,
                 "Some".to_string(),
                 Some("Some".to_string()),
@@ -958,8 +984,8 @@ mod tests {
                 1,
                 4,
             ),
-            Token::new(expected_token, markup_str.clone(), None, 1, 5, 6),
-            Token::new(
+            Token::new_default(expected_token, markup_str.clone(), None, 1, 5, 6),
+            Token::new_default(
                 TokenType::Text,
                 "bar".to_string(),
                 Some("bar".to_string()),
@@ -967,8 +993,8 @@ mod tests {
                 7,
                 9,
             ),
-            Token::new(expected_token, markup_str, None, 1, 10, 11),
-            Token::new(
+            Token::new_default(expected_token, markup_str, None, 1, 10, 11),
+            Token::new_default(
                 TokenType::Text,
                 "bar.".to_string(),
                 Some("bar.".to_string()),
@@ -986,7 +1012,7 @@ mod tests {
     fn inline_macros(#[case] markup_check: &str, #[case] expected_token: TokenType) {
         let markup = format!("Some {}bar]", &markup_check);
         let expected_tokens = vec![
-            Token::new(
+            Token::new_default(
                 TokenType::Text,
                 "Some ".to_string(),
                 Some("Some ".to_string()),
@@ -994,7 +1020,7 @@ mod tests {
                 1,
                 5,
             ),
-            Token::new(
+            Token::new_default(
                 expected_token,
                 markup_check.to_string(),
                 None,
@@ -1002,7 +1028,7 @@ mod tests {
                 6,
                 6 + markup_check.len() - 1,
             ),
-            Token::new(
+            Token::new_default(
                 TokenType::Text,
                 "bar".to_string(),
                 Some("bar".to_string()),
@@ -1010,7 +1036,7 @@ mod tests {
                 6 + markup_check.len(),
                 6 + markup_check.len() + 2,
             ),
-            Token::new(
+            Token::new_default(
                 TokenType::InlineMacroClose,
                 "]".to_string(),
                 Some("]".to_string()),
@@ -1031,7 +1057,7 @@ mod tests {
     fn inline_admonitions(#[case] markup_check: &str, #[case] expected_token: TokenType) {
         let markup = format!("{}: bar.", markup_check);
         let expected_tokens = vec![
-            Token::new(
+            Token::new_default(
                 expected_token,
                 format!("{}: ", markup_check),
                 Some(format!("{}: ", markup_check)),
@@ -1039,7 +1065,7 @@ mod tests {
                 1,
                 markup_check.len() + 2, // account for space
             ),
-            Token::new(
+            Token::new_default(
                 TokenType::Text,
                 "bar.".to_string(),
                 Some("bar.".to_string()),
@@ -1056,7 +1082,7 @@ mod tests {
         // make it "DS" instead of "Description" to avoid the "i" delimiting the text
         let markup = "Term:: DS";
         let expected_tokens = vec![
-            Token::new(
+            Token::new_default(
                 TokenType::Text,
                 "Term".to_string(),
                 Some("Term".to_string()),
@@ -1064,7 +1090,7 @@ mod tests {
                 1,
                 4,
             ),
-            Token::new(
+            Token::new_default(
                 TokenType::DescriptionListMarker,
                 ":: ".to_string(),
                 None,
@@ -1072,7 +1098,7 @@ mod tests {
                 5,
                 7,
             ),
-            Token::new(
+            Token::new_default(
                 TokenType::Text,
                 "DS".to_string(),
                 Some("DS".to_string()),
@@ -1089,7 +1115,7 @@ mod tests {
         // make it "DS" instead of "Description" to avoid the "i" delimiting the text
         let markup = "Term::\nDS";
         let expected_tokens = vec![
-            Token::new(
+            Token::new_default(
                 TokenType::Text,
                 "Term".to_string(),
                 Some("Term".to_string()),
@@ -1097,7 +1123,7 @@ mod tests {
                 1,
                 4,
             ),
-            Token::new(
+            Token::new_default(
                 TokenType::DescriptionListMarker,
                 "::\n".to_string(),
                 None,
@@ -1105,7 +1131,7 @@ mod tests {
                 5,
                 7,
             ),
-            Token::new(
+            Token::new_default(
                 TokenType::Text,
                 "DS".to_string(),
                 Some("DS".to_string()),
@@ -1122,7 +1148,7 @@ mod tests {
         let markup = "Term :: bar";
 
         let expected_tokens = vec![
-            Token::new(
+            Token::new_default(
                 TokenType::Text,
                 "Term ".to_string(),
                 Some("Term ".to_string()),
@@ -1130,7 +1156,7 @@ mod tests {
                 1,
                 5,
             ),
-            Token::new(
+            Token::new_default(
                 TokenType::Text,
                 ":".to_string(),
                 Some(":".to_string()),
@@ -1138,7 +1164,7 @@ mod tests {
                 6,
                 6,
             ),
-            Token::new(
+            Token::new_default(
                 TokenType::Text,
                 ": bar".to_string(),
                 Some(": bar".to_string()),
@@ -1154,7 +1180,7 @@ mod tests {
     fn link_with_text() {
         let markup = "Some http://example.com[bar]";
         let expected_tokens = vec![
-            Token::new(
+            Token::new_default(
                 TokenType::Text,
                 "Some ".to_string(),
                 Some("Some ".to_string()),
@@ -1162,7 +1188,7 @@ mod tests {
                 1,
                 5,
             ),
-            Token::new(
+            Token::new_default(
                 TokenType::LinkMacro,
                 "http://example.com[".to_string(),
                 Some("http://example.com[".to_string()),
@@ -1170,7 +1196,7 @@ mod tests {
                 6,
                 24,
             ),
-            Token::new(
+            Token::new_default(
                 TokenType::Text,
                 "bar".to_string(),
                 Some("bar".to_string()),
@@ -1178,7 +1204,7 @@ mod tests {
                 25,
                 27,
             ),
-            Token::new(
+            Token::new_default(
                 TokenType::InlineMacroClose,
                 "]".to_string(),
                 Some("]".to_string()),
@@ -1194,7 +1220,7 @@ mod tests {
     fn link_no_text() {
         let markup = "Some http://example.com[]";
         let expected_tokens = vec![
-            Token::new(
+            Token::new_default(
                 TokenType::Text,
                 "Some ".to_string(),
                 Some("Some ".to_string()),
@@ -1202,7 +1228,7 @@ mod tests {
                 1,
                 5,
             ),
-            Token::new(
+            Token::new_default(
                 TokenType::LinkMacro,
                 "http://example.com[".to_string(),
                 Some("http://example.com[".to_string()),
@@ -1210,7 +1236,7 @@ mod tests {
                 6,
                 24,
             ),
-            Token::new(
+            Token::new_default(
                 TokenType::InlineMacroClose,
                 "]".to_string(),
                 Some("]".to_string()),
@@ -1225,7 +1251,7 @@ mod tests {
     #[test]
     fn block_image_with_alt() {
         let markup = "image::path/to/img.png[alt text]";
-        let expected_tokens = vec![Token::new(
+        let expected_tokens = vec![Token::new_default(
             TokenType::BlockImageMacro,
             "image::path/to/img.png[alt text]".to_string(),
             Some("image::path/to/img.png[alt text]".to_string()),
@@ -1240,7 +1266,7 @@ mod tests {
     fn inline_image() {
         let markup = "Some image:path/to/img.png[]";
         let expected_tokens = vec![
-            Token::new(
+            Token::new_default(
                 TokenType::Text,
                 "Some ".to_string(),
                 Some("Some ".to_string()),
@@ -1248,7 +1274,7 @@ mod tests {
                 1,
                 5,
             ),
-            Token::new(
+            Token::new_default(
                 TokenType::InlineImageMacro,
                 "image:path/to/img.png[]".to_string(),
                 Some("image:path/to/img.png[]".to_string()),
@@ -1264,7 +1290,7 @@ mod tests {
     fn no_inline_image_if_double_colon() {
         let markup = "Some image::bar.png[]";
         let expected_tokens = vec![
-            Token::new(
+            Token::new_default(
                 TokenType::Text,
                 "Some ".to_string(),
                 Some("Some ".to_string()),
@@ -1272,7 +1298,7 @@ mod tests {
                 1,
                 5,
             ),
-            Token::new(
+            Token::new_default(
                 TokenType::Text,
                 "image".to_string(),
                 Some("image".to_string()),
@@ -1280,7 +1306,7 @@ mod tests {
                 6,
                 10,
             ),
-            Token::new(
+            Token::new_default(
                 TokenType::Text,
                 ":".to_string(),
                 Some(":".to_string()),
@@ -1288,7 +1314,7 @@ mod tests {
                 11,
                 11,
             ),
-            Token::new(
+            Token::new_default(
                 TokenType::Text,
                 ":bar.".to_string(),
                 Some(":bar.".to_string()),
@@ -1296,7 +1322,7 @@ mod tests {
                 12,
                 16,
             ),
-            Token::new(
+            Token::new_default(
                 TokenType::Text,
                 "png".to_string(),
                 Some("png".to_string()),
@@ -1304,7 +1330,7 @@ mod tests {
                 17,
                 19,
             ),
-            Token::new(
+            Token::new_default(
                 TokenType::Text,
                 "[".to_string(),
                 Some("[".to_string()),
@@ -1312,7 +1338,7 @@ mod tests {
                 20,
                 20,
             ),
-            Token::new(
+            Token::new_default(
                 TokenType::InlineMacroClose,
                 "]".to_string(),
                 Some("]".to_string()),
@@ -1328,7 +1354,7 @@ mod tests {
     fn inline_style_in_line() {
         let markup = "Some [.style]#text#";
         let expected_tokens = vec![
-            Token::new(
+            Token::new_default(
                 TokenType::Text,
                 "Some ".to_string(),
                 Some("Some ".to_string()),
@@ -1336,7 +1362,7 @@ mod tests {
                 1,
                 5,
             ),
-            Token::new(
+            Token::new_default(
                 TokenType::InlineStyle,
                 "[.style]".to_string(),
                 Some("[.style]".to_string()),
@@ -1344,8 +1370,8 @@ mod tests {
                 6,
                 13,
             ),
-            Token::new(TokenType::Mark, "#".to_string(), None, 1, 14, 14),
-            Token::new(
+            Token::new_default(TokenType::Mark, "#".to_string(), None, 1, 14, 14),
+            Token::new_default(
                 TokenType::Text,
                 "text".to_string(),
                 Some("text".to_string()),
@@ -1353,7 +1379,7 @@ mod tests {
                 15,
                 18,
             ),
-            Token::new(TokenType::Mark, "#".to_string(), None, 1, 19, 19),
+            Token::new_default(TokenType::Mark, "#".to_string(), None, 1, 19, 19),
         ];
         scan_and_assert_eq(&markup, expected_tokens);
     }
@@ -1362,8 +1388,8 @@ mod tests {
     fn inline_style_new_line() {
         let markup = "\n[.style]#text#";
         let expected_tokens = vec![
-            Token::new(TokenType::NewLineChar, "\n".to_string(), None, 1, 1, 1),
-            Token::new(
+            Token::new_default(TokenType::NewLineChar, "\n".to_string(), None, 1, 1, 1),
+            Token::new_default(
                 TokenType::InlineStyle,
                 "[.style]".to_string(),
                 Some("[.style]".to_string()),
@@ -1371,8 +1397,8 @@ mod tests {
                 1,
                 8,
             ),
-            Token::new(TokenType::Mark, "#".to_string(), None, 2, 9, 9),
-            Token::new(
+            Token::new_default(TokenType::Mark, "#".to_string(), None, 2, 9, 9),
+            Token::new_default(
                 TokenType::Text,
                 "text".to_string(),
                 Some("text".to_string()),
@@ -1380,7 +1406,7 @@ mod tests {
                 10,
                 13,
             ),
-            Token::new(TokenType::Mark, "#".to_string(), None, 2, 14, 14),
+            Token::new_default(TokenType::Mark, "#".to_string(), None, 2, 14, 14),
         ];
         scan_and_assert_eq(&markup, expected_tokens);
     }
@@ -1388,9 +1414,9 @@ mod tests {
     fn inline_style_new_block() {
         let markup = "\n\n[.style]#text#";
         let expected_tokens = vec![
-            Token::new(TokenType::NewLineChar, "\n".to_string(), None, 1, 1, 1),
-            Token::new(TokenType::NewLineChar, "\n".to_string(), None, 2, 1, 1),
-            Token::new(
+            Token::new_default(TokenType::NewLineChar, "\n".to_string(), None, 1, 1, 1),
+            Token::new_default(TokenType::NewLineChar, "\n".to_string(), None, 2, 1, 1),
+            Token::new_default(
                 TokenType::InlineStyle,
                 "[.style]".to_string(),
                 Some("[.style]".to_string()),
@@ -1398,8 +1424,8 @@ mod tests {
                 1,
                 8,
             ),
-            Token::new(TokenType::Mark, "#".to_string(), None, 3, 9, 9),
-            Token::new(
+            Token::new_default(TokenType::Mark, "#".to_string(), None, 3, 9, 9),
+            Token::new_default(
                 TokenType::Text,
                 "text".to_string(),
                 Some("text".to_string()),
@@ -1407,7 +1433,7 @@ mod tests {
                 10,
                 13,
             ),
-            Token::new(TokenType::Mark, "#".to_string(), None, 3, 14, 14),
+            Token::new_default(TokenType::Mark, "#".to_string(), None, 3, 14, 14),
         ];
         scan_and_assert_eq(&markup, expected_tokens);
     }
@@ -1416,7 +1442,7 @@ mod tests {
     fn inline_charref() {
         let markup = "bar&mdash;bar";
         let expected_tokens = vec![
-            Token::new(
+            Token::new_default(
                 TokenType::Text,
                 "bar".to_string(),
                 Some("bar".to_string()),
@@ -1424,7 +1450,7 @@ mod tests {
                 1,
                 3,
             ),
-            Token::new(
+            Token::new_default(
                 TokenType::CharRef,
                 "&mdash;".to_string(),
                 Some("&mdash;".to_string()),
@@ -1432,7 +1458,7 @@ mod tests {
                 4,
                 10,
             ),
-            Token::new(
+            Token::new_default(
                 TokenType::Text,
                 "bar".to_string(),
                 Some("bar".to_string()),
@@ -1448,7 +1474,7 @@ mod tests {
     fn document_attribute_name_value() {
         let markup = ":foo: bar\n";
         let expected_tokens = vec![
-            Token::new(
+            Token::new_default(
                 TokenType::Attribute,
                 String::from(":foo: bar"),
                 None,
@@ -1456,7 +1482,7 @@ mod tests {
                 1,
                 9,
             ),
-            Token::new(TokenType::NewLineChar, "\n".to_string(), None, 1, 10, 10),
+            Token::new_default(TokenType::NewLineChar, "\n".to_string(), None, 1, 10, 10),
         ];
         scan_and_assert_eq(&markup, expected_tokens);
     }
@@ -1465,7 +1491,7 @@ mod tests {
     fn inline_attr_reference() {
         let markup = "bar{foo}bar";
         let expected_tokens = vec![
-            Token::new(
+            Token::new_default(
                 TokenType::Text,
                 "bar".to_string(),
                 Some("bar".to_string()),
@@ -1473,7 +1499,7 @@ mod tests {
                 1,
                 3,
             ),
-            Token::new(
+            Token::new_default(
                 TokenType::AttributeReference,
                 "{foo}".to_string(),
                 None,
@@ -1481,7 +1507,7 @@ mod tests {
                 4,
                 8,
             ),
-            Token::new(
+            Token::new_default(
                 TokenType::Text,
                 "bar".to_string(),
                 Some("bar".to_string()),
@@ -1496,16 +1522,28 @@ mod tests {
     #[test]
     fn cross_reference() {
         let markup = "<<foo_bar>>";
-        let expected_tokens = vec![
-            Token::new(
-                TokenType::CrossReference,
-                "<<foo_bar>>".to_string(),
-                Some("<<foo_bar>>".to_string()),
-                1,
-                1,
-                11,
-            )
-        ];
+        let expected_tokens = vec![Token::new_default(
+            TokenType::CrossReference,
+            "<<foo_bar>>".to_string(),
+            Some("<<foo_bar>>".to_string()),
+            1,
+            1,
+            11,
+        )];
+        scan_and_assert_eq(&markup, expected_tokens);
+    }
+
+    #[test]
+    fn simple_include() {
+        let markup = "include::partial.adoc[]";
+        let expected_tokens = vec![Token::new_default(
+            TokenType::Include,
+            "include::partial.adoc[]".to_string(),
+            Some("include::partial.adoc[]".to_string()),
+            1,
+            1,
+            23,
+        )];
         scan_and_assert_eq(&markup, expected_tokens);
     }
 
@@ -1517,7 +1555,7 @@ mod tests {
         let mut expected_tokens: Vec<Token> = vec![];
         if beginning == "\n" {
             addition = 1;
-            expected_tokens = vec![Token::new(
+            expected_tokens = vec![Token::new_default(
                 TokenType::NewLineChar,
                 "\n".to_string(),
                 None,
@@ -1528,7 +1566,7 @@ mod tests {
         }
         let markup = format!("{beginning}[[foo]]\n");
         expected_tokens.extend(vec![
-            Token::new(
+            Token::new_default(
                 TokenType::BlockAnchor,
                 "[[foo]]".to_string(),
                 Some("[[foo]]".to_string()),
@@ -1536,7 +1574,7 @@ mod tests {
                 1,
                 7,
             ),
-            Token::new(
+            Token::new_default(
                 TokenType::NewLineChar,
                 "\n".to_string(),
                 None,

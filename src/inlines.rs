@@ -531,6 +531,7 @@ mod tests {
             line: 1,
             startcol: 1,
             endcol: 1,
+            file_stack: vec![]
         };
         let inline = InlineRef::new_xref_from_token(token);
         assert_eq!(inline.variant, InlineRefVariant::Xref);
@@ -539,7 +540,7 @@ mod tests {
 
     #[test]
     fn image_from_token() {
-        let token = Token::new(
+        let token = Token::new_default(
             crate::tokens::TokenType::InlineImageMacro,
             "image:path/to/img.png[]".to_string(),
             Some("image:path/to/img.png[]".to_string()),
@@ -553,7 +554,7 @@ mod tests {
 
     #[test]
     fn image_from_token_title() {
-        let token = Token::new(
+        let token = Token::new_default(
             crate::tokens::TokenType::InlineImageMacro,
             "image:path/to/img.png[title=Pause]".to_string(),
             Some("image:path/to/img.png[title=Pause]".to_string()),
