@@ -188,6 +188,7 @@ impl Parser {
             // references
             TokenType::AttributeReference => self.parse_attribute_reference(token),
             TokenType::CrossReference => self.parse_cross_reference(token),
+            TokenType::Include=> self.parse_include(token),
 
             // inline macros
             TokenType::FootnoteMacro => self.parse_footnote_macro(token),
@@ -389,6 +390,13 @@ impl Parser {
         // for now, do nothing
     }
 
+    fn parse_include(&self, _token: Token) {
+        // Match filetype, if adoc scan into tokens, adding the location, then parse... then pop
+        // out the blocks? I think that makes sense.
+        // if not adoc, just add each token as inline text until we're through
+        todo!()
+    }
+
     /// Gathers preceding inlines into the "terms" attribute on DListItem, then adds what follows
     /// as you would for a normal list
     fn parse_description_list_term(&mut self, token: Token) {
@@ -477,7 +485,7 @@ impl Parser {
     //fn parse_block_label(&mut self, token: Token, asg: &mut Asg) {}
 
     fn parse_level_0_heading(&mut self, token: Token, asg: &mut Asg) {
-        if token.first_location() == (Location { line: 1, col: 1 }) {
+        if token.first_location() == Location::default() {
             self.in_document_header = true
         }
         if self.in_document_header {

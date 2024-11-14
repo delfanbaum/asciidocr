@@ -61,9 +61,8 @@ pub struct Author {
 pub struct Location {
     pub line: usize, // 1-indexed
     pub col: usize,  // 1-indexed
-                     //#[serde(skip_serializing_if = "Option::is_none")]
-                     //pub file: Option<Vec<String>>, // I *think* this is for includes, though we're not going to handle
-                     // those yet
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub file: Option<Vec<String>>,
 }
 
 impl Default for Location {
@@ -71,7 +70,7 @@ impl Default for Location {
         Location {
             line: 1,
             col: 1,
-            //file: None,
+            file: None,
         }
     }
 }
@@ -97,9 +96,9 @@ impl Location {
         Location {
             line,
             col,
-            //file: None,
+            file: None,
         }
-    } // handle file later
+    } 
 
     pub fn col(&self) -> usize {
         self.col

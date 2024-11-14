@@ -191,11 +191,11 @@ pub enum TokenType {
 
     InlineStyle, // i.e., [.some_class], usually [.x]#applied here#
 
-    // references, cross references TK
-    // math blocks TK
-    //Include,
+    // file and tag references
+    Include,
     //StartTag, // tag::[]
     //EndTag,
+    // math blocks TK
 
     // Attributes, anchors and references
     BlockAnchor,

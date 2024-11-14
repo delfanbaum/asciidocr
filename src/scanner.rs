@@ -205,7 +205,9 @@ impl<'a> Scanner<'a> {
                 }
             }
             'i' => {
-                if self.starts_new_line() && self.peeks_ahead(6) == "mage::" {
+                if self.starts_new_line() && self.peeks_ahead(8) == "nclude::" {
+                    self.add_include()
+                } else if self.starts_new_line() && self.peeks_ahead(6) == "mage::" {
                     self.add_block_image()
                 // double colons after just parse as regular text per asciidoctor implementation
                 } else if self.peeks_ahead(5) == "mage:"
@@ -369,6 +371,15 @@ impl<'a> Scanner<'a> {
         }
         self.current += 1; // consume the ']' char
         self.add_token(TokenType::InlineImageMacro, true, 0)
+    }
+
+    /// Adds the include image, consuming the target as well as any attributes
+    fn add_include(&mut self) -> Token {
+        while self.peek() != ']' {
+            self.current += 1
+        }
+        self.current += 1; // consume the ']' char
+        self.add_token(TokenType::Include, true, 0)
     }
 
     /// Adds the link, consuming the target but not any attributes
@@ -1504,6 +1515,22 @@ mod tests {
                 1,
                 1,
                 11,
+            )
+        ];
+        scan_and_assert_eq(&markup, expected_tokens);
+    }
+
+    #[test]
+    fn simple_include() {
+        let markup = "include::partial.adoc[]";
+        let expected_tokens = vec![
+            Token::new(
+                TokenType::Include,
+                "include::partial.adoc[]".to_string(),
+                Some("include::partial.adoc[]".to_string()),
+                1,
+                1,
+                23,
             )
         ];
         scan_and_assert_eq(&markup, expected_tokens);
