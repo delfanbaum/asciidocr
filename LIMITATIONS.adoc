@@ -5,6 +5,7 @@ non-features.
 
 == Language Features in a Non-Working State
 
+* Tables
 * Cross reference checking and text
 * Section IDs are not auto-generated
 * Custom IDs/reference text
@@ -15,14 +16,9 @@ non-features.
 attribute short hand] -- I'm both not a fan (just use `role=` and `[[id]]`, etc.!) and parsing this is going to be semi-annoying so I shall put it off.
 * Hardbreaks-option attribute (which we shall include for our poet friends who
   don't want to have to wrap everything in `[verse]`) 
-* Includes
-* Tables
-* https://docs.asciidoctor.org/asciidoc/latest/document/author-information/[Author
-  information]
-* https://docs.asciidoctor.org/asciidoc/latest/document/revision-information/[Revision
-  information]
-* https://docs.asciidoctor.org/asciidoc/latest/document/metadata/[Document
-  metadata]
+* https://docs.asciidoctor.org/asciidoc/latest/document/author-information/[Author information]
+* https://docs.asciidoctor.org/asciidoc/latest/document/revision-information/[Revision information]
+* https://docs.asciidoctor.org/asciidoc/latest/document/metadata/[Document metadata]
 * https://docs.asciidoctor.org/asciidoc/latest/document/doctype/[Document types]
 * https://docs.asciidoctor.org/asciidoc/latest/sections/section-ref/[Section
   Attributes and styles]
