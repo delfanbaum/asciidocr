@@ -35,9 +35,7 @@ pub fn read_output(args: Cli) -> Option<PathBuf> {
             if output == "-" {
                 None
             } else {
-                let mut out_destination = PathBuf::from(args.file.clone());
-                out_destination.set_extension("html");
-                Some(out_destination)
+                Some(PathBuf::from(output.clone()))
             }
         }
         None => {

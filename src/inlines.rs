@@ -483,6 +483,11 @@ impl InlineLiteral {
         // update the locations
         self.location = Location::reconcile(self.location.clone(), value_locations);
     }
+
+    pub fn value(&self) -> String {
+        self.value.clone()
+    }
+
 }
 
 #[derive(Serialize, Clone, Debug)]

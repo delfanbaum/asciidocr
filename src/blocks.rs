@@ -618,6 +618,10 @@ impl LeafBlock {
         };
         first_location.line
     }
+
+    pub fn inlines(&self) -> Vec<Inline> {
+        self.inlines.clone()
+    }
 }
 
 #[derive(Serialize, Debug)]
