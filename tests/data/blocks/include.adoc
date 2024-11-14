@@ -1,0 +1,5 @@
+Here is a paragraph, followed by an include.
+
+include::tests/data/blocks/nested-headings-multiple.adoc[]
+
+And then some final content back in the original file.

@@ -61,8 +61,8 @@ pub struct Author {
 pub struct Location {
     pub line: usize, // 1-indexed
     pub col: usize,  // 1-indexed
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub file: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub file: Vec<String>,
 }
 
 impl Default for Location {
@@ -70,7 +70,7 @@ impl Default for Location {
         Location {
             line: 1,
             col: 1,
-            file: None,
+            file: vec![],
         }
     }
 }
@@ -92,11 +92,11 @@ impl PartialOrd for Location {
 }
 
 impl Location {
-    pub fn new(line: usize, col: usize) -> Self {
+    pub fn new(line: usize, col: usize, file: Vec<String>) -> Self {
         Location {
             line,
             col,
-            file: None,
+            file,
         }
     } 
 
@@ -139,10 +139,10 @@ mod tests {
 
     #[test]
     fn reconcile_locations() {
-        let start = vec![Location::new(1, 1), Location::new(2, 4)];
-        let other = vec![Location::new(1, 1), Location::new(4, 5)];
+        let start = vec![Location::new(1, 1, vec![]), Location::new(2, 4, vec![])];
+        let other = vec![Location::new(1, 1, vec![]), Location::new(4, 5, vec![])];
         assert_eq!(
-            vec![Location::new(1, 1), Location::new(4, 5)],
+            vec![Location::new(1, 1, vec![]), Location::new(4, 5, vec![])],
             Location::reconcile(start, other)
         )
     }

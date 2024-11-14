@@ -10,7 +10,10 @@ pub fn target_and_attrs_from_token(token: &Token) -> (String, Option<ElementMeta
             target_and_attrs = token.text()[7..].to_string(); // after image::
         }
         crate::tokens::TokenType::InlineImageMacro => {
-            target_and_attrs = token.text()[6..].to_string(); // after image::
+            target_and_attrs = token.text()[6..].to_string(); // after image:
+        }
+        crate::tokens::TokenType::Include => {
+            target_and_attrs = token.text()[9..].to_string(); // after include::
         }
         _ => panic!("Invalid token provided to target_and_attrs_from_token")
     }

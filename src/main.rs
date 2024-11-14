@@ -1,12 +1,13 @@
 use anyhow::Result;
 use clap::Parser;
-use std::{fs, io, path::PathBuf};
+use std::{fs, path::PathBuf};
 
 use asciidocr::{
     cli::{Backends, Cli},
     output::{gather_htmlbook_templates, render_from_templates},
     parser::Parser as AdocParser,
     scanner::Scanner,
+    utils::open_file,
 };
 
 fn main() {
@@ -42,18 +43,10 @@ fn main() {
 }
 
 fn run(args: Cli) -> Result<String> {
-    let graph = AdocParser::new().parse(Scanner::new(&open(&args.file)));
+    let graph = AdocParser::new().parse(Scanner::new(&open_file(&args.file)));
     match args.backend {
         Backends::Htmlbook => render_from_templates(&graph, gather_htmlbook_templates()),
         Backends::Json => Ok(serde_json::to_string_pretty(&graph)?),
-    }
-}
-
-fn open(filename: &str) -> String {
-    match filename {
-        "-" => io::read_to_string(io::stdin()).expect("Error reading from stdin"),
-        _ => fs::read_to_string(filename)
-            .unwrap_or_else(|_| panic!("Unable to read file: {}", filename)),
     }
 }
 

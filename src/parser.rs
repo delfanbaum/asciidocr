@@ -6,9 +6,12 @@ use crate::{
     blocks::{Block, BlockMacro, Break, LeafBlock, ParentBlock, Section},
     inlines::{Inline, InlineLiteral, InlineRef, InlineSpan, LineBreak},
     lists::{DList, DListItem, List, ListItem, ListVariant},
+    macros::target_and_attrs_from_token,
     metadata::{AttributeType, ElementMetadata},
     nodes::{Header, Location},
+    scanner::Scanner,
     tokens::{Token, TokenType},
+    utils::{is_asciidoc_file, open_file},
 };
 
 /// Parses a stream of tokens into an Abstract Syntax Graph, returning the graph once all tokens
@@ -21,6 +24,9 @@ pub struct Parser {
     block_stack: Vec<Block>,
     /// holding ground for inline elements until it's time to push to the relevant block
     inline_stack: VecDeque<Inline>,
+    /// holding ground for includes file names; if inside an include push to stack, popping off
+    /// once the file's tokens have been accommodated (this allows for simpler nesting)
+    file_stack: Vec<String>,
     /// holding ground for a block title, to be applied to the subsequent block
     block_title: Option<Vec<Inline>>,
     /// holding ground for block metadata, to be applied to the subsequent block
@@ -67,6 +73,7 @@ impl Parser {
             document_attributes: HashMap::new(),
             block_stack: vec![],
             inline_stack: VecDeque::new(),
+            file_stack: vec![],
             block_title: None,
             metadata: None,
             open_delimited_block_lines: vec![],
@@ -188,7 +195,7 @@ impl Parser {
             // references
             TokenType::AttributeReference => self.parse_attribute_reference(token),
             TokenType::CrossReference => self.parse_cross_reference(token),
-            TokenType::Include=> self.parse_include(token),
+            TokenType::Include => self.parse_include(token, asg),
 
             // inline macros
             TokenType::FootnoteMacro => self.parse_footnote_macro(token),
@@ -390,11 +397,33 @@ impl Parser {
         // for now, do nothing
     }
 
-    fn parse_include(&self, _token: Token) {
-        // Match filetype, if adoc scan into tokens, adding the location, then parse... then pop
-        // out the blocks? I think that makes sense.
-        // if not adoc, just add each token as inline text until we're through
-        todo!()
+    fn parse_include(&mut self, token: Token, asg: &mut Asg) {
+        // ignore any attributes for the time being
+        let (target, _) = target_and_attrs_from_token(&token);
+        self.file_stack.push(target.clone());
+        
+        let current_block_stack_len = self.block_stack.len();
+
+        // Match filetype, if adoc scan into tokens, adding the location, then parse... 
+        if is_asciidoc_file(&target) {
+            for token in Scanner::new_with_stack(&open_file(&target), self.file_stack.clone()) {
+                self.token_into(token, asg)
+            }
+        } else {
+            for token in Scanner::new_with_stack(&open_file(&target), self.file_stack.clone()) {
+                self.parse_text(token)
+            }
+        }
+
+        // clean up inlines
+        self.add_inlines_to_block_stack();
+
+        // get the blocks stack back to where it was
+        while self.block_stack.len() > current_block_stack_len {
+            self.add_last_block_to_graph(asg)
+        }
+        // ...then pop the file off the stack
+        self.file_stack.pop();
     }
 
     /// Gathers preceding inlines into the "terms" attribute on DListItem, then adds what follows
@@ -920,6 +949,7 @@ impl Parser {
                     line,
                     startcol,
                     endcol,
+                    file_stack: self.file_stack.clone()
                 };
                 self.add_text_to_last_inline(reconstituted_token)
             }
