@@ -511,8 +511,9 @@ impl<'a> Scanner<'a> {
         constrained: TokenType,
         unconstrained: TokenType,
     ) -> Token {
-        if [' ', '\0', '.', ',', ';', ':', '\n', ')', '"'].contains(&self.peek())
-            || [' ', '\n', '\0', ']', '(', '"'].contains(&self.peek_back()) && self.peek() != c
+        // punctuation
+        if [' ', '\0', '.', ',', ';', ':', '\n', ')', '"', '!', '?', '\'', ']', '…', '“', '”','‘','’'].contains(&self.peek())
+            || [' ', '\n', '\0', ']', '(', '"', '['].contains(&self.peek_back()) && self.peek() != c
         {
             self.add_token(constrained, false, 0)
         } else if self.peek() == c {
