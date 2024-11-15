@@ -15,7 +15,7 @@ use crate::{
 pub enum _ToFindHomesFor {}
 
 /// Blocks enum, containing any tree blocks
-#[derive(Serialize, PartialEq, Debug)]
+#[derive(Serialize, PartialEq, Clone, Debug)]
 #[serde(untagged)]
 pub enum Block {
     Section(Section), // sort of a special case but prob needs to be included here
@@ -382,7 +382,7 @@ impl Block {
     }
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Clone, Debug)]
 pub struct Section {
     name: String,
     #[serde(rename = "type")]
@@ -396,7 +396,7 @@ pub struct Section {
     #[serde(skip_serializing_if = "Option::is_none")]
     metadata: Option<ElementMetadata>,
     pub level: usize,
-    blocks: Vec<Block>,
+    pub blocks: Vec<Block>,
     location: Vec<Location>,
 }
 
@@ -423,7 +423,7 @@ impl Section {
     }
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Clone, Debug)]
 pub struct Break {
     name: String,
     #[serde(rename = "type")]
@@ -438,7 +438,7 @@ impl PartialEq for Break {
     }
 }
 
-#[derive(Serialize, Debug, PartialEq, Eq)]
+#[derive(Serialize, Clone, Debug, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum BreakVariant {
     Page,
@@ -456,7 +456,7 @@ impl Break {
     }
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Clone, Debug)]
 pub struct BlockMacro {
     name: BlockMacroName,
     #[serde(rename = "type")]
@@ -476,7 +476,7 @@ impl PartialEq for BlockMacro {
     }
 }
 
-#[derive(Serialize, PartialEq, Debug)]
+#[derive(Serialize, PartialEq, Clone, Debug)]
 #[serde(rename_all = "lowercase")]
 pub enum BlockMacroName {
     Audio,
@@ -517,7 +517,7 @@ impl BlockMacro {
     }
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Clone, Debug)]
 pub struct LeafBlock {
     pub name: LeafBlockName,
     #[serde(rename = "type")]
@@ -532,7 +532,7 @@ pub struct LeafBlock {
     location: Vec<Location>,
 }
 
-#[derive(Serialize, Debug, PartialEq)]
+#[derive(Serialize, Clone, Debug, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub enum LeafBlockName {
     Listing,
@@ -543,7 +543,7 @@ pub enum LeafBlockName {
     Verse,
     Comment, // Gets thrown away, but convenient
 }
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Clone, Debug)]
 #[serde(rename_all = "lowercase")]
 pub enum LeafBlockForm {
     Delimited,
@@ -624,7 +624,7 @@ impl LeafBlock {
     }
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Clone, Debug)]
 pub struct ParentBlock {
     pub name: ParentBlockName,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -656,7 +656,7 @@ impl PartialEq for ParentBlock {
     }
 }
 
-#[derive(Serialize, Debug, PartialEq)]
+#[derive(Serialize, Clone, Debug, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub enum ParentBlockName {
     Admonition,
@@ -668,7 +668,7 @@ pub enum ParentBlockName {
            // ParentBlock until someone convinces me otherwise
 }
 
-#[derive(Serialize, Debug, PartialEq)]
+#[derive(Serialize, Clone, Debug, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub enum ParentBlockVarient {
     Caution,

@@ -6,7 +6,7 @@ use crate::{
 };
 use serde::Serialize;
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Clone, Debug)]
 pub struct List {
     name: String,
     #[serde(rename = "type")]
@@ -55,7 +55,7 @@ pub enum ListVariant {
     Unordered,
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Clone, Debug)]
 pub struct ListItem {
     name: String,
     #[serde(rename = "type")]
@@ -92,7 +92,7 @@ impl ListItem {
 }
 
 /// Functions essentially the same as a list
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Clone, Debug)]
 pub struct DList {
     name: String,
     #[serde(rename = "type")]
@@ -124,7 +124,7 @@ impl DList {
     }
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Clone, Debug)]
 pub struct DListItem {
     name: String,
     #[serde(rename = "type")]
