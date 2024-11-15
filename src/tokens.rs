@@ -179,6 +179,11 @@ pub enum TokenType {
     WarningPara,   // WARNING:
 
     BlockContinuation, // a "+" all by itself on a line can signal continuation
+    
+    // Tables -- note that we'll do two passes here for simplicity in parsing: just collect the
+    // cells and we will handle rows/inlines later
+    TableDelimiter, // |===
+    TableCell, // | to the next | or \n
 
     // INLINES
     // definition lists

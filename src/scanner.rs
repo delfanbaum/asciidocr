@@ -300,6 +300,22 @@ impl<'a> Scanner<'a> {
                     self.add_text_until_next_markup()
                 }
             }
+            '|' => {
+                if self.starts_new_line() && self.peeks_ahead(3) == "===" {
+                    self.current += 3; // don't consume the newline
+                                       // check to make sure the next char is a newline or EOF
+                    if ['\n', '\0'].contains(&self.peek()) {
+                        self.add_token(TokenType::TableDelimiter, false, 0)
+                    } else {
+                        self.add_text_until_next_markup()
+                    }
+                } else if self.starts_new_line() || self.peek_back() == ' ' {
+                    // it's either a new line, or if on the same line, must have a space before it
+                    self.add_table_cell()
+                } else {
+                    self.add_text_until_next_markup()
+                }
+            }
             _ => self.add_text_until_next_markup(),
         }
     }
@@ -395,6 +411,20 @@ impl<'a> Scanner<'a> {
         }
         self.current += 1; // consume the ']' char
         self.add_token(TokenType::Include, true, 0)
+    }
+
+    /// Adds contents into a TableCell token, regardless of other formatting (simpler to re-scan later)
+    fn add_table_cell(&mut self) -> Token {
+        while !['\n', '\0', '|'].contains(&self.peek()) {
+            self.current += 1
+        }
+        // if the delimiter is |
+        if self.peek() == '|' &&
+            self.source.as_bytes()[self.current -1] as char != ' ' {
+            self.current += 1;
+            return self.add_table_cell();
+        }
+        self.add_token(TokenType::TableCell, true, 0)
     }
 
     /// Adds the link, consuming the target but not any attributes
@@ -512,7 +542,11 @@ impl<'a> Scanner<'a> {
         unconstrained: TokenType,
     ) -> Token {
         // punctuation
-        if [' ', '\0', '.', ',', ';', ':', '\n', ')', '"', '!', '?', '\'', ']', '…', '“', '”','‘','’'].contains(&self.peek())
+        if [
+            ' ', '\0', '.', ',', ';', ':', '\n', ')', '"', '!', '?', '\'', ']', '…', '“', '”', '‘',
+            '’',
+        ]
+        .contains(&self.peek())
             || [' ', '\n', '\0', ']', '(', '"', '['].contains(&self.peek_back()) && self.peek() != c
         {
             self.add_token(constrained, false, 0)
@@ -580,17 +614,21 @@ mod tests {
         assert_eq!(s.collect::<Vec<Token>>(), expected_tokens);
     }
 
-    #[test]
-    fn newline() {
-        let markup = "\n".to_string();
-        let expected_tokens = vec![Token::new_default(
+    fn newline_token_at(line: usize, col: usize) -> Token {
+        Token::new_default(
             TokenType::NewLineChar,
             "\n".to_string(),
             None,
-            1,
-            1,
-            1,
-        )];
+            line,
+            col,
+            col,
+        )
+    }
+
+    #[test]
+    fn newline() {
+        let markup = "\n".to_string();
+        let expected_tokens = vec![newline_token_at(1, 1)];
         scan_and_assert_eq(&markup, expected_tokens)
     }
 
@@ -1584,6 +1622,81 @@ mod tests {
                 8,
             ),
         ]);
+        scan_and_assert_eq(&markup, expected_tokens);
+    }
+
+    #[test]
+    fn simple_table() {
+        let markup = "[cols=\"1,1\"]\n|===\n|cell one\n|cell two\n|===";
+        let expected_tokens = vec![
+            Token::new_default(
+                TokenType::ElementAttributes,
+                "[cols=\"1,1\"]".to_string(),
+                Some("[cols=\"1,1\"]".to_string()),
+                1,
+                1,
+                12,
+            ),
+            newline_token_at(1, 13),
+            Token::new_default(TokenType::TableDelimiter, "|===".to_string(), None, 2, 1, 4),
+            newline_token_at(2, 5),
+            Token::new_default(
+                TokenType::TableCell,
+                "|cell one".to_string(),
+                Some("|cell one".to_string()),
+                3,
+                1,
+                9,
+            ),
+            newline_token_at(3, 10),
+            Token::new_default(
+                TokenType::TableCell,
+                "|cell two".to_string(),
+                Some("|cell two".to_string()),
+                4,
+                1,
+                9,
+            ),
+            newline_token_at(4, 10),
+            Token::new_default(TokenType::TableDelimiter, "|===".to_string(), None, 5, 1, 4),
+        ];
+        scan_and_assert_eq(&markup, expected_tokens);
+    }
+
+    #[test]
+    fn simple_table_cols_same_line() {
+        let markup = "[cols=\"1,1\"]\n|===\n|cell one |cell two\n|===";
+        let expected_tokens = vec![
+            Token::new_default(
+                TokenType::ElementAttributes,
+                "[cols=\"1,1\"]".to_string(),
+                Some("[cols=\"1,1\"]".to_string()),
+                1,
+                1,
+                12,
+            ),
+            newline_token_at(1, 13),
+            Token::new_default(TokenType::TableDelimiter, "|===".to_string(), None, 2, 1, 4),
+            newline_token_at(2, 5),
+            Token::new_default(
+                TokenType::TableCell,
+                "|cell one ".to_string(),
+                Some("|cell one ".to_string()),
+                3,
+                1,
+                10,
+            ),
+            Token::new_default(
+                TokenType::TableCell,
+                "|cell two".to_string(),
+                Some("|cell two".to_string()),
+                3,
+                11,
+                19,
+            ),
+            newline_token_at(3, 20),
+            Token::new_default(TokenType::TableDelimiter, "|===".to_string(), None, 4, 1, 4),
+        ];
         scan_and_assert_eq(&markup, expected_tokens);
     }
 }
