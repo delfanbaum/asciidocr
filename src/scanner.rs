@@ -305,7 +305,7 @@ impl<'a> Scanner<'a> {
                     self.current += 3; // don't consume the newline
                                        // check to make sure the next char is a newline or EOF
                     if ['\n', '\0'].contains(&self.peek()) {
-                        self.add_token(TokenType::TableDelimiter, false, 0)
+                        self.add_token(TokenType::Table, false, 0)
                     } else {
                         self.add_text_until_next_markup()
                     }
@@ -1638,7 +1638,7 @@ mod tests {
                 12,
             ),
             newline_token_at(1, 13),
-            Token::new_default(TokenType::TableDelimiter, "|===".to_string(), None, 2, 1, 4),
+            Token::new_default(TokenType::Table, "|===".to_string(), None, 2, 1, 4),
             newline_token_at(2, 5),
             Token::new_default(
                 TokenType::TableCell,
@@ -1658,7 +1658,7 @@ mod tests {
                 9,
             ),
             newline_token_at(4, 10),
-            Token::new_default(TokenType::TableDelimiter, "|===".to_string(), None, 5, 1, 4),
+            Token::new_default(TokenType::Table, "|===".to_string(), None, 5, 1, 4),
         ];
         scan_and_assert_eq(&markup, expected_tokens);
     }
@@ -1676,7 +1676,7 @@ mod tests {
                 12,
             ),
             newline_token_at(1, 13),
-            Token::new_default(TokenType::TableDelimiter, "|===".to_string(), None, 2, 1, 4),
+            Token::new_default(TokenType::Table, "|===".to_string(), None, 2, 1, 4),
             newline_token_at(2, 5),
             Token::new_default(
                 TokenType::TableCell,
@@ -1695,7 +1695,7 @@ mod tests {
                 19,
             ),
             newline_token_at(3, 20),
-            Token::new_default(TokenType::TableDelimiter, "|===".to_string(), None, 4, 1, 4),
+            Token::new_default(TokenType::Table, "|===".to_string(), None, 4, 1, 4),
         ];
         scan_and_assert_eq(&markup, expected_tokens);
     }

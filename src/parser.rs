@@ -212,7 +212,7 @@ impl Parser {
                 .push_back(Inline::InlineBreak(LineBreak::new_from_token(token))),
 
             // delimited blocks
-            TokenType::SidebarBlock | TokenType::OpenBlock | TokenType::ExampleBlock => {
+            TokenType::SidebarBlock | TokenType::OpenBlock | TokenType::ExampleBlock | TokenType::Table => {
                 self.parse_delimited_parent_block(token)
             }
 
@@ -796,7 +796,6 @@ impl Parser {
         }
     }
 
-    // TODO: handle [NOTE]\n==== cases (i.e., some block metadata check)
     fn parse_delimited_parent_block(&mut self, token: Token) {
         let delimiter_line = token.first_location().line;
         let mut block = ParentBlock::new_from_token(token);

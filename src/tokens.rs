@@ -182,7 +182,7 @@ pub enum TokenType {
     
     // Tables -- note that we'll do two passes here for simplicity in parsing: just collect the
     // cells and we will handle rows/inlines later
-    TableDelimiter, // |===
+    Table, // |===
     TableCell, // | to the next | or \n
 
     // INLINES

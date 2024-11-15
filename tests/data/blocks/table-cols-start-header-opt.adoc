@@ -1,0 +1,11 @@
+[cols="2*",options="header"]
+|===
+|Column 1, header row
+|Column 2, header row
+
+|Cell in column 1, row 2
+|Cell in column 2, row 2
+
+|Cell in column 1, row 3
+|Cell in column 2, row 3
+|===

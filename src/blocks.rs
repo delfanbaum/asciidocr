@@ -31,6 +31,7 @@ pub enum Block {
     LeafBlock(LeafBlock),
     ParentBlock(ParentBlock), // Admonitions are hiding in here
     BlockMetadata(ElementMetadata),
+    TableCell(TableCell),
 }
 
 impl Display for Block {
@@ -49,6 +50,7 @@ impl Display for Block {
             Block::LeafBlock(_) => write!(f, "LeafBlock"),
             Block::ParentBlock(_) => write!(f, "ParentBlock"),
             Block::BlockMetadata(_) => write!(f, "BlockMetadata"),
+            Block::TableCell(_) => write!(f, "TableCell"),
         }
     }
 }
@@ -79,6 +81,11 @@ impl Block {
                     } else {
                         panic!("Attempted to push dangling ListItem to parent block")
                     }
+                } else if matches!(parent_block.name, ParentBlockName::Table)
+                    && !matches!(block, Block::TableCell(_))
+                {
+                    // sanity-guard
+                    panic!("Attempted to add something other than a TableCell to a Table")
                 } else {
                     parent_block.blocks.push(block)
                 }
@@ -204,6 +211,7 @@ impl Block {
             Block::LeafBlock(block) => block.location.clone(),
             Block::ParentBlock(block) => block.location.clone(),
             Block::BlockMetadata(block) => block.location.clone(),
+            Block::TableCell(block) => block.location.clone(),
         }
     }
 
@@ -269,6 +277,12 @@ impl Block {
             }
             Block::ParentBlock(block) => {
                 if let Some(last_inline) = block.blocks.last() {
+                    block.location =
+                        Location::reconcile(block.location.clone(), last_inline.locations())
+                }
+            }
+            Block::TableCell(block) => {
+                if let Some(last_inline) = block.inlines.last() {
                     block.location =
                         Location::reconcile(block.location.clone(), last_inline.locations())
                 }
@@ -436,7 +450,7 @@ impl BlockMacro {
     pub fn add_metadata(mut self, incoming_metadata: &ElementMetadata) -> Self {
         match self.metadata {
             Some(ref mut metadata) => metadata.add_metadata_from_other(incoming_metadata),
-            None => self.metadata = Some(incoming_metadata.clone())
+            None => self.metadata = Some(incoming_metadata.clone()),
         }
         self
     }
@@ -585,6 +599,8 @@ pub enum ParentBlockName {
     Sidebar,
     Open,
     Quote,
+    Table, // Tables function basically the same in terms of delimiter, so I'm going to reuse
+           // ParentBlock until someone convinces me otherwise
 }
 
 #[derive(Serialize, Debug, PartialEq)]
@@ -683,6 +699,13 @@ impl ParentBlock {
                 vec![],
                 token.locations(),
             ),
+            TokenType::Table => ParentBlock::new(
+                ParentBlockName::Table,
+                None,
+                token.text(),
+                vec![],
+                token.locations(),
+            ),
 
             _ => panic!("Tried to create a ParentBlock from an invalid Token."),
         }
@@ -696,5 +719,19 @@ impl ParentBlock {
             )
         };
         first_location.line
+    }
+}
+
+#[derive(Serialize, Clone, Debug)]
+pub struct TableCell {
+    pub name: String,
+    node_type: NodeTypes,
+    pub inlines: Vec<Inline>,
+    pub location: Vec<Location>,
+}
+
+impl PartialEq for TableCell {
+    fn eq(&self, _: &Self) -> bool {
+        true
     }
 }
