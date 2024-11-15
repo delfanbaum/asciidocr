@@ -26,3 +26,4 @@ Cargo.lock
 notes/
 tester.adoc
 bacon.toml
+*.docx
