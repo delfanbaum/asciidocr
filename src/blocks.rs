@@ -99,7 +99,11 @@ impl Block {
     pub fn takes_inlines(&self) -> bool {
         matches!(
             self,
-            Block::Section(_) | Block::LeafBlock(_) | Block::ListItem(_) | Block::DListItem(_) | Block::TableCell(_)
+            Block::Section(_)
+                | Block::LeafBlock(_)
+                | Block::ListItem(_)
+                | Block::DListItem(_)
+                | Block::TableCell(_)
         )
     }
 
@@ -164,6 +168,56 @@ impl Block {
 
     pub fn is_definition_list_item(&self) -> bool {
         matches!(self, Block::DListItem(_))
+    }
+
+    pub fn is_table(&self) -> bool {
+        if let Block::ParentBlock(parent_block) = self {
+            parent_block.name == ParentBlockName::Table
+        } else {
+            false
+        }
+    }
+
+    pub fn consolidate_table_info(&mut self) {
+        let Block::ParentBlock(table) = self else {
+            panic!("Incorrect function call: consolidate_table_info on non-table block")
+        };
+        // check if there is an implicit header
+        if table.blocks.len() >= 2 {
+            // if the cells in the first row are on the same line, either serves as cols
+            // designation
+            let first_cell_line = table.blocks[0].line();
+            if first_cell_line == table.blocks[1].line() {
+                if first_cell_line == table.location[0].line + 1 {
+                    if let Some(ref mut metadata) = table.metadata {
+                        metadata.options.push("header".to_string());
+                    } else {
+                        let mut metadata = ElementMetadata::default();
+                        metadata.options.push("header".to_string());
+                        table.metadata = Some(metadata)
+                    }
+                } else {
+                    let cols = table.blocks.iter().fold(0usize, |acc, block| {
+                        if block.line() == first_cell_line {
+                            acc + 1
+                        } else {
+                            0
+                        }
+                    });
+                    if let Some(ref mut metadata) = table.metadata {
+                        if !metadata.attributes.contains_key("cols") {
+                            // TK THE IDEA IS TO COUNT THE BLOCKS FOR WHOM THE LINE THING HOLDS
+                            // TRUE
+                            metadata.attributes.insert("cols".to_string(), format!("{cols}"));
+                        }
+                    } else {
+                        let mut metadata = ElementMetadata::default();
+                            metadata.attributes.insert("cols".to_string(), format!("{cols}"));
+                        table.metadata = Some(metadata)
+                    }
+                }
+            }
+        }
     }
 
     pub fn has_blocks(&self) -> bool {

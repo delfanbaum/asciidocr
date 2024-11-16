@@ -843,6 +843,9 @@ impl Parser {
                 while !blocks_to_add.is_empty() {
                     delimited_block.push_block(blocks_to_add.pop_front().unwrap())
                 }
+                if delimited_block.is_table() {
+                    delimited_block.consolidate_table_info();
+                }
                 self.push_block_to_stack(delimited_block);
                 // close any continuations
                 self.in_block_continuation = false;

@@ -47,6 +47,19 @@ pub struct ElementMetadata {
     pub location: Vec<Location>,
 }
 
+impl Default for ElementMetadata {
+    fn default() -> Self {
+        ElementMetadata {
+            attributes: HashMap::new(),
+            options: vec![],
+            roles: vec![],
+            inline_metadata: false,
+            declared_type: None,
+            location: vec![],
+        }
+    }
+}
+
 impl ElementMetadata {
     /// used to check if there's any "there there," as sometimes we just need it for the
     /// declared_type
