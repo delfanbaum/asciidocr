@@ -34,7 +34,7 @@ impl AttributeType {
     }
 }
 
-#[derive(Serialize, PartialEq, Clone, Debug)]
+#[derive(Serialize, PartialEq, Default, Clone, Debug)]
 pub struct ElementMetadata {
     pub attributes: HashMap<String, String>,
     pub options: Vec<String>,
@@ -45,19 +45,6 @@ pub struct ElementMetadata {
     #[serde(skip)]
     pub declared_type: Option<AttributeType>,
     pub location: Vec<Location>,
-}
-
-impl Default for ElementMetadata {
-    fn default() -> Self {
-        ElementMetadata {
-            attributes: HashMap::new(),
-            options: vec![],
-            roles: vec![],
-            inline_metadata: false,
-            declared_type: None,
-            location: vec![],
-        }
-    }
 }
 
 impl ElementMetadata {
@@ -151,7 +138,7 @@ impl ElementMetadata {
         for (idx, attribute) in attributes.iter_mut().enumerate() {
             match key_values_from_named_attribute(attribute) {
                 Ok((key, values)) => {
-                    if key == "role".to_string() {
+                    if key == *"role" {
                         for role in values {
                             self.roles.push(role.to_string());
                         }

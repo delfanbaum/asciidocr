@@ -1069,11 +1069,7 @@ impl Parser {
         // then add it to the list
         let last_item = self.block_stack.pop().unwrap();
         // if the last thing is a list item, add it to the list
-        if matches!(last_item, Block::ListItem(_)) {
-            if let Some(list) = self.block_stack.last_mut() {
-                list.push_block(last_item)
-            }
-        } else if matches!(last_item, Block::DListItem(_)) {
+        if matches!(last_item, Block::ListItem(_) | Block::DListItem(_)) {
             if let Some(list) = self.block_stack.last_mut() {
                 list.push_block(last_item)
             }

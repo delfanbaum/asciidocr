@@ -208,11 +208,15 @@ impl Block {
                         if !metadata.attributes.contains_key("cols") {
                             // TK THE IDEA IS TO COUNT THE BLOCKS FOR WHOM THE LINE THING HOLDS
                             // TRUE
-                            metadata.attributes.insert("cols".to_string(), format!("{cols}"));
+                            metadata
+                                .attributes
+                                .insert("cols".to_string(), format!("{cols}"));
                         }
                     } else {
                         let mut metadata = ElementMetadata::default();
-                            metadata.attributes.insert("cols".to_string(), format!("{cols}"));
+                        metadata
+                            .attributes
+                            .insert("cols".to_string(), format!("{cols}"));
                         table.metadata = Some(metadata)
                     }
                 }
