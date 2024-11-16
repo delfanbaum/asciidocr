@@ -91,8 +91,10 @@ impl Token {
         vec![self.first_location(), self.last_location()]
     }
 
-    pub fn update_line_number_by(&mut self, lines: usize) {
+    pub fn update_token_loc_offsets_by(&mut self, lines: usize, cols: usize) {
         self.line += lines - 1;
+        self.startcol += cols;
+        self.endcol += cols;
     }
 
     pub fn is_inline(&self) -> bool {

@@ -861,6 +861,7 @@ impl Parser {
         // take the token text, which begins with a `|`, and then use everything after
         let cell_contents = token.text()[1..].to_string();
         let cell_line = token.first_location().line;
+        let cell_col = token.first_location().col;
 
         self.push_block_to_stack(Block::TableCell(TableCell::new_from_token(token)));
 
@@ -869,7 +870,7 @@ impl Parser {
         for mut inline_token in Scanner::new(&cell_contents) {
             // update the line numbering for the token to match the table cell mathematically, in
             // case my vague memory of multi-line cells is correct
-            inline_token.update_line_number_by(cell_line);
+            inline_token.update_token_loc_offsets_by(cell_line, cell_col);
             self.token_into(inline_token, asg);
         }
         // clear all the things to ensure inlines get added appropriately

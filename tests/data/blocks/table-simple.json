@@ -16,7 +16,7 @@
               "name": "text",
               "type": "string",
               "value": "Cell in ",
-              "location": [ { "line": 3, "col": 1 }, { "line": 3, "col": 8 } ]
+              "location": [ { "line": 3, "col": 2 }, { "line": 3, "col": 9 } ]
             },
             {
               "name": "span",
@@ -28,16 +28,16 @@
                   "name": "text",
                   "type": "string",
                   "value": "column",
-                  "location": [ { "line": 3, "col": 10 }, { "line": 3, "col": 15 } ]
+                  "location": [ { "line": 3, "col": 11 }, { "line": 3, "col": 16 } ]
                 }
               ],
-              "location": [ { "line": 3, "col": 9 }, { "line": 3, "col": 16 } ]
+              "location": [ { "line": 3, "col": 10 }, { "line": 3, "col": 17 } ]
             },
             {
               "name": "text",
               "type": "string",
               "value": " 1, ",
-              "location": [ { "line": 3, "col": 17 }, { "line": 3, "col": 20 } ]
+              "location": [ { "line": 3, "col": 18 }, { "line": 3, "col": 21 } ]
             },
             {
               "name": "span",
@@ -49,16 +49,16 @@
                   "name": "text",
                   "type": "string",
                   "value": "row",
-                  "location": [ { "line": 3, "col": 22 }, { "line": 3, "col": 24 } ]
+                  "location": [ { "line": 3, "col": 23 }, { "line": 3, "col": 25 } ]
                 }
               ],
-              "location": [ { "line": 3, "col": 21 }, { "line": 3, "col": 25 } ]
+              "location": [ { "line": 3, "col": 22 }, { "line": 3, "col": 26 } ]
             },
             {
               "name": "text",
               "type": "string",
               "value": " 1 ",
-              "location": [ { "line": 3, "col": 26 }, { "line": 3, "col": 28 } ]
+              "location": [ { "line": 3, "col": 27 }, { "line": 3, "col": 29 } ]
             }
           ],
           "location": [ { "line": 3, "col": 1 }, { "line": 3, "col": 29 } ]
@@ -71,7 +71,7 @@
               "name": "text",
               "type": "string",
               "value": "Cell in column 2, row 1 ",
-              "location": [ { "line": 4, "col": 1 }, { "line": 4, "col": 24 } ]
+              "location": [ { "line": 4, "col": 2 }, { "line": 4, "col": 25 } ]
             }
           ],
           "location": [ { "line": 4, "col": 1 }, { "line": 4, "col": 25 } ]
@@ -84,10 +84,14 @@
               "name": "text",
               "type": "string",
               "value": "Cell in column 1, row 2",
-              "location": [ { "line": 6, "col": 1 }, { "line": 6, "col": 23 } ]
+              "location": [ { "line": 6, "col": 2 }, { "line": 6, "col": 24
+                }
+              ]
             }
           ],
-          "location": [ { "line": 6, "col": 1 }, { "line": 6, "col": 24 } ]
+          "location": [ { "line": 6, "col": 1 }, { "line": 6, "col": 24
+            }
+          ]
         },
         {
           "name": "tableCell",
@@ -97,7 +101,7 @@
               "name": "text",
               "type": "string",
               "value": "Cell in column 2, row 2",
-              "location": [ { "line": 7, "col": 1 }, { "line": 7, "col": 23 } ]
+              "location": [ { "line": 7, "col": 2 }, { "line": 7, "col": 24 } ]
             }
           ],
           "location": [ { "line": 7, "col": 1 }, { "line": 7, "col": 24 } ]
@@ -110,7 +114,7 @@
               "name": "text",
               "type": "string",
               "value": "Cell in column 1, row 3",
-              "location": [ { "line": 9, "col": 1 }, { "line": 9, "col": 23 } ]
+              "location": [ { "line": 9, "col": 2 }, { "line": 9, "col": 24 } ]
             }
           ],
           "location": [ { "line": 9, "col": 1 }, { "line": 9, "col": 24 } ]
@@ -123,7 +127,7 @@
               "name": "text",
               "type": "string",
               "value": "Cell in column 2, row 3 ",
-              "location": [ { "line": 10, "col": 1 }, { "line": 10, "col": 24 } ]
+              "location": [ { "line": 10, "col": 2 }, { "line": 10, "col": 25 } ]
             }
           ],
           "location": [ { "line": 10, "col": 1 }, { "line": 10, "col": 25 } ]
