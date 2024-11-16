@@ -9,8 +9,8 @@ pub struct Token {
     pub line: usize,
     pub startcol: usize,
     pub endcol: usize,
-    // the file's source, if it's an include 
-    pub file_stack: Vec<String>
+    // the file's source, if it's an include
+    pub file_stack: Vec<String>,
 }
 
 impl Default for Token {
@@ -23,7 +23,7 @@ impl Default for Token {
             line: 0,
             startcol: 1,
             endcol: 1,
-            file_stack:vec![]
+            file_stack: vec![],
         }
     }
 }
@@ -45,7 +45,7 @@ impl Token {
             line,
             startcol,
             endcol,
-            file_stack
+            file_stack,
         }
     }
 
@@ -65,7 +65,7 @@ impl Token {
             line,
             startcol,
             endcol,
-            file_stack: vec![]
+            file_stack: vec![],
         }
     }
 
@@ -88,15 +88,11 @@ impl Token {
         Location::new(self.line, self.endcol, self.file_stack.clone())
     }
     pub fn locations(&self) -> Vec<Location> {
-        vec![
-            self.first_location(),
-            self.last_location(),
-        ]
+        vec![self.first_location(), self.last_location()]
     }
 
-    pub fn update_line_number_by(&mut self, lines: usize)  {
-        self.line += lines -1;
-
+    pub fn update_line_number_by(&mut self, lines: usize) {
+        self.line += lines - 1;
     }
 
     pub fn is_inline(&self) -> bool {
@@ -184,10 +180,10 @@ pub enum TokenType {
     WarningPara,   // WARNING:
 
     BlockContinuation, // a "+" all by itself on a line can signal continuation
-    
+
     // Tables -- note that we'll do two passes here for simplicity in parsing: just collect the
     // cells and we will handle rows/inlines later
-    Table, // |===
+    Table,     // |===
     TableCell, // | to the next | or \n
 
     // INLINES
