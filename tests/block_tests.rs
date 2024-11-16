@@ -227,3 +227,11 @@ fn test_include() {
     let asg_json_fn = format!("{}.json", fn_pattern);
     assert_parsed_doc_matches_expected_asg(&adoc_fn, &asg_json_fn)
 }
+
+#[test]
+fn test_table_simple() {
+    let fn_pattern = "blocks/table-simple";
+    let adoc_fn = format!("{}.adoc", fn_pattern);
+    let asg_json_fn = format!("{}.json", fn_pattern);
+    assert_parsed_doc_matches_expected_asg(&adoc_fn, &asg_json_fn)
+}

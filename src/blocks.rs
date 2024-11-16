@@ -85,6 +85,7 @@ impl Block {
                     && !matches!(block, Block::TableCell(_))
                 {
                     // sanity-guard
+                    println!("{:?}", block);
                     panic!("Attempted to add something other than a TableCell to a Table")
                 } else {
                     parent_block.blocks.push(block)
@@ -98,7 +99,7 @@ impl Block {
     pub fn takes_inlines(&self) -> bool {
         matches!(
             self,
-            Block::Section(_) | Block::LeafBlock(_) | Block::ListItem(_) | Block::DListItem(_)
+            Block::Section(_) | Block::LeafBlock(_) | Block::ListItem(_) | Block::DListItem(_) | Block::TableCell(_)
         )
     }
 
@@ -108,6 +109,7 @@ impl Block {
             Block::LeafBlock(block) => block.inlines.push(inline),
             Block::ListItem(list_item) => list_item.add_inline(inline),
             Block::DListItem(list_item) => list_item.add_inline(inline),
+            Block::TableCell(table_cell) => table_cell.inlines.push(inline),
             _ => panic!("push_block not implemented for {}", self),
         }
     }
@@ -733,5 +735,16 @@ pub struct TableCell {
 impl PartialEq for TableCell {
     fn eq(&self, _: &Self) -> bool {
         true
+    }
+}
+
+impl TableCell {
+    pub fn new_from_token(token: Token) -> Self {
+        TableCell {
+            name: "tableCell".to_string(),
+            node_type: NodeTypes::Block,
+            inlines: vec![],
+            location: token.locations(),
+        }
     }
 }

@@ -3,7 +3,7 @@ use std::collections::{HashMap, VecDeque};
 
 use crate::{
     asg::Asg,
-    blocks::{Block, BlockMacro, Break, LeafBlock, ParentBlock, Section},
+    blocks::{Block, BlockMacro, Break, LeafBlock, ParentBlock, Section, TableCell},
     inlines::{Inline, InlineLiteral, InlineRef, InlineSpan, LineBreak},
     lists::{DList, DListItem, List, ListItem, ListVariant},
     macros::target_and_attrs_from_token,
@@ -212,9 +212,14 @@ impl Parser {
                 .push_back(Inline::InlineBreak(LineBreak::new_from_token(token))),
 
             // delimited blocks
-            TokenType::SidebarBlock | TokenType::OpenBlock | TokenType::ExampleBlock | TokenType::Table => {
-                self.parse_delimited_parent_block(token)
-            }
+            TokenType::SidebarBlock
+            | TokenType::OpenBlock
+            | TokenType::ExampleBlock
+            | TokenType::Table => self.parse_delimited_parent_block(token),
+
+            // table cells -- note that we just create the cells; up to the backend/template to handle the
+            // column-making (for now, so we can just reuse ParentBlock)
+            TokenType::TableCell => self.parse_table_cell(token, asg),
 
             TokenType::QuoteVerseBlock => {
                 // check if it's verse
@@ -401,10 +406,10 @@ impl Parser {
         // ignore any attributes for the time being
         let (target, _) = target_and_attrs_from_token(&token);
         self.file_stack.push(target.clone());
-        
+
         let current_block_stack_len = self.block_stack.len();
 
-        // Match filetype, if adoc scan into tokens, adding the location, then parse... 
+        // Match filetype, if adoc scan into tokens, adding the location, then parse...
         if is_asciidoc_file(&target) {
             for token in Scanner::new_with_stack(&open_file(&target), self.file_stack.clone()) {
                 self.token_into(token, asg)
@@ -852,6 +857,28 @@ impl Parser {
         self.push_block_to_stack(Block::ParentBlock(block));
     }
 
+    fn parse_table_cell(&mut self, token: Token, asg: &mut Asg) {
+        // take the token text, which begins with a `|`, and then use everything after
+        let cell_contents = token.text()[1..].to_string();
+        let cell_line = token.first_location().line;
+
+        self.push_block_to_stack(Block::TableCell(TableCell::new_from_token(token)));
+
+        // create new inlines from the stack, clearing any dangling newlines
+        self.dangling_newline = None;
+        for mut inline_token in Scanner::new(&cell_contents) {
+            // update the line numbering for the token to match the table cell mathematically, in
+            // case my vague memory of multi-line cells is correct
+            inline_token.update_line_number_by(cell_line);
+            self.token_into(inline_token, asg);
+        }
+        // clear all the things to ensure inlines get added appropriately
+        self.in_block_line = false;
+        self.force_new_block = false;
+        // then add them to the stack, i.e., to the recently added TableCell
+        self.add_inlines_to_block_stack();
+    }
+
     fn push_block_to_stack(&mut self, mut block: Block) {
         // we only want to push on continue if we're not in an open delimited block (which will
         // close itself, emptying the open_delimited_block_lines)
@@ -948,7 +975,7 @@ impl Parser {
                     line,
                     startcol,
                     endcol,
-                    file_stack: self.file_stack.clone()
+                    file_stack: self.file_stack.clone(),
                 };
                 self.add_text_to_last_inline(reconstituted_token)
             }

@@ -10,6 +10,8 @@ use crate::{
     tokens::{Token, TokenType},
 };
 
+// just make this quoted, and then pull everything else out
+static RE_NAMED_QUOTED: Lazy<Regex> = Lazy::new(|| Regex::new(r#"(\w*=".*?")"#).unwrap());
 static RE_NAMED: Lazy<Regex> = Lazy::new(|| Regex::new(r#"(.*?)[=|,](.*)"#).unwrap());
 
 #[derive(PartialEq, Clone, Debug)]
@@ -22,7 +24,6 @@ pub enum AttributeType {
 
 impl AttributeType {
     fn from_str(s: &str) -> Option<Self> {
-        println!("string to attribue: {}", s);
         match s {
             "role" => Some(AttributeType::Role),
             "quote" => Some(AttributeType::Quote),
@@ -91,7 +92,16 @@ impl ElementMetadata {
             new_block_metadata.attributes.insert("id".to_string(), id);
         } else {
             let attribute_list = token.lexeme[1..token.lexeme.len() - 1].to_string();
-            let attributes: Vec<&str> = attribute_list.split(',').collect();
+            let mut non_quoted_key_values = attribute_list.clone();
+            let mut attributes: Vec<&str> = vec![];
+            // TK "1,2,4" should be a single attribute, not "1,", 2, 4"
+            for quoted_attr in RE_NAMED_QUOTED.captures_iter(&attribute_list) {
+                let (total, [_]) = quoted_attr.extract();
+                attributes.push(total);
+                non_quoted_key_values = non_quoted_key_values.replace(total, "");
+            }
+            attributes.extend(non_quoted_key_values.split(',').collect::<Vec<&str>>());
+
             new_block_metadata.process_attributes(attributes);
         }
         new_block_metadata

@@ -94,6 +94,11 @@ impl Token {
         ]
     }
 
+    pub fn update_line_number_by(&mut self, lines: usize)  {
+        self.line += lines -1;
+
+    }
+
     pub fn is_inline(&self) -> bool {
         matches!(self.token_type(), |TokenType::Comment| TokenType::Text
             | TokenType::Emphasis
