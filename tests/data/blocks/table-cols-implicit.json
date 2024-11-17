@@ -1,0 +1,228 @@
+{
+  "name": "document",
+  "type": "block",
+  "blocks": [
+    {
+      "name": "table",
+      "type": "block",
+      "form": "delimited",
+      "delimiter": "|===",
+      "blocks": [
+        {
+          "name": "tableCell",
+          "node_type": "block",
+          "inlines": [
+            {
+              "name": "text",
+              "type": "string",
+              "value": "Cell in column 1, row 1 ",
+              "location": [
+                {
+                  "line": 3,
+                  "col": 2
+                },
+                {
+                  "line": 3,
+                  "col": 25
+                }
+              ]
+            }
+          ],
+          "location": [
+            {
+              "line": 3,
+              "col": 1
+            },
+            {
+              "line": 3,
+              "col": 25
+            }
+          ]
+        },
+        {
+          "name": "tableCell",
+          "node_type": "block",
+          "inlines": [
+            {
+              "name": "text",
+              "type": "string",
+              "value": "Cell in column 2, row 1 ",
+              "location": [
+                {
+                  "line": 3,
+                  "col": 27
+                },
+                {
+                  "line": 3,
+                  "col": 50
+                }
+              ]
+            }
+          ],
+          "location": [
+            {
+              "line": 3,
+              "col": 26
+            },
+            {
+              "line": 3,
+              "col": 50
+            }
+          ]
+        },
+        {
+          "name": "tableCell",
+          "node_type": "block",
+          "inlines": [
+            {
+              "name": "text",
+              "type": "string",
+              "value": "Cell in column 1, row 2 ",
+              "location": [
+                {
+                  "line": 4,
+                  "col": 2
+                },
+                {
+                  "line": 4,
+                  "col": 25
+                }
+              ]
+            }
+          ],
+          "location": [
+            {
+              "line": 4,
+              "col": 1
+            },
+            {
+              "line": 4,
+              "col": 25
+            }
+          ]
+        },
+        {
+          "name": "tableCell",
+          "node_type": "block",
+          "inlines": [
+            {
+              "name": "text",
+              "type": "string",
+              "value": "Cell in column 2, row 2",
+              "location": [
+                {
+                  "line": 4,
+                  "col": 27
+                },
+                {
+                  "line": 4,
+                  "col": 49
+                }
+              ]
+            }
+          ],
+          "location": [
+            {
+              "line": 4,
+              "col": 26
+            },
+            {
+              "line": 4,
+              "col": 49
+            }
+          ]
+        },
+        {
+          "name": "tableCell",
+          "node_type": "block",
+          "inlines": [
+            {
+              "name": "text",
+              "type": "string",
+              "value": "Cell in column 1, row 3 ",
+              "location": [
+                {
+                  "line": 5,
+                  "col": 2
+                },
+                {
+                  "line": 5,
+                  "col": 25
+                }
+              ]
+            }
+          ],
+          "location": [
+            {
+              "line": 5,
+              "col": 1
+            },
+            {
+              "line": 5,
+              "col": 25
+            }
+          ]
+        },
+        {
+          "name": "tableCell",
+          "node_type": "block",
+          "inlines": [
+            {
+              "name": "text",
+              "type": "string",
+              "value": "Cell in column 2, row 3 ",
+              "location": [
+                {
+                  "line": 5,
+                  "col": 27
+                },
+                {
+                  "line": 5,
+                  "col": 50
+                }
+              ]
+            }
+          ],
+          "location": [
+            {
+              "line": 5,
+              "col": 26
+            },
+            {
+              "line": 5,
+              "col": 50
+            }
+          ]
+        }
+      ],
+      "metadata": {
+        "attributes": {
+          "cols": "2"
+        },
+        "options": [],
+        "roles": [],
+        "location": []
+      },
+      "location": [
+        {
+          "line": 1,
+          "col": 1
+        },
+        {
+          "line": 6,
+          "col": 4
+        }
+      ]
+    }
+  ],
+  "location": [
+    {
+      "line": 1,
+      "col": 1
+    },
+    {
+      "line": 6,
+      "col": 4
+    }
+  ]
+}

@@ -197,17 +197,12 @@ impl Block {
                         table.metadata = Some(metadata)
                     }
                 } else {
+                    // count for implicit column designation
                     let cols = table.blocks.iter().fold(0usize, |acc, block| {
-                        if block.line() == first_cell_line {
-                            acc + 1
-                        } else {
-                            0
-                        }
+                        acc + (block.line() == first_cell_line) as usize
                     });
                     if let Some(ref mut metadata) = table.metadata {
                         if !metadata.attributes.contains_key("cols") {
-                            // TK THE IDEA IS TO COUNT THE BLOCKS FOR WHOM THE LINE THING HOLDS
-                            // TRUE
                             metadata
                                 .attributes
                                 .insert("cols".to_string(), format!("{cols}"));
@@ -221,6 +216,12 @@ impl Block {
                     }
                 }
             }
+            // FOR NOW, make the cols an integer for easier templating.
+            let Some(ref mut metadata) = table.metadata else {
+                // TK this should be a proper error
+                panic!("Missing table metadata; cannot construct table")
+            };
+            metadata.simplify_cols()
         }
     }
 

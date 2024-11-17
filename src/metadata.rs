@@ -195,6 +195,21 @@ impl ElementMetadata {
             }
         }
     }
+
+    pub fn simplify_cols(&mut self) {
+        if let Some(cols_value) = self.attributes.get("cols") {
+            if cols_value.contains(',') {
+                // cols="1,2,1"
+                self.attributes.insert(
+                    "cols".to_string(),
+                    format!("{}", cols_value.split(',').collect::<Vec<&str>>().len()),
+                );
+            } else if cols_value.len() == 2 && cols_value[1..] == *"*" {
+                self.attributes
+                    .insert("cols".to_string(), cols_value[..1].to_string());
+            }
+        }
+    }
 }
 
 fn key_values_from_named_attribute(attribute: &str) -> Result<(String, Vec<&str>)> {
