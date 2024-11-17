@@ -1,7 +1,7 @@
 use std::fs;
 
 use asciidocr::{
-    output::{gather_htmlbook_templates, render_from_templates},
+    templates::{gather_htmlbook_templates, render_from_templates},
     parser::Parser,
     scanner::Scanner,
 };

@@ -1,4 +1,5 @@
 use clap::{Parser, ValueEnum};
+use std::path::PathBuf;
 
 #[derive(Debug, ValueEnum, Clone)]
 pub enum Backends {
@@ -24,4 +25,30 @@ pub struct Cli {
     /// Optionally select a backend for conversion.
     #[arg(value_enum, short = 'b', long = "backend", default_value = "htmlbook")]
     pub backend: Backends,
+}
+
+pub fn read_output(args: Cli) -> Option<PathBuf> {
+    match args.output {
+        Some(ref output) => {
+            if output == "-" {
+                None
+            } else {
+                Some(PathBuf::from(output.clone()))
+            }
+        }
+        None => {
+            if args.file == "-" {
+                // we put to stdout if stdin following asciidoctor
+                None
+            } else {
+                let mut out_destination = PathBuf::new();
+                out_destination.push(args.file.clone());
+                match args.backend {
+                    Backends::Htmlbook => out_destination.set_extension("html"),
+                    Backends::Json => out_destination.set_extension("json"),
+                };
+                Some(out_destination)
+            }
+        }
+    }
 }
