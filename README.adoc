@@ -62,8 +62,8 @@ https://github.com/nlopes/acdc/tree/main/acdc-parser[another exciting project's 
 * [*] Titles
 * [*] Footnotes
 * [*] Includes
-** *Advanced* (Of the following, I am likely only interested in tagged regions,
-   but maybe you then get offsets kind of for free).
+
+* *Advanced* (Of the following, I am likely only interested in tagged regions, but maybe you then get offsets kind of for free).
 ** [ ] Offsets
 ** [ ] Tagged regions
 * [ ] Conditionals
