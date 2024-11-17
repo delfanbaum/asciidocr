@@ -1,0 +1,26 @@
+{%- import "inline.html.tera" as inline_macros -%}
+{%- macro process_table(block) -%}
+{#- Collect Cells into rows; should be save to assume that all tables have a cols attr -#}
+{% set cols = block.metadata.attributes.cols | int %}
+    <table>
+        <tr>
+        {% set num_cells = block.blocks | length -%}
+        {% for idx in range(end=num_cells) -%}
+            {%- set cell = block.blocks | nth(n=idx) -%}
+                {{ self::process_table_cell(cell=cell) -}}
+        {% if idx > 0 and (idx + 1) % cols == 0 and idx+1 != num_cells %}
+        </tr>
+        <tr>{%- endif %}
+        {% endfor %}</tr>
+    </table>
+{%- endmacro process_table -%}
+
+{%- macro process_table_cell(cell) -%}
+            <td>
+            {%- if cell.inlines -%}
+            {%- for inline in cell.inlines -%}
+            {{- inline_macros::process_inline(inline=inline) -}}
+            {%- endfor -%}
+            {%- endif -%}
+            </td>
+{%- endmacro process_table_cell -%}

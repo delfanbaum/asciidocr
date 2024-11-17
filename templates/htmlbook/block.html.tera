@@ -10,11 +10,14 @@ this should work.
 -#}
 {%- import "inline.html.tera" as inline_macros -%}
 {%- import "leafblocks.html.tera" as leaf_block_macros -%}
+{%- import "tables.html.tera" as table_macros -%}
 {%- macro process_block(block, skip_tag) -%}
 {%- set local_skip_tag = false -%}
 {#- Handle breaks separately; makes the logic easier -#}
 {%- if block.name in ["paragraph", "listing", "verse", "pass"] %}
-    {{ leaf_block_macros::process_leaf_block(block=block) }}
+    {{ leaf_block_macros::process_table(block=block) }}
+{%- elif block.name == "table" -%}
+    {{ table_macros::process_table(block=block) }}
 {%- else -%}
 {%- if block.name == "break"-%}
     {% if block.variant == "page" %}
