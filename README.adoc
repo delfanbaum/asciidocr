@@ -1,6 +1,6 @@
 = asciidocr
 
-A(n in-progress, unstable, incomplete) Rust library for processing Asciidoc files.
+A(n in-progress, incomplete, but more or less functional) Rust library for processing Asciidoc files.
 
 == Usage (Command-Line)
 
@@ -25,30 +25,53 @@ Options:
 
 == Current State Notes (As of the Last README Commit)
 
-=== 0.1.1
+We (more or less) now produce HTML output for the vast majority of "common"
+asciidoc markup features. To borrow
+https://github.com/nlopes/acdc/tree/main/acdc-parser[another exciting project's list]:
 
-I've decided to bump to "0.1.1" as we now function as expected when installed
-and run elsewhere (i.e., out of the crate repo) on the machine. Trick was to
-statically load the templates, as opposed to having them be referenced files.
+* [*] Document Headers (see limitations)
+* [*] Section
+* [*] Delimited Block
+** [*] Comment
+** [*] Example
+** [*] Listing
+** [ ] Literal (see limitations)
+** [*] Open
+** [*] Sidebar
+** [*] Table
+** [*] Pass
+** [*] Quote
+* [*] Paragraph (Note that I'm not currently taking into account indented, or literal source leafblocks)
+** [*] Bold
+** [*] Italic
+** [*] Monospace
+** [ ] Literal Monospace (see limitations)
+** [*] Highlight (including the application of inline styles!)
+** [*] Subscript / Superscript
+* [*] Image (inline and block, with blocks optionally rendering as captioned figures)
+* [*] Lists
+** [*] Ordered
+** [*] Unordered
+** [ ] Checklists
+* [*] Thematic Break
+* [*] Page Break
+* [*] Tables (see limitations)
+* [*] Admonitions
+* [*] Anchors
+* [*] Attributes
+* [*] Titles
+* [*] Footnotes
+* [*] Includes
+** *Advanced* (Of the following, I am likely only interested in tagged regions,
+   but maybe you then get offsets kind of for free).
+** [ ] Offsets
+** [ ] Tagged regions
+* [ ] Conditionals
+** [ ] ifdef
+** [ ] ifndef
+** [ ] ifeval
 
-Easy enough. It's probably at a state where folks can start actually using it a
-little.
-
-TIP: Check out `LIMITATIONS.adoc` for a better feature list. Probably this
-section will be subsumed into that at some point.
-
-=== 0.1.0
-
-_We have output_! You can now convert, for example, this entire README using the
-`asciidocr` command to a fairly bare-bones HTML more or less along the lines of
-what O'Reilly's https://oreillymedia.github.io/HTMLBook/[HTMLBook] expects.
-
-There are still plenty of edge-cases and, in fact, tokens to be
-parsed/implemented, but we've got headings, paragraphs, lists, and links, and
-you can go pretty far with those. And frankly I needed a break from the parsing,
-so I figured I'd change lanes for a little bit and work on the HTML output.
-
-Bonus: also can now do __un__constrained text formatting!
+Check out `LIMITATIONS.adoc` for a more complete feature/limitations list.
 
 == Project Goals 
 
