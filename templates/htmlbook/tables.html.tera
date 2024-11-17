@@ -2,25 +2,41 @@
 {%- macro process_table(block) -%}
 {#- Collect Cells into rows; should be save to assume that all tables have a cols attr -#}
 {% set cols = block.metadata.attributes.cols | int %}
-    <table>
-        <tr>
-        {% set num_cells = block.blocks | length -%}
-        {% for idx in range(end=num_cells) -%}
+{%- set body_start = 0 -%}
+{%- if "header" in block.metadata.options -%}
+{%- set header = true -%}
+{%- set body_start = cols -%}
+{%- endif -%}
+    <table>{% if header %}
+    <thead>
+        {% for idx in range(start=0, end=body_start) -%}
             {%- set cell = block.blocks | nth(n=idx) -%}
-                {{ self::process_table_cell(cell=cell) -}}
+                {{ self::process_table_cell(cell=cell, tag="th") }}
+    {% endfor %}</thead>
+    <tbody>
+        <tr>
+        {%- else -%}
+        <tr>
+        {%- endif %}
+        {% set num_cells = block.blocks | length -%}
+        {% for idx in range(start=body_start, end=num_cells) -%}
+            {%- set cell = block.blocks | nth(n=idx) -%}
+                {{ self::process_table_cell(cell=cell, tag="td") -}}
         {% if idx > 0 and (idx + 1) % cols == 0 and idx+1 != num_cells %}
         </tr>
         <tr>{%- endif %}
         {% endfor %}</tr>
+    {%- if header %}
+    </tbody>{%- endif %}
     </table>
 {%- endmacro process_table -%}
 
-{%- macro process_table_cell(cell) -%}
-            <td>
+{%- macro process_table_cell(cell, tag) -%}
+            <{{tag}}>
             {%- if cell.inlines -%}
             {%- for inline in cell.inlines -%}
             {{- inline_macros::process_inline(inline=inline) -}}
             {%- endfor -%}
             {%- endif -%}
-            </td>
+            </{{tag}}>
 {%- endmacro process_table_cell -%}

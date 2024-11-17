@@ -15,7 +15,7 @@ this should work.
 {%- set local_skip_tag = false -%}
 {#- Handle breaks separately; makes the logic easier -#}
 {%- if block.name in ["paragraph", "listing", "verse", "pass"] %}
-    {{ leaf_block_macros::process_table(block=block) }}
+    {{ leaf_block_macros::process_leaf_block(block=block) }}
 {%- elif block.name == "table" -%}
     {{ table_macros::process_table(block=block) }}
 {%- else -%}
