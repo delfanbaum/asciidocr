@@ -9,9 +9,16 @@ this should work.
 
 -#}
 {%- import "inline.html.tera" as inline_macros -%}
+{%- import "leafblocks.html.tera" as leaf_block_macros -%}
+{%- import "tables.html.tera" as table_macros -%}
 {%- macro process_block(block, skip_tag) -%}
 {%- set local_skip_tag = false -%}
 {#- Handle breaks separately; makes the logic easier -#}
+{%- if block.name in ["paragraph", "listing", "verse", "pass"] %}
+    {{ leaf_block_macros::process_leaf_block(block=block) }}
+{%- elif block.name == "table" -%}
+    {{ table_macros::process_table(block=block) }}
+{%- else -%}
 {%- if block.name == "break"-%}
     {% if block.variant == "page" %}
     <div style="page-break-after: always;"></div>
@@ -51,18 +58,6 @@ this should work.
     {%- set tag = "div" -%}
     {% elif block.name == "quote" -%}
     {%- set tag = "blockquote" -%}
-    {% elif block.name == "paragraph" -%}
-    {%- set tag = "p" -%}
-        {#- we always want to render p tags -#}
-        {%- set skip_tag = false -%}
-    {% elif block.name == "listing" -%}
-    {%- set tag = "pre" -%}
-        {%- if block.metadata.attributes.language -%}
-        {%- set code_language = block.metadata.attributes.language -%}
-        {%- endif -%}
-    {% elif block.name == "verse" -%}
-    {%- set tag = "pre" -%}
-        {%- set data_type = "verse" -%}
     {% elif block.name == "image" -%}
     {%- set tag = "figure" -%}
         {%- if block.metadata.attributes.positional_1 -%}
@@ -71,8 +66,6 @@ this should work.
         {%- if block.metadata.attributes.id -%}
         {%- set id = block.metadata.attributes.id -%}
         {%- endif -%}
-    {% elif block.name == "pass" -%}
-        {#- No tag is applied -#}
     {% elif block.name == "sidebar" -%}
         {%- set tag = "aside" -%}
         {%- set data_type = "sidebar" -%}
@@ -135,6 +128,7 @@ this should work.
     {%- endfor -%}
     {%- endif -%}
 </section>
+{%- endif -%}
 {%- endif -%}
 {%- endif -%}
 {%- endmacro process_block -%}

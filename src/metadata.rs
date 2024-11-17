@@ -10,6 +10,8 @@ use crate::{
     tokens::{Token, TokenType},
 };
 
+// just make this quoted, and then pull everything else out
+static RE_NAMED_QUOTED: Lazy<Regex> = Lazy::new(|| Regex::new(r#"(\w*=".*?")"#).unwrap());
 static RE_NAMED: Lazy<Regex> = Lazy::new(|| Regex::new(r#"(.*?)[=|,](.*)"#).unwrap());
 
 #[derive(PartialEq, Clone, Debug)]
@@ -22,7 +24,6 @@ pub enum AttributeType {
 
 impl AttributeType {
     fn from_str(s: &str) -> Option<Self> {
-        println!("string to attribue: {}", s);
         match s {
             "role" => Some(AttributeType::Role),
             "quote" => Some(AttributeType::Quote),
@@ -33,7 +34,7 @@ impl AttributeType {
     }
 }
 
-#[derive(Serialize, PartialEq, Clone, Debug)]
+#[derive(Serialize, PartialEq, Default, Clone, Debug)]
 pub struct ElementMetadata {
     pub attributes: HashMap<String, String>,
     pub options: Vec<String>,
@@ -91,7 +92,16 @@ impl ElementMetadata {
             new_block_metadata.attributes.insert("id".to_string(), id);
         } else {
             let attribute_list = token.lexeme[1..token.lexeme.len() - 1].to_string();
-            let attributes: Vec<&str> = attribute_list.split(',').collect();
+            let mut non_quoted_key_values = attribute_list.clone();
+            let mut attributes: Vec<&str> = vec![];
+            // TK "1,2,4" should be a single attribute, not "1,", 2, 4"
+            for quoted_attr in RE_NAMED_QUOTED.captures_iter(&attribute_list) {
+                let (total, [_]) = quoted_attr.extract();
+                attributes.push(total);
+                non_quoted_key_values = non_quoted_key_values.replace(total, "");
+            }
+            attributes.extend(non_quoted_key_values.split(',').collect::<Vec<&str>>());
+
             new_block_metadata.process_attributes(attributes);
         }
         new_block_metadata
@@ -128,7 +138,7 @@ impl ElementMetadata {
         for (idx, attribute) in attributes.iter_mut().enumerate() {
             match key_values_from_named_attribute(attribute) {
                 Ok((key, values)) => {
-                    if key == "role".to_string() {
+                    if key == *"role" {
                         for role in values {
                             self.roles.push(role.to_string());
                         }
@@ -182,6 +192,21 @@ impl ElementMetadata {
                         }
                     }
                 }
+            }
+        }
+    }
+
+    pub fn simplify_cols(&mut self) {
+        if let Some(cols_value) = self.attributes.get("cols") {
+            if cols_value.contains(',') {
+                // cols="1,2,1"
+                self.attributes.insert(
+                    "cols".to_string(),
+                    format!("{}", cols_value.split(',').collect::<Vec<&str>>().len()),
+                );
+            } else if cols_value.len() == 2 && cols_value[1..] == *"*" {
+                self.attributes
+                    .insert("cols".to_string(), cols_value[..1].to_string());
             }
         }
     }

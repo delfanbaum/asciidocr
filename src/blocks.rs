@@ -31,6 +31,7 @@ pub enum Block {
     LeafBlock(LeafBlock),
     ParentBlock(ParentBlock), // Admonitions are hiding in here
     BlockMetadata(ElementMetadata),
+    TableCell(TableCell),
 }
 
 impl Display for Block {
@@ -49,6 +50,7 @@ impl Display for Block {
             Block::LeafBlock(_) => write!(f, "LeafBlock"),
             Block::ParentBlock(_) => write!(f, "ParentBlock"),
             Block::BlockMetadata(_) => write!(f, "BlockMetadata"),
+            Block::TableCell(_) => write!(f, "TableCell"),
         }
     }
 }
@@ -79,6 +81,12 @@ impl Block {
                     } else {
                         panic!("Attempted to push dangling ListItem to parent block")
                     }
+                } else if matches!(parent_block.name, ParentBlockName::Table)
+                    && !matches!(block, Block::TableCell(_))
+                {
+                    // sanity-guard
+                    println!("{:?}", block);
+                    panic!("Attempted to add something other than a TableCell to a Table")
                 } else {
                     parent_block.blocks.push(block)
                 }
@@ -91,7 +99,11 @@ impl Block {
     pub fn takes_inlines(&self) -> bool {
         matches!(
             self,
-            Block::Section(_) | Block::LeafBlock(_) | Block::ListItem(_) | Block::DListItem(_)
+            Block::Section(_)
+                | Block::LeafBlock(_)
+                | Block::ListItem(_)
+                | Block::DListItem(_)
+                | Block::TableCell(_)
         )
     }
 
@@ -101,6 +113,7 @@ impl Block {
             Block::LeafBlock(block) => block.inlines.push(inline),
             Block::ListItem(list_item) => list_item.add_inline(inline),
             Block::DListItem(list_item) => list_item.add_inline(inline),
+            Block::TableCell(table_cell) => table_cell.inlines.push(inline),
             _ => panic!("push_block not implemented for {}", self),
         }
     }
@@ -157,6 +170,61 @@ impl Block {
         matches!(self, Block::DListItem(_))
     }
 
+    pub fn is_table(&self) -> bool {
+        if let Block::ParentBlock(parent_block) = self {
+            parent_block.name == ParentBlockName::Table
+        } else {
+            false
+        }
+    }
+
+    pub fn consolidate_table_info(&mut self) {
+        let Block::ParentBlock(table) = self else {
+            panic!("Incorrect function call: consolidate_table_info on non-table block")
+        };
+        // check if there is an implicit header
+        if table.blocks.len() >= 2 {
+            // if the cells in the first row are on the same line, either serves as cols
+            // designation
+            let first_cell_line = table.blocks[0].line();
+            if first_cell_line == table.blocks[1].line() {
+                if first_cell_line == table.location[0].line + 1 {
+                    if let Some(ref mut metadata) = table.metadata {
+                        metadata.options.push("header".to_string());
+                    } else {
+                        let mut metadata = ElementMetadata::default();
+                        metadata.options.push("header".to_string());
+                        table.metadata = Some(metadata)
+                    }
+                } else {
+                    // count for implicit column designation
+                    let cols = table.blocks.iter().fold(0usize, |acc, block| {
+                        acc + (block.line() == first_cell_line) as usize
+                    });
+                    if let Some(ref mut metadata) = table.metadata {
+                        if !metadata.attributes.contains_key("cols") {
+                            metadata
+                                .attributes
+                                .insert("cols".to_string(), format!("{cols}"));
+                        }
+                    } else {
+                        let mut metadata = ElementMetadata::default();
+                        metadata
+                            .attributes
+                            .insert("cols".to_string(), format!("{cols}"));
+                        table.metadata = Some(metadata)
+                    }
+                }
+            }
+            // FOR NOW, make the cols an integer for easier templating.
+            let Some(ref mut metadata) = table.metadata else {
+                // TK this should be a proper error
+                panic!("Missing table metadata; cannot construct table")
+            };
+            metadata.simplify_cols()
+        }
+    }
+
     pub fn has_blocks(&self) -> bool {
         match self {
             Block::Section(section) => !section.blocks.is_empty(),
@@ -204,6 +272,7 @@ impl Block {
             Block::LeafBlock(block) => block.location.clone(),
             Block::ParentBlock(block) => block.location.clone(),
             Block::BlockMetadata(block) => block.location.clone(),
+            Block::TableCell(block) => block.location.clone(),
         }
     }
 
@@ -269,6 +338,12 @@ impl Block {
             }
             Block::ParentBlock(block) => {
                 if let Some(last_inline) = block.blocks.last() {
+                    block.location =
+                        Location::reconcile(block.location.clone(), last_inline.locations())
+                }
+            }
+            Block::TableCell(block) => {
+                if let Some(last_inline) = block.inlines.last() {
                     block.location =
                         Location::reconcile(block.location.clone(), last_inline.locations())
                 }
@@ -436,7 +511,7 @@ impl BlockMacro {
     pub fn add_metadata(mut self, incoming_metadata: &ElementMetadata) -> Self {
         match self.metadata {
             Some(ref mut metadata) => metadata.add_metadata_from_other(incoming_metadata),
-            None => self.metadata = Some(incoming_metadata.clone())
+            None => self.metadata = Some(incoming_metadata.clone()),
         }
         self
     }
@@ -585,6 +660,8 @@ pub enum ParentBlockName {
     Sidebar,
     Open,
     Quote,
+    Table, // Tables function basically the same in terms of delimiter, so I'm going to reuse
+           // ParentBlock until someone convinces me otherwise
 }
 
 #[derive(Serialize, Debug, PartialEq)]
@@ -683,6 +760,13 @@ impl ParentBlock {
                 vec![],
                 token.locations(),
             ),
+            TokenType::Table => ParentBlock::new(
+                ParentBlockName::Table,
+                None,
+                token.text(),
+                vec![],
+                token.locations(),
+            ),
 
             _ => panic!("Tried to create a ParentBlock from an invalid Token."),
         }
@@ -696,5 +780,30 @@ impl ParentBlock {
             )
         };
         first_location.line
+    }
+}
+
+#[derive(Serialize, Clone, Debug)]
+pub struct TableCell {
+    pub name: String,
+    node_type: NodeTypes,
+    pub inlines: Vec<Inline>,
+    pub location: Vec<Location>,
+}
+
+impl PartialEq for TableCell {
+    fn eq(&self, _: &Self) -> bool {
+        true
+    }
+}
+
+impl TableCell {
+    pub fn new_from_token(token: Token) -> Self {
+        TableCell {
+            name: "tableCell".to_string(),
+            node_type: NodeTypes::Block,
+            inlines: vec![],
+            location: token.locations(),
+        }
     }
 }

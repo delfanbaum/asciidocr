@@ -10,6 +10,14 @@ non-features.
 * Section IDs are not auto-generated
 * Custom IDs/reference text
 
+== Working Caveats
+
+Tables:: Tables are rendered as expected, save that `asciidocr` does not
+currently respect column width designations; `cols="3,1,1"` will still produce a
+three-column table, but with columns of "default" widths. Tables also do not
+currently support spanning columns or rows; if you require this functionality,
+please use an HTML table in a passthrough block.
+
 == Language Features Planned for Inclusion Later
 
 * https://docs.asciidoctor.org/asciidoc/latest/attributes/positional-and-named-attributes/#block-style-and-attribute-shorthand[block style
