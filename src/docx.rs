@@ -1,4 +1,4 @@
-use docx_rust::{document::*, formatting::*, Docx, DocxResult};
+use docx_rust::{document::*, formatting::*, styles::Style, Docx, DocxResult};
 use std::path::Path;
 
 use crate::{
@@ -12,7 +12,11 @@ pub fn render_docx(graph: &Asg, output_path: &Path) -> DocxResult<()> {
 
     // TK add a header
     if let Some(header) = &graph.header {
-        let mut title = Paragraph::default().property(ParagraphProperty::default().style_id(ParagraphStyleId {value: std::borrow::Cow::Borrowed("Heading1")}));
+        let mut title = Paragraph::default().property(ParagraphProperty::default().style_id(
+            ParagraphStyleId {
+                value: std::borrow::Cow::Borrowed("Heading1"),
+            },
+        ));
         for inline in header.title() {
             for content in content_from_inline(inline, &mut vec![]) {
                 title = title.push(content);
@@ -142,4 +146,32 @@ fn apply_manuscript_format(doc: &mut Docx) {
         }),
         revision: None,
     });
+    doc.styles.push(
+        Style::new(docx_rust::styles::StyleType::Paragraph, "Normal")
+            .name("Normal")
+            .paragraph(
+                ParagraphProperty::default()
+                    .indent(Indent {
+                        left_chars: None,
+                        left: None,
+                        right_chars: None,
+                        right: None,
+                        first_line_chars: None,
+                        first_line: Some(720),
+                        hanging: None,
+                    })
+                    .spacing(Spacing::default().line(480 as isize)),
+            )
+            .character(CharacterProperty::default().fonts(Fonts {
+                hint: None,
+                ascii: Some("Times New Roman".to_string()),
+                east_asia: None,
+                h_ansi: Some("Times New Roman".to_string()),
+                custom: None,
+                ascii_theme: None,
+                east_asia_theme: None,
+                h_ansi_theme: None,
+                custom_theme: None,
+            })),
+    );
 }
