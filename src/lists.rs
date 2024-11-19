@@ -89,6 +89,14 @@ impl ListItem {
     pub fn add_inline(&mut self, inline: Inline) {
         self.principal.push(inline)
     }
+
+    pub fn principal(&self) -> Vec<Inline> { 
+        self.principal.clone()
+    }
+
+    pub fn blocks(&self) -> Vec<Block> { 
+        self.blocks.clone()
+    }
 }
 
 /// Functions essentially the same as a list

@@ -3,10 +3,13 @@ use std::path::Path;
 
 use crate::{
     asg::Asg,
-    blocks::{Block, LeafBlock},
+    blocks::{Block, LeafBlock, LeafBlockName},
     inlines::{Inline, InlineSpanVariant},
+    lists::{ListItem, ListVariant},
 };
 
+// TK New idea: made a template DOCX that we read in and _then_ add things to it; seems like there
+// are no real defaults on this Docx object.
 pub fn render_docx(graph: &Asg, output_path: &Path) -> DocxResult<()> {
     let mut doc = Docx::default();
 
@@ -46,6 +49,15 @@ fn add_block_to_doc<'a>(doc: &mut Docx<'a>, block: &'a Block) {
         Block::LeafBlock(block) => {
             doc.document.push(para_from_leafblock(block));
         }
+        Block::List(list_block) => {
+            for block in &list_block.items {
+                if let Block::ListItem(list_item) = block {
+                    for para in paras_from_list_item(list_item, list_block.variant.clone()) {
+                        doc.document.push(para);
+                    }
+                };
+            }
+        }
         _ => {}
     }
     //doc
@@ -60,6 +72,48 @@ fn para_from_leafblock(block: &LeafBlock) -> Paragraph {
         }
     }
     para
+}
+
+/// "Simple" lists only for now
+fn paras_from_list_item(block: &ListItem, variant: ListVariant) -> Vec<Paragraph> {
+    let mut paras = vec![];
+    let mut para = Paragraph::default();
+    for inline in block.principal() {
+        for content in content_from_inline(inline, &mut vec![]) {
+            para = para.push(content);
+        }
+    }
+    match variant {
+        ListVariant::Unordered => {
+            para = para.property(ParagraphProperty::default().style_id("List Bullet"));
+        }
+        _ => {
+            // just do all other lists as such for now
+            para = para.property(ParagraphProperty::default().style_id("List"));
+        }
+    }
+    paras.push(para);
+    for child_block in block.blocks() {
+        if let Block::LeafBlock(leaf) = child_block {
+            if leaf.name == LeafBlockName::Paragraph {
+                let mut child_para = Paragraph::default();
+                for inline in block.principal() {
+                    for content in content_from_inline(inline, &mut vec![]) {
+                        child_para = child_para.push(content);
+                    }
+                }
+                child_para =
+                    child_para.property(ParagraphProperty::default().style_id("List Continue"));
+                paras.push(child_para);
+            } else {
+                todo!()
+            }
+        } else {
+            todo!()
+        }
+    }
+
+    paras
 }
 
 fn content_from_inline<'a>(
