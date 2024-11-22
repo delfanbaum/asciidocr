@@ -3,12 +3,12 @@ use std::{collections::VecDeque, fmt::Display, iter};
 
 use serde::Serialize;
 
-use crate::{
+use crate::graph::{
     macros::target_and_attrs_from_token,
     metadata::ElementMetadata,
     nodes::{Location, NodeTypes},
-    tokens::{Token, TokenType},
 };
+use crate::tokens::{Token, TokenType};
 
 /// Inlines enum containing literals, spans, and references (the latter not implemented)
 #[derive(Serialize, Clone, Debug)]
@@ -612,12 +612,9 @@ impl LineBreak {
 #[cfg(test)]
 mod tests {
 
-    use crate::{
-        inlines::InlineRefVariant,
-        tokens::{Token, TokenType},
-    };
+    use crate::tokens::{Token, TokenType};
 
-    use super::InlineRef;
+    use super::*;
 
     #[test]
     fn xref_from_token() {

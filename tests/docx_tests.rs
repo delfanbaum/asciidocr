@@ -1,6 +1,6 @@
 use std::fs;
 
-use asciidocr::docx::render_docx;
+use asciidocr::backends::docx::render_docx;
 use asciidocr::parser::Parser;
 use asciidocr::scanner::Scanner;
 use tempfile::NamedTempFile;

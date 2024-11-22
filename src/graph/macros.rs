@@ -1,7 +1,8 @@
 use core::panic;
 use std::collections::HashMap;
 
-use crate::{metadata::ElementMetadata, tokens::Token};
+use crate::graph::metadata::ElementMetadata;
+use crate::tokens::Token;
 
 pub fn target_and_attrs_from_token(token: &Token) -> (String, Option<ElementMetadata>) {
     let target_and_attrs = match token.token_type() {
@@ -14,7 +15,7 @@ pub fn target_and_attrs_from_token(token: &Token) -> (String, Option<ElementMeta
         crate::tokens::TokenType::Include => {
             token.text()[9..].to_string() // after include::
         }
-        _ => panic!("Invalid token provided to target_and_attrs_from_token")
+        _ => panic!("Invalid token provided to target_and_attrs_from_token"),
     };
 
     let target: String = target_and_attrs.chars().take_while(|c| c != &'[').collect();
