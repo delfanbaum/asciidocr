@@ -1,9 +1,9 @@
 use std::fs;
 
 use asciidocr::{
+    backends::templates::{gather_htmlbook_templates, render_from_templates},
     parser::Parser,
     scanner::Scanner,
-    templates::{gather_htmlbook_templates, render_from_templates},
 };
 use assert_json_diff::assert_json_eq;
 use serde_json::{json, Value};

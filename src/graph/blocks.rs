@@ -3,16 +3,14 @@ use std::fmt::Display;
 
 use serde::Serialize;
 
-use crate::{
+use crate::graph::{
     inlines::Inline,
     lists::{DList, DListItem, List, ListItem, ListVariant},
     macros::target_and_attrs_from_token,
     metadata::ElementMetadata,
     nodes::{Location, NodeTypes},
-    tokens::{Token, TokenType},
 };
-
-pub enum _ToFindHomesFor {}
+use crate::tokens::{Token, TokenType};
 
 /// Blocks enum, containing any tree blocks
 #[derive(Serialize, PartialEq, Clone, Debug)]
@@ -1016,7 +1014,7 @@ impl TableCell {
 
 #[cfg(test)]
 mod tests {
-    use crate::inlines::{
+    use crate::graph::inlines::{
         InlineLiteral, InlineLiteralName, InlineRefVariant, InlineSpan, InlineSpanForm, InlineSpanVariant
     };
 

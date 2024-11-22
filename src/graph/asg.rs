@@ -2,8 +2,8 @@ use std::collections::HashMap;
 
 use serde::Serialize;
 
-use crate::blocks::{Block, ParentBlock};
-use crate::nodes::{Header, Location, NodeTypes};
+use crate::graph::blocks::{Block, ParentBlock};
+use crate::graph::nodes::{Header, Location, NodeTypes};
 
 /// Abstract Syntax Graph used to represent an asciidoc document
 /// roughly meaning to follow the "official" schema:
@@ -99,8 +99,8 @@ impl Asg {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::blocks::*;
-    use crate::inlines::*;
+    use crate::graph::blocks::*;
+    use crate::graph::inlines::*;
 
     #[test]
     fn consolidate_footnotes() {

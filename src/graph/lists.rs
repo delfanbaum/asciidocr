@@ -1,9 +1,9 @@
-use crate::{
+use crate::graph::{
     blocks::{Block, LeafBlock},
     inlines::Inline,
     nodes::{Location, NodeTypes},
-    tokens::Token,
 };
+use crate::tokens::Token;
 use serde::Serialize;
 
 #[derive(Serialize, Clone, Debug)]

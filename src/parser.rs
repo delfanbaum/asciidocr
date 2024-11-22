@@ -1,7 +1,7 @@
 use core::panic;
 use std::collections::{HashMap, VecDeque};
 
-use crate::{
+use crate::graph::{
     asg::Asg,
     blocks::{Block, BlockMacro, Break, LeafBlock, ParentBlock, Section, TableCell},
     inlines::{Inline, InlineLiteral, InlineRef, InlineSpan, LineBreak},
@@ -9,10 +9,10 @@ use crate::{
     macros::target_and_attrs_from_token,
     metadata::{AttributeType, ElementMetadata},
     nodes::{Header, Location},
-    scanner::Scanner,
-    tokens::{Token, TokenType},
-    utils::{is_asciidoc_file, open_file},
 };
+use crate::scanner::Scanner;
+use crate::tokens::{Token, TokenType};
+use crate::utils::{is_asciidoc_file, open_file};
 
 /// Parses a stream of tokens into an Abstract Syntax Graph, returning the graph once all tokens
 /// have been parsed.
@@ -381,7 +381,7 @@ impl Parser {
         self.add_to_block_stack_or_graph(
             asg,
             Block::Break(Break::new(
-                crate::blocks::BreakVariant::Thematic,
+                crate::graph::blocks::BreakVariant::Thematic,
                 token.locations(),
             )),
         )
@@ -391,7 +391,7 @@ impl Parser {
         self.add_to_block_stack_or_graph(
             asg,
             Block::Break(Break::new(
-                crate::blocks::BreakVariant::Page,
+                crate::graph::blocks::BreakVariant::Page,
                 token.locations(),
             )),
         )
@@ -1003,8 +1003,8 @@ impl Parser {
             para_locations = first_inline.locations().clone();
         }
         let mut para_block = Block::LeafBlock(LeafBlock::new(
-            crate::blocks::LeafBlockName::Paragraph,
-            crate::blocks::LeafBlockForm::Paragraph,
+            crate::graph::blocks::LeafBlockName::Paragraph,
+            crate::graph::blocks::LeafBlockForm::Paragraph,
             None,
             para_locations,
             vec![],
@@ -1036,7 +1036,7 @@ impl Parser {
                 };
                 if metadata.declared_type == Some(AttributeType::Quote) {
                     let mut quote_block = Block::ParentBlock(ParentBlock::new(
-                        crate::blocks::ParentBlockName::Quote,
+                        crate::graph::blocks::ParentBlockName::Quote,
                         None,
                         "".to_string(),
                         vec![],

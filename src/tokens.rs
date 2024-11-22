@@ -1,4 +1,4 @@
-use crate::nodes::Location;
+use crate::graph::nodes::Location;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Token {

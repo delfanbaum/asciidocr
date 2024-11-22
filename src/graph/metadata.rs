@@ -5,10 +5,8 @@ use once_cell::sync::Lazy;
 use regex::Regex;
 use serde::Serialize;
 
-use crate::{
-    nodes::Location,
-    tokens::{Token, TokenType},
-};
+use crate::graph::nodes::Location;
+use crate::tokens::{Token, TokenType};
 
 // just make this quoted, and then pull everything else out
 static RE_NAMED_QUOTED: Lazy<Regex> = Lazy::new(|| Regex::new(r#"(\w*=".*?")"#).unwrap());
@@ -279,7 +277,7 @@ fn key_values_from_named_attribute(attribute: &str) -> Result<(String, Vec<&str>
 
 #[cfg(test)]
 mod tests {
-    use crate::metadata::key_values_from_named_attribute;
+    use super::*;
 
     #[test]
     fn values_from_named_attribute_role() {

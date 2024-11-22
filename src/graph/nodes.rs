@@ -1,6 +1,6 @@
 use serde::Serialize;
 
-use crate::inlines::Inline;
+use crate::graph::inlines::Inline;
 
 #[derive(Clone, Copy, Serialize, Debug)]
 #[serde(rename_all = "lowercase")]
@@ -149,9 +149,9 @@ impl Location {
 
 #[cfg(test)]
 mod tests {
-    use crate::inlines::{Inline, InlineLiteral};
+    use crate::graph::inlines::{Inline, InlineLiteral, InlineLiteralName};
 
-    use super::{Header, Location};
+    use super::*;
 
     #[test]
     fn reconcile_locations() {
@@ -167,7 +167,7 @@ mod tests {
     fn header_to_document_id() {
         let mut header = Header::new();
         header.title.push(Inline::InlineLiteral(InlineLiteral::new(
-            crate::inlines::InlineLiteralName::Text,
+            InlineLiteralName::Text,
             String::from("Foo With Space"),
             vec![],
         )));

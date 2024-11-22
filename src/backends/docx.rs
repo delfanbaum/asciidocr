@@ -1,14 +1,14 @@
 use docx_rust::{document::*, formatting::*, Docx, DocxFile, DocxResult};
 use std::{io::Cursor, path::Path};
 
-use crate::{
+use crate::graph::{
     asg::Asg,
     blocks::{Block, LeafBlock, LeafBlockName},
     inlines::{Inline, InlineSpanVariant},
     lists::{ListItem, ListVariant},
 };
 
-static REFERENCE_DOCX: &[u8] = include_bytes!("../templates/docx/reference.docx");
+static REFERENCE_DOCX: &[u8] = include_bytes!("../../templates/docx/reference.docx");
 
 pub fn render_docx(graph: &Asg, output_path: &Path) -> DocxResult<()> {
     let cursor = Cursor::new(REFERENCE_DOCX);
