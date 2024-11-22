@@ -1,5 +1,6 @@
 use anyhow::Result;
 use clap::Parser;
+use simple_logger::SimpleLogger;
 use std::{fs, path::PathBuf};
 
 use asciidocr::{
@@ -12,6 +13,7 @@ use asciidocr::{
 };
 
 fn main() {
+    let _ = SimpleLogger::new().with_level(log::LevelFilter::Warn).with_colors(true);
     let args = Cli::parse();
 
     if let Err(e) = run(args) {

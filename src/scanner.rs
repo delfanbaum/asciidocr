@@ -1,4 +1,6 @@
-use core::{panic, str};
+use core::str;
+
+use log::error;
 
 use crate::tokens::{Token, TokenType};
 
@@ -375,7 +377,10 @@ impl<'a> Scanner<'a> {
             3 => self.add_token(TokenType::Heading3, false, 0),
             4 => self.add_token(TokenType::Heading4, false, 0),
             5 => self.add_token(TokenType::Heading5, false, 0),
-            _ => panic!("Too many headings"), // TODO
+            _ => {
+                error!("Invalid headling level: line {}", self.line);
+                std::process::exit(1)
+            }
         }
     }
 
@@ -419,8 +424,7 @@ impl<'a> Scanner<'a> {
             self.current += 1
         }
         // if the delimiter is |
-        if self.peek() == '|' &&
-            self.source.as_bytes()[self.current -1] as char != ' ' {
+        if self.peek() == '|' && self.source.as_bytes()[self.current - 1] as char != ' ' {
             self.current += 1;
             return self.add_table_cell();
         }
@@ -1012,7 +1016,6 @@ mod tests {
     #[case::monospace(String::from("``"), TokenType::UnconstrainedMonospace)]
     #[case::mark(String::from("##"), TokenType::UnconstrainedMark)]
     fn inline_formatting_doubles(#[case] markup_str: String, #[case] expected_token: TokenType) {
-        // TODO make this less ugly
         let markup = format!("Some{}bar{}bar.", markup_str, markup_str);
         let expected_tokens = vec![
             Token::new_default(

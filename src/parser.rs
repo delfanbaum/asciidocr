@@ -1,6 +1,8 @@
 use core::panic;
 use std::collections::{HashMap, VecDeque};
 
+use log::{error, warn};
+
 use crate::graph::{
     asg::Asg,
     blocks::{Block, BlockMacro, Break, LeafBlock, ParentBlock, Section, TableCell},
@@ -289,8 +291,8 @@ impl Parser {
         let mut attr_components: Vec<&str> = binding.split_terminator(':').collect();
         attr_components.remove(0); // throw away initial "" in the list
         if attr_components.is_empty() {
-            // guard clause
-            todo!()
+            warn!("Empty attributes list at line: {}", token.line);
+            return;
         }
         let key = attr_components.first().unwrap().to_string();
         // values should be trimmed
@@ -325,9 +327,7 @@ impl Parser {
         // if we had a block title, let's clean that out
         if let Some(ref mut title_stack) = self.block_title {
             while !self.inline_stack.is_empty() {
-                let Some(inline) = self.inline_stack.pop_front() else {
-                    panic!("Error getting inline from open queue");
-                };
+                let inline = self.inline_stack.pop_front().unwrap();
                 title_stack.push(inline);
             }
         }
@@ -455,9 +455,7 @@ impl Parser {
 
         // collect the inlines
         while !self.inline_stack.is_empty() {
-            let Some(inline) = self.inline_stack.pop_front() else {
-                panic!("Error getting inline from open queue");
-            };
+            let inline = self.inline_stack.pop_front().unwrap();
             dlist_item.push_term(inline);
         }
         if self.block_stack.last().is_some()
@@ -679,13 +677,9 @@ impl Parser {
             .rposition(|inline| inline.is_macro())
         {
             // consolidate into the inline macro
-            let Some(mut inline_macro) = self.inline_stack.remove(inline_macro_idx) else {
-                panic!("Index error getting inline macro")
-            };
+            let mut inline_macro = self.inline_stack.remove(inline_macro_idx).unwrap();
             while self.inline_stack.len() > inline_macro_idx {
-                let Some(subsequent_inline) = self.inline_stack.remove(inline_macro_idx) else {
-                    panic!("Index error while adding inlines to inline macro")
-                };
+                let subsequent_inline = self.inline_stack.remove(inline_macro_idx).unwrap();
                 inline_macro.push_inline(subsequent_inline);
             }
             // update the locations
@@ -722,8 +716,7 @@ impl Parser {
             // indexing
             token.endcol = token.startcol + value.len() - 1;
         } else {
-            // TODO throw a better warning
-            eprintln!("Missing document attribute: {}", attribute_target);
+            warn!("Missing document attribute: {}", attribute_target);
         }
         // then add it as literal text
         self.parse_text(token);
@@ -750,10 +743,18 @@ impl Parser {
                         }
                     }
                     Inline::InlineRef(_) => {
-                        panic!("Inline references are not allowed in document titles")
+                        error!(
+                            "Inline references are not allowed in document titles: line {}",
+                            token.line
+                        );
+                        std::process::exit(1)
                     }
                     Inline::InlineBreak(_) => {
-                        panic!("Line breaks (+) are not allowed in document titles")
+                        error!(
+                            "Line breaks (+) are not allowed in document titles: line {}",
+                            token.line
+                        );
+                        std::process::exit(1)
                     }
                 }
             } else {
@@ -784,12 +785,9 @@ impl Parser {
         }
     }
 
-    /// TODO some magic about the inlines, etc.
     fn parse_delimited_leaf_block(&mut self, token: Token) {
         if self.open_parse_after_as_text_type.is_some() {
-            let Some(open_leaf) = self.block_stack.last_mut() else {
-                panic!("Missing last block on the stack")
-            };
+            let open_leaf = self.block_stack.last_mut().unwrap();
             open_leaf.add_locations(token.locations().clone());
             self.open_parse_after_as_text_type = None;
         } else {
@@ -820,18 +818,20 @@ impl Parser {
         {
             let matched_block = self.block_stack.remove(parent_block_idx);
             let Block::ParentBlock(mut matched) = matched_block else {
-                panic!("Unexpteced block in Block::ParentBlock")
+                panic!(
+                    "Unexpected block in Block::ParentBlock: line {}",
+                    delimiter_line
+                );
             };
             if matched == block {
                 // close any dangling inlines BEFORE opening the delimited block lines
                 self.add_inlines_to_block_stack();
                 // remove the open delimiter line from the count and confirm we're nested properly
                 let Some(line) = self.open_delimited_block_lines.pop() else {
-                    panic!("Attempted to close a non-existent delimited block")
+                    panic!("Attempted to close a non-existent delimited block");
                 };
                 if line != matched.opening_line() {
-                    // TODO this should be an error, not a panic
-                    panic!("Error nesting delimited blocks, see line {}", line)
+                    warn!("Error nesting delimited blocks, see line {}", line)
                 }
                 // update the final location
                 matched.location = Location::reconcile(matched.location.clone(), block.location);
@@ -888,10 +888,11 @@ impl Parser {
         // close itself, emptying the open_delimited_block_lines)
         if self.in_block_continuation && self.open_delimited_block_lines.is_empty() {
             let Some(last_block) = self.block_stack.last_mut() else {
-                panic!(
+                error!(
                     "Line {}: Invalid block continuation: no previous block",
                     block.line()
-                )
+                );
+                std::process::exit(1)
             };
             last_block.push_block(block);
             self.in_block_continuation = false;
@@ -947,8 +948,10 @@ impl Parser {
                 .iter()
                 .rposition(|inline| inline.is_open())
             else {
-                println!("This inline opening has not been handled!");
-                panic!()
+                error!("Unknown error with mismatched inline style delimiters");
+                std::process::exit(70)  // this might be useful to the user as opposed to a
+                // panic; exit code 70 is, I read, sometimes used for "EX_SOFTWARE", "Internal
+                // Software Error"
             };
             let mut open_span = self.inline_stack.remove(open_span_idx).unwrap();
             let open_span_literal = open_span.produce_literal_from_self();
@@ -988,9 +991,7 @@ impl Parser {
         if let Some(last_block) = self.block_stack.last_mut() {
             if last_block.takes_inlines() && !self.in_block_line && !self.force_new_block {
                 while !self.inline_stack.is_empty() {
-                    let Some(inline) = self.inline_stack.pop_front() else {
-                        panic!("Error getting inline from open queue");
-                    };
+                    let inline = self.inline_stack.pop_front().unwrap();
                     last_block.push_inline(inline);
                 }
                 return;
@@ -1016,25 +1017,23 @@ impl Parser {
         }
         if self.in_block_continuation && self.open_delimited_block_lines.is_empty() {
             let Some(last_block) = self.block_stack.last_mut() else {
-                panic!(
+                error!(
                     "Line {}: Invalid block continuation: no previous block",
                     para_block.line()
-                )
+                );
+                std::process::exit(1)
             };
             last_block.push_block(para_block);
             return;
         }
 
-        if self.metadata.is_some() {
+        if let Some(ref block_metadata) = self.metadata {
             // check to see if we need to apply metadata to the para block
             let line_above = para_block.locations().first().unwrap().line + 1;
             if self.open_delimited_block_lines.last() == Some(&line_above)
                 || self.open_delimited_block_lines.is_empty()
             {
-                let Some(ref metadata) = self.metadata else {
-                    panic!()
-                };
-                if metadata.declared_type == Some(AttributeType::Quote) {
+                if block_metadata.declared_type == Some(AttributeType::Quote) {
                     let mut quote_block = Block::ParentBlock(ParentBlock::new(
                         crate::graph::blocks::ParentBlockName::Quote,
                         None,
@@ -1120,7 +1119,7 @@ impl Parser {
                     if matches!(next_last_block, Block::List(_)) {
                         next_last_block.push_block(block);
                     } else {
-                        //panic!("Dangling list item: missing parent list: {}", block.line())
+                        panic!("Dangling list item: missing parent list: {}", block.line())
                     }
                 } else if matches!(block, Block::DListItem(_)) {
                     next_last_block.push_block(block);

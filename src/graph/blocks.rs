@@ -1,5 +1,6 @@
 use core::panic;
 use std::fmt::Display;
+use log::error;
 
 use serde::Serialize;
 
@@ -216,8 +217,8 @@ impl Block {
             }
             // FOR NOW, make the cols an integer for easier templating.
             let Some(ref mut metadata) = table.metadata else {
-                // TK this should be a proper error
-                panic!("Missing table metadata; cannot construct table")
+                error!("Error creating table at Line: {}", first_cell_line);
+                std::process::exit(1)
             };
             metadata.simplify_cols()
         }
