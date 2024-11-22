@@ -4,7 +4,7 @@ use std::{fs, path::PathBuf};
 
 use asciidocr::{
     backends::docx::render_docx,
-    backends::templates::{gather_htmlbook_templates, render_from_templates},
+    backends::htmls::{gather_htmlbook_templates, render_from_templates},
     cli::{read_output, Backends, Cli},
     parser::Parser as AdocParser,
     scanner::Scanner,

@@ -1,7 +1,7 @@
 use std::fs;
 
 use asciidocr::{
-    backends::templates::{gather_htmlbook_templates, render_from_templates},
+    backends::htmls::{gather_htmlbook_templates, render_from_templates},
     parser::Parser,
     scanner::Scanner,
 };
