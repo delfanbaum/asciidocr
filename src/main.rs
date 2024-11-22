@@ -4,10 +4,11 @@ use std::{fs, path::PathBuf};
 
 use asciidocr::{
     cli::{read_output, Backends, Cli},
+    docx::render_docx,
     parser::Parser as AdocParser,
     scanner::Scanner,
-    utils::open_file,
     templates::{gather_htmlbook_templates, render_from_templates},
+    utils::open_file,
 };
 
 fn main() {
@@ -32,6 +33,16 @@ fn run(args: Cli) -> Result<()> {
         Backends::Json => {
             render_string(serde_json::to_string_pretty(&graph)?, read_output(args));
             Ok(())
+        }
+
+        Backends::Docx => {
+            if let Some(output_path) = read_output(args) {
+                render_docx(&graph, &output_path).expect("Error rendering docx");
+                Ok(())
+            } else {
+                eprintln!("Error: can't send docx backend to stdout");
+                std::process::exit(1)
+            }
         }
     }
 }

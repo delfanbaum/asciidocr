@@ -43,6 +43,11 @@ impl Header {
             self.location = Location::reconcile(self.location.clone(), last_inline.locations())
         }
     }
+    
+    pub fn title(&self) -> Vec<Inline> {
+        self.title.clone()
+
+}
 }
 
 /// Struct containing document author information

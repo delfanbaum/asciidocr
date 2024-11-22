@@ -15,7 +15,7 @@ use crate::{
 pub enum _ToFindHomesFor {}
 
 /// Blocks enum, containing any tree blocks
-#[derive(Serialize, PartialEq, Debug)]
+#[derive(Serialize, PartialEq, Clone, Debug)]
 #[serde(untagged)]
 pub enum Block {
     Section(Section), // sort of a special case but prob needs to be included here
@@ -380,9 +380,77 @@ impl Block {
             _ => todo!(),
         }
     }
+
+    /// Returns all literal text in a block
+    pub fn block_text(&self) -> String {
+        let mut block_text = String::new();
+        match self {
+            Block::Section(block) => {
+                for inline in block.title() {
+                    block_text.push_str(&inline.extract_values_to_string())
+                }
+
+                for block in block.blocks.iter() {
+                    block_text.push_str(&block.block_text())
+                }
+            }
+            Block::List(list) => {
+                for item in list.items.iter() {
+                    block_text.push_str(&item.block_text())
+                }
+            }
+            Block::ListItem(block) => {
+                for inline in block.principal.iter() {
+                    block_text.push_str(&inline.extract_values_to_string())
+                }
+
+                for block in block.blocks.iter() {
+                    block_text.push_str(&block.block_text())
+                }
+            }
+            Block::DList(list) => {
+                for item in list.items.iter() {
+                    block_text.push_str(&item.block_text())
+                }
+            }
+            Block::DListItem(block) => {
+                for inline in block.principal.iter() {
+                    block_text.push_str(&inline.extract_values_to_string())
+                }
+
+                for block in block.blocks.iter() {
+                    block_text.push_str(&block.block_text())
+                }
+            }
+            Block::Break(_) => {} // break doesn't have literals
+            Block::BlockMacro(block) => {
+                for inline in block.caption.iter() {
+                    block_text.push_str(&inline.extract_values_to_string())
+                }
+            }
+            Block::LeafBlock(block) => {
+                for inline in block.inlines.iter() {
+                    block_text.push_str(&inline.extract_values_to_string())
+                }
+            }
+            Block::ParentBlock(block) => {
+                for block in block.blocks.iter() {
+                    block_text.push_str(&block.block_text())
+                }
+            }
+            Block::BlockMetadata(_) => {}
+            Block::TableCell(block) => {
+                for inline in block.inlines.iter() {
+                    block_text.push_str(&inline.extract_values_to_string())
+                }
+            }
+            _ => todo!(),
+        }
+        block_text
+    }
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Clone, Debug)]
 pub struct Section {
     name: String,
     #[serde(rename = "type")]
@@ -396,7 +464,7 @@ pub struct Section {
     #[serde(skip_serializing_if = "Option::is_none")]
     metadata: Option<ElementMetadata>,
     pub level: usize,
-    blocks: Vec<Block>,
+    pub blocks: Vec<Block>,
     location: Vec<Location>,
 }
 
@@ -421,9 +489,13 @@ impl Section {
             location: vec![first_location],
         }
     }
+
+    pub fn title(&self) -> Vec<Inline> {
+        self.inlines.clone()
+    }
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Clone, Debug)]
 pub struct Break {
     name: String,
     #[serde(rename = "type")]
@@ -438,7 +510,7 @@ impl PartialEq for Break {
     }
 }
 
-#[derive(Serialize, Debug, PartialEq, Eq)]
+#[derive(Serialize, Clone, Debug, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum BreakVariant {
     Page,
@@ -456,7 +528,7 @@ impl Break {
     }
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Clone, Debug)]
 pub struct BlockMacro {
     name: BlockMacroName,
     #[serde(rename = "type")]
@@ -476,7 +548,7 @@ impl PartialEq for BlockMacro {
     }
 }
 
-#[derive(Serialize, PartialEq, Debug)]
+#[derive(Serialize, PartialEq, Clone, Debug)]
 #[serde(rename_all = "lowercase")]
 pub enum BlockMacroName {
     Audio,
@@ -517,7 +589,7 @@ impl BlockMacro {
     }
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Clone, Debug)]
 pub struct LeafBlock {
     pub name: LeafBlockName,
     #[serde(rename = "type")]
@@ -532,7 +604,7 @@ pub struct LeafBlock {
     location: Vec<Location>,
 }
 
-#[derive(Serialize, Debug, PartialEq)]
+#[derive(Serialize, Clone, Debug, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub enum LeafBlockName {
     Listing,
@@ -543,7 +615,7 @@ pub enum LeafBlockName {
     Verse,
     Comment, // Gets thrown away, but convenient
 }
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Clone, Debug)]
 #[serde(rename_all = "lowercase")]
 pub enum LeafBlockForm {
     Delimited,
@@ -618,9 +690,13 @@ impl LeafBlock {
         };
         first_location.line
     }
+
+    pub fn inlines(&self) -> Vec<Inline> {
+        self.inlines.clone()
+    }
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Clone, Debug)]
 pub struct ParentBlock {
     pub name: ParentBlockName,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -652,7 +728,7 @@ impl PartialEq for ParentBlock {
     }
 }
 
-#[derive(Serialize, Debug, PartialEq)]
+#[derive(Serialize, Clone, Debug, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub enum ParentBlockName {
     Admonition,
@@ -664,7 +740,7 @@ pub enum ParentBlockName {
            // ParentBlock until someone convinces me otherwise
 }
 
-#[derive(Serialize, Debug, PartialEq)]
+#[derive(Serialize, Clone, Debug, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub enum ParentBlockVarient {
     Caution,
