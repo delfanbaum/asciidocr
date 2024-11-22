@@ -59,7 +59,7 @@ impl Header {
             .chars()
             .map(|c| if c.is_alphanumeric() { c } else { '_' })
             .collect();
-        id
+        id.to_lowercase().to_string()
     }
 }
 
@@ -149,6 +149,8 @@ impl Location {
 
 #[cfg(test)]
 mod tests {
+    use crate::inlines::{Inline, InlineLiteral};
+
     use super::{Header, Location};
 
     #[test]
@@ -163,7 +165,18 @@ mod tests {
 
     #[test]
     fn header_to_document_id() {
-        let _header = Header::new();
-        todo!()
+        let mut header = Header::new();
+        header.title.push(Inline::InlineLiteral(InlineLiteral::new(
+            crate::inlines::InlineLiteralName::Text,
+            String::from("Foo With Space"),
+            vec![],
+        )));
+        assert_eq!(header.document_id(), "foo_with_space");
+    }
+
+    #[test]
+    fn header_to_empty_document_id() {
+        let header = Header::new();
+        assert_eq!(header.document_id(), "");
     }
 }
