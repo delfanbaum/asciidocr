@@ -1,11 +1,10 @@
-= Known Limitations
+= Limitations
 
 This is a rough-and-ready list of current-state features, planned features, and
 non-features.
 
 == Language Features in a Non-Working State
 
-* Tables
 * Cross reference checking and text
 * Section IDs are not auto-generated
 * Custom IDs/reference text
