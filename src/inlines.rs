@@ -359,6 +359,7 @@ impl InlineSpan {
             footnote_ref.location.clone(),
         );
         footnote.inlines.push(Inline::InlineRef(footnote_ref));
+        footnote.metadata = Some(ElementMetadata::new_with_role("footnote".to_string()));
         footnote
     }
 
@@ -434,8 +435,8 @@ pub struct InlineRef {
     name: String,
     #[serde(rename = "type")]
     node_type: NodeTypes,
-    variant: InlineRefVariant,
-    target: String,
+    pub variant: InlineRefVariant,
+    pub target: String,
     pub inlines: Vec<Inline>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub metadata: Option<ElementMetadata>,

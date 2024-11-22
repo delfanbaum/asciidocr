@@ -715,8 +715,7 @@ pub enum LeafBlockName {
     Pass,
     Stem, // TK not handling now
     Verse,
-    Comment,     // Gets thrown away, but convenient
-    FootnoteDef, // Gets thrown away(?), but convenient
+    Comment, // Gets thrown away, but convenient
 }
 #[derive(Serialize, Clone, Debug)]
 #[serde(rename_all = "lowercase")]
@@ -802,12 +801,15 @@ impl LeafBlock {
         inlines: Vec<Inline>,
     ) -> Self {
         Self {
-            name: LeafBlockName::FootnoteDef,
+            name: LeafBlockName::Paragraph,
             node_type: NodeTypes::Block,
             form: LeafBlockForm::Paragraph,
             delimiter: None,
             inlines,
-            metadata: Some(ElementMetadata::new_with_id(definition_id)),
+            metadata: Some(ElementMetadata::new_with_id_and_roles(
+                definition_id,
+                vec!["footnote".to_string()],
+            )),
             location: vec![],
         }
     }
@@ -1014,9 +1016,62 @@ impl TableCell {
 
 #[cfg(test)]
 mod tests {
+    use crate::inlines::{
+        InlineLiteral, InlineLiteralName, InlineRefVariant, InlineSpan, InlineSpanForm, InlineSpanVariant
+    };
+
+    use super::*;
+    use core::panic;
 
     #[test]
     fn extract_footnote_definitions() {
-        todo!()
+        let mut footnote = Inline::InlineSpan(InlineSpan::new(
+            InlineSpanVariant::Footnote,
+            InlineSpanForm::Constrained,
+            vec![],
+        ));
+        footnote.push_inline(Inline::InlineLiteral(InlineLiteral::new(
+            InlineLiteralName::Text,
+            "Foonote text".to_string(),
+            vec![],
+        )));
+        let mut some_leaf = Block::LeafBlock(LeafBlock::new(
+            LeafBlockName::Paragraph,
+            LeafBlockForm::Paragraph,
+            None,
+            vec![],
+            vec![footnote],
+        ));
+        let extracted = some_leaf.extract_footnote_definitions(0, "");
+        let Block::LeafBlock(result) = some_leaf else {
+            panic!("Destroyed the leaf block somehow")
+        };
+
+        let Some(inline) = result.inlines.first() else {
+            panic!("Removed the inlines from the block instead of replacing them")
+        };
+        // ensure we've swapped the span
+        if let Inline::InlineSpan(span) = inline {
+            assert_eq!(span.variant, InlineSpanVariant::Superscript)
+        }
+        assert_eq!(result.inlines.len(), 1);
+
+        // ensure our result is what we expect it to be
+        assert_eq!(extracted.len(), 1);
+        let Some(Block::LeafBlock(block)) = extracted.first() else {
+            panic!("Extracted block was not a leaf block")
+        };
+        assert_eq!(block.name, LeafBlockName::Paragraph);
+        let Some(ref metadata) = block.metadata else {
+            panic!("Extracted leaf block is missing metadata")
+        };
+        assert_eq!(metadata.element_id().unwrap(), "_footnotedef_1");
+        assert_eq!(metadata.roles.first().unwrap(), "footnote");
+        let Some(Inline::InlineRef(inline)) = block.inlines.first() else {
+            panic!("Missing footnote def content!")
+        };
+        assert_eq!(inline.variant, InlineRefVariant::Xref);
+        assert_eq!(inline.target, "_footnoteref_1");
+
     }
 }

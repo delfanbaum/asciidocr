@@ -72,22 +72,6 @@ impl Asg {
         self.consolidate_footnotes();
     }
 
-    //<div class="paragraph">
-    //<p>This is a test.<sup class="footnote">[<a id="_footnoteref_1" class="footnote" href="#_footnotedef_1" title="View footnote.">1</a>]</sup></p>
-    //</div>
-    //<div class="paragraph">
-    //<p>This is a second test.<sup class="footnote">[<a id="_footnoteref_2" class="footnote" href="#_footnotedef_2" title="View footnote.">2</a>]</sup></p>
-    //</div>
-    //</div>
-    //<div id="footnotes">
-    //<hr>
-    //<div class="footnote" id="_footnotedef_1">
-    //<a href="#_footnoteref_1">1</a>. First footnote.
-    //</div>
-    //<div class="footnote" id="_footnotedef_2">
-    //<a href="#_footnoteref_2">2</a>. Second footnote.
-    //</div>
-    //</div>
     fn consolidate_footnotes(&mut self) {
         // Until the spec says otherwise, put footnote definitions in leaf blocks
         let mut footnote_defs: Vec<Block> = vec![];
@@ -109,5 +93,52 @@ impl Asg {
             graph_text.push_str(&block.block_text())
         }
         graph_text
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::blocks::*;
+    use crate::inlines::*;
+
+    #[test]
+    fn consolidate_footnotes() {
+        let mut footnote = Inline::InlineSpan(InlineSpan::new(
+            InlineSpanVariant::Footnote,
+            InlineSpanForm::Constrained,
+            vec![],
+        ));
+        footnote.push_inline(Inline::InlineLiteral(InlineLiteral::new(
+            InlineLiteralName::Text,
+            "Foonote text".to_string(),
+            vec![],
+        )));
+        let some_leaf = Block::LeafBlock(LeafBlock::new(
+            LeafBlockName::Paragraph,
+            LeafBlockForm::Paragraph,
+            None,
+            vec![],
+            vec![footnote],
+        ));
+        let mut graph = Asg::new();
+        graph.document_id = "test".into();
+        graph.push_block(some_leaf);
+        assert_eq!(graph.blocks.len(), 1);
+        // just spot-check that we break them out; the actual logic is checked elsewhere
+        graph.consolidate_footnotes();
+        assert_eq!(graph.blocks.len(), 2);
+        // but also spot-check that we add the document_id, if any
+        let Some(Block::LeafBlock(leaf)) = graph.blocks.first() else {
+            panic!("Destroyed the block we were only supposed to modify")
+        };
+        let inlines = leaf.inlines();
+        let Some(Inline::InlineSpan(footnoteref)) = inlines.first() else {
+            panic!("Missing footnote ref in leaf block")
+        };
+        let Some(Inline::InlineRef(iref)) = footnoteref.inlines.first() else {
+            panic!("Missing footnote ref link")
+        };
+        assert_eq!(iref.target, "test_footnotedef_1");
     }
 }
