@@ -421,6 +421,10 @@ impl Section {
             location: vec![first_location],
         }
     }
+
+    pub fn title(&self) -> Vec<Inline> {
+        self.inlines.clone()
+    }
 }
 
 #[derive(Serialize, Clone, Debug)]
