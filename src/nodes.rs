@@ -43,11 +43,24 @@ impl Header {
             self.location = Location::reconcile(self.location.clone(), last_inline.locations())
         }
     }
-    
+
     pub fn title(&self) -> Vec<Inline> {
         self.title.clone()
+    }
 
-}
+    /// Returns a document_id from the title, otherwise an empty string
+    pub fn document_id(&self) -> String {
+        let mut id = String::new();
+        for inline in self.title() {
+            id.push_str(&inline.extract_values_to_string());
+        }
+        // replace non-alphanumeric characters
+        id = id
+            .chars()
+            .map(|c| if c.is_alphanumeric() { c } else { '_' })
+            .collect();
+        id.to_lowercase().to_string()
+    }
 }
 
 /// Struct containing document author information
@@ -98,12 +111,8 @@ impl PartialOrd for Location {
 
 impl Location {
     pub fn new(line: usize, col: usize, file: Vec<String>) -> Self {
-        Location {
-            line,
-            col,
-            file,
-        }
-    } 
+        Location { line, col, file }
+    }
 
     pub fn col(&self) -> usize {
         self.col
@@ -140,7 +149,9 @@ impl Location {
 
 #[cfg(test)]
 mod tests {
-    use super::Location;
+    use crate::inlines::{Inline, InlineLiteral};
+
+    use super::{Header, Location};
 
     #[test]
     fn reconcile_locations() {
@@ -150,5 +161,22 @@ mod tests {
             vec![Location::new(1, 1, vec![]), Location::new(4, 5, vec![])],
             Location::reconcile(start, other)
         )
+    }
+
+    #[test]
+    fn header_to_document_id() {
+        let mut header = Header::new();
+        header.title.push(Inline::InlineLiteral(InlineLiteral::new(
+            crate::inlines::InlineLiteralName::Text,
+            String::from("Foo With Space"),
+            vec![],
+        )));
+        assert_eq!(header.document_id(), "foo_with_space");
+    }
+
+    #[test]
+    fn header_to_empty_document_id() {
+        let header = Header::new();
+        assert_eq!(header.document_id(), "");
     }
 }

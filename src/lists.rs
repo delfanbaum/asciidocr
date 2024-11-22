@@ -1,5 +1,5 @@
 use crate::{
-    blocks::Block,
+    blocks::{Block, LeafBlock},
     inlines::Inline,
     nodes::{Location, NodeTypes},
     tokens::Token,
@@ -90,12 +90,44 @@ impl ListItem {
         self.principal.push(inline)
     }
 
-    pub fn principal(&self) -> Vec<Inline> { 
+    pub fn principal(&self) -> Vec<Inline> {
         self.principal.clone()
     }
 
-    pub fn blocks(&self) -> Vec<Block> { 
+    pub fn blocks(&self) -> Vec<Block> {
         self.blocks.clone()
+    }
+
+    pub fn extract_footnotes(&mut self, count: usize, document_id: &str) -> Vec<Block> {
+        let mut local_count = count;
+        let mut extracted: Vec<Block> = Vec::new();
+        for idx in 0..self.principal.len() {
+            if self.principal[idx].is_footnote() {
+                local_count += 1;
+                let inline_span = self.principal.remove(idx);
+                let Inline::InlineSpan(mut footnote) = inline_span else {
+                    panic!("Bad is_footnote match")
+                };
+                // deconstruct it
+                let (definition_id, replacement_span, footnote_contents) =
+                    footnote.deconstruct_footnote(local_count, document_id);
+                // add the relevant stuff to the return
+                extracted.push(Block::LeafBlock(
+                    LeafBlock::new_footnote_def_from_id_and_inlines(
+                        definition_id,
+                        footnote_contents,
+                    ),
+                ));
+                // put the reference back where the span was
+                self.principal.insert(idx, replacement_span);
+            }
+        }
+        for child in self.blocks.iter_mut() {
+            let child_footnoes = child.extract_footnote_definitions(local_count, document_id);
+            local_count += child_footnoes.len();
+            extracted.extend(child_footnoes);
+        }
+        extracted
     }
 }
 
@@ -140,7 +172,7 @@ pub struct DListItem {
     marker: String, // the lexeme with no space
     pub terms: Vec<Inline>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
-    pub principal: Vec<Inline>,     // apparently this can also be optional!
+    pub principal: Vec<Inline>, // apparently this can also be optional!
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub blocks: Vec<Block>, // a LI can have subsequent blocks, too
     pub location: Vec<Location>,
@@ -178,5 +210,37 @@ impl DListItem {
 
     pub fn locations(&self) -> Vec<Location> {
         self.location.clone()
+    }
+
+    pub fn extract_footnotes(&mut self, count: usize, document_id: &str) -> Vec<Block> {
+        let mut local_count = count;
+        let mut extracted: Vec<Block> = Vec::new();
+        for idx in 0..self.principal.len() {
+            if self.principal[idx].is_footnote() {
+                local_count += 1;
+                let inline_span = self.principal.remove(idx);
+                let Inline::InlineSpan(mut footnote) = inline_span else {
+                    panic!("Bad is_footnote match")
+                };
+                // deconstruct it
+                let (definition_id, replacement_span, footnote_contents) =
+                    footnote.deconstruct_footnote(local_count, document_id);
+                // add the relevant stuff to the return
+                extracted.push(Block::LeafBlock(
+                    LeafBlock::new_footnote_def_from_id_and_inlines(
+                        definition_id,
+                        footnote_contents,
+                    ),
+                ));
+                // put the reference back where the span was
+                self.principal.insert(idx, replacement_span);
+            }
+        }
+        for child in self.blocks.iter_mut() {
+            let child_footnoes = child.extract_footnote_definitions(local_count, document_id);
+            local_count += child_footnoes.len();
+            extracted.extend(child_footnoes);
+        }
+        extracted
     }
 }

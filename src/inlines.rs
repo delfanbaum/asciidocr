@@ -115,6 +115,13 @@ impl Inline {
         }
     }
 
+    pub fn is_footnote(&self) -> bool {
+        match self {
+            Inline::InlineSpan(span) => span.variant == InlineSpanVariant::Footnote,
+            _ => false,
+        }
+    }
+
     pub fn extract_values_to_string(&self) -> String {
         match &self {
             Inline::InlineLiteral(literal) => literal.value.clone(),
@@ -344,6 +351,64 @@ impl InlineSpan {
         }
         self.inlines.push(inline);
     }
+
+    fn new_footnote_ref(footnote_ref: InlineRef) -> Self {
+        let mut footnote = InlineSpan::new(
+            InlineSpanVariant::Superscript,
+            InlineSpanForm::Constrained,
+            footnote_ref.location.clone(),
+        );
+        footnote.inlines.push(Inline::InlineRef(footnote_ref));
+        footnote.metadata = Some(ElementMetadata::new_with_role("footnote".to_string()));
+        footnote
+    }
+
+    /// Deconstructs a footnote span into the relevant footnote definition ID (to be applied to
+    /// the leafblock that contains the footnote text), an InlineSpan Sup<InlineRef> that replaces the footnote
+    /// with a link to said leafblock, and the vector of inlines that will be inserted into
+    /// said leafblock
+    pub fn deconstruct_footnote(
+        &mut self,
+        count: usize,
+        document_id: &str,
+    ) -> (String, Inline, Vec<Inline>) {
+        // setup
+        let footnote_def_pattern = format!("{}_footnotedef_{}", document_id, count);
+        let footnote_ref_pattern = format!("{}_footnoteref_{}", document_id, count);
+        // Literal text for the numbering
+        let numbering = Inline::InlineLiteral(InlineLiteral {
+            name: InlineLiteralName::Text,
+            node_type: NodeTypes::Inline,
+            value: format!("{}", count),
+            location: self.location.clone(),
+        });
+
+        // For now, just copy over the footnote span locations everywhere -- since that almost
+        // makes sense -- until the spec clarifies what's supposed to happen here
+        // Footnote ref targets the definition
+        let footnote_ref = InlineRef::new_footnote_ref(
+            footnote_def_pattern.clone(),
+            Some(footnote_ref_pattern.clone()),
+            numbering.clone(),
+            self.location.clone(),
+        );
+        // Footnote def targets the reference
+        let footnote_def = InlineRef::new_footnote_ref(
+            footnote_ref_pattern,
+            None,
+            numbering,
+            self.location.clone(),
+        );
+        // put the footnote def (with targets back to the reference) into the inline vec
+        self.inlines.insert(0, Inline::InlineRef(footnote_def));
+        // handle adding a ". " after the footnote numbering in the template
+
+        (
+            footnote_def_pattern,
+            Inline::InlineSpan(InlineSpan::new_footnote_ref(footnote_ref)),
+            self.inlines.clone(),
+        )
+    }
 }
 
 #[derive(Serialize, PartialEq, Eq, Clone, Debug)]
@@ -370,11 +435,11 @@ pub struct InlineRef {
     name: String,
     #[serde(rename = "type")]
     node_type: NodeTypes,
-    variant: InlineRefVariant,
-    target: String,
+    pub variant: InlineRefVariant,
+    pub target: String,
     pub inlines: Vec<Inline>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    metadata: Option<ElementMetadata>,
+    pub metadata: Option<ElementMetadata>,
     location: Vec<Location>,
 }
 
@@ -387,6 +452,29 @@ impl InlineRef {
             target,
             inlines: vec![],
             metadata: None,
+            location,
+        }
+    }
+
+    pub fn new_footnote_ref(
+        target: String,
+        id: Option<String>,
+        numbering: Inline,
+        location: Vec<Location>,
+    ) -> Self {
+        let mut metadata: Option<ElementMetadata> = None;
+
+        if let Some(ref_id) = id {
+            metadata = Some(ElementMetadata::new_inline_with_id(ref_id));
+        }
+
+        InlineRef {
+            name: "ref".to_string(),
+            node_type: NodeTypes::Inline,
+            variant: InlineRefVariant::Xref,
+            target,
+            inlines: vec![numbering],
+            metadata,
             location,
         }
     }
