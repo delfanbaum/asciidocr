@@ -63,4 +63,14 @@ impl Asg {
         // more TK
         self.location.len() == 2
     }
+
+    /// Gathers all the "literal" text in a given document graph (i.e., without styling, etc.)
+    /// (Largely a testing/verification function)
+    pub fn all_text(&self) -> String {
+        let mut graph_text = String::new();
+        for block in self.blocks.iter() {
+            graph_text.push_str(&block.block_text())
+        }
+        graph_text
+    }
 }

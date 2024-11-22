@@ -10,17 +10,14 @@ use crate::{
 
 static REFERENCE_DOCX: &[u8] = include_bytes!("../templates/docx/reference.docx");
 
-// TK New idea: made a template DOCX that we read in and _then_ add things to it; seems like there
-// are no real defaults on this Docx object.
 pub fn render_docx(graph: &Asg, output_path: &Path) -> DocxResult<()> {
-    // TK this is going to fail if run outside the crate; need to figure out how to make this
-    // relative
     let cursor = Cursor::new(REFERENCE_DOCX);
     let docx = DocxFile::from_reader(cursor)?;
     let donor_doc = docx.parse()?;
-    let mut doc = Docx::default();
-
-    doc.styles = donor_doc.styles.clone();
+    let mut doc = Docx::<'_> {
+        styles: donor_doc.styles.clone(),
+        ..Default::default()
+    };
 
     // TK add a header
     if let Some(header) = &graph.header {

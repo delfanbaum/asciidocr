@@ -380,6 +380,74 @@ impl Block {
             _ => todo!(),
         }
     }
+
+    /// Returns all literal text in a block
+    pub fn block_text(&self) -> String {
+        let mut block_text = String::new();
+        match self {
+            Block::Section(block) => {
+                for inline in block.title() {
+                    block_text.push_str(&inline.extract_values_to_string())
+                }
+
+                for block in block.blocks.iter() {
+                    block_text.push_str(&block.block_text())
+                }
+            }
+            Block::List(list) => {
+                for item in list.items.iter() {
+                    block_text.push_str(&item.block_text())
+                }
+            }
+            Block::ListItem(block) => {
+                for inline in block.principal.iter() {
+                    block_text.push_str(&inline.extract_values_to_string())
+                }
+
+                for block in block.blocks.iter() {
+                    block_text.push_str(&block.block_text())
+                }
+            }
+            Block::DList(list) => {
+                for item in list.items.iter() {
+                    block_text.push_str(&item.block_text())
+                }
+            }
+            Block::DListItem(block) => {
+                for inline in block.principal.iter() {
+                    block_text.push_str(&inline.extract_values_to_string())
+                }
+
+                for block in block.blocks.iter() {
+                    block_text.push_str(&block.block_text())
+                }
+            }
+            Block::Break(_) => {} // break doesn't have literals
+            Block::BlockMacro(block) => {
+                for inline in block.caption.iter() {
+                    block_text.push_str(&inline.extract_values_to_string())
+                }
+            }
+            Block::LeafBlock(block) => {
+                for inline in block.inlines.iter() {
+                    block_text.push_str(&inline.extract_values_to_string())
+                }
+            }
+            Block::ParentBlock(block) => {
+                for block in block.blocks.iter() {
+                    block_text.push_str(&block.block_text())
+                }
+            }
+            Block::BlockMetadata(_) => {}
+            Block::TableCell(block) => {
+                for inline in block.inlines.iter() {
+                    block_text.push_str(&inline.extract_values_to_string())
+                }
+            }
+            _ => todo!(),
+        }
+        block_text
+    }
 }
 
 #[derive(Serialize, Clone, Debug)]

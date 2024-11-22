@@ -110,7 +110,7 @@ impl Inline {
     /// Used for checking if a given inline is just a literal "\n"
     pub fn is_newline(&self) -> bool {
         match self {
-            Inline::InlineLiteral(lit) => lit.value == *"\n", 
+            Inline::InlineLiteral(lit) => lit.value == *"\n",
             _ => false,
         }
     }
@@ -125,8 +125,14 @@ impl Inline {
                 }
                 values
             }
-            Inline::InlineRef(_) => todo!(),
-            Inline::InlineBreak(_) => todo!(),
+            Inline::InlineRef(iref) => {
+                let mut values = String::new();
+                for inline in &iref.inlines {
+                    values.push_str(&inline.extract_values_to_string())
+                }
+                values
+            }
+            Inline::InlineBreak(_) => String::new(), // has no value
         }
     }
 
@@ -487,7 +493,6 @@ impl InlineLiteral {
     pub fn value(&self) -> String {
         self.value.clone()
     }
-
 }
 
 #[derive(Serialize, Clone, Debug)]
@@ -536,7 +541,7 @@ mod tests {
             line: 1,
             startcol: 1,
             endcol: 1,
-            file_stack: vec![]
+            file_stack: vec![],
         };
         let inline = InlineRef::new_xref_from_token(token);
         assert_eq!(inline.variant, InlineRefVariant::Xref);

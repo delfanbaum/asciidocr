@@ -24,3 +24,4 @@ tera = {version = "1.20.0", features=["builtins"]}
 [dev-dependencies]
 assert-json-diff = "2.0.2"
 rstest = "0.23.0"
+tempfile = "3.14.0"
