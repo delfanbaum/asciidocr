@@ -2,12 +2,29 @@
 
 A(n in-progress, incomplete, but more or less functional) Rust library for processing Asciidoc files.
 
+== Installation
+
+Right now the crate provides an `asciidocr` executable as well as an
+`asciidocr-tck-adapter` executable. The latter is for future checking against
+the still-in-progress asciidoc official spec. To install from `crates.io`:
+
+[source, console]
+----
+$ cargo install asciidocr
+----
+
+To install from source, clone and `cd` into the repo and run:
+
+[source, console]
+----
+$ cargo install --path .
+----
+
 == Usage (Command-Line)
 
-Library usage is still TBD. To use the in-progress CLI tool, clone the repo,
-install the crate with `cargo install --path .`. Here's the usage:
+Here's the usage:
 
-[source, bash]
+[source, console]
 ----
 $ asciidocr --help
 A Rust CLI and library for processing Asciidoc files.
