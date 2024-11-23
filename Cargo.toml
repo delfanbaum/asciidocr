@@ -6,7 +6,7 @@ license = "MIT"
 edition = "2021"
 description = "A CLI and library for processing and converting asciidoc files"
 repository = "https://github.com/delfanbaum/asciidocr"
-keywords = ["asciidoc", "lightweight markup", "htmlbook"]
+keywords = ["asciidoc", "lightweight-markup", "htmlbook"]
 categories = ["command-line-utilities", "parser-implementations", "text-processing"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
