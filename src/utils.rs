@@ -1,5 +1,7 @@
 use std::{fs, io, path::Path};
 
+use log::warn;
+
 pub fn is_asciidoc_file(file: &str) -> bool {
     let file_path = Path::new(file);
     matches!(
@@ -14,6 +16,12 @@ pub fn is_asciidoc_file(file: &str) -> bool {
 pub fn open_file(filename: &str) -> String {
     match filename {
         "-" => io::read_to_string(io::stdin()).expect("Error reading from stdin"),
-        _ => fs::read_to_string(filename).expect("Error reading provided file")
+        _ => match fs::read_to_string(filename) {
+            Ok(file_string) => file_string,
+            Err(e) => {
+                warn!("Unable to read file {filename}: {e}");
+                std::process::exit(1)
+            }
+        },
     }
 }
