@@ -1,5 +1,9 @@
 use core::panic;
-use std::{collections::VecDeque, fmt::Display, iter};
+use std::{
+    collections::{HashMap, VecDeque},
+    fmt::Display,
+    iter,
+};
 
 use serde::Serialize;
 
@@ -535,7 +539,7 @@ pub enum InlineRefVariant {
 
 #[derive(Serialize, Clone, Debug)]
 pub struct InlineLiteral {
-    name: InlineLiteralName,
+    pub name: InlineLiteralName,
     #[serde(rename = "type")]
     node_type: NodeTypes, // always "string"
     value: String,
@@ -554,6 +558,10 @@ impl InlineLiteral {
 
     pub fn new_text_from_token(token: &Token) -> Self {
         InlineLiteral::new(InlineLiteralName::Text, token.text(), token.locations())
+    }
+
+    pub fn new_charref_from_token(token: &Token) -> Self {
+        InlineLiteral::new(InlineLiteralName::Charref, token.text(), token.locations())
     }
 
     /// Add text and reconcile location information from a given (text) token
@@ -580,6 +588,31 @@ impl InlineLiteral {
 
     pub fn value(&self) -> String {
         self.value.clone()
+    }
+
+    pub fn value_or_refd_char(&self) -> String {
+        // In HTML these just get passed through, but for certain outputs we want to do replacements. This
+        // is obviously an incomplete table.
+        let charref_entities: HashMap<String, &str> = HashMap::from([
+            (String::from("&nbsp;"), " "),
+            (String::from("&mdash;"), "—"),
+            (String::from("&ndash;"), "—"),
+            (String::from("&dollar;"), "$"),
+            (String::from("&amp;"), "&"),
+            (String::from("&gt;"), ">"),
+            (String::from("&lt;"), "<"),
+            (String::from("&equals;"), "="),
+            (String::from("&plus;"), "+"),
+        ]);
+
+        if matches!(self.name, InlineLiteralName::Charref) {
+            match charref_entities.get(&self.value) {
+                Some(entity) => entity.to_string(),
+                None => self.value.clone(),
+            }
+        } else {
+            self.value.clone()
+        }
     }
 }
 

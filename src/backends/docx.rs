@@ -138,7 +138,7 @@ fn content_from_inline<'a>(
     let mut contents: Vec<ParagraphContent<'a>> = Vec::new();
     match inline {
         Inline::InlineLiteral(lit) => {
-            let mut run = Run::default().push_text((lit.value(), TextSpace::Preserve));
+            let mut run = Run::default().push_text((lit.value_or_refd_char(), TextSpace::Preserve));
             if !variants.is_empty() {
                 for variant in variants {
                     match variant {

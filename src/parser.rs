@@ -181,6 +181,7 @@ impl Parser {
             // inlines
             TokenType::NewLineChar => self.parse_new_line_char(token, asg),
             TokenType::Text => self.parse_text(token),
+            TokenType::CharRef => self.parse_charref(token),
             TokenType::Strong
             | TokenType::Mark
             | TokenType::Monospace
@@ -785,6 +786,58 @@ impl Parser {
         }
     }
 
+    fn parse_charref(&mut self, token: Token) {
+        let inline_lit = Inline::InlineLiteral(InlineLiteral::new_charref_from_token(&token));
+        if self.in_document_header && self.in_block_line {
+            if let Some(inline) = self.document_header.title.last_mut() {
+                match inline {
+                    Inline::InlineLiteral(_) => self.document_header.title.push(inline_lit),
+                    Inline::InlineSpan(span) => {
+                        if self.in_inline_span {
+                            span.add_inline(inline_lit)
+                        } else {
+                            self.document_header.title.push(inline_lit)
+                        }
+                    }
+                    Inline::InlineRef(_) => {
+                        error!(
+                            "Inline references are not allowed in document titles: line {}",
+                            token.line
+                        );
+                        std::process::exit(1)
+                    }
+                    Inline::InlineBreak(_) => {
+                        error!(
+                            "Line breaks (+) are not allowed in document titles: line {}",
+                            token.line
+                        );
+                        std::process::exit(1)
+                    }
+                }
+            } else {
+                self.document_header.title.push(inline_lit);
+            }
+        } else {
+            if let Some(newline_token) = self.dangling_newline.clone() {
+                if self.preserve_newline_text {
+                    // add the newline as such
+                    self.inline_stack.push_back(Inline::InlineLiteral(
+                        InlineLiteral::new_text_from_token(&newline_token),
+                    ));
+                    // clear the newline
+                    self.dangling_newline = None;
+                    // add the new text separately
+                    self.inline_stack.push_back(inline_lit);
+                    return;
+                } else {
+                    self.add_text_to_last_inline(newline_token);
+                    self.dangling_newline = None;
+                }
+            }
+            self.add_text_to_last_inline(token)
+        }
+    }
+
     fn parse_delimited_leaf_block(&mut self, token: Token) {
         if self.open_parse_after_as_text_type.is_some() {
             let open_leaf = self.block_stack.last_mut().unwrap();
@@ -1032,19 +1085,18 @@ impl Parser {
             let line_above = para_block.locations().first().unwrap().line + 1;
             if self.open_delimited_block_lines.last() == Some(&line_above)
                 || self.open_delimited_block_lines.is_empty()
+                    && block_metadata.declared_type == Some(AttributeType::Quote)
             {
-                if block_metadata.declared_type == Some(AttributeType::Quote) {
-                    let mut quote_block = Block::ParentBlock(ParentBlock::new(
-                        crate::graph::blocks::ParentBlockName::Quote,
-                        None,
-                        "".to_string(),
-                        vec![],
-                        vec![],
-                    ));
-                    quote_block.push_block(para_block);
-                    self.push_block_to_stack(quote_block);
-                    return;
-                }
+                let mut quote_block = Block::ParentBlock(ParentBlock::new(
+                    crate::graph::blocks::ParentBlockName::Quote,
+                    None,
+                    "".to_string(),
+                    vec![],
+                    vec![],
+                ));
+                quote_block.push_block(para_block);
+                self.push_block_to_stack(quote_block);
+                return;
             }
         }
         self.push_block_to_stack(para_block)
