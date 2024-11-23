@@ -13,7 +13,7 @@ use asciidocr::{
 };
 
 fn main() {
-    SimpleLogger::new().with_level(log::LevelFilter::Warn).with_colors(true).with_timestamps(false).init().unwrap();
+    SimpleLogger::new().with_level(log::LevelFilter::Warn).with_colors(true).without_timestamps().init().unwrap();
     let args = Cli::parse();
 
     if let Err(e) = run(args) {
