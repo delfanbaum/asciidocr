@@ -590,10 +590,7 @@ impl<'a> Scanner<'a> {
     }
 
     fn peek_back(&self) -> char {
-        if self.start == 0 ||
-             !self.source.is_char_boundary(self.start -1)
-
-        {
+        if self.start == 0 || !self.source.is_char_boundary(self.start - 1) {
             return '\0';
         }
         self.source.as_bytes()[self.start - 1] as char
