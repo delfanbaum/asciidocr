@@ -583,21 +583,27 @@ impl<'a> Scanner<'a> {
     }
 
     fn peek(&self) -> char {
-        if self.is_at_end() {
+        if self.is_at_end() || !self.source.is_char_boundary(self.current) {
             return '\0';
         }
         self.source.as_bytes()[self.current] as char
     }
 
     fn peek_back(&self) -> char {
-        if self.start == 0 {
+        if self.start == 0 ||
+             !self.source.is_char_boundary(self.start -1)
+
+        {
             return '\0';
         }
         self.source.as_bytes()[self.start - 1] as char
     }
 
     fn peeks_ahead(&self, count: usize) -> &str {
-        if self.is_at_end() || self.current + count > self.source.len() {
+        if self.is_at_end()
+            || self.current + count > self.source.len()
+            || !self.source.is_char_boundary(self.current + count)
+        {
             return "\0";
         }
         &self.source[self.current..self.current + count]
@@ -1699,6 +1705,51 @@ mod tests {
             ),
             newline_token_at(3, 20),
             Token::new_default(TokenType::Table, "|===".to_string(), None, 4, 1, 4),
+        ];
+        scan_and_assert_eq(&markup, expected_tokens);
+    }
+
+    // this previously panicked at byte index 13 because it is not a char boundary; should now pass
+    #[test]
+    fn scan_odd_boundaried_text() {
+        let markup = "regular shit…\n";
+        let expected_tokens = vec![
+            Token {
+                token_type: TokenType::Text,
+                lexeme: "regular s".into(),
+                literal: Some("regular s".into()),
+                line: 1,
+                startcol: 1,
+                endcol: 9,
+                file_stack: vec![],
+            },
+            Token {
+                token_type: TokenType::Text,
+                lexeme: "h".into(),
+                literal: Some("h".into()),
+                line: 1,
+                startcol: 10,
+                endcol: 10,
+                file_stack: vec![],
+            },
+            Token {
+                token_type: TokenType::Text,
+                lexeme: "it…".into(),
+                literal: Some("it…".into()),
+                line: 1,
+                startcol: 11,
+                endcol: 15,
+                file_stack: vec![],
+            },
+            Token {
+                token_type: TokenType::NewLineChar,
+                lexeme: "\n".into(),
+                literal: None,
+                line: 1,
+                startcol: 16,
+                endcol: 16,
+                file_stack: vec![],
+            },
         ];
         scan_and_assert_eq(&markup, expected_tokens);
     }
