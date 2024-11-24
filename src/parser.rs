@@ -143,7 +143,7 @@ impl Parser {
                         return;
                     }
                 }
-                TokenType::SourceBlock | TokenType::PassthroughBlock => {
+                TokenType::SourceBlock | TokenType::PassthroughBlock | TokenType::LiteralBlock => {
                     if token.token_type() != token_type {
                         self.parse_text(token);
                         return;
@@ -240,7 +240,7 @@ impl Parser {
             }
 
             // the following should probably be consumed into the above
-            TokenType::PassthroughBlock => self.parse_delimited_leaf_block(token),
+            TokenType::PassthroughBlock | TokenType::LiteralBlock => self.parse_delimited_leaf_block(token),
             TokenType::SourceBlock => self.parse_delimited_leaf_block(token),
 
             // block macros

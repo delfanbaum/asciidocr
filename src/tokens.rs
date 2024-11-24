@@ -156,6 +156,7 @@ pub enum TokenType {
     SourceBlock,      // i.e., "----"
     QuoteVerseBlock,  // i.e., "____"
     CommentBlock,     // i.e., "////"
+    LiteralBlock,     // i.e., "...."
     ExampleBlock,     // i.e., "====" (Also used for admonitions!)
 
     // two-char delimiters as new block
@@ -249,6 +250,7 @@ impl TokenType {
             '_' => Self::QuoteVerseBlock,
             '/' => Self::CommentBlock,
             '=' => Self::ExampleBlock,
+            '.' => Self::LiteralBlock,
             _ => panic!("Invalid character match to produce block TokenType"),
         }
     }

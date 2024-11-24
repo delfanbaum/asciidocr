@@ -75,7 +75,7 @@ impl<'a> Scanner<'a> {
                 }
             }
             // potential block delimiter chars get treated similarly
-            '+' | '*' | '-' | '_' | '/' | '=' => {
+            '+' | '*' | '-' | '_' | '/' | '=' | '.' => {
                 if self.starts_new_line() && self.starts_repeated_char_line(c, 4) {
                     self.current += 3; // the remaining repeated chars
                     self.add_token(TokenType::block_from_char(c), false, 0)
@@ -135,21 +135,21 @@ impl<'a> Scanner<'a> {
                             TokenType::Emphasis,
                             TokenType::UnconstrainedEmphasis,
                         ),
+                        // ordered list item or section title
+                        '.' => {
+                            if self.starts_new_line() {
+                                if self.peek() == ' ' {
+                                    self.add_list_item(TokenType::OrderedListItem)
+                                } else {
+                                    self.add_token(TokenType::BlockLabel, false, 0)
+                                }
+                            } else {
+                                self.add_text_until_next_markup()
+                            }
+                        }
+
                         _ => self.add_text_until_next_markup(),
                     }
-                }
-            }
-
-            // ordered list item or section title
-            '.' => {
-                if self.starts_new_line() {
-                    if self.peek() == ' ' {
-                        self.add_list_item(TokenType::OrderedListItem)
-                    } else {
-                        self.add_token(TokenType::BlockLabel, false, 0)
-                    }
-                } else {
-                    self.add_text_until_next_markup()
                 }
             }
 
@@ -646,6 +646,7 @@ mod tests {
     #[case("____\n".to_string(), TokenType::QuoteVerseBlock)]
     #[case("____\n".to_string(), TokenType::QuoteVerseBlock)]
     #[case("====\n".to_string(), TokenType::ExampleBlock)]
+    #[case("....\n".to_string(), TokenType::LiteralBlock)]
     fn fenced_block_delimiter_start(#[case] markup: String, #[case] expected_token: TokenType) {
         let expected_tokens = vec![
             Token::new_default(
@@ -668,6 +669,7 @@ mod tests {
     #[case("\n\n____\n".to_string(), TokenType::QuoteVerseBlock)]
     #[case("\n\n////\n".to_string(), TokenType::CommentBlock)]
     #[case("\n\n====\n".to_string(), TokenType::ExampleBlock)]
+    #[case("\n\n....\n".to_string(), TokenType::LiteralBlock)]
     fn fenced_block_delimiter_new_block(#[case] markup: String, #[case] expected_token: TokenType) {
         let expected_tokens = vec![
             Token::new_default(TokenType::NewLineChar, "\n".to_string(), None, 1, 1, 1),

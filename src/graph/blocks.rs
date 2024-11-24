@@ -772,6 +772,7 @@ impl LeafBlock {
     pub fn new_from_token(token: Token) -> Self {
         match token.token_type() {
             TokenType::PassthroughBlock => Self::new_delimited_block(token, LeafBlockName::Pass),
+            TokenType::LiteralBlock => Self::new_delimited_block(token, LeafBlockName::Literal),
             TokenType::SourceBlock => Self::new_delimited_block(token, LeafBlockName::Listing),
             TokenType::CommentBlock => Self::new_delimited_block(token, LeafBlockName::Listing),
             TokenType::QuoteVerseBlock => Self::new_delimited_block(token, LeafBlockName::Verse),
