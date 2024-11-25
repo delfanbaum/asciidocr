@@ -1,6 +1,6 @@
 use core::panic;
-use std::fmt::Display;
 use log::error;
+use std::{collections::HashMap, fmt::Display};
 
 use serde::Serialize;
 
@@ -243,6 +243,71 @@ impl Block {
         }
     }
 
+    pub fn title(&self) -> Option<Vec<Inline>> {
+        match self {
+            Block::Section(block) => {
+                Some(block.inlines.clone())
+            }
+            Block::ParentBlock(block) => {
+                Some(block.title.clone())
+            }
+            Block::BlockMacro(block) => {
+                Some(block.caption.clone())
+            }
+            _ => None
+        }
+    }
+
+    pub fn inlines(&mut self) -> Vec<&mut Inline> {
+        let mut inlines: Vec<&mut Inline> = vec![];
+        match self {
+            // parents
+            Block::Section(block) => {
+                inlines.extend(block.inlines.iter_mut());
+                for child in block.blocks.iter_mut() {
+                    inlines.extend(child.inlines())
+                }
+            }
+            Block::ParentBlock(block) => {
+                inlines.extend(block.title.iter_mut());
+                for child in block.blocks.iter_mut() {
+                    inlines.extend(child.inlines())
+                }
+            }
+            Block::List(block) => {
+                for child in block.items.iter_mut() {
+                    inlines.extend(child.inlines())
+                }
+            }
+            Block::DList(block) => {
+                for child in block.items.iter_mut() {
+                    inlines.extend(child.inlines())
+                }
+            }
+            Block::ListItem(block) => {
+                inlines.extend(block.principal.iter_mut());
+                for child in block.blocks.iter_mut() {
+                    inlines.extend(child.inlines())
+                }
+            }
+            Block::DListItem(block) => {
+                inlines.extend(block.principal.iter_mut());
+                for child in block.blocks.iter_mut() {
+                    inlines.extend(child.inlines())
+                }
+            }
+            Block::LeafBlock(block) => {
+                inlines.extend(block.inlines.iter_mut())
+            }
+            Block::TableCell(block) => {
+                inlines.extend(block.inlines.iter_mut())
+            }
+            _ => {} // remaining blocks don't have inlines
+        }
+
+        inlines
+    }
+
     /// Helper for extracting footnote definitions, replacing the footnote span with a reference
     /// that counts based on what's passed to the function
     pub fn extract_footnote_definitions(
@@ -337,6 +402,148 @@ impl Block {
                 id = id.replace(' ', "-");
                 section.id = id
             }
+        }
+    }
+
+    pub fn id_hashes(&self)-> HashMap<String, Vec<Inline>> {
+        let mut block_id_hash = HashMap::new();
+        if let Some(id) = self.id(){
+            if let Some(title)= self.title() {
+                block_id_hash.insert(id, title);
+            } else {
+                block_id_hash.insert(id, vec![]);
+
+            }
+        }
+        match self {
+            Block::Section(block) => {
+                for child in block.blocks.iter() {
+                    block_id_hash.extend(child.id_hashes());
+                }
+            }
+            Block::ParentBlock(block) => {
+                for child in block.blocks.iter() {
+                    block_id_hash.extend(child.id_hashes());
+                }
+            }
+            Block::List(block) => {
+                for child in block.items.iter() {
+                    block_id_hash.extend(child.id_hashes());
+                }
+            }
+            Block::DList(block) => {
+                for child in block.items.iter() {
+                    block_id_hash.extend(child.id_hashes());
+                }
+            }
+            Block::ListItem(block) => {
+                for child in block.blocks.iter() {
+                    block_id_hash.extend(child.id_hashes());
+                }
+            }
+            Block::DListItem(block) => {
+                for child in block.blocks.iter() {
+                    block_id_hash.extend(child.id_hashes());
+                }
+            }
+            _=> {}
+        }
+        block_id_hash
+    }
+
+    pub fn id(&self) -> Option<String> {
+        match self {
+            Block::Section(block) => {
+                if let Some(metadata) = &block.metadata {
+                    match metadata.attributes.get("id") {
+                        Some(id) => Some(id.clone()),
+                        None => None,
+                    }
+                } else {
+                    None
+                }
+            }
+            Block::List(block) => {
+                if let Some(metadata) = &block.metadata {
+                    match metadata.attributes.get("id") {
+                        Some(id) => Some(id.clone()),
+                        None => None,
+                    }
+                } else {
+                    None
+                }
+            }
+            Block::ListItem(block) => {
+                if let Some(metadata) = &block.metadata {
+                    match metadata.attributes.get("id") {
+                        Some(id) => Some(id.clone()),
+                        None => None,
+                    }
+                } else {
+                    None
+                }
+            }
+            Block::DList(block) => {
+                if let Some(metadata) = &block.metadata {
+                    match metadata.attributes.get("id") {
+                        Some(id) => Some(id.clone()),
+                        None => None,
+                    }
+                } else {
+                    None
+                }
+            }
+            Block::DListItem(block) => {
+                if let Some(metadata) = &block.metadata {
+                    match metadata.attributes.get("id") {
+                        Some(id) => Some(id.clone()),
+                        None => None,
+                    }
+                } else {
+                    None
+                }
+            }
+            Block::BlockMacro(block) => {
+                if let Some(metadata) = &block.metadata {
+                    match metadata.attributes.get("id") {
+                        Some(id) => Some(id.clone()),
+                        None => None,
+                    }
+                } else {
+                    None
+                }
+            }
+            Block::LeafBlock(block) => {
+                if let Some(metadata) = &block.metadata {
+                    match metadata.attributes.get("id") {
+                        Some(id) => Some(id.clone()),
+                        None => None,
+                    }
+                } else {
+                    None
+                }
+            }
+            Block::ParentBlock(block) => {
+                if let Some(metadata) = &block.metadata {
+                    match metadata.attributes.get("id") {
+                        Some(id) => Some(id.clone()),
+                        None => None,
+                    }
+                } else {
+                    None
+                }
+            }
+            Block::TableCell(block) => {
+                if let Some(metadata) = &block.metadata {
+                    match metadata.attributes.get("id") {
+                        Some(id) => Some(id.clone()),
+                        None => None,
+                    }
+                } else {
+                    None
+                }
+            }
+            _ => None,
         }
     }
 
@@ -994,6 +1201,8 @@ pub struct TableCell {
     pub name: String,
     node_type: NodeTypes,
     pub inlines: Vec<Inline>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub metadata: Option<ElementMetadata>,
     pub location: Vec<Location>,
 }
 
@@ -1009,6 +1218,7 @@ impl TableCell {
             name: "tableCell".to_string(),
             node_type: NodeTypes::Block,
             inlines: vec![],
+            metadata: None,
             location: token.locations(),
         }
     }
@@ -1017,7 +1227,8 @@ impl TableCell {
 #[cfg(test)]
 mod tests {
     use crate::graph::inlines::{
-        InlineLiteral, InlineLiteralName, InlineRefVariant, InlineSpan, InlineSpanForm, InlineSpanVariant
+        InlineLiteral, InlineLiteralName, InlineRefVariant, InlineSpan, InlineSpanForm,
+        InlineSpanVariant,
     };
 
     use super::*;
@@ -1072,6 +1283,5 @@ mod tests {
         };
         assert_eq!(inline.variant, InlineRefVariant::Xref);
         assert_eq!(inline.target, "_footnoteref_1");
-
     }
 }

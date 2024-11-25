@@ -5,9 +5,10 @@ use std::{
     iter,
 };
 
+use log::warn;
 use serde::Serialize;
 
-use crate::graph::{
+use super::{
     macros::target_and_attrs_from_token,
     metadata::ElementMetadata,
     nodes::{Location, NodeTypes},
@@ -241,6 +242,21 @@ impl Inline {
         match self {
             Inline::InlineSpan(span) => span.open = false,
             _ => panic!("Invalid action: this inline does not take metadata"),
+        }
+    }
+
+    pub fn attempt_xref_standardization(&mut self, id_hash: &HashMap<String, Vec<Inline>>) {
+        match self {
+            Inline::InlineRef(iref) => {
+                if matches!(iref.variant, InlineRefVariant::Xref) {
+                    if let Some(ref_text) = id_hash.get(&iref.target) {
+                        iref.inlines = ref_text.clone()
+                    } else {
+                        warn!("Unable to find xref: {}", iref.target)
+                    }
+                }
+            }
+            _ => {}
         }
     }
 }

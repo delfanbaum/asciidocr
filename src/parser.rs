@@ -109,7 +109,7 @@ impl Parser {
         while !self.block_stack.is_empty() {
             self.add_last_block_to_graph(&mut asg);
         }
-        // cleanup the tree
+        // cleanup the final tree locations and xrefs
         asg.consolidate();
         asg
     }
@@ -240,7 +240,9 @@ impl Parser {
             }
 
             // the following should probably be consumed into the above
-            TokenType::PassthroughBlock | TokenType::LiteralBlock => self.parse_delimited_leaf_block(token),
+            TokenType::PassthroughBlock | TokenType::LiteralBlock => {
+                self.parse_delimited_leaf_block(token)
+            }
             TokenType::SourceBlock => self.parse_delimited_leaf_block(token),
 
             // block macros
@@ -361,7 +363,7 @@ impl Parser {
                     // check for dangling list items
                     if !last_block.is_section() && self.open_delimited_block_lines.is_empty() {
                         self.add_to_block_stack_or_graph(asg, last_block);
-                        if self.close_parent_after_push {
+                        if self.close_parent_after_push && !self.block_stack.is_empty() {
                             self.add_last_to_block_stack_or_graph(asg);
                             self.close_parent_after_push = false;
                         }

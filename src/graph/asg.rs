@@ -2,8 +2,9 @@ use std::collections::HashMap;
 
 use serde::Serialize;
 
-use crate::graph::blocks::{Block, ParentBlock};
-use crate::graph::nodes::{Header, Location, NodeTypes};
+use super::blocks::{Block, ParentBlock};
+use super::inlines::Inline;
+use super::nodes::{Header, Location, NodeTypes};
 
 /// Abstract Syntax Graph used to represent an asciidoc document
 /// roughly meaning to follow the "official" schema:
@@ -20,6 +21,8 @@ pub struct Asg {
     pub header: Option<Header>,
     #[serde(skip)]
     document_id: String,
+    #[serde(skip)]
+    document_id_hash: HashMap<String, Vec<Inline>>,
     pub blocks: Vec<Block>,
     pub location: Vec<Location>, // really a tuple of a "Start" location and an "end" location
 }
@@ -38,9 +41,18 @@ impl Asg {
             attributes: None,
             header: None,
             document_id: "".to_string(),
+            document_id_hash: HashMap::new(),
             blocks: vec![],
             location: vec![Location::default()],
         }
+    }
+
+    /// Standardizes the graph into the "official" ASG format. Since we keep an intermediate
+    /// representation that differs slightly (e.g., see footnotes), we need to do this ahead of
+    /// JSON or (eventually) "asciidoctor-style" HTML output.
+    pub fn consolidate(&mut self) {
+        self.consolidate_locations();
+        self.consolidate_xrefs();
     }
 
     pub fn add_header(&mut self, header: Header, doc_attributes: HashMap<String, String>) {
@@ -54,25 +66,32 @@ impl Asg {
     /// Adds a block (tree) to the "root" of the document
     pub fn push_block(&mut self, mut block: Block) {
         block.consolidate_locations();
+        self.document_id_hash.extend(block.id_hashes());
         self.blocks.push(block)
     }
 
-    /// Consolidates location (and, later, other) information about the tree
-    pub fn consolidate(&mut self) {
+    /// Consolidates location information about the tree
+    pub fn consolidate_locations(&mut self) {
         if let Some(last_block) = self.blocks.last_mut() {
             self.location = Location::reconcile(self.location.clone(), last_block.locations())
         }
     }
 
-    /// Standardizes the graph into the "official" ASG format. Since we keep an intermediate
-    /// representation that differs slightly (e.g., see footnotes), we need to do this ahead of
-    /// JSON or (eventually) "asciidoctor-style" HTML output.
-    pub fn standardize(&mut self) {
-        // TODO run functions
-        self.consolidate_footnotes();
+    /// If possible, puts the title text of a given referenced element into the xref Inline so that
+    /// the relevant text is displayed as a part of the link; if the xref is missing or not a
+    /// title, notify the user
+    fn consolidate_xrefs(&mut self) {
+        for block in self.blocks.iter_mut() {
+            for inline in block.inlines() {
+                // easier to push the matching down to the Inline enum
+                inline.attempt_xref_standardization(&self.document_id_hash);
+            }
+        }
     }
 
-    fn consolidate_footnotes(&mut self) {
+    /// Pulls footnote definitions into a separate block, replacing the inlines with references to
+    /// the definitions
+    pub fn standardize_footnotes(&mut self) {
         // Until the spec says otherwise, put footnote definitions in leaf blocks
         let mut footnote_defs: Vec<Block> = vec![];
         for block in self.blocks.iter_mut() {
@@ -126,7 +145,7 @@ mod tests {
         graph.push_block(some_leaf);
         assert_eq!(graph.blocks.len(), 1);
         // just spot-check that we break them out; the actual logic is checked elsewhere
-        graph.consolidate_footnotes();
+        graph.standardize_footnotes();
         assert_eq!(graph.blocks.len(), 2);
         // but also spot-check that we add the document_id, if any
         let Some(Block::LeafBlock(leaf)) = graph.blocks.first() else {
