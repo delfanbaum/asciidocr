@@ -1,4 +1,6 @@
-use std::{fs, io, path::Path};
+use std::{
+    fmt::Display, fs, path::{Path, PathBuf}
+};
 
 use log::warn;
 
@@ -13,15 +15,15 @@ pub fn is_asciidoc_file(file: &str) -> bool {
     )
 }
 
-pub fn open_file(filename: &str) -> String {
-    match filename {
-        "-" => io::read_to_string(io::stdin()).expect("Error reading from stdin"),
-        _ => match fs::read_to_string(filename) {
-            Ok(file_string) => file_string,
-            Err(e) => {
-                warn!("Unable to read file {filename}: {e}");
-                std::process::exit(1)
-            }
-        },
+pub fn open_file<P>(filename: P) -> String
+where
+    P: AsRef<Path> + Into<PathBuf> + Display,
+{
+    match fs::read_to_string(&filename) {
+        Ok(file_string) => file_string,
+        Err(e) => {
+            warn!("Unable to read file {filename}: {e}");
+            std::process::exit(1)
+        }
     }
 }

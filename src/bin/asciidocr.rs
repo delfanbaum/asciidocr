@@ -4,16 +4,22 @@ use simple_logger::SimpleLogger;
 use std::{fs, path::PathBuf};
 
 use asciidocr::{
-    backends::docx::render_docx,
-    backends::htmls::{gather_htmlbook_templates, render_from_templates},
-    cli::{read_output, Backends, Cli},
+    backends::{
+        docx::render_docx,
+        htmls::{gather_htmlbook_templates, render_from_templates},
+    },
+    cli::{read_input, read_output, Backends, Cli},
     parser::Parser as AdocParser,
-    scanner::Scanner,
-    utils::open_file,
+    scanner::Scanner
 };
 
 fn main() {
-    SimpleLogger::new().with_level(log::LevelFilter::Warn).with_colors(true).without_timestamps().init().unwrap();
+    SimpleLogger::new()
+        .with_level(log::LevelFilter::Warn)
+        .with_colors(true)
+        .without_timestamps()
+        .init()
+        .unwrap();
     let args = Cli::parse();
 
     if let Err(e) = run(args) {
@@ -23,7 +29,7 @@ fn main() {
 }
 
 fn run(args: Cli) -> Result<()> {
-    let graph = AdocParser::new().parse(Scanner::new(&open_file(&args.file)));
+    let graph = AdocParser::new(PathBuf::from(&args.file)).parse(Scanner::new(&read_input(&args)));
     match args.backend {
         Backends::Htmlbook => {
             render_string(

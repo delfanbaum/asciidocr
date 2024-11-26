@@ -7,7 +7,7 @@ use asciidocr::{parser::Parser, scanner::Scanner};
 fn main() {
     match io::read_to_string(io::stdin()) {
         Ok(asciidoc) => {
-            let graph = Parser::new().parse(Scanner::new(&asciidoc));
+            let graph = Parser::default().parse(Scanner::new(&asciidoc));
             match serde_json::to_string_pretty(&graph) {
                 Ok(json) => print!("{}", json),
                 Err(e) => {

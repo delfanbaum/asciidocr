@@ -1,5 +1,9 @@
 use core::panic;
-use std::collections::{HashMap, VecDeque};
+use std::{
+    collections::{HashMap, VecDeque},
+    env,
+    path::PathBuf,
+};
 
 use log::{error, warn};
 
@@ -19,8 +23,13 @@ use crate::utils::{is_asciidoc_file, open_file};
 /// Parses a stream of tokens into an Abstract Syntax Graph, returning the graph once all tokens
 /// have been parsed.
 pub struct Parser {
+    /// Where the parsing "starts," i.e., the adoc file passed to the script
+    origin: PathBuf,
+    /// allows for "what just happened" matching
     last_token_type: TokenType,
+    /// optional document header
     document_header: Header,
+    /// document-level attributes, used for replacements, etc.
     document_attributes: HashMap<String, String>,
     /// holding ground for graph blocks until it's time to push to the main graph
     block_stack: Vec<Block>,
@@ -63,13 +72,21 @@ pub struct Parser {
 
 impl Default for Parser {
     fn default() -> Self {
-        Self::new()
+        // defaults assuming stdin
+        match env::current_dir() {
+            Ok(dir) => Self::new(dir),
+            Err(e) => {
+                error!("Unexpeced error: {e}");
+                std::process::exit(1)
+            }
+        }
     }
 }
 
 impl Parser {
-    pub fn new() -> Self {
+    pub fn new(origin: PathBuf) -> Self {
         Parser {
+            origin,
             last_token_type: TokenType::Eof,
             document_header: Header::new(),
             document_attributes: HashMap::new(),
