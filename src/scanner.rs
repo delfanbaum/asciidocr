@@ -70,6 +70,10 @@ impl<'a> Scanner<'a> {
                     self.add_token(TokenType::PageBreak, false, 0)
                 } else if self.peek() == '<' {
                     self.add_cross_reference()
+                } else if self.starts_code_callout() {
+                    self.current += 1; // add the trailing '>' char
+                    self.add_token(TokenType::CodeCallout, true, 0)
+                // else if ...
                 } else {
                     self.add_text_until_next_markup()
                 }
@@ -576,6 +580,16 @@ impl<'a> Scanner<'a> {
             self.current = current_placeholder;
             false
         }
+    }
+    fn starts_code_callout(&mut self) -> bool {
+        while self.peek() != '>' {
+            if self.peek().is_digit(10) {
+                self.current += 1;
+            } else {
+                return false;
+            }
+        }
+        return true;
     }
 
     fn is_at_end(&self) -> bool {
@@ -1749,6 +1763,30 @@ mod tests {
                 endcol: 16,
                 file_stack: vec![],
             },
+        ];
+        scan_and_assert_eq(&markup, expected_tokens);
+    }
+
+    #[test]
+    fn picks_up_code_callouts_behind_inline_comment() {
+        let markup = "bar // <1>";
+        let expected_tokens = vec![
+            Token::new_default(
+                TokenType::Text,
+                "bar // ".to_string(),
+                Some("bar // ".to_string()),
+                1,
+                1,
+                7,
+            ),
+            Token::new_default(
+                TokenType::CodeCallout,
+                "<1>".to_string(),
+                Some("<1>".to_string()),
+                1,
+                8,
+                10,
+            ),
         ];
         scan_and_assert_eq(&markup, expected_tokens);
     }

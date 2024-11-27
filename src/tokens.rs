@@ -166,6 +166,12 @@ pub enum TokenType {
     OrderedListItem,
     UnorderedListItem,
 
+    // definition lists
+    DescriptionListMarker, // just match "::" and the parser can figure it out
+
+    // Code callout markers and list
+    CodeCallout,
+
     // block info markers
     BlockLabel, // ".Some text", specifically the r"^." here
 
@@ -190,9 +196,6 @@ pub enum TokenType {
     TableCell, // | to the next | or \n
 
     // INLINES
-    // definition lists
-    DescriptionListMarker, // just match "::" and the parser can figure it out
-
     // formatting tokens (inline markup)
     Strong,   // TK Handle bounded characters, e.g., **Some**thing -> <b>Some</b>thing
     Emphasis, // same applies above
