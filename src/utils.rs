@@ -1,5 +1,7 @@
 use std::{
-    fmt::Display, fs, path::{Path, PathBuf}
+    fmt::Debug,
+    fs,
+    path::{Path, PathBuf},
 };
 
 use log::warn;
@@ -17,12 +19,12 @@ pub fn is_asciidoc_file(file: &str) -> bool {
 
 pub fn open_file<P>(filename: P) -> String
 where
-    P: AsRef<Path> + Into<PathBuf> + Display,
+    P: AsRef<Path> + Into<PathBuf> + Debug,
 {
     match fs::read_to_string(&filename) {
         Ok(file_string) => file_string,
         Err(e) => {
-            warn!("Unable to read file {filename}: {e}");
+            warn!("Unable to read file {:?}: {e}", filename);
             std::process::exit(1)
         }
     }

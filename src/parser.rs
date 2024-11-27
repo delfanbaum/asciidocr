@@ -3,6 +3,7 @@ use std::{
     collections::{HashMap, VecDeque},
     env,
     path::PathBuf,
+    str::FromStr,
 };
 
 use log::{error, warn};
@@ -24,7 +25,7 @@ use crate::utils::{is_asciidoc_file, open_file};
 /// have been parsed.
 pub struct Parser {
     /// Where the parsing "starts," i.e., the adoc file passed to the script
-    origin: PathBuf,
+    origin_directory: PathBuf,
     /// allows for "what just happened" matching
     last_token_type: TokenType,
     /// optional document header
@@ -85,8 +86,12 @@ impl Default for Parser {
 
 impl Parser {
     pub fn new(origin: PathBuf) -> Self {
+        let origin_directory = origin
+            .parent()
+            .unwrap_or(&env::current_dir().unwrap())
+            .to_path_buf();
         Parser {
-            origin,
+            origin_directory,
             last_token_type: TokenType::Eof,
             document_header: Header::new(),
             document_attributes: HashMap::new(),
@@ -425,17 +430,52 @@ impl Parser {
     fn parse_include(&mut self, token: Token, asg: &mut Asg) {
         // ignore any attributes for the time being
         let (target, _) = target_and_attrs_from_token(&token);
+        // calculate target, given that it's relative; if there is something on the stack, use
+        // that, else use self.origin
+
+        let mut resolved_target: PathBuf;
+
+        if !self.file_stack.is_empty() {
+            resolved_target = self.origin_directory.clone();
+            // may as well follow the rabbit hole
+            for file in self.file_stack.iter() {
+                match PathBuf::from_str(file).unwrap().parent() {
+                    Some(parent) => resolved_target.push(parent),
+                    None => {}
+                }
+            }
+            resolved_target = resolved_target
+                .join(target.clone())
+                .canonicalize()
+                .expect(&format!(
+                    "Uanble to canonicalize include path: {:?}",
+                    self.origin_directory.join(target.clone())
+                ));
+        } else {
+            resolved_target = self
+                .origin_directory
+                .join(target.clone())
+                .canonicalize()
+                .expect(&format!(
+                    "Uanble to canonicalize include path: {:?}",
+                    self.origin_directory.join(target.clone())
+                ));
+        }
         self.file_stack.push(target.clone());
 
         let current_block_stack_len = self.block_stack.len();
 
         // Match filetype, if adoc scan into tokens, adding the location, then parse...
         if is_asciidoc_file(&target) {
-            for token in Scanner::new_with_stack(&open_file(&target), self.file_stack.clone()) {
+            for token in
+                Scanner::new_with_stack(&open_file(resolved_target), self.file_stack.clone())
+            {
                 self.token_into(token, asg)
             }
         } else {
-            for token in Scanner::new_with_stack(&open_file(&target), self.file_stack.clone()) {
+            for token in
+                Scanner::new_with_stack(&open_file(resolved_target), self.file_stack.clone())
+            {
                 self.parse_text(token)
             }
         }

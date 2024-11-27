@@ -17,8 +17,7 @@ pub fn assert_parsed_doc_matches_expected_asg(adoc_fn: &str, asg_json_fn: &str) 
     )));
 
     let expected_asg: Value = serde_json::from_str(
-        &fs::read_to_string(test_dir.join(asg_json_fn))
-            .expect("Unable to find asg json"),
+        &fs::read_to_string(test_dir.join(asg_json_fn)).expect("Unable to find asg json"),
     )
     .unwrap();
     assert_json_eq!(parsed_asg, expected_asg);
@@ -38,14 +37,14 @@ pub fn assert_rendered_html_matches_expected(adoc_fn: &str, html_fn: &str) {
     let test_dir = PathBuf::from("tests/data/");
     let mut rendered_html = render_from_templates(
         &Parser::new(test_dir.join(adoc_fn)).parse(Scanner::new(
-            &fs::read_to_string( test_dir.join(adoc_fn)).expect("Unable to find adoc"),
+            &fs::read_to_string(test_dir.join(adoc_fn)).expect("Unable to find adoc"),
         )),
         gather_htmlbook_templates(),
     )
     .expect("Unable to render HTML from document");
     rendered_html.retain(|c| !c.is_whitespace());
-    let mut expected_html = fs::read_to_string(test_dir.join(html_fn))
-        .expect("Unable to read expectd html file");
+    let mut expected_html =
+        fs::read_to_string(test_dir.join(html_fn)).expect("Unable to read expectd html file");
     expected_html.retain(|c| !c.is_whitespace());
     assert_eq!(rendered_html, expected_html);
 }

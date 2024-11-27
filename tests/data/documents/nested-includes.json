@@ -9,11 +9,72 @@
         {
           "name": "text",
           "type": "string",
-          "value": "Here is a paragraph, followed by an include.",
-          "location": [ { "line": 1, "col": 1 }, { "line": 1, "col": 44 } ]
+          "value": "Here is include:",
+          "location": [
+            {
+              "line": 1,
+              "col": 1
+            },
+            {
+              "line": 1,
+              "col": 16
+            }
+          ]
         }
       ],
-      "location": [ { "line": 1, "col": 1 }, { "line": 1, "col": 44 } ]
+      "location": [
+        {
+          "line": 1,
+          "col": 1
+        },
+        {
+          "line": 1,
+          "col": 16
+        }
+      ]
+    },
+    {
+      "name": "paragraph",
+      "type": "block",
+      "inlines": [
+        {
+          "name": "text",
+          "type": "string",
+          "value": "Here is a paragraph, followed by an include.",
+          "location": [
+            {
+              "line": 1,
+              "col": 1,
+              "file": [
+                "../blocks/include.adoc"
+              ]
+            },
+            {
+              "line": 1,
+              "col": 44,
+              "file": [
+                "../blocks/include.adoc"
+              ]
+            }
+          ]
+        }
+      ],
+      "location": [
+        {
+          "line": 1,
+          "col": 1,
+          "file": [
+            "../blocks/include.adoc"
+          ]
+        },
+        {
+          "line": 1,
+          "col": 44,
+          "file": [
+            "../blocks/include.adoc"
+          ]
+        }
+      ]
     },
     {
       "name": "section",
@@ -23,13 +84,20 @@
           "name": "text",
           "type": "string",
           "value": "Section Title",
-          "location": [ { "line": 1, "col": 4,
+          "location": [
+            {
+              "line": 1,
+              "col": 4,
               "file": [
+                "../blocks/include.adoc",
                 "nested-headings-multiple.adoc"
               ]
             },
-            { "line": 1, "col": 16,
+            {
+              "line": 1,
+              "col": 16,
               "file": [
+                "../blocks/include.adoc",
                 "nested-headings-multiple.adoc"
               ]
             }
@@ -46,13 +114,20 @@
               "name": "text",
               "type": "string",
               "value": "Contents",
-              "location": [ { "line": 3, "col": 1,
+              "location": [
+                {
+                  "line": 3,
+                  "col": 1,
                   "file": [
+                    "../blocks/include.adoc",
                     "nested-headings-multiple.adoc"
                   ]
                 },
-                { "line": 3, "col": 8,
+                {
+                  "line": 3,
+                  "col": 8,
                   "file": [
+                    "../blocks/include.adoc",
                     "nested-headings-multiple.adoc"
                   ]
                 }
@@ -61,14 +136,18 @@
           ],
           "location": [
             {
-              "line": 3, "col": 1,
+              "line": 3,
+              "col": 1,
               "file": [
+                "../blocks/include.adoc",
                 "nested-headings-multiple.adoc"
               ]
             },
             {
-              "line": 3, "col": 8,
+              "line": 3,
+              "col": 8,
               "file": [
+                "../blocks/include.adoc",
                 "nested-headings-multiple.adoc"
               ]
             }
@@ -84,14 +163,18 @@
               "value": "Nested Section Title",
               "location": [
                 {
-                  "line": 5, "col": 5,
+                  "line": 5,
+                  "col": 5,
                   "file": [
+                    "../blocks/include.adoc",
                     "nested-headings-multiple.adoc"
                   ]
                 },
                 {
-                  "line": 5, "col": 24,
+                  "line": 5,
+                  "col": 24,
                   "file": [
+                    "../blocks/include.adoc",
                     "nested-headings-multiple.adoc"
                   ]
                 }
@@ -110,14 +193,18 @@
                   "value": "Contents",
                   "location": [
                     {
-                      "line": 7, "col": 1,
+                      "line": 7,
+                      "col": 1,
                       "file": [
+                        "../blocks/include.adoc",
                         "nested-headings-multiple.adoc"
                       ]
                     },
                     {
-                      "line": 7, "col": 8,
+                      "line": 7,
+                      "col": 8,
                       "file": [
+                        "../blocks/include.adoc",
                         "nested-headings-multiple.adoc"
                       ]
                     }
@@ -126,14 +213,18 @@
               ],
               "location": [
                 {
-                  "line": 7, "col": 1,
+                  "line": 7,
+                  "col": 1,
                   "file": [
+                    "../blocks/include.adoc",
                     "nested-headings-multiple.adoc"
                   ]
                 },
                 {
-                  "line": 7, "col": 8,
+                  "line": 7,
+                  "col": 8,
                   "file": [
+                    "../blocks/include.adoc",
                     "nested-headings-multiple.adoc"
                   ]
                 }
@@ -142,14 +233,18 @@
           ],
           "location": [
             {
-              "line": 5, "col": 1,
+              "line": 5,
+              "col": 1,
               "file": [
+                "../blocks/include.adoc",
                 "nested-headings-multiple.adoc"
               ]
             },
             {
-              "line": 7, "col": 8,
+              "line": 7,
+              "col": 8,
               "file": [
+                "../blocks/include.adoc",
                 "nested-headings-multiple.adoc"
               ]
             }
@@ -165,14 +260,18 @@
               "value": "Nested Section Title",
               "location": [
                 {
-                  "line": 9, "col": 5,
+                  "line": 9,
+                  "col": 5,
                   "file": [
+                    "../blocks/include.adoc",
                     "nested-headings-multiple.adoc"
                   ]
                 },
                 {
-                  "line": 9, "col": 24,
+                  "line": 9,
+                  "col": 24,
                   "file": [
+                    "../blocks/include.adoc",
                     "nested-headings-multiple.adoc"
                   ]
                 }
@@ -191,14 +290,18 @@
                   "value": "Contents",
                   "location": [
                     {
-                      "line": 11, "col": 1,
+                      "line": 11,
+                      "col": 1,
                       "file": [
+                        "../blocks/include.adoc",
                         "nested-headings-multiple.adoc"
                       ]
                     },
                     {
-                      "line": 11, "col": 8,
+                      "line": 11,
+                      "col": 8,
                       "file": [
+                        "../blocks/include.adoc",
                         "nested-headings-multiple.adoc"
                       ]
                     }
@@ -207,14 +310,18 @@
               ],
               "location": [
                 {
-                  "line": 11, "col": 1,
+                  "line": 11,
+                  "col": 1,
                   "file": [
+                    "../blocks/include.adoc",
                     "nested-headings-multiple.adoc"
                   ]
                 },
                 {
-                  "line": 11, "col": 8,
+                  "line": 11,
+                  "col": 8,
                   "file": [
+                    "../blocks/include.adoc",
                     "nested-headings-multiple.adoc"
                   ]
                 }
@@ -223,14 +330,18 @@
           ],
           "location": [
             {
-              "line": 9, "col": 1,
+              "line": 9,
+              "col": 1,
               "file": [
+                "../blocks/include.adoc",
                 "nested-headings-multiple.adoc"
               ]
             },
             {
-              "line": 11, "col": 8,
+              "line": 11,
+              "col": 8,
               "file": [
+                "../blocks/include.adoc",
                 "nested-headings-multiple.adoc"
               ]
             }
@@ -239,14 +350,18 @@
       ],
       "location": [
         {
-          "line": 1, "col": 1,
+          "line": 1,
+          "col": 1,
           "file": [
+            "../blocks/include.adoc",
             "nested-headings-multiple.adoc"
           ]
         },
         {
-          "line": 11, "col": 8,
+          "line": 11,
+          "col": 8,
           "file": [
+            "../blocks/include.adoc",
             "nested-headings-multiple.adoc"
           ]
         }
@@ -260,11 +375,81 @@
           "name": "text",
           "type": "string",
           "value": "And then some final content back in the original file.",
-          "location": [ { "line": 6, "col": 1 }, { "line": 6, "col": 54 } ]
+          "location": [
+            {
+              "line": 6,
+              "col": 1,
+              "file": [
+                "../blocks/include.adoc"
+              ]
+            },
+            {
+              "line": 6,
+              "col": 54,
+              "file": [
+                "../blocks/include.adoc"
+              ]
+            }
+          ]
         }
       ],
-      "location": [ { "line": 6, "col": 1 }, { "line": 6, "col": 54 } ]
+      "location": [
+        {
+          "line": 6,
+          "col": 1,
+          "file": [
+            "../blocks/include.adoc"
+          ]
+        },
+        {
+          "line": 6,
+          "col": 54,
+          "file": [
+            "../blocks/include.adoc"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "paragraph",
+      "type": "block",
+      "inlines": [
+        {
+          "name": "text",
+          "type": "string",
+          "value": "And after.",
+          "location": [
+            {
+              "line": 5,
+              "col": 1
+            },
+            {
+              "line": 5,
+              "col": 10
+            }
+          ]
+        }
+      ],
+      "location": [
+        {
+          "line": 5,
+          "col": 1
+        },
+        {
+          "line": 5,
+          "col": 10
+        }
+      ]
     }
   ],
-  "location": [ { "line": 1, "col": 1 }, { "line": 6, "col": 54 } ]
+  "location": [
+    {
+      "line": 1,
+      "col": 1
+    },
+    {
+      "line": 5,
+      "col": 10
+    }
+  ]
 }

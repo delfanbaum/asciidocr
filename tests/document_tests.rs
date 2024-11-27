@@ -15,6 +15,26 @@ fn test_reference_test_insertion() {
 }
 
 #[test]
+/// Test that we pull reference text from the target into reference as an inline but when it's an
+/// include
+fn test_reference_test_in_include() {
+    let fn_pattern = "documents/references-include-fig";
+    let adoc_fn = format!("{}.adoc", fn_pattern);
+    let asg_json_fn = format!("{}.json", fn_pattern);
+    assert_parsed_doc_matches_expected_asg(&adoc_fn, &asg_json_fn)
+}
+
+#[test]
+/// Test that we pull reference text from the target into reference as an inline but when it's an
+/// include
+fn test_nested_includes() {
+    let fn_pattern = "documents/nested-includes";
+    let adoc_fn = format!("{}.adoc", fn_pattern);
+    let asg_json_fn = format!("{}.json", fn_pattern);
+    assert_parsed_doc_matches_expected_asg(&adoc_fn, &asg_json_fn)
+}
+
+#[test]
 ///Smoke test for "have we covered enough" -- will be added to as we go along and do not panic
 fn test_targeted_coverage() {
     let adoc_fn = "tests/data/documents/minimum.adoc";

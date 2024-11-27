@@ -145,7 +145,6 @@ fn test_admontions_non_delimited_at_eof() {
     assert_parsed_doc_matches_expected_asg(&adoc_fn, &asg_json_fn)
 }
 
-
 #[test]
 /// Block roles (classes) can be applied
 fn test_block_meta() {
@@ -251,7 +250,6 @@ fn test_table_star_cols_option_header() {
     let asg_json_fn = format!("{}.json", fn_pattern);
     assert_parsed_doc_matches_expected_asg(&adoc_fn, &asg_json_fn)
 }
-
 
 #[test]
 fn test_table_implicit_header() {

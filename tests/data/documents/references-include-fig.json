@@ -1,0 +1,172 @@
+{
+  "name": "document",
+  "type": "block",
+  "blocks": [
+    {
+      "name": "paragraph",
+      "type": "block",
+      "inlines": [
+        {
+          "name": "text",
+          "type": "string",
+          "value": "This is a reference to a figure in an included file, namely ",
+          "location": [
+            {
+              "line": 1,
+              "col": 1
+            },
+            {
+              "line": 1,
+              "col": 60
+            }
+          ]
+        },
+        {
+          "name": "ref",
+          "type": "inline",
+          "variant": "xref",
+          "target": "image_id",
+          "inlines": [
+            {
+              "name": "text",
+              "type": "string",
+              "value": "Figure Title",
+              "location": [
+                {
+                  "line": 2,
+                  "col": 2,
+                  "file": [
+                    "../blocks/image-block-figure.adoc"
+                  ]
+                },
+                {
+                  "line": 2,
+                  "col": 13,
+                  "file": [
+                    "../blocks/image-block-figure.adoc"
+                  ]
+                }
+              ]
+            }
+          ],
+          "location": [
+            {
+              "line": 1,
+              "col": 61
+            },
+            {
+              "line": 1,
+              "col": 72
+            }
+          ]
+        },
+        {
+          "name": "text",
+          "type": "string",
+          "value": ".",
+          "location": [
+            {
+              "line": 1,
+              "col": 73
+            },
+            {
+              "line": 1,
+              "col": 73
+            }
+          ]
+        }
+      ],
+      "location": [
+        {
+          "line": 1,
+          "col": 1
+        },
+        {
+          "line": 1,
+          "col": 73
+        }
+      ]
+    },
+    {
+      "name": "image",
+      "type": "block",
+      "form": "macro",
+      "target": "path/to/image.png",
+      "caption": [
+        {
+          "name": "text",
+          "type": "string",
+          "value": "Figure Title",
+          "location": [
+            {
+              "line": 2,
+              "col": 2,
+              "file": [
+                "../blocks/image-block-figure.adoc"
+              ]
+            },
+            {
+              "line": 2,
+              "col": 13,
+              "file": [
+                "../blocks/image-block-figure.adoc"
+              ]
+            }
+          ]
+        }
+      ],
+      "metadata": {
+        "attributes": {
+          "id": "image_id"
+        },
+        "options": [],
+        "roles": [],
+        "location": [
+          {
+            "line": 1,
+            "col": 1,
+            "file": [
+              "../blocks/image-block-figure.adoc"
+            ]
+          },
+          {
+            "line": 1,
+            "col": 12,
+            "file": [
+              "../blocks/image-block-figure.adoc"
+            ]
+          }
+        ]
+      },
+      "location": [
+        {
+          "line": 3,
+          "col": 1,
+          "file": [
+            "../blocks/image-block-figure.adoc"
+          ]
+        },
+        {
+          "line": 3,
+          "col": 26,
+          "file": [
+            "../blocks/image-block-figure.adoc"
+          ]
+        }
+      ]
+    }
+  ],
+  "location": [
+    {
+      "line": 1,
+      "col": 1
+    },
+    {
+      "line": 3,
+      "col": 26,
+      "file": [
+        "../blocks/image-block-figure.adoc"
+      ]
+    }
+  ]
+}
