@@ -5,7 +5,6 @@ non-features.
 
 == Language Features in a Non-Working State
 
-* Cross reference checking and text
 * Section IDs are not auto-generated
 * Custom IDs/reference text
 

@@ -1,0 +1,5 @@
+Here is include:
+
+include::../blocks/include.adoc[]
+
+And after.

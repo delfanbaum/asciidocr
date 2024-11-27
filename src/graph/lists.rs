@@ -6,6 +6,8 @@ use crate::graph::{
 use crate::tokens::Token;
 use serde::Serialize;
 
+use super::metadata::ElementMetadata;
+
 #[derive(Serialize, Clone, Debug)]
 pub struct List {
     name: String,
@@ -14,6 +16,8 @@ pub struct List {
     marker: String,
     pub variant: ListVariant,
     pub items: Vec<Block>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub metadata: Option<ElementMetadata>,
     pub location: Vec<Location>,
 }
 
@@ -38,6 +42,7 @@ impl List {
             marker: list_marker,
             variant,
             items: vec![],
+            metadata: None,
             location,
         }
     }
@@ -64,6 +69,8 @@ pub struct ListItem {
     pub principal: Vec<Inline>, // apparently this can also be optional!
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub blocks: Vec<Block>, // a LI can have subsequent blocks, too
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub metadata: Option<ElementMetadata>,
     pub location: Vec<Location>,
 }
 
@@ -82,6 +89,7 @@ impl ListItem {
             marker: trimmed_mark,
             principal: vec![],
             blocks: vec![],
+            metadata: None,
             location,
         }
     }
@@ -139,6 +147,8 @@ pub struct DList {
     node_type: NodeTypes,
     marker: String,
     pub items: Vec<Block>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub metadata: Option<ElementMetadata>,
     pub location: Vec<Location>,
 }
 
@@ -156,6 +166,7 @@ impl DList {
             node_type: NodeTypes::Block,
             marker: "::".to_string(),
             items: vec![],
+            metadata: None,
             location,
         }
     }
@@ -175,6 +186,8 @@ pub struct DListItem {
     pub principal: Vec<Inline>, // apparently this can also be optional!
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub blocks: Vec<Block>, // a LI can have subsequent blocks, too
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub metadata: Option<ElementMetadata>,
     pub location: Vec<Location>,
 }
 
@@ -194,6 +207,7 @@ impl DListItem {
             terms: vec![],
             principal: vec![],
             blocks: vec![],
+            metadata: None,
             location: token.locations(),
         }
     }

@@ -1,5 +1,7 @@
 use clap::{Parser, ValueEnum};
-use std::path::PathBuf;
+use std::{io, path::PathBuf};
+
+use crate::utils::open_file;
 
 #[derive(Debug, ValueEnum, Clone)]
 pub enum Backends {
@@ -27,6 +29,13 @@ pub struct Cli {
     /// Optionally select a backend for conversion.
     #[arg(value_enum, short = 'b', long = "backend", default_value = "htmlbook")]
     pub backend: Backends,
+}
+
+pub fn read_input(args: &Cli) -> String {
+    match args.file.as_str() {
+        "-" => io::read_to_string(io::stdin()).expect("Error reading from stdin"),
+        _ => open_file(&args.file),
+    }
 }
 
 pub fn read_output(args: Cli) -> Option<PathBuf> {

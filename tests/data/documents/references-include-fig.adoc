@@ -1,0 +1,3 @@
+This is a reference to a figure in an included file, namely <<image_id>>.
+
+include::../blocks/image-block-figure.adoc[]

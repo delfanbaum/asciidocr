@@ -1,0 +1,6 @@
+This is a reference to <<uuid>>.
+
+[[uuid]]
+== Some Title
+
+Content.

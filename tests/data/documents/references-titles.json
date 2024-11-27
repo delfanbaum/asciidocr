@@ -1,0 +1,78 @@
+{
+    "name": "document",
+    "type": "block",
+    "blocks": [
+        {
+            "name": "paragraph",
+            "type": "block",
+            "inlines": [
+                {
+                    "name": "text",
+                    "type": "string",
+                    "value": "This is a reference to ",
+                    "location": [ { "line": 1, "col": 1 }, { "line": 1, "col": 23 } ]
+                },
+                {
+                    "name": "ref",
+                    "type": "inline",
+                    "variant": "xref",
+                    "target": "uuid",
+                    "inlines": [
+                        {
+                            "name": "text",
+                            "type": "string",
+                            "value": "Some Title",
+                            "location": [ { "line": 4, "col": 4 }, { "line": 4, "col": 13 } ]
+                        }
+                    ],
+                    "location": [ { "line": 1, "col": 24 }, { "line": 1, "col": 31 } ]
+                },
+                {
+                    "name": "text",
+                    "type": "string",
+                    "value": ".",
+                    "location": [ { "line": 1, "col": 32 }, { "line": 1, "col": 32 } ]
+                }
+            ],
+            "location": [ { "line": 1, "col": 1 }, { "line": 1, "col": 32 } ]
+        },
+        {
+            "name": "section",
+            "type": "block",
+            "title": [
+                {
+                    "name": "text",
+                    "type": "string",
+                    "value": "Some Title",
+                    "location": [ { "line": 4, "col": 4 }, { "line": 4, "col": 13 } ]
+                }
+            ],
+            "metadata": {
+                "attributes": {
+                    "id": "uuid"
+                },
+                "options": [],
+                "roles": [],
+                "location": [ { "line": 3, "col": 1 }, { "line": 3, "col": 8 } ]
+            },
+            "level": 1,
+            "blocks": [
+                {
+                    "name": "paragraph",
+                    "type": "block",
+                    "inlines": [
+                        {
+                            "name": "text",
+                            "type": "string",
+                            "value": "Content.",
+                            "location": [ { "line": 6, "col": 1 }, { "line": 6, "col": 8 } ]
+                        }
+                    ],
+                    "location": [ { "line": 6, "col": 1 }, { "line": 6, "col": 8 } ]
+                }
+            ],
+            "location": [ { "line": 4, "col": 1 }, { "line": 6, "col": 8 } ]
+        }
+    ],
+    "location": [ { "line": 1, "col": 1 }, { "line": 6, "col": 8 } ]
+}
