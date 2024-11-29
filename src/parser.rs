@@ -229,7 +229,7 @@ impl Parser {
             TokenType::PassthroughInlineMacro => self.parse_passthrough_inline_macro(token),
             TokenType::InlineMacroClose => self.parse_inline_macro_close(token),
 
-            // breaks NEED TESTS
+            // breaks
             TokenType::PageBreak => self.parse_page_break(token, asg),
             TokenType::ThematicBreak => self.parse_thematic_break(token, asg),
             TokenType::LineContinuation => self
@@ -266,6 +266,7 @@ impl Parser {
                 self.parse_delimited_leaf_block(token)
             }
             TokenType::SourceBlock => self.parse_delimited_leaf_block(token),
+            TokenType::CodeCallout => todo!(),
 
             // block macros
             TokenType::BlockImageMacro => self.parse_block_image(token, asg),

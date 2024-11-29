@@ -169,8 +169,9 @@ pub enum TokenType {
     // definition lists
     DescriptionListMarker, // just match "::" and the parser can figure it out
 
-    // Code callout markers and list
+    // Code callout markers and list items
     CodeCallout,
+    CodeCalloutListItem,
 
     // block info markers
     BlockLabel, // ".Some text", specifically the r"^." here

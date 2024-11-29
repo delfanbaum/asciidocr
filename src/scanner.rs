@@ -70,8 +70,10 @@ impl<'a> Scanner<'a> {
                     self.add_token(TokenType::PageBreak, false, 0)
                 } else if self.peek() == '<' {
                     self.add_cross_reference()
+                } else if self.starts_new_line() && self.starts_code_callout_list_item() {
+                    self.current += 1; // consume the space char
+                    self.add_token(TokenType::CodeCalloutListItem, true, 0)
                 } else if self.starts_code_callout() {
-                    self.current += 1; // add the trailing '>' char
                     self.add_token(TokenType::CodeCallout, true, 0)
                 // else if ...
                 } else {
@@ -581,6 +583,19 @@ impl<'a> Scanner<'a> {
             false
         }
     }
+
+    fn starts_code_callout_list_item(&mut self) -> bool {
+        while self.peek() != '>' {
+            if self.peek().is_digit(10) {
+                self.current += 1;
+            } else {
+                return false;
+            }
+        }
+        self.current += 1;
+        self.peek() == ' ' // next must be a space
+    }
+
     fn starts_code_callout(&mut self) -> bool {
         while self.peek() != '>' {
             if self.peek().is_digit(10) {
@@ -589,7 +604,8 @@ impl<'a> Scanner<'a> {
                 return false;
             }
         }
-        return true;
+        self.current += 1;
+        self.peek() == '\n' // callouts MUST be last chars in line
     }
 
     fn is_at_end(&self) -> bool {
@@ -1769,7 +1785,7 @@ mod tests {
 
     #[test]
     fn picks_up_code_callouts_behind_inline_comment() {
-        let markup = "bar // <1>";
+        let markup = "bar // <1>\n";
         let expected_tokens = vec![
             Token::new_default(
                 TokenType::Text,
@@ -1786,6 +1802,30 @@ mod tests {
                 1,
                 8,
                 10,
+            ),
+            Token::new_default(TokenType::NewLineChar, "\n".to_string(), None, 1, 11, 11),
+        ];
+        scan_and_assert_eq(&markup, expected_tokens);
+    }
+    #[test]
+    fn code_callout_list() {
+        let markup = "<1> Bar";
+        let expected_tokens = vec![
+            Token::new_default(
+                TokenType::CodeCalloutListItem,
+                "<1> ".to_string(),
+                Some("<1> ".to_string()),
+                1,
+                1,
+                4,
+            ),
+            Token::new_default(
+                TokenType::Text,
+                "Bar".to_string(),
+                Some("Bar".to_string()),
+                1,
+                5,
+                7,
             ),
         ];
         scan_and_assert_eq(&markup, expected_tokens);

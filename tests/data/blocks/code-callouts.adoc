@@ -1,0 +1,8 @@
+[source, python]
+----
+def hello(name: str):  # <1>
+""" Welcomes the person whose name is passed to the function"""
+    print(f"Hello, {name}")  # <2>
+----
+<1> This is a function definition.
+<2> This print statement employs an "f-string"
