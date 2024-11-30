@@ -165,8 +165,15 @@ impl Parser {
                         return;
                     }
                 }
-                TokenType::SourceBlock | TokenType::PassthroughBlock | TokenType::LiteralBlock => {
+                TokenType::PassthroughBlock | TokenType::LiteralBlock => {
                     if token.token_type() != token_type {
+                        self.parse_text(token);
+                        return;
+                    }
+                }
+                TokenType::SourceBlock => {
+                    // allow callouts in the source block
+                    if ![token_type, TokenType::CodeCallout].contains(&token.token_type()) {
                         self.parse_text(token);
                         return;
                     }
@@ -266,7 +273,8 @@ impl Parser {
                 self.parse_delimited_leaf_block(token)
             }
             TokenType::SourceBlock => self.parse_delimited_leaf_block(token),
-            TokenType::CodeCallout => todo!(),
+            TokenType::CodeCallout => self.parse_code_callout(token),
+            TokenType::CodeCalloutListItem => todo!(),
 
             // block macros
             TokenType::BlockImageMacro => self.parse_block_image(token, asg),
@@ -627,26 +635,17 @@ impl Parser {
         self.force_new_block = false;
     }
 
-    //fn parse_blockquote(&mut self, token: Token, asg: &mut Asg) {}
-    //fn parse_verse(&mut self, token: Token, asg: &mut Asg) {}
-    //fn parse_source(&mut self, token: Token, asg: &mut Asg) {}
-
     fn parse_admonition_para_syntax(&mut self, token: Token) {
         self.block_stack
             .push(Block::ParentBlock(ParentBlock::new_from_token(token)));
         self.close_parent_after_push = true;
     }
 
-    //fn parse_tip(&mut self, token: Token, asg: &mut Asg) {}
-    //fn parse_important(&mut self, token: Token, asg: &mut Asg) {}
-    //fn parse_caution(&mut self, token: Token, asg: &mut Asg) {}
-    //fn parse_warning(&mut self, token: Token, asg: &mut Asg) {}
     fn parse_block_continuation(&mut self, _token: Token) {
         self.add_inlines_to_block_stack();
         self.in_block_continuation = true;
         self.force_new_block = true;
     }
-    //fn parse_def_list_mark(&mut self, token: Token, asg: &mut Asg) {}
 
     /// Generic parser for inline spans that close themselves
     fn parse_inline_span(&mut self, mut inline: Inline) {
@@ -685,10 +684,6 @@ impl Parser {
         }
         self.in_inline_span = true;
     }
-
-    //fn parse_superscript(&mut self, token: Token, asg: &mut Asg) {}
-    //fn parse_subscript(&mut self, token: Token, asg: &mut Asg) {}
-    //fn parse_highlighted(&mut self, token: Token, asg: &mut Asg) {}
 
     fn parse_link_macro(&mut self, token: Token) {
         self.inline_stack
@@ -756,13 +751,6 @@ impl Parser {
         }
     }
 
-    //fn parse_eof(&mut self, token: Token, asg: &mut Asg) {}
-    //fn parse_inline_style(&mut self, token: Token, asg: &mut Asg) {}
-    //fn parse_quote_verse_block(&mut self, token: Token, asg: &mut Asg) {}
-    //fn parse_admonition_block(&mut self, token: Token, asg: &mut Asg) {}
-    //fn parse_open_block(&mut self, token: Token, asg: &mut Asg) {}
-    //
-
     /// attribute references become literals, but we need to replace them with the appropriate
     /// values from the document header first
     fn parse_attribute_reference(&mut self, mut token: Token) {
@@ -787,6 +775,21 @@ impl Parser {
         self.inline_stack
             .push_back(Inline::InlineRef(InlineRef::new_xref_from_token(token)));
         self.close_parent_after_push = true;
+    }
+
+    fn parse_code_callout(&mut self, token: Token) {
+        if let Some(value) = self.document_attributes.get("icons") {
+            if value == "true" {
+                if let Some(_last_inline) = self.inline_stack.back_mut() {
+                    // handle deleting comment markup, IF we're handling icons
+                    todo!();
+                }
+            }
+        }
+        self.inline_stack
+            .push_back(Inline::InlineSpan(InlineSpan::inline_span_from_token(
+                token,
+            )));
     }
 
     fn parse_text(&mut self, token: Token) {

@@ -353,6 +353,23 @@ impl InlineSpan {
                 InlineSpanForm::Constrained,
                 token.locations(),
             ),
+            TokenType::CodeCallout => {
+                let metadata = ElementMetadata::new_with_role("conum".into());
+                let mut code_span = Self::new(
+                    InlineSpanVariant::Strong,
+                    InlineSpanForm::Constrained,
+                    token.locations(),
+                );
+                code_span.metadata = Some(metadata);
+                code_span
+                    .inlines
+                    .push(Inline::InlineLiteral(InlineLiteral::new(
+                        InlineLiteralName::Text,
+                        format!("({})", token.text()[1..token.text().len() - 1].to_string()),
+                        token.locations(),
+                    )));
+                code_span
+            }
             _ => {
                 panic!("Invalid action: tried to create an inline span from an invalid token type")
             }
