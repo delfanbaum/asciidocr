@@ -127,7 +127,7 @@ impl Parser {
 
         // add any dangling inlines
         self.add_inlines_to_block_stack();
-        // add any dangling blocks
+        // add any dangling blocks (most often sections)
         while !self.block_stack.is_empty() {
             self.add_last_block_to_graph(&mut asg);
         }
@@ -185,10 +185,10 @@ impl Parser {
         match token.token_type() {
             // document header, headings and section parsing
             TokenType::Heading1 => self.parse_level_0_heading(token, asg),
-            TokenType::Heading2 => self.parse_section_headings(token, asg, 1),
-            TokenType::Heading3 => self.parse_section_headings(token, asg, 2),
-            TokenType::Heading4 => self.parse_section_headings(token, asg, 3),
-            TokenType::Heading5 => self.parse_section_headings(token, asg, 4),
+            TokenType::Heading2 => self.parse_section_headings(token, 1),
+            TokenType::Heading3 => self.parse_section_headings(token, 2),
+            TokenType::Heading4 => self.parse_section_headings(token, 3),
+            TokenType::Heading5 => self.parse_section_headings(token, 4),
 
             // document attributes
             TokenType::Attribute => self.parse_attribute(token),
@@ -379,6 +379,10 @@ impl Parser {
                 }
                 self.in_document_header = false
             } else {
+                println!("\nstack at newline: ");
+                for block in &self.block_stack {
+                    println!("\n{:?}", block);
+                }
                 // consolidate any dangling list items
                 if let Some(Block::ListItem(_)) = self.block_stack.last() {
                     self.add_last_list_item_to_list();
@@ -624,32 +628,8 @@ impl Parser {
         }
     }
 
-    fn parse_section_headings(&mut self, token: Token, asg: &mut Asg, level: usize) {
-        if let Some(matched_section_idx) = self.block_stack.iter().rposition(|block| match block {
-            Block::Section(section) => section.level == level,
-            _ => false,
-        }) {
-            let mut matched_section = self.block_stack.remove(matched_section_idx);
-            let mut blocks_to_add =
-                VecDeque::from_iter(self.block_stack.drain(matched_section_idx..));
-            println!("{:?}", blocks_to_add);
-            while !blocks_to_add.is_empty() {
-                matched_section.push_block(blocks_to_add.pop_front().unwrap());
-            }
-            self.add_to_block_stack_or_graph(asg, matched_section);
-        } else if let Some(last_block) = self.block_stack.pop() {
-            if matches!(last_block, Block::Section(_)) {
-                if last_block.level_check().unwrap_or(999) >= level {
-                    self.add_to_block_stack_or_graph(asg, last_block)
-                } else {
-                    self.push_block_to_stack(last_block)
-                }
-            } else {
-                self.push_block_to_stack(last_block)
-            }
-        }
-
-        // always add new sections directly to the block stack
+    fn parse_section_headings(&mut self, token: Token, level: usize) {
+        // add the new section to the stack
         self.push_block_to_stack(Block::Section(Section::new(
             "".to_string(),
             level,
@@ -1100,9 +1080,9 @@ impl Parser {
                 .rposition(|inline| inline.is_open())
             else {
                 error!("Unknown error with mismatched inline style delimiters");
-                std::process::exit(70)  // this might be useful to the user as opposed to a
-                // panic; exit code 70 is, I read, sometimes used for "EX_SOFTWARE", "Internal
-                // Software Error"
+                std::process::exit(70) // this might be useful to the user as opposed to a
+                                       // panic; exit code 70 is, I read, sometimes used for "EX_SOFTWARE", "Internal
+                                       // Software Error"
             };
             let mut open_span = self.inline_stack.remove(open_span_idx).unwrap();
             let open_span_literal = open_span.produce_literal_from_self();
@@ -1231,7 +1211,7 @@ impl Parser {
 
     fn add_to_block_stack_or_graph(&mut self, asg: &mut Asg, mut block: Block) {
         if let Some(last_block) = self.block_stack.last_mut() {
-            if last_block.can_be_parent() {
+            if last_block.takes_block_of_type(&block) {
                 last_block.push_block(block);
                 return;
             }
@@ -1246,7 +1226,7 @@ impl Parser {
     fn add_last_to_block_stack_or_graph(&mut self, asg: &mut Asg) {
         if let Some(last_block) = self.block_stack.pop() {
             if let Some(prior_block) = self.block_stack.last_mut() {
-                if prior_block.can_be_parent() {
+                if prior_block.takes_block_of_type(&last_block) {
                     prior_block.push_block(last_block);
                     return;
                 }
@@ -1264,18 +1244,8 @@ impl Parser {
                 self.metadata = None;
             }
             if let Some(next_last_block) = self.block_stack.last_mut() {
-                if matches!(block, Block::ListItem(_)) {
-                    // sanity check
-                    if matches!(next_last_block, Block::List(_)) {
-                        next_last_block.push_block(block);
-                    } else {
-                        panic!("Dangling list item: missing parent list: {}", block.line())
-                    }
-                } else if matches!(block, Block::DListItem(_)) {
+                if next_last_block.takes_block_of_type(&block) {
                     next_last_block.push_block(block);
-                } else if next_last_block.can_be_parent() {
-                    next_last_block.push_block(block);
-                    return;
                 } else {
                     asg.push_block(block)
                 }

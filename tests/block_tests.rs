@@ -65,7 +65,7 @@ fn test_simple_heading_sections(#[case] heading_markup: &str, #[case] section_le
 #[rstest]
 #[case::nested_two_in_one("blocks/nested-headings")]
 #[case::nested_two_in_one_multiple("blocks/nested-headings-multiple")]
-fn test_nexted_sections(#[case] fn_pattern: &str) {
+fn test_nested_sections(#[case] fn_pattern: &str) {
     let adoc_fn = format!("{}.adoc", fn_pattern);
     let asg_json_fn = format!("{}.json", fn_pattern);
     assert_parsed_doc_matches_expected_asg(&adoc_fn, &asg_json_fn)

@@ -116,16 +116,23 @@ impl Block {
         }
     }
 
-    pub fn can_be_parent(&self) -> bool {
-        matches!(
-            self,
-            Block::Section(_)
-                | Block::ParentBlock(_)
-                | Block::List(_)
-                | Block::ListItem(_)
-                | Block::DList(_)
-                | Block::DListItem(_)
-        )
+    pub fn takes_block_of_type(&self, block: &Block) -> bool {
+        match self {
+            Block::Section(check) => {
+                if let Some(block_level) = block.level_check() {
+                    // higher-level sections can take lower-level sections
+                    check.level < block_level
+                } else {
+                    true
+                }
+            }
+            Block::List(_) => matches!(block, Block::ListItem(_)),
+            Block::DList(_) => matches!(block, Block::DListItem(_)),
+            Block::ParentBlock(_)
+            | Block::ListItem(_)
+            | Block::DListItem(_) => true,
+            _ => false,
+        }
     }
 
     pub fn is_section(&self) -> bool {
