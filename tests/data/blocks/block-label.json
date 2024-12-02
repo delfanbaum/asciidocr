@@ -17,11 +17,11 @@
             {
               "name": "text",
               "type": "string",
-              "value": "[source,py]\n\nprint(f\"Hello, {name}!\")\n",
+              "value": "\nprint(f\"Hello, {name}!\")\n",
               "location": [
                 {
-                  "line": 3,
-                  "col": 1
+                  "line": 4,
+                  "col": 5
                 },
                 {
                   "line": 5,
@@ -30,6 +30,23 @@
               ]
             }
           ],
+          "metadata": {
+            "attributes": {
+              "language": "py"
+            },
+            "options": [],
+            "roles": [],
+            "location": [
+              {
+                "line": 3,
+                "col": 1
+              },
+              {
+                "line": 3,
+                "col": 11
+              }
+            ]
+          },
           "location": [
             {
               "line": 4,

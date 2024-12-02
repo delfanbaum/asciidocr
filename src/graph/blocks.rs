@@ -133,6 +133,13 @@ impl Block {
         matches!(self, Block::Section(_))
     }
 
+    pub fn is_source_block(&self) -> bool {
+        match self {
+            Block::LeafBlock(block) => block.name == LeafBlockName::Listing,
+            _ => false,
+        }
+    }
+
     pub fn level_check(&self) -> Option<usize> {
         match self {
             Block::Section(section) => Some(section.level),
@@ -153,7 +160,7 @@ impl Block {
 
     pub fn is_ordered_list_item(&self) -> bool {
         match self {
-            Block::ListItem(list) => list.marker == *".",
+            Block::ListItem(list) => list.marker == *"." || list.marker.contains('<'),
             _ => false,
         }
     }
@@ -245,16 +252,10 @@ impl Block {
 
     pub fn title(&self) -> Option<Vec<Inline>> {
         match self {
-            Block::Section(block) => {
-                Some(block.inlines.clone())
-            }
-            Block::ParentBlock(block) => {
-                Some(block.title.clone())
-            }
-            Block::BlockMacro(block) => {
-                Some(block.caption.clone())
-            }
-            _ => None
+            Block::Section(block) => Some(block.inlines.clone()),
+            Block::ParentBlock(block) => Some(block.title.clone()),
+            Block::BlockMacro(block) => Some(block.caption.clone()),
+            _ => None,
         }
     }
 
@@ -296,12 +297,8 @@ impl Block {
                     inlines.extend(child.inlines())
                 }
             }
-            Block::LeafBlock(block) => {
-                inlines.extend(block.inlines.iter_mut())
-            }
-            Block::TableCell(block) => {
-                inlines.extend(block.inlines.iter_mut())
-            }
+            Block::LeafBlock(block) => inlines.extend(block.inlines.iter_mut()),
+            Block::TableCell(block) => inlines.extend(block.inlines.iter_mut()),
             _ => {} // remaining blocks don't have inlines
         }
 
@@ -405,14 +402,13 @@ impl Block {
         }
     }
 
-    pub fn id_hashes(&self)-> HashMap<String, Vec<Inline>> {
+    pub fn id_hashes(&self) -> HashMap<String, Vec<Inline>> {
         let mut block_id_hash = HashMap::new();
-        if let Some(id) = self.id(){
-            if let Some(title)= self.title() {
+        if let Some(id) = self.id() {
+            if let Some(title) = self.title() {
                 block_id_hash.insert(id, title);
             } else {
                 block_id_hash.insert(id, vec![]);
-
             }
         }
         match self {
@@ -446,7 +442,7 @@ impl Block {
                     block_id_hash.extend(child.id_hashes());
                 }
             }
-            _=> {}
+            _ => {}
         }
         block_id_hash
     }

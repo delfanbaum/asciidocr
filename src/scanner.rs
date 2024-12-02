@@ -70,6 +70,12 @@ impl<'a> Scanner<'a> {
                     self.add_token(TokenType::PageBreak, false, 0)
                 } else if self.peek() == '<' {
                     self.add_cross_reference()
+                } else if self.starts_new_line() && self.starts_code_callout_list_item() {
+                    self.current += 1; // consume the space char
+                    self.add_token(TokenType::CodeCalloutListItem, true, 0)
+                } else if self.starts_code_callout() {
+                    self.add_token(TokenType::CodeCallout, true, 0)
+                // else if ...
                 } else {
                     self.add_text_until_next_markup()
                 }
@@ -482,13 +488,6 @@ impl<'a> Scanner<'a> {
         self.add_token(TokenType::Text, true, 0)
     }
 
-    fn starts_new_block(&self) -> bool {
-        self.start == 0
-            || self.start >= 2 // guarding against very short, silly documents (tests)
-                && self.source.as_bytes()[self.start - 2] == b'\n'
-                && self.source.as_bytes()[self.start - 1] == b'\n'
-    }
-
     fn starts_new_line(&self) -> bool {
         self.start == 0 || self.source.as_bytes()[self.start - 1] == b'\n'
     }
@@ -569,13 +568,38 @@ impl<'a> Scanner<'a> {
         while self.peek() != '\n' && !self.is_at_end() {
             self.current += 1;
         }
-        if self.starts_new_block() && self.source.as_bytes()[self.current - 1] as char == ']' {
+        // handle "only on new block save after comment" in the parser
+        if self.starts_new_line() && self.source.as_bytes()[self.current - 1] as char == ']' {
             // i.e., the end of an attribute list line
             true
         } else {
             self.current = current_placeholder;
             false
         }
+    }
+
+    fn starts_code_callout_list_item(&mut self) -> bool {
+        while self.peek() != '>' {
+            if self.peek().is_digit(10) {
+                self.current += 1;
+            } else {
+                return false;
+            }
+        }
+        self.current += 1;
+        self.peek() == ' ' // next must be a space
+    }
+
+    fn starts_code_callout(&mut self) -> bool {
+        while self.peek() != '>' {
+            if self.peek().is_digit(10) {
+                self.current += 1;
+            } else {
+                return false;
+            }
+        }
+        self.current += 1;
+        self.peek() == '\n' // callouts MUST be last chars in line
     }
 
     fn is_at_end(&self) -> bool {
@@ -1749,6 +1773,54 @@ mod tests {
                 endcol: 16,
                 file_stack: vec![],
             },
+        ];
+        scan_and_assert_eq(&markup, expected_tokens);
+    }
+
+    #[test]
+    fn picks_up_code_callouts_behind_inline_comment() {
+        let markup = "bar // <1>\n";
+        let expected_tokens = vec![
+            Token::new_default(
+                TokenType::Text,
+                "bar // ".to_string(),
+                Some("bar // ".to_string()),
+                1,
+                1,
+                7,
+            ),
+            Token::new_default(
+                TokenType::CodeCallout,
+                "<1>".to_string(),
+                Some("<1>".to_string()),
+                1,
+                8,
+                10,
+            ),
+            Token::new_default(TokenType::NewLineChar, "\n".to_string(), None, 1, 11, 11),
+        ];
+        scan_and_assert_eq(&markup, expected_tokens);
+    }
+    #[test]
+    fn code_callout_list() {
+        let markup = "<1> Bar";
+        let expected_tokens = vec![
+            Token::new_default(
+                TokenType::CodeCalloutListItem,
+                "<1> ".to_string(),
+                Some("<1> ".to_string()),
+                1,
+                1,
+                4,
+            ),
+            Token::new_default(
+                TokenType::Text,
+                "Bar".to_string(),
+                Some("Bar".to_string()),
+                1,
+                5,
+                7,
+            ),
         ];
         scan_and_assert_eq(&markup, expected_tokens);
     }
