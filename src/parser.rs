@@ -625,14 +625,30 @@ impl Parser {
     }
 
     fn parse_section_headings(&mut self, token: Token, asg: &mut Asg, level: usize) {
-        // if the last block is a section of the same level, push it up
-        if let Some(last_block) = self.block_stack.pop() {
-            if last_block.level_check().unwrap_or(999) == level {
-                self.add_to_block_stack_or_graph(asg, last_block)
+        if let Some(matched_section_idx) = self.block_stack.iter().rposition(|block| match block {
+            Block::Section(section) => section.level == level,
+            _ => false,
+        }) {
+            let mut matched_section = self.block_stack.remove(matched_section_idx);
+            let mut blocks_to_add =
+                VecDeque::from_iter(self.block_stack.drain(matched_section_idx..));
+            println!("{:?}", blocks_to_add);
+            while !blocks_to_add.is_empty() {
+                matched_section.push_block(blocks_to_add.pop_front().unwrap());
+            }
+            self.add_to_block_stack_or_graph(asg, matched_section);
+        } else if let Some(last_block) = self.block_stack.pop() {
+            if matches!(last_block, Block::Section(_)) {
+                if last_block.level_check().unwrap_or(999) >= level {
+                    self.add_to_block_stack_or_graph(asg, last_block)
+                } else {
+                    self.push_block_to_stack(last_block)
+                }
             } else {
                 self.push_block_to_stack(last_block)
             }
         }
+
         // always add new sections directly to the block stack
         self.push_block_to_stack(Block::Section(Section::new(
             "".to_string(),
