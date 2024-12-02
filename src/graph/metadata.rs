@@ -193,51 +193,47 @@ impl ElementMetadata {
                     }
                 }
                 Err(_) => {
-                    // i.e., is not a named attribute
-                    if attribute.len() > 2 {
+                    if idx == 0 && attribute.len() >= 2 {
                         match &attribute[..2] {
                             "so" | "qu" | "ve" => {
                                 self.declared_type = AttributeType::from_str(attribute);
+                                continue;
                             }
-                            _ => {
-                                match self.declared_type {
-                                    Some(AttributeType::Source) => {
-                                        if idx == 1 {
-                                            self.attributes.insert(
-                                                String::from("language"),
-                                                attribute.trim().into(),
-                                            );
-                                        }
-                                    }
-                                    Some(AttributeType::Quote) | Some(AttributeType::Verse) => {
-                                        if idx == 1 {
-                                            self.attributes.insert(
-                                                String::from("attribution"),
-                                                String::from(attribute.trim()),
-                                            );
-                                        } else if idx == 2 {
-                                            self.attributes.insert(
-                                                String::from("citation"),
-                                                String::from(attribute.trim()),
-                                            );
-                                        } else {
-                                            todo!(); // or panic?
-                                        }
-                                    }
-                                    _ => {
-                                        if attribute.starts_with('"') {
-                                            *attribute = &attribute[1..attribute.len() - 1]
-                                        }
-                                        self.attributes.insert(
-                                            format!("positional_{}", idx + 1),
-                                            attribute.to_string(),
-                                        );
-                                    }
-                                }
-                            }
+                            _ => self.process_attribute(idx, attribute),
                         }
+                    } else if !attribute.is_empty() {
+                        self.process_attribute(idx, attribute);
                     }
                 }
+            }
+        }
+    }
+
+    fn process_attribute(&mut self, idx: usize, attribute: &mut &str) {
+        match self.declared_type {
+            Some(AttributeType::Source) => {
+                if idx == 1 {
+                    self.attributes
+                        .insert(String::from("language"), attribute.trim().into());
+                }
+            }
+            Some(AttributeType::Quote) | Some(AttributeType::Verse) => {
+                if idx == 1 {
+                    self.attributes
+                        .insert(String::from("attribution"), String::from(attribute.trim()));
+                } else if idx == 2 {
+                    self.attributes
+                        .insert(String::from("citation"), String::from(attribute.trim()));
+                } else {
+                    todo!(); // or panic?
+                }
+            }
+            _ => {
+                if attribute.starts_with('"') {
+                    *attribute = &attribute[1..attribute.len() - 1]
+                }
+                self.attributes
+                    .insert(format!("positional_{}", idx + 1), attribute.to_string());
             }
         }
     }
