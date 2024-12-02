@@ -84,7 +84,6 @@ impl Block {
                     && !matches!(block, Block::TableCell(_))
                 {
                     // sanity-guard
-                    println!("{:?}", block);
                     panic!("Attempted to add something other than a TableCell to a Table")
                 } else {
                     parent_block.blocks.push(block)
@@ -202,7 +201,7 @@ impl Block {
                         metadata.options.push("header".to_string());
                         table.metadata = Some(metadata)
                     }
-                } else {
+                } 
                     // count for implicit column designation
                     let cols = table.blocks.iter().fold(0usize, |acc, block| {
                         acc + (block.line() == first_cell_line) as usize
@@ -220,7 +219,7 @@ impl Block {
                             .insert("cols".to_string(), format!("{cols}"));
                         table.metadata = Some(metadata)
                     }
-                }
+                
             }
             // FOR NOW, make the cols an integer for easier templating.
             let Some(ref mut metadata) = table.metadata else {

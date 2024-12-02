@@ -1,0 +1,7 @@
+[[example_table]]
+.Some table caption
+[options="header"]
+|===
+|Col 1 |Col 2 | Col 3
+|Col 1 |Col 2 | Col 3
+|===
