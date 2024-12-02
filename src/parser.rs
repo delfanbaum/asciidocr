@@ -448,27 +448,30 @@ impl Parser {
             resolved_target = self.origin_directory.clone();
             // may as well follow the rabbit hole
             for file in self.file_stack.iter() {
-                match PathBuf::from_str(file).unwrap().parent() {
-                    Some(parent) => resolved_target.push(parent),
-                    None => {}
+                if let Some(parent) = PathBuf::from_str(file).unwrap().parent() {
+                    resolved_target.push(parent)
                 }
             }
             resolved_target = resolved_target
                 .join(target.clone())
                 .canonicalize()
-                .expect(&format!(
-                    "Uanble to canonicalize include path: {:?}",
-                    self.origin_directory.join(target.clone())
-                ));
+                .unwrap_or_else(|_| {
+                    panic!(
+                        "Uanble to canonicalize include path: {:?}",
+                        self.origin_directory.join(target.clone())
+                    )
+                });
         } else {
             resolved_target = self
                 .origin_directory
                 .join(target.clone())
                 .canonicalize()
-                .expect(&format!(
-                    "Uanble to canonicalize include path: {:?}",
-                    self.origin_directory.join(target.clone())
-                ));
+                .unwrap_or_else(|_| {
+                    panic!(
+                        "Uanble to canonicalize include path: {:?}",
+                        self.origin_directory.join(target.clone())
+                    )
+                });
         }
         self.file_stack.push(target.clone());
 
@@ -919,7 +922,6 @@ impl Parser {
                     open_leaf.add_locations(token.locations().clone());
                     self.push_block_to_stack(open_leaf);
                     self.open_parse_after_as_text_type = None;
-                    return;
                 }
                 None => panic!("Invalid open_parse_after_as_text_type occurance"),
             };

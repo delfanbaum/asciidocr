@@ -450,90 +450,63 @@ impl Block {
         match self {
             Block::Section(block) => {
                 if let Some(metadata) = &block.metadata {
-                    match metadata.attributes.get("id") {
-                        Some(id) => Some(id.clone()),
-                        None => None,
-                    }
+                    metadata.attributes.get("id").cloned()
                 } else {
                     None
                 }
             }
             Block::List(block) => {
                 if let Some(metadata) = &block.metadata {
-                    match metadata.attributes.get("id") {
-                        Some(id) => Some(id.clone()),
-                        None => None,
-                    }
+                    metadata.attributes.get("id").cloned()
                 } else {
                     None
                 }
             }
             Block::ListItem(block) => {
                 if let Some(metadata) = &block.metadata {
-                    match metadata.attributes.get("id") {
-                        Some(id) => Some(id.clone()),
-                        None => None,
-                    }
+                    metadata.attributes.get("id").cloned()
                 } else {
                     None
                 }
             }
             Block::DList(block) => {
                 if let Some(metadata) = &block.metadata {
-                    match metadata.attributes.get("id") {
-                        Some(id) => Some(id.clone()),
-                        None => None,
-                    }
+                    metadata.attributes.get("id").cloned()
                 } else {
                     None
                 }
             }
             Block::DListItem(block) => {
                 if let Some(metadata) = &block.metadata {
-                    match metadata.attributes.get("id") {
-                        Some(id) => Some(id.clone()),
-                        None => None,
-                    }
+                    metadata.attributes.get("id").cloned()
                 } else {
                     None
                 }
             }
             Block::BlockMacro(block) => {
                 if let Some(metadata) = &block.metadata {
-                    match metadata.attributes.get("id") {
-                        Some(id) => Some(id.clone()),
-                        None => None,
-                    }
+                    metadata.attributes.get("id").cloned()
                 } else {
                     None
                 }
             }
             Block::LeafBlock(block) => {
                 if let Some(metadata) = &block.metadata {
-                    match metadata.attributes.get("id") {
-                        Some(id) => Some(id.clone()),
-                        None => None,
-                    }
+                    metadata.attributes.get("id").cloned()
                 } else {
                     None
                 }
             }
             Block::ParentBlock(block) => {
                 if let Some(metadata) = &block.metadata {
-                    match metadata.attributes.get("id") {
-                        Some(id) => Some(id.clone()),
-                        None => None,
-                    }
+                    metadata.attributes.get("id").cloned()
                 } else {
                     None
                 }
             }
             Block::TableCell(block) => {
                 if let Some(metadata) = &block.metadata {
-                    match metadata.attributes.get("id") {
-                        Some(id) => Some(id.clone()),
-                        None => None,
-                    }
+                    metadata.attributes.get("id").cloned()
                 } else {
                     None
                 }

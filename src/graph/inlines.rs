@@ -246,17 +246,14 @@ impl Inline {
     }
 
     pub fn attempt_xref_standardization(&mut self, id_hash: &HashMap<String, Vec<Inline>>) {
-        match self {
-            Inline::InlineRef(iref) => {
-                if matches!(iref.variant, InlineRefVariant::Xref) {
-                    if let Some(ref_text) = id_hash.get(&iref.target) {
-                        iref.inlines = ref_text.clone()
-                    } else {
-                        warn!("Unable to find xref: {}", iref.target)
-                    }
+        if let Inline::InlineRef(iref) = self {
+            if matches!(iref.variant, InlineRefVariant::Xref) {
+                if let Some(ref_text) = id_hash.get(&iref.target) {
+                    iref.inlines = ref_text.clone()
+                } else {
+                    warn!("Unable to find xref: {}", iref.target)
                 }
             }
-            _ => {}
         }
     }
 }
@@ -365,7 +362,7 @@ impl InlineSpan {
                     .inlines
                     .push(Inline::InlineLiteral(InlineLiteral::new(
                         InlineLiteralName::Text,
-                        format!("({})", token.text()[1..token.text().len() - 1].to_string()),
+                        format!("({})", &token.text()[1..token.text().len() - 1]),
                         token.locations(),
                     )));
                 code_span

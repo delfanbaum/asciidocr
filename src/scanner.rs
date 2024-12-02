@@ -580,7 +580,7 @@ impl<'a> Scanner<'a> {
 
     fn starts_code_callout_list_item(&mut self) -> bool {
         while self.peek() != '>' {
-            if self.peek().is_digit(10) {
+            if self.peek().is_ascii_digit() {
                 self.current += 1;
             } else {
                 return false;
@@ -592,7 +592,7 @@ impl<'a> Scanner<'a> {
 
     fn starts_code_callout(&mut self) -> bool {
         while self.peek() != '>' {
-            if self.peek().is_digit(10) {
+            if self.peek().is_ascii_digit(){
                 self.current += 1;
             } else {
                 return false;
