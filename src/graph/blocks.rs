@@ -193,6 +193,7 @@ impl Block {
             // designation
             let first_cell_line = table.blocks[0].line();
             if first_cell_line == table.blocks[1].line() {
+                // check for an implicit header
                 if first_cell_line == table.location[0].line + 1 {
                     if let Some(ref mut metadata) = table.metadata {
                         metadata.options.push("header".to_string());
@@ -201,25 +202,24 @@ impl Block {
                         metadata.options.push("header".to_string());
                         table.metadata = Some(metadata)
                     }
-                } 
-                    // count for implicit column designation
-                    let cols = table.blocks.iter().fold(0usize, |acc, block| {
-                        acc + (block.line() == first_cell_line) as usize
-                    });
-                    if let Some(ref mut metadata) = table.metadata {
-                        if !metadata.attributes.contains_key("cols") {
-                            metadata
-                                .attributes
-                                .insert("cols".to_string(), format!("{cols}"));
-                        }
-                    } else {
-                        let mut metadata = ElementMetadata::default();
+                }
+                // count for implicit column designation
+                let cols = table.blocks.iter().fold(0usize, |acc, block| {
+                    acc + (block.line() == first_cell_line) as usize
+                });
+                if let Some(ref mut metadata) = table.metadata {
+                    if !metadata.attributes.contains_key("cols") {
                         metadata
                             .attributes
                             .insert("cols".to_string(), format!("{cols}"));
-                        table.metadata = Some(metadata)
                     }
-                
+                } else {
+                    let mut metadata = ElementMetadata::default();
+                    metadata
+                        .attributes
+                        .insert("cols".to_string(), format!("{cols}"));
+                    table.metadata = Some(metadata)
+                }
             }
             // FOR NOW, make the cols an integer for easier templating.
             let Some(ref mut metadata) = table.metadata else {
