@@ -1,0 +1,268 @@
+{
+  "name": "document",
+  "type": "block",
+  "blocks": [
+    {
+      "name": "listing",
+      "type": "block",
+      "form": "delimited",
+      "delimiter": "----",
+      "inlines": [
+        {
+          "name": "text",
+          "type": "string",
+          "value": "\ndef hello(name: str):  # ",
+          "location": [
+            {
+              "line": 2,
+              "col": 5
+            },
+            {
+              "line": 3,
+              "col": 25
+            }
+          ]
+        },
+        {
+          "name": "span",
+          "type": "inline",
+          "variant": "strong",
+          "form": "constrained",
+          "inlines": [
+            {
+              "name": "text",
+              "type": "string",
+              "value": "(1)",
+              "location": [
+                {
+                  "line": 3,
+                  "col": 26
+                },
+                {
+                  "line": 3,
+                  "col": 28
+                }
+              ]
+            }
+          ],
+          "metadata": {
+            "attributes": {},
+            "options": [],
+            "roles": [
+              "conum"
+            ],
+            "location": []
+          },
+          "location": [
+            {
+              "line": 3,
+              "col": 26
+            },
+            {
+              "line": 3,
+              "col": 28
+            }
+          ]
+        },
+        {
+          "name": "text",
+          "type": "string",
+          "value": "\n\"\"\" Welcomes the person whose name is passed to the function\"\"\"\n    print(f\"Hello, {name}\")  # ",
+          "location": [
+            {
+              "line": 3,
+              "col": 29
+            },
+            {
+              "line": 5,
+              "col": 31
+            }
+          ]
+        },
+        {
+          "name": "span",
+          "type": "inline",
+          "variant": "strong",
+          "form": "constrained",
+          "inlines": [
+            {
+              "name": "text",
+              "type": "string",
+              "value": "(2)",
+              "location": [
+                {
+                  "line": 5,
+                  "col": 32
+                },
+                {
+                  "line": 5,
+                  "col": 34
+                }
+              ]
+            }
+          ],
+          "metadata": {
+            "attributes": {},
+            "options": [],
+            "roles": [
+              "conum"
+            ],
+            "location": []
+          },
+          "location": [
+            {
+              "line": 5,
+              "col": 32
+            },
+            {
+              "line": 5,
+              "col": 34
+            }
+          ]
+        },
+        {
+          "name": "text",
+          "type": "string",
+          "value": "\n",
+          "location": [
+            {
+              "line": 5,
+              "col": 35
+            },
+            {
+              "line": 5,
+              "col": 35
+            }
+          ]
+        }
+      ],
+      "metadata": {
+        "attributes": {
+          "language": "python"
+        },
+        "options": [],
+        "roles": [],
+        "location": [
+          {
+            "line": 1,
+            "col": 1
+          },
+          {
+            "line": 1,
+            "col": 16
+          }
+        ]
+      },
+      "location": [
+        {
+          "line": 2,
+          "col": 1
+        },
+        {
+          "line": 6,
+          "col": 4
+        }
+      ]
+    },
+    {
+      "name": "list",
+      "type": "block",
+      "marker": ".",
+      "variant": "ordered",
+      "items": [
+        {
+          "name": "listItem",
+          "type": "block",
+          "marker": "<1>",
+          "principal": [
+            {
+              "name": "text",
+              "type": "string",
+              "value": "This is a function definition.",
+              "location": [
+                {
+                  "line": 7,
+                  "col": 5
+                },
+                {
+                  "line": 7,
+                  "col": 34
+                }
+              ]
+            }
+          ],
+          "location": [
+            {
+              "line": 7,
+              "col": 1
+            },
+            {
+              "line": 7,
+              "col": 34
+            }
+          ]
+        },
+        {
+          "name": "listItem",
+          "type": "block",
+          "marker": "<2>",
+          "principal": [
+            {
+              "name": "text",
+              "type": "string",
+              "value": "This print statement employs an \"f-string\"",
+              "location": [
+                {
+                  "line": 8,
+                  "col": 5
+                },
+                {
+                  "line": 8,
+                  "col": 46
+                }
+              ]
+            }
+          ],
+          "location": [
+            {
+              "line": 8,
+              "col": 1
+            },
+            {
+              "line": 8,
+              "col": 46
+            }
+          ]
+        }
+      ],
+      "metadata": {
+        "attributes": {},
+        "options": [],
+        "roles": [
+          "colist"
+        ],
+        "location": []
+      },
+      "location": [
+        {
+          "line": 7,
+          "col": 1
+        },
+        {
+          "line": 8,
+          "col": 46
+        }
+      ]
+    }
+  ],
+  "location": [
+    {
+      "line": 1,
+      "col": 1
+    },
+    {
+      "line": 8,
+      "col": 46
+    }
+  ]
+}

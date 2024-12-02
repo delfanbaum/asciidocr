@@ -274,14 +274,14 @@ impl Parser {
             }
             TokenType::SourceBlock => self.parse_delimited_leaf_block(token),
             TokenType::CodeCallout => self.parse_code_callout(token),
-            TokenType::CodeCalloutListItem => todo!(),
 
             // block macros
             TokenType::BlockImageMacro => self.parse_block_image(token, asg),
 
             // lists
             TokenType::UnorderedListItem => self.parse_unordered_list_item(token),
-            TokenType::OrderedListItem => self.parse_ordered_list_item(token),
+            TokenType::CodeCalloutListItem | // for now, match here (until we need to do more)
+            TokenType::OrderedListItem => self.parse_ordered_list_item(token, asg),
             TokenType::DescriptionListMarker => self.parse_description_list_term(token),
 
             // inline admonitions
@@ -358,7 +358,7 @@ impl Parser {
         // newline exits a title, TK line continuation
         self.in_block_line = false;
 
-        // if we had a block title, let's clean that out
+        // if there is a block title, add the inline stack to the title
         if let Some(ref mut title_stack) = self.block_title {
             while !self.inline_stack.is_empty() {
                 let inline = self.inline_stack.pop_front().unwrap();
@@ -541,7 +541,7 @@ impl Parser {
         self.preserve_newline_text = true;
     }
 
-    fn parse_ordered_list_item(&mut self, token: Token) {
+    fn parse_ordered_list_item(&mut self, token: Token, asg: &mut Asg) {
         // clear any dangling newlines
         self.dangling_newline = None;
         let list_item = ListItem::new(token.lexeme.clone(), token.locations());
@@ -553,10 +553,19 @@ impl Parser {
             self.add_last_list_item_to_list()
         } else {
             // we need to create the list first
-            self.push_block_to_stack(Block::List(List::new(
-                ListVariant::Ordered,
-                token.locations().clone(),
-            )));
+            let mut list = List::new(ListVariant::Ordered, token.locations().clone());
+            if token.token_type() == TokenType::CodeCalloutListItem {
+                // check to see if we ought to "close" the source block (almost always)
+                // TODO source blocks should close themselves, I think.
+                if let Some(block) = self.block_stack.last() {
+                    if block.is_source_block() {
+                        // we need to add this before we create the new list
+                        self.add_last_to_block_stack_or_graph(asg);
+                    }
+                }
+                list.metadata = Some(ElementMetadata::new_with_role("colist".to_string()));
+            }
+            self.push_block_to_stack(Block::List(list));
         }
         // either way, add the new list item
         self.push_block_to_stack(Block::ListItem(list_item));
@@ -903,9 +912,17 @@ impl Parser {
 
     fn parse_delimited_leaf_block(&mut self, token: Token) {
         if self.open_parse_after_as_text_type.is_some() {
-            let open_leaf = self.block_stack.last_mut().unwrap();
-            open_leaf.add_locations(token.locations().clone());
-            self.open_parse_after_as_text_type = None;
+            // ensure inlines are added appropriately
+            self.add_inlines_to_block_stack();
+            match self.block_stack.pop() {
+                Some(mut open_leaf) => {
+                    open_leaf.add_locations(token.locations().clone());
+                    self.push_block_to_stack(open_leaf);
+                    self.open_parse_after_as_text_type = None;
+                    return;
+                }
+                None => panic!("Invalid open_parse_after_as_text_type occurance"),
+            };
         } else {
             self.open_parse_after_as_text_type = Some(token.token_type());
             let block = LeafBlock::new_from_token(token);

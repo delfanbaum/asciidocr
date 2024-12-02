@@ -488,13 +488,6 @@ impl<'a> Scanner<'a> {
         self.add_token(TokenType::Text, true, 0)
     }
 
-    fn starts_new_block(&self) -> bool {
-        self.start == 0
-            || self.start >= 2 // guarding against very short, silly documents (tests)
-                && self.source.as_bytes()[self.start - 2] == b'\n'
-                && self.source.as_bytes()[self.start - 1] == b'\n'
-    }
-
     fn starts_new_line(&self) -> bool {
         self.start == 0 || self.source.as_bytes()[self.start - 1] == b'\n'
     }
@@ -575,7 +568,8 @@ impl<'a> Scanner<'a> {
         while self.peek() != '\n' && !self.is_at_end() {
             self.current += 1;
         }
-        if self.starts_new_block() && self.source.as_bytes()[self.current - 1] as char == ']' {
+        // handle "only on new block save after comment" in the parser
+        if self.starts_new_line() && self.source.as_bytes()[self.current - 1] as char == ']' {
             // i.e., the end of an attribute list line
             true
         } else {
