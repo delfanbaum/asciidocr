@@ -23,14 +23,11 @@
           "name": "text",
           "type": "string",
           "value": "Section Title",
-          "location": [ { "line": 1, "col": 4,
-              "file": [
+          "location": [ { "line": 1, "col": 4, "file": [
                 "nested-headings-multiple.adoc"
               ]
             },
-            { "line": 1, "col": 16,
-              "file": [
-                "nested-headings-multiple.adoc"
+            { "line": 1, "col": 16, "file": [ "nested-headings-multiple.adoc"
               ]
             }
           ]
@@ -51,8 +48,7 @@
                     "nested-headings-multiple.adoc"
                   ]
                 },
-                { "line": 3, "col": 8,
-                  "file": [
+                { "line": 3, "col": 8, "file": [
                     "nested-headings-multiple.adoc"
                   ]
                 }
@@ -107,7 +103,7 @@
                 {
                   "name": "text",
                   "type": "string",
-                  "value": "Contents",
+                  "value": "Contents of nested",
                   "location": [
                     {
                       "line": 7, "col": 1,
@@ -116,7 +112,7 @@
                       ]
                     },
                     {
-                      "line": 7, "col": 8,
+                      "line": 7, "col": 18,
                       "file": [
                         "nested-headings-multiple.adoc"
                       ]
@@ -132,7 +128,7 @@
                   ]
                 },
                 {
-                  "line": 7, "col": 8,
+                  "line": 7, "col": 18,
                   "file": [
                     "nested-headings-multiple.adoc"
                   ]
@@ -142,13 +138,15 @@
           ],
           "location": [
             {
-              "line": 5, "col": 1,
+              "line": 5,
+              "col": 1,
               "file": [
                 "nested-headings-multiple.adoc"
               ]
             },
             {
-              "line": 7, "col": 8,
+              "line": 7,
+              "col": 18,
               "file": [
                 "nested-headings-multiple.adoc"
               ]
@@ -165,13 +163,15 @@
               "value": "Nested Section Title",
               "location": [
                 {
-                  "line": 9, "col": 5,
+                  "line": 9,
+                  "col": 5,
                   "file": [
                     "nested-headings-multiple.adoc"
                   ]
                 },
                 {
-                  "line": 9, "col": 24,
+                  "line": 9,
+                  "col": 24,
                   "file": [
                     "nested-headings-multiple.adoc"
                   ]
@@ -188,16 +188,18 @@
                 {
                   "name": "text",
                   "type": "string",
-                  "value": "Contents",
+                  "value": "Contents of nested at same level",
                   "location": [
                     {
-                      "line": 11, "col": 1,
+                      "line": 11,
+                      "col": 1,
                       "file": [
                         "nested-headings-multiple.adoc"
                       ]
                     },
                     {
-                      "line": 11, "col": 8,
+                      "line": 11,
+                      "col": 32,
                       "file": [
                         "nested-headings-multiple.adoc"
                       ]
@@ -207,13 +209,15 @@
               ],
               "location": [
                 {
-                  "line": 11, "col": 1,
+                  "line": 11,
+                  "col": 1,
                   "file": [
                     "nested-headings-multiple.adoc"
                   ]
                 },
                 {
-                  "line": 11, "col": 8,
+                  "line": 11,
+                  "col": 32,
                   "file": [
                     "nested-headings-multiple.adoc"
                   ]
@@ -223,13 +227,15 @@
           ],
           "location": [
             {
-              "line": 9, "col": 1,
+              "line": 9,
+              "col": 1,
               "file": [
                 "nested-headings-multiple.adoc"
               ]
             },
             {
-              "line": 11, "col": 8,
+              "line": 11,
+              "col": 32,
               "file": [
                 "nested-headings-multiple.adoc"
               ]
@@ -239,13 +245,15 @@
       ],
       "location": [
         {
-          "line": 1, "col": 1,
+          "line": 1,
+          "col": 1,
           "file": [
             "nested-headings-multiple.adoc"
           ]
         },
         {
-          "line": 11, "col": 8,
+          "line": 11,
+          "col": 32,
           "file": [
             "nested-headings-multiple.adoc"
           ]
@@ -260,11 +268,38 @@
           "name": "text",
           "type": "string",
           "value": "And then some final content back in the original file.",
-          "location": [ { "line": 6, "col": 1 }, { "line": 6, "col": 54 } ]
+          "location": [
+            {
+              "line": 6,
+              "col": 1
+            },
+            {
+              "line": 6,
+              "col": 54
+            }
+          ]
         }
       ],
-      "location": [ { "line": 6, "col": 1 }, { "line": 6, "col": 54 } ]
+      "location": [
+        {
+          "line": 6,
+          "col": 1
+        },
+        {
+          "line": 6,
+          "col": 54
+        }
+      ]
     }
   ],
-  "location": [ { "line": 1, "col": 1 }, { "line": 6, "col": 54 } ]
+  "location": [
+    {
+      "line": 1,
+      "col": 1
+    },
+    {
+      "line": 6,
+      "col": 54
+    }
+  ]
 }

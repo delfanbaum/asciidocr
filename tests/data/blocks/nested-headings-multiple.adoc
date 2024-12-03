@@ -4,8 +4,8 @@ Contents
 
 === Nested Section Title
 
-Contents
+Contents of nested
 
 === Nested Section Title
 
-Contents
+Contents of nested at same level

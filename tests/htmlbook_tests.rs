@@ -178,3 +178,12 @@ fn callout_lists() {
     let html_fn = format!("{}.html", fn_pattern);
     assert_rendered_html_matches_expected(&adoc_fn, &html_fn)
 }
+
+#[test]
+// it's just easier to reason about this in HTML than in JSON, so testing this here
+fn section_nesting() {
+    let fn_pattern = String::from("htmlbook/sections-nesting-and-close");
+    let adoc_fn = format!("{}.adoc", fn_pattern);
+    let html_fn = format!("{}.html", fn_pattern);
+    assert_rendered_html_matches_expected(&adoc_fn, &html_fn)
+}

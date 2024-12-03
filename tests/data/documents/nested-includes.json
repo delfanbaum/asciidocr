@@ -190,7 +190,7 @@
                 {
                   "name": "text",
                   "type": "string",
-                  "value": "Contents",
+                  "value": "Contents of nested",
                   "location": [
                     {
                       "line": 7,
@@ -202,7 +202,7 @@
                     },
                     {
                       "line": 7,
-                      "col": 8,
+                      "col": 18,
                       "file": [
                         "../blocks/include.adoc",
                         "nested-headings-multiple.adoc"
@@ -222,7 +222,7 @@
                 },
                 {
                   "line": 7,
-                  "col": 8,
+                  "col": 18,
                   "file": [
                     "../blocks/include.adoc",
                     "nested-headings-multiple.adoc"
@@ -242,7 +242,7 @@
             },
             {
               "line": 7,
-              "col": 8,
+              "col": 18,
               "file": [
                 "../blocks/include.adoc",
                 "nested-headings-multiple.adoc"
@@ -287,7 +287,7 @@
                 {
                   "name": "text",
                   "type": "string",
-                  "value": "Contents",
+                  "value": "Contents of nested at same level",
                   "location": [
                     {
                       "line": 11,
@@ -299,7 +299,7 @@
                     },
                     {
                       "line": 11,
-                      "col": 8,
+                      "col": 32,
                       "file": [
                         "../blocks/include.adoc",
                         "nested-headings-multiple.adoc"
@@ -319,7 +319,7 @@
                 },
                 {
                   "line": 11,
-                  "col": 8,
+                  "col": 32,
                   "file": [
                     "../blocks/include.adoc",
                     "nested-headings-multiple.adoc"
@@ -339,7 +339,7 @@
             },
             {
               "line": 11,
-              "col": 8,
+              "col": 32,
               "file": [
                 "../blocks/include.adoc",
                 "nested-headings-multiple.adoc"
@@ -359,7 +359,7 @@
         },
         {
           "line": 11,
-          "col": 8,
+          "col": 32,
           "file": [
             "../blocks/include.adoc",
             "nested-headings-multiple.adoc"
