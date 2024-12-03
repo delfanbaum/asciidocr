@@ -1,0 +1,10 @@
+Description lists serve as glossaries of terminology:
+
+someThing::
+  Returns a thing.
+someOtherThing::
+  Returns a different thing.
+someThird::
+  Takes just the first two and does a twirl.
+someFourth::
+  Returns the fourth thing.
