@@ -2,9 +2,10 @@
 //!
 //! (For information about Asciidoc, see <https://asciidoc.org/>)
 //!
-//! This crate provides a CLI tool (`asciidocr`), a Technology Compatibility Kit adapter (see
-//! <https://gitlab.eclipse.org/eclipse/asciidoc-lang/asciidoc-tck>), and library access to the
-//! parser, scanner, backends, and Abstract Syntax Graph elements.
+//! This crate provides a CLI tool (`asciidocr`) for working with/building asciidoc files, a way to
+//! interface with the official Technology Compatibility Kit adapter (see
+//! <https://gitlab.eclipse.org/eclipse/asciidoc-lang/asciidoc-tck>) via the `json` backend, and
+//! library access to the parser, scanner, backends, and Abstract Syntax Graph elements.
 //!
 //! NOTE: This crate is still in progress and nothing, including library elements, should be
 //! considered stable. If something disappears that you're interested in, please open an [`issue`].
