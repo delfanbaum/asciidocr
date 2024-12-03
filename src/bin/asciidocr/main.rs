@@ -5,11 +5,11 @@ use clap::Parser;
 use simple_logger::SimpleLogger;
 use std::{fs, path::PathBuf};
 
-use asciidocr::{
-    backends::{docx::render_docx, htmls::render_htmlbook},
-    parser::Parser as AdocParser,
-    scanner::Scanner,
-};
+use asciidocr::{backends::htmls::render_htmlbook, parser::Parser as AdocParser, scanner::Scanner};
+
+#[cfg(feature = "docx")]
+use asciidocr::backends::docx::render_docx;
+
 use cli::{read_input, read_output, Backends, Cli};
 
 fn main() {
@@ -39,6 +39,7 @@ fn run(args: Cli) -> Result<()> {
             Ok(())
         }
 
+        #[cfg(feature = "docx")]
         Backends::Docx => {
             if let Some(output_path) = read_output(args) {
                 render_docx(&graph, &output_path).expect("Error rendering docx");

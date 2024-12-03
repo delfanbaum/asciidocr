@@ -18,9 +18,19 @@ To install from source, clone and `cd` into the repo and run:
 $ cargo install --path .
 ```
 
+To include the experimental docx backend, enable the `docx` feature:
+
+```console
+$ cargo install --features "docx" asciidocr
+```
+
+```console
+$ cargo install --path . --features "docx"
+```
+
 ## Usage (Command-Line)
 
-Here's the usage:
+Here's the usage with the `docx` feature enabled:
 
 ```console
 $ asciidocr --help
@@ -50,7 +60,7 @@ Options:
           Print help (see a summary with '-h')
 ```
 
-## Features and Limitations
+## Limitations
 
 `asciidocr` currently produces "Htmlbook"-style HTML for all handled
 blocks/inlines and has _limited, experimental_ support for producing `docx` files,

@@ -6,4 +6,5 @@
 //!
 
 pub mod htmls;
+#[cfg(feature = "docx")]
 pub mod docx;
