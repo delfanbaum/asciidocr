@@ -35,7 +35,7 @@ pub struct Cli {
 pub fn read_input(args: &Cli) -> String {
     match args.file.as_str() {
         "-" => io::read_to_string(io::stdin()).expect("Error reading from stdin"),
-        _ => match fs::read_to_string(&args.file.as_str()) {
+        _ => match fs::read_to_string(args.file.as_str()) {
             Ok(file_string) => file_string,
             Err(e) => {
                 warn!("Unable to read file {:?}: {e}", &args.file.as_str());

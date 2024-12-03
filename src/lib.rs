@@ -13,7 +13,7 @@
 //! not yet implemented. Notable misses include:
 //!
 //! - Some Asciidoctor document attributes (e.g., `:toc:`, `:icons:`, etc.)
-//! - Indented source blocks 
+//! - Indented source blocks
 //! - Offsets
 //! - Tagged regions
 //! - Conditionals (`ifdef`, `ifndef`, `ifeval`)
@@ -23,14 +23,15 @@
 //! published schema, esp. in cases where it's not obvious what's to be done.
 //!
 //! Current backends (parse targets) includes:
-//! 
-//! - [`HTMLBook`] (fairly good support; can be used as a relatively "unadorned" HTML generator)
-//! - Docx (experimental and still very much in-progress; but good enough for "simple" documents without tables, images, etc.)
+//!
+//! - [`HTMLBook`]: fairly good support; can be used as a relatively "unadorned" HTML generator
+//! - Docx (behind `docx` feature):  experimental and still very much in-progress; but good enough
+//!   for "simple" documents without tables, images, etc.
 //!
 //! [`issue`]: https://github.com/delfanbaum/asciidocr/issues
 //! [`HTMLBook`]: https://oreillymedia.github.io/HTMLBook/
 
+pub mod backends;
 pub mod graph;
 pub mod parser;
 pub mod scanner;
-pub mod backends;
