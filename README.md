@@ -18,7 +18,7 @@ To install from source, clone and `cd` into the repo and run:
 $ cargo install --path .
 ```
 
-== Usage (Command-Line)
+## Usage (Command-Line)
 
 Here's the usage:
 
