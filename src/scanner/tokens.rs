@@ -209,6 +209,7 @@ pub enum TokenType {
     Strong,   // TK Handle bounded characters, e.g., **Some**thing -> <b>Some</b>thing
     Emphasis, // same applies above
     Monospace,
+    Literal,
     Mark, // #text# or [.class]#text#
 
     Superscript, // ^super^
@@ -218,6 +219,7 @@ pub enum TokenType {
     UnconstrainedStrong, // TK Handle bounded characters, e.g., **Some**thing -> <b>Some</b>thing
     UnconstrainedEmphasis, // same applies above
     UnconstrainedMonospace,
+    UnconstrainedLiteral,
     UnconstrainedMark, // #text# or [.class]#text#
 
     // inline macros

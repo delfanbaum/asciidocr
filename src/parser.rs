@@ -216,12 +216,14 @@ impl Parser {
             TokenType::Strong
             | TokenType::Mark
             | TokenType::Monospace
+            | TokenType::Literal
             | TokenType::Emphasis
             | TokenType::Superscript
             | TokenType::Subscript
             | TokenType::UnconstrainedStrong
             | TokenType::UnconstrainedMark
             | TokenType::UnconstrainedMonospace
+            | TokenType::UnconstrainedLiteral
             | TokenType::UnconstrainedEmphasis => self.parse_inline_span(Inline::InlineSpan(
                 InlineSpan::inline_span_from_token(token),
             )),

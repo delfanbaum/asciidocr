@@ -309,6 +309,11 @@ impl InlineSpan {
                 InlineSpanForm::Constrained,
                 token.locations(),
             ),
+            TokenType::Literal => Self::new(
+                InlineSpanVariant::Code,
+                InlineSpanForm::Constrained,
+                token.locations(),
+            ),
             TokenType::Mark => Self::new(
                 InlineSpanVariant::Mark,
                 InlineSpanForm::Constrained,
@@ -336,6 +341,11 @@ impl InlineSpan {
                 token.locations(),
             ),
             TokenType::UnconstrainedMonospace => Self::new(
+                InlineSpanVariant::Code,
+                InlineSpanForm::Unconstrained,
+                token.locations(),
+            ),
+            TokenType::UnconstrainedLiteral => Self::new(
                 InlineSpanVariant::Code,
                 InlineSpanForm::Unconstrained,
                 token.locations(),
