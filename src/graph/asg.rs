@@ -8,23 +8,29 @@ use super::nodes::{Header, Location, NodeTypes};
 
 /// Abstract Syntax Graph used to represent an asciidoc document
 /// roughly meaning to follow the "official" schema:
-/// https://gitlab.eclipse.org/eclipse/asciidoc-lang/asciidoc-lang/-/blob/main/asg/schema.json
+/// <https://gitlab.eclipse.org/eclipse/asciidoc-lang/asciidoc-lang/-/blob/main/asg/schema.json>
 #[derive(Serialize, Debug)]
 pub struct Asg {
-    // abstract syntax graph
-    pub name: String, // is this always "Document?"
+    /// This is always "document"
+    pub name: String,
     #[serde(rename = "type")]
-    pub node_type: NodeTypes, // is this always "block"
+    /// This is always "block"
+    pub node_type: NodeTypes,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub attributes: Option<HashMap<String, String>>, // the value can also be a bool; deal with this later
     #[serde(skip_serializing_if = "Option::is_none")]
     pub header: Option<Header>,
     #[serde(skip)]
+    /// Essentially optional (empty string for convenience), useful when creating things like
+    /// footnote references
     document_id: String,
     #[serde(skip)]
+    /// Has of all IDs in the document, and the references they point to
     document_id_hash: HashMap<String, Vec<Inline>>,
+    /// Document contents
     pub blocks: Vec<Block>,
-    pub location: Vec<Location>, // really a tuple of a "Start" location and an "end" location
+    /// Marks the start and end of document
+    pub location: Vec<Location>,
 }
 
 impl Default for Asg {

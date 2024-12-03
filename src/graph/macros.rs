@@ -2,17 +2,17 @@ use core::panic;
 use std::collections::HashMap;
 
 use crate::graph::metadata::ElementMetadata;
-use crate::tokens::Token;
+use crate::scanner::tokens::{Token, TokenType};
 
 pub fn target_and_attrs_from_token(token: &Token) -> (String, Option<ElementMetadata>) {
     let target_and_attrs = match token.token_type() {
-        crate::tokens::TokenType::BlockImageMacro => {
+        TokenType::BlockImageMacro => {
             token.text()[7..].to_string() // after image::
         }
-        crate::tokens::TokenType::InlineImageMacro => {
+        TokenType::InlineImageMacro => {
             token.text()[6..].to_string() // after image:
         }
-        crate::tokens::TokenType::Include => {
+        TokenType::Include => {
             token.text()[9..].to_string() // after include::
         }
         _ => panic!("Invalid token provided to target_and_attrs_from_token"),

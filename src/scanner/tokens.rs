@@ -1,6 +1,9 @@
 use crate::graph::nodes::Location;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+/// Produced by the Scanner; contains the text, location information about itself, and what
+/// file it came from (helpful when sorting out `include::` directives... and because its required
+/// by the official schema).
 pub struct Token {
     pub token_type: TokenType,
     //id: Option<String>,
@@ -9,7 +12,7 @@ pub struct Token {
     pub line: usize,
     pub startcol: usize,
     pub endcol: usize,
-    // the file's source, if it's an include
+    /// The file's stack hierarchy if it's an include, otherwise stays empty
     pub file_stack: Vec<String>,
 }
 
@@ -29,6 +32,7 @@ impl Default for Token {
 }
 
 impl Token {
+    /// Creates a new token
     pub fn new(
         token_type: TokenType,
         lexeme: String,
@@ -49,7 +53,7 @@ impl Token {
         }
     }
 
-    /// Testing helper; new but ignoring the file stack part
+    /// Testing helper; essentially `Token::new()` but defaulting to an empty file stack
     pub fn new_default(
         token_type: TokenType,
         lexeme: String,
@@ -69,10 +73,12 @@ impl Token {
         }
     }
 
+    /// Convince function to return the [`TokenType`] for matching
     pub fn token_type(&self) -> TokenType {
         self.token_type
     }
 
+    /// Returns the Token's text content
     pub fn text(&self) -> String {
         if let Some(text) = &self.literal {
             text.clone()
@@ -87,6 +93,7 @@ impl Token {
     pub fn last_location(&self) -> Location {
         Location::new(self.line, self.endcol, self.file_stack.clone())
     }
+
     pub fn locations(&self) -> Vec<Location> {
         vec![self.first_location(), self.last_location()]
     }
@@ -138,6 +145,7 @@ impl Token {
 // would later add pub enum Section{Preface, Introduction, etc}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// Types of Tokens that text can be; roughly equivalent to the language features of Asciidoc
 pub enum TokenType {
     // BLOCKS
     NewLineChar, // these are effectively semantic, so we should track them. Two in a row indicate
@@ -246,7 +254,7 @@ pub enum TokenType {
 }
 
 impl TokenType {
-    pub fn block_from_char(c: char) -> Self {
+    pub(crate) fn block_from_char(c: char) -> Self {
         match c {
             '+' => Self::PassthroughBlock,
             '*' => Self::SidebarBlock,
@@ -259,7 +267,7 @@ impl TokenType {
         }
     }
 
-    pub fn clears_newline_after(&self) -> bool {
+    pub(crate) fn clears_newline_after(&self) -> bool {
         matches!(
             self,
             TokenType::ElementAttributes

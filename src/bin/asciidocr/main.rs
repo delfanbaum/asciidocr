@@ -1,17 +1,16 @@
+mod cli;
+
 use anyhow::Result;
 use clap::Parser;
 use simple_logger::SimpleLogger;
 use std::{fs, path::PathBuf};
 
 use asciidocr::{
-    backends::{
-        docx::render_docx,
-        htmls::{gather_htmlbook_templates, render_from_templates},
-    },
-    cli::{read_input, read_output, Backends, Cli},
+    backends::{docx::render_docx, htmls::render_htmlbook},
     parser::Parser as AdocParser,
-    scanner::Scanner
+    scanner::Scanner,
 };
+use cli::{read_input, read_output, Backends, Cli};
 
 fn main() {
     SimpleLogger::new()
@@ -32,10 +31,7 @@ fn run(args: Cli) -> Result<()> {
     let graph = AdocParser::new(PathBuf::from(&args.file)).parse(Scanner::new(&read_input(&args)));
     match args.backend {
         Backends::Htmlbook => {
-            render_string(
-                render_from_templates(&graph, gather_htmlbook_templates())?,
-                read_output(args),
-            );
+            render_string(render_htmlbook(&graph)?, read_output(args));
             Ok(())
         }
         Backends::Json => {

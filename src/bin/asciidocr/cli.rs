@@ -1,7 +1,6 @@
 use clap::{Parser, ValueEnum};
-use std::{io, path::PathBuf};
-
-use crate::utils::open_file;
+use log::warn;
+use std::{fs, io, path::PathBuf};
 
 #[derive(Debug, ValueEnum, Clone)]
 pub enum Backends {
@@ -34,7 +33,13 @@ pub struct Cli {
 pub fn read_input(args: &Cli) -> String {
     match args.file.as_str() {
         "-" => io::read_to_string(io::stdin()).expect("Error reading from stdin"),
-        _ => open_file(&args.file),
+        _ => match fs::read_to_string(&args.file.as_str()) {
+            Ok(file_string) => file_string,
+            Err(e) => {
+                warn!("Unable to read file {:?}: {e}", &args.file.as_str());
+                std::process::exit(1)
+            }
+        },
     }
 }
 

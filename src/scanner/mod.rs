@@ -1,10 +1,12 @@
+//! The Scanner scans the asciidoc string into Tokens, which is then consumed by the Parser.
+
+pub mod tokens;
 use core::str;
-
 use log::error;
-
-use crate::tokens::{Token, TokenType};
+use tokens::{Token, TokenType};
 
 #[derive(Debug)]
+/// Scans an asciidoc `&str` into [`Token`]s to be consumed by the Parser.
 pub struct Scanner<'a> {
     pub source: &'a str,
     start: usize,
@@ -592,7 +594,7 @@ impl<'a> Scanner<'a> {
 
     fn starts_code_callout(&mut self) -> bool {
         while self.peek() != '>' {
-            if self.peek().is_ascii_digit(){
+            if self.peek().is_ascii_digit() {
                 self.current += 1;
             } else {
                 return false;
@@ -635,7 +637,7 @@ impl<'a> Scanner<'a> {
 mod tests {
     use std::char;
 
-    use crate::tokens::TokenType;
+    use crate::scanner::tokens::TokenType;
     use rstest::rstest;
 
     use super::*;

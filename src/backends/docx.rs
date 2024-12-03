@@ -10,6 +10,8 @@ use crate::graph::{
 
 static REFERENCE_DOCX: &[u8] = include_bytes!("../../templates/docx/reference.docx");
 
+/// !Experimental! Renders a Docx file based on a "manuscript" (Times New Roman, 12pt,
+/// double-spaced) template document. Some [`Asg`] blocks are still unsupported. 
 pub fn render_docx(graph: &Asg, output_path: &Path) -> DocxResult<()> {
     let cursor = Cursor::new(REFERENCE_DOCX);
     let docx = DocxFile::from_reader(cursor)?;

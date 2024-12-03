@@ -1,9 +1,8 @@
+//! Parses a stream of tokens into an [`Asg`] (Abstract Syntax Graph)
+
 use core::panic;
 use std::{
-    collections::{HashMap, VecDeque},
-    env,
-    path::PathBuf,
-    str::FromStr,
+    collections::{HashMap, VecDeque}, env, fmt::Debug, fs, path::{Path, PathBuf}, str::FromStr
 };
 
 use log::{error, warn};
@@ -18,11 +17,10 @@ use crate::graph::{
     nodes::{Header, Location},
 };
 use crate::scanner::Scanner;
-use crate::tokens::{Token, TokenType};
-use crate::utils::{is_asciidoc_file, open_file};
+use crate::scanner::tokens::{Token, TokenType};
 
-/// Parses a stream of tokens into an Abstract Syntax Graph, returning the graph once all tokens
-/// have been parsed.
+/// Parses a stream of tokens into an [`Asg`] (Abstract Syntax Graph), returning the graph once all
+/// tokens have been parsed.
 pub struct Parser {
     /// Where the parsing "starts," i.e., the adoc file passed to the script
     origin_directory: PathBuf,
@@ -85,6 +83,9 @@ impl Default for Parser {
 }
 
 impl Parser {
+    /// Initializes the parser with a "origin", which is either the current directory (in the case
+    /// of STDIN (`-`)) or the parent of the provided asciidoc file; this origin is required for
+    /// correct `include::` directive resolution.
     pub fn new(origin: PathBuf) -> Self {
         let origin_directory = origin
             .parent()
@@ -113,6 +114,7 @@ impl Parser {
         }
     }
 
+    /// Parses the stream of tokens provided by the [`Scanner`].
     pub fn parse<I>(&mut self, tokens: I) -> Asg
     where
         I: Iterator<Item = Token>,
@@ -478,7 +480,13 @@ impl Parser {
         let current_block_stack_len = self.block_stack.len();
 
         // Match filetype, if adoc scan into tokens, adding the location, then parse...
-        if is_asciidoc_file(&target) {
+        if matches!(
+            Path::new(&target)
+                .extension()
+                .unwrap_or_else(|| panic!("Invalid file path: {}", target))
+                .to_str(),
+            Some("adoc") | Some("asciidoc") | Some("txt")
+        ) {
             for token in
                 Scanner::new_with_stack(&open_file(resolved_target), self.file_stack.clone())
             {
@@ -629,7 +637,7 @@ impl Parser {
         // if the last section is at the same level, we need to push that up, otherwise the
         // accordion effect gets screwy with section levels
         if let Some(Block::Section(_)) = self.block_stack.last() {
-                self.add_last_to_block_stack_or_graph(asg)
+            self.add_last_to_block_stack_or_graph(asg)
         }
         //if let Some(Block::Section(last_section)) = self.block_stack.last() {
         //    if last_section.level >= level {
@@ -1259,6 +1267,19 @@ impl Parser {
             } else {
                 asg.push_block(block)
             }
+        }
+    }
+}
+
+fn open_file<P>(filename: P) -> String
+where
+    P: AsRef<Path> + Into<PathBuf> + Debug,
+{
+    match fs::read_to_string(&filename) {
+        Ok(file_string) => file_string,
+        Err(e) => {
+            warn!("Unable to read file {:?}: {e}", filename);
+            std::process::exit(1)
         }
     }
 }
