@@ -526,7 +526,6 @@ impl Parser {
             // then add the next terms back
             self.inline_stack.append(&mut next_terms);
         }
-        //println!("{:?}", self.block_stack);
         // collect the inlines
         while !self.inline_stack.is_empty() {
             let inline = self.inline_stack.pop_front().unwrap();
@@ -1128,8 +1127,6 @@ impl Parser {
         }
 
         if let Some(last_block) = self.block_stack.last_mut() {
-            //println!("HERE: {:?}", last_block);
-            //    println!("Check: {}, {}, {}", last_block.takes_inlines(), !self.in_block_line, !self.force_new_block);
             if last_block.takes_inlines() && !self.in_block_line && !self.force_new_block {
                 while !self.inline_stack.is_empty() {
                     let inline = self.inline_stack.pop_front().unwrap();
