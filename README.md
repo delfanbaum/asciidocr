@@ -77,9 +77,7 @@ For a more complete list of the current limitations and caveats, see
 A non-exhaustive list:
 
 * Coverage of the majority, if not all, asciidoc language features
-* Passes the
-  https://gitlab.eclipse.org/eclipse/asciidoc-lang/asciidoc-tck[language
-  compatibility toolkit] tests
+* Passes the [language compatibility toolkit](https://gitlab.eclipse.org/eclipse/asciidoc-lang/asciidoc-tck) tests
 * Clean, simple HTML output as a default with extant but minimal styling
 * Native "document" (`docx` or `odt`, probably `docx`) output in a "manuscript"
   template, like what you might send to a publisher or literary journal
@@ -90,8 +88,8 @@ A non-exhaustive list:
 Great minds think alike, and as such, a few other people are working on asciidoc
 tools in Rust now, too. Here are at least a few I know about:
 
-* https://github.com/jaredh159/asciidork[`asciidork`]
-* https://github.com/nlopes/acdc/tree/main/acdc-parser[`acdc`]
+* [`asciidork`](https://github.com/jaredh159/asciidork)
+* [`acdc`](https://github.com/nlopes/acdc/tree/main/acdc-parser)
 
 ## Known Bugs
 
