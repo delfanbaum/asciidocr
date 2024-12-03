@@ -64,7 +64,21 @@ impl Block {
 
     pub fn push_block(&mut self, block: Block) {
         match self {
-            Block::Section(section) => section.blocks.push(block),
+            Block::Section(section) => {
+                if block.is_section() {
+                    if let Some(possible_section) = section.blocks.last_mut() {
+                        if possible_section.takes_block_of_type(&block) {
+                            possible_section.push_block(block);
+                        } else {
+                            section.blocks.push(block);
+                        }
+                    } else {
+                        section.blocks.push(block);
+                    }
+                } else {
+                    section.blocks.push(block)
+                }
+            }
             Block::List(list) => list.add_item(block),
             Block::DList(list) => list.add_item(block),
             Block::ListItem(list_item) => list_item.blocks.push(block),
@@ -128,9 +142,7 @@ impl Block {
             }
             Block::List(_) => matches!(block, Block::ListItem(_)),
             Block::DList(_) => matches!(block, Block::DListItem(_)),
-            Block::ParentBlock(_)
-            | Block::ListItem(_)
-            | Block::DListItem(_) => true,
+            Block::ParentBlock(_) | Block::ListItem(_) | Block::DListItem(_) => true,
             _ => false,
         }
     }

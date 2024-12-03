@@ -14,7 +14,6 @@ Content.
 
 Content.
 
-=== This is a Top-Level Heading, and Should Note be Included in the Third-Level Heading
+=== This is a Top-Level Heading, and Should Not be Included in the Third-Level Heading
 
 Content. 
-

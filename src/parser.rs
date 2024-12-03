@@ -185,10 +185,10 @@ impl Parser {
         match token.token_type() {
             // document header, headings and section parsing
             TokenType::Heading1 => self.parse_level_0_heading(token, asg),
-            TokenType::Heading2 => self.parse_section_headings(token, 1),
-            TokenType::Heading3 => self.parse_section_headings(token, 2),
-            TokenType::Heading4 => self.parse_section_headings(token, 3),
-            TokenType::Heading5 => self.parse_section_headings(token, 4),
+            TokenType::Heading2 => self.parse_section_headings(token, 1, asg),
+            TokenType::Heading3 => self.parse_section_headings(token, 2, asg),
+            TokenType::Heading4 => self.parse_section_headings(token, 3, asg),
+            TokenType::Heading5 => self.parse_section_headings(token, 4, asg),
 
             // document attributes
             TokenType::Attribute => self.parse_attribute(token),
@@ -379,10 +379,6 @@ impl Parser {
                 }
                 self.in_document_header = false
             } else {
-                println!("\nstack at newline: ");
-                for block in &self.block_stack {
-                    println!("\n{:?}", block);
-                }
                 // consolidate any dangling list items
                 if let Some(Block::ListItem(_)) = self.block_stack.last() {
                     self.add_last_list_item_to_list();
@@ -628,7 +624,17 @@ impl Parser {
         }
     }
 
-    fn parse_section_headings(&mut self, token: Token, level: usize) {
+    fn parse_section_headings(&mut self, token: Token, level: usize, asg: &mut Asg) {
+        // if the last section is at the same level, we need to push that up, otherwise the
+        // accordion effect gets screwy with section levels
+        if let Some(Block::Section(_)) = self.block_stack.last() {
+                self.add_last_to_block_stack_or_graph(asg)
+        }
+        //if let Some(Block::Section(last_section)) = self.block_stack.last() {
+        //    if last_section.level >= level {
+        //        self.add_last_to_block_stack_or_graph(asg)
+        //    }
+        //}
         // add the new section to the stack
         self.push_block_to_stack(Block::Section(Section::new(
             "".to_string(),
@@ -1244,6 +1250,7 @@ impl Parser {
                 self.metadata = None;
             }
             if let Some(next_last_block) = self.block_stack.last_mut() {
+                println!("{:?}\n{:?}\n", block, next_last_block);
                 if next_last_block.takes_block_of_type(&block) {
                     next_last_block.push_block(block);
                 } else {
