@@ -1250,7 +1250,6 @@ impl Parser {
                 self.metadata = None;
             }
             if let Some(next_last_block) = self.block_stack.last_mut() {
-                println!("{:?}\n{:?}\n", block, next_last_block);
                 if next_last_block.takes_block_of_type(&block) {
                     next_last_block.push_block(block);
                 } else {
