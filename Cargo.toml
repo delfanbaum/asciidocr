@@ -1,7 +1,7 @@
 [package]
 name = "asciidocr"
-version = "0.1.2"
-readme = "README.adoc"
+version = "0.1.3"
+readme = "README.md"
 license = "MIT"
 edition = "2021"
 description = "A CLI and library for processing and converting asciidoc files"
