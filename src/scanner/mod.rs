@@ -135,7 +135,11 @@ impl<'a> Scanner<'a> {
                             } else if self.peek_back() == ' ' && self.peek() == '\n' {
                                 self.add_token(TokenType::LineContinuation, false, 0)
                             } else {
-                                self.add_text_until_next_markup()
+                                self.handle_inline_formatting(
+                                    c,
+                                    TokenType::Literal,
+                                    TokenType::UnconstrainedLiteral,
+                                )
                             }
                         }
                         '_' => self.handle_inline_formatting(
@@ -546,8 +550,10 @@ impl<'a> Scanner<'a> {
         constrained: TokenType,
         unconstrained: TokenType,
     ) -> Token {
-        // punctuation
-        if [
+        // guard clause against dangling markup
+        if self.peek() == ' ' && self.peek_back() == ' ' {
+            self.add_text_until_next_markup()
+        } else if [
             ' ', '\0', '.', ',', ';', ':', '\n', ')', '"', '!', '?', '\'', ']', '…', '“', '”', '‘',
             '’',
         ]
@@ -1005,6 +1011,7 @@ mod tests {
     #[case('*', TokenType::Strong)]
     #[case('_', TokenType::Emphasis)]
     #[case('`', TokenType::Monospace)]
+    #[case('+', TokenType::Literal)]
     #[case('^', TokenType::Superscript)]
     #[case('~', TokenType::Subscript)]
     #[case('#', TokenType::Mark)]
@@ -1046,6 +1053,7 @@ mod tests {
     #[case::emphasis(String::from("__"), TokenType::UnconstrainedEmphasis)]
     #[case::monospace(String::from("``"), TokenType::UnconstrainedMonospace)]
     #[case::mark(String::from("##"), TokenType::UnconstrainedMark)]
+    #[case::mark(String::from("++"), TokenType::UnconstrainedLiteral)]
     fn inline_formatting_doubles(#[case] markup_str: String, #[case] expected_token: TokenType) {
         let markup = format!("Some{}bar{}bar.", markup_str, markup_str);
         let expected_tokens = vec![
@@ -1074,6 +1082,36 @@ mod tests {
                 1,
                 12,
                 15,
+            ),
+        ];
+        scan_and_assert_eq(&markup, expected_tokens);
+    }
+
+    #[rstest]
+    #[case('*')]
+    #[case('_')]
+    #[case('`')]
+    #[case('+')]
+    #[case('#')]
+    // note that ^ and ~ transformations are handled better by the parser
+    fn inline_formatting_by_self_is_text(#[case] markup_char: char) {
+        let markup = format!(" {} ", markup_char);
+        let expected_tokens = vec![
+            Token::new_default(
+                TokenType::Text,
+                " ".to_string(),
+                Some(" ".to_string()),
+                1,
+                1,
+                1,
+            ),
+            Token::new_default(
+                TokenType::Text,
+                format!("{} ", markup_char),
+                Some(format!("{} ", markup_char)),
+                1,
+                2,
+                3,
             ),
         ];
         scan_and_assert_eq(&markup, expected_tokens);
