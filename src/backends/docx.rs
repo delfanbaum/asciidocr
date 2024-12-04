@@ -1,3 +1,5 @@
+#![cfg(feature="docx")]
+
 use docx_rust::{document::*, formatting::*, Docx, DocxFile, DocxResult};
 use std::{io::Cursor, path::Path};
 
