@@ -9,7 +9,10 @@ repository = "https://github.com/delfanbaum/asciidocr"
 keywords = ["asciidoc", "lightweight-markup", "htmlbook"]
 categories = ["command-line-utilities", "parser-implementations", "text-processing"]
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[lib]
+name = "asciidocr"
+
+crate-type = ["cdylib"]
 
 [dependencies]
 anyhow = "1.0.89"
@@ -17,6 +20,7 @@ clap = {version = "4.5.20", features=["derive"]}
 docx-rs = {version="0.4.17", optional=true}
 log = "0.4.22"
 once_cell = "1.20.2"
+pyo3 = { version = "0.23.3", features = ["extension-module"] }
 regex = "1.11.1"
 serde = {version = "1.0.210", features=["derive"]}
 serde_json = "1.0.128"
