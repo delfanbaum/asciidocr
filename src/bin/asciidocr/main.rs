@@ -1,17 +1,16 @@
+mod cli;
+
 use anyhow::Result;
 use clap::Parser;
 use simple_logger::SimpleLogger;
 use std::{fs, path::PathBuf};
 
-use asciidocr::{
-    backends::{
-        docx::render_docx,
-        htmls::{gather_htmlbook_templates, render_from_templates},
-    },
-    cli::{read_input, read_output, Backends, Cli},
-    parser::Parser as AdocParser,
-    scanner::Scanner
-};
+use asciidocr::{backends::htmls::render_htmlbook, parser::Parser as AdocParser, scanner::Scanner};
+
+#[cfg(feature = "docx")]
+use asciidocr::backends::docx::render_docx;
+
+use cli::{read_input, read_output, Backends, Cli};
 
 fn main() {
     SimpleLogger::new()
@@ -32,10 +31,7 @@ fn run(args: Cli) -> Result<()> {
     let graph = AdocParser::new(PathBuf::from(&args.file)).parse(Scanner::new(&read_input(&args)));
     match args.backend {
         Backends::Htmlbook => {
-            render_string(
-                render_from_templates(&graph, gather_htmlbook_templates())?,
-                read_output(args),
-            );
+            render_string(render_htmlbook(&graph)?, read_output(args));
             Ok(())
         }
         Backends::Json => {
@@ -43,6 +39,7 @@ fn run(args: Cli) -> Result<()> {
             Ok(())
         }
 
+        #[cfg(feature = "docx")]
         Backends::Docx => {
             if let Some(output_path) = read_output(args) {
                 render_docx(&graph, &output_path).expect("Error rendering docx");

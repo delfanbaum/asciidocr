@@ -3,7 +3,7 @@ use crate::graph::{
     inlines::Inline,
     nodes::{Location, NodeTypes},
 };
-use crate::tokens::Token;
+use crate::scanner::tokens::Token;
 use serde::Serialize;
 
 use super::metadata::ElementMetadata;

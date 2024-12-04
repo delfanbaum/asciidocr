@@ -13,7 +13,7 @@ use super::{
     metadata::ElementMetadata,
     nodes::{Location, NodeTypes},
 };
-use crate::tokens::{Token, TokenType};
+use crate::scanner::tokens::{Token, TokenType};
 
 /// Inlines enum containing literals, spans, and references (the latter not implemented)
 #[derive(Serialize, Clone, Debug)]
@@ -398,7 +398,7 @@ impl InlineSpan {
     }
 
     /// Deconstructs a footnote span into the relevant footnote definition ID (to be applied to
-    /// the leafblock that contains the footnote text), an InlineSpan Sup<InlineRef> that replaces the footnote
+    /// the leafblock that contains the footnote text), an InlineSpan `Sup<InlineRef>` that replaces the footnote
     /// with a link to said leafblock, and the vector of inlines that will be inserted into
     /// said leafblock
     pub fn deconstruct_footnote(
@@ -675,7 +675,7 @@ impl LineBreak {
 #[cfg(test)]
 mod tests {
 
-    use crate::tokens::{Token, TokenType};
+    use crate::scanner::tokens::{Token, TokenType};
 
     use super::*;
 
@@ -699,7 +699,7 @@ mod tests {
     #[test]
     fn image_from_token() {
         let token = Token::new_default(
-            crate::tokens::TokenType::InlineImageMacro,
+            TokenType::InlineImageMacro,
             "image:path/to/img.png[]".to_string(),
             Some("image:path/to/img.png[]".to_string()),
             1,
@@ -713,7 +713,7 @@ mod tests {
     #[test]
     fn image_from_token_title() {
         let token = Token::new_default(
-            crate::tokens::TokenType::InlineImageMacro,
+            TokenType::InlineImageMacro,
             "image:path/to/img.png[title=Pause]".to_string(),
             Some("image:path/to/img.png[title=Pause]".to_string()),
             1,

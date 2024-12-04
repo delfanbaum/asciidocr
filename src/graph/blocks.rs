@@ -11,25 +11,31 @@ use crate::graph::{
     metadata::ElementMetadata,
     nodes::{Location, NodeTypes},
 };
-use crate::tokens::{Token, TokenType};
+use crate::scanner::tokens::{Token, TokenType};
 
-/// Blocks enum, containing any tree blocks
+/// Blocks Enum, containing all possible document blocks
 #[derive(Serialize, PartialEq, Clone, Debug)]
 #[serde(untagged)]
 pub enum Block {
-    Section(Section), // sort of a special case but prob needs to be included here
-    SectionBody,      // this can probably be deleted
+    Section(Section),
+    /// Current unused, but included in schema
+    SectionBody,
+    /// Current unused, but included in schema
     NonSectionBlockBody(NonSectionBlockBody),
     List(List),
     ListItem(ListItem),
     DList(DList),
     DListItem(DListItem),
-    DiscreteHeading, // not handled currently
+    /// Current unused, but included in schema
+    DiscreteHeading,
     Break(Break),
     BlockMacro(BlockMacro),
     LeafBlock(LeafBlock),
-    ParentBlock(ParentBlock), // Admonitions are hiding in here
+    /// Parent blocks also include admonition elements
+    ParentBlock(ParentBlock),
     BlockMetadata(ElementMetadata),
+    /// Tables aren't explicitly specified in the official schema yet, so this is a temporary
+    /// workaround for convenience
     TableCell(TableCell),
 }
 

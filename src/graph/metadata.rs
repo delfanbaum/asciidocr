@@ -6,7 +6,7 @@ use regex::Regex;
 use serde::Serialize;
 
 use crate::graph::nodes::Location;
-use crate::tokens::{Token, TokenType};
+use crate::scanner::tokens::{Token, TokenType};
 
 // just make this quoted, and then pull everything else out
 static RE_NAMED_QUOTED: Lazy<Regex> = Lazy::new(|| Regex::new(r#"(\w*=".*?")"#).unwrap());
