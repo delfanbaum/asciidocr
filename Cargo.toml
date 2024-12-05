@@ -1,6 +1,6 @@
 [package]
 name = "asciidocr"
-version = "0.1.4"
+version = "0.1.5"
 readme = "README.md"
 license = "MIT"
 edition = "2021"
