@@ -3,7 +3,7 @@ requires = ["maturin>=1,<2"]
 build-backend = "maturin"
 
 [project]
-name = "pyo3_example"
+name = "asciidocr"
 requires-python = ">=3.11"
 classifiers = [
     "Programming Language :: Rust",
