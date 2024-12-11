@@ -49,6 +49,10 @@ fn run(args: Cli) -> Result<()> {
                 std::process::exit(1)
             }
         }
+
+        Backends::Term => {
+            todo!()
+        }
     }
 }
 

@@ -7,6 +7,9 @@
 
 #[cfg(feature = "docx")]
 pub mod docx;
+
+pub mod term; // probably this ends up under a feature as well
+
 pub mod htmls;
 
 use clap::ValueEnum;
@@ -25,4 +28,8 @@ pub enum Backends {
     #[cfg(feature = "docx")]
     /// !Experimental! Produces a "manuscript-styled" DOCX document.
     Docx,
+
+    /// !Experimental! Displays a preview of the document in the terminal. Note: not all features
+    /// (italics, bold, colors, etc.,) may be supported by your terminal emulator.
+    Term,
 }
