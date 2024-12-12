@@ -109,6 +109,7 @@ tools in Rust now, too. Here are at least a few I know about:
 
 * [`asciidork`](https://github.com/jaredh159/asciidork)
 * [`acdc`](https://github.com/nlopes/acdc/tree/main/acdc-parser)
+* [`asciidoc-parser`](https://github.com/scouten/asciidoc-parser)
 
 ## Known Bugs
 
