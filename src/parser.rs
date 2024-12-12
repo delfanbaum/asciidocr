@@ -228,6 +228,12 @@ impl Parser {
                 InlineSpan::inline_span_from_token(token),
             )),
 
+            // replacements -- done on token.text()
+            TokenType::OpenDoubleQuote
+            | TokenType::CloseDoubleQuote
+            | TokenType::OpenSingleQuote
+            | TokenType::CloseSingleQuote => self.parse_text(token),
+
             // references
             TokenType::AttributeReference => self.parse_attribute_reference(token),
             TokenType::CrossReference => self.parse_cross_reference(token),

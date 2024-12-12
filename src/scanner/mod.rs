@@ -62,6 +62,9 @@ impl<'a> Scanner<'a> {
                 if self.starts_repeated_char_line(c, 3) {
                     self.current += 2;
                     self.add_token(TokenType::ThematicBreak, false, 0)
+                } else if ['\0', ' ', '\n'].contains(&self.peek_back()) && self.peek() == '`' {
+                    self.current += 1;
+                    self.add_token(TokenType::OpenSingleQuote, true, 0)
                 } else {
                     self.add_text_until_next_markup()
                 }
@@ -185,11 +188,26 @@ impl<'a> Scanner<'a> {
                 }
             }
 
-            '`' => self.handle_inline_formatting(
-                c,
-                TokenType::Monospace,
-                TokenType::UnconstrainedMonospace,
-            ),
+            '`' => {
+                if ["' ", "'\n"].contains(&self.peeks_ahead(2))
+                    || (self.peeks_ahead(2) == "\0" && self.peek() == '\'')
+                {
+                    self.current += 1;
+                    self.add_token(TokenType::CloseSingleQuote, true, 0)
+                } else if ["\" ", "\"\n"].contains(&self.peeks_ahead(2))
+                    || (self.peeks_ahead(2) == "\0" && self.peek() == '\"')
+                {
+                    self.current += 1;
+                    self.add_token(TokenType::CloseDoubleQuote, true, 0)
+
+                } else {
+                    self.handle_inline_formatting(
+                        c,
+                        TokenType::Monospace,
+                        TokenType::UnconstrainedMonospace,
+                    )
+                }
+            }
             '^' => self.add_token(TokenType::Superscript, false, 0),
             '~' => self.add_token(TokenType::Subscript, false, 0),
             '#' => self.handle_inline_formatting(c, TokenType::Mark, TokenType::UnconstrainedMark),
@@ -326,6 +344,14 @@ impl<'a> Scanner<'a> {
                 } else if self.starts_new_line() || self.peek_back() == ' ' {
                     // it's either a new line, or if on the same line, must have a space before it
                     self.add_table_cell()
+                } else {
+                    self.add_text_until_next_markup()
+                }
+            }
+            '\"' => {
+                if ['\0', ' ', '\n'].contains(&self.peek_back()) && self.peek() == '`' {
+                    self.current += 1;
+                    self.add_token(TokenType::OpenDoubleQuote, true, 0)
                 } else {
                     self.add_text_until_next_markup()
                 }
@@ -484,7 +510,7 @@ impl<'a> Scanner<'a> {
         // Chars: newline, bold, italic, code, super, subscript, footnote, pass, link, end inline macro, definition list marker, highlighted, inline admonition initial chars, inline images
         while ![
             '\n', '*', '_', '`', '^', '~', 'f', 'p', 'h', ']', '[', ':', '#', 'N', 'T', 'I', 'C',
-            'W', '&', '{', '+', 'i', '<',
+            'W', '&', '{', '+', 'i', '<', '\'', '\"',
         ]
         .contains(&self.peek())
             && !self.is_at_end()
@@ -1859,6 +1885,45 @@ mod tests {
                 Some("Bar".to_string()),
                 1,
                 5,
+                7,
+            ),
+        ];
+        scan_and_assert_eq(&markup, expected_tokens);
+    }
+
+    #[rstest]
+    #[case::double_quotes("\"`", "`\"", TokenType::OpenDoubleQuote, TokenType::CloseDoubleQuote)]
+    #[case::single_quotes("'`", "`'", TokenType::OpenSingleQuote, TokenType::CloseSingleQuote)]
+    fn typographers_quotes(
+        #[case] open_markup: &str,
+        #[case] close_markup: &str,
+        #[case] open_token: TokenType,
+        #[case] close_token: TokenType,
+    ) {
+        let markup = format!("{}bar{}", open_markup, close_markup);
+        let expected_tokens = vec![
+            Token::new_default(
+                open_token,
+                open_markup.to_string(),
+                Some(open_markup.to_string()),
+                1,
+                1,
+                2,
+            ),
+            Token::new_default(
+                TokenType::Text,
+                "bar".to_string(),
+                Some("bar".to_string()),
+                1,
+                3,
+                5,
+            ),
+            Token::new_default(
+                close_token,
+                close_markup.to_string(),
+                Some(close_markup.to_string()),
+                1,
+                6,
                 7,
             ),
         ];

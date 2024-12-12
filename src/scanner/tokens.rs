@@ -80,10 +80,18 @@ impl Token {
 
     /// Returns the Token's text content
     pub fn text(&self) -> String {
-        if let Some(text) = &self.literal {
-            text.clone()
-        } else {
-            self.lexeme.clone()
+        match self.token_type() {
+            TokenType::OpenDoubleQuote => "“".into(),
+            TokenType::CloseDoubleQuote => "”".into(),
+            TokenType::OpenSingleQuote => "‘".into(),
+            TokenType::CloseSingleQuote => "’".into(),
+            _ => {
+                if let Some(text) = &self.literal {
+                    text.clone()
+                } else {
+                    self.lexeme.clone()
+                }
+            }
         }
     }
 
@@ -235,6 +243,12 @@ pub enum TokenType {
 
     // character reference, such as "&mdash;"
     CharRef,
+
+    // character replacement combos, e.g., "`foo`" for “foo”, etc.
+    OpenDoubleQuote,
+    CloseDoubleQuote,
+    OpenSingleQuote,
+    CloseSingleQuote,
 
     // End of File Token
     Eof,
