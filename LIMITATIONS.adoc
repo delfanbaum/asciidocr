@@ -29,7 +29,7 @@ attribute short hand] -- I'm both not a fan (just use `role=` and `[[id]]`, etc.
 * https://docs.asciidoctor.org/asciidoc/latest/sections/section-ref/[Section
   Attributes and styles]
 * Paragraph alignment and indented blocks 
-* Substitutions
+* Substitutions (quote substitutions now working!)
 * Checklists
 * Autolinks (for now, just use the `url[text]` or `url[]` syntax)
 * `mailto:`
@@ -38,7 +38,6 @@ attribute short hand] -- I'm both not a fan (just use `role=` and `[[id]]`, etc.
 * Keyboard/button/etc. macros (I mean to target "writers," first, then
   "technical writers" at some later point).
 * Syntax highlighting for source blocks
-* Code callous
 * STEM and equations
 * Automatic Tables of Contents
 * Deeply nested description lists (in the meantime: just use an open block)
