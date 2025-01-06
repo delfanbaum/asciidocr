@@ -3,7 +3,7 @@ use std::{io::Cursor, path::Path};
 
 use crate::graph::{
     asg::Asg,
-    blocks::{Block, LeafBlock, LeafBlockName},
+    blocks::{Block, BreakVariant, LeafBlock, LeafBlockName},
     inlines::{Inline, InlineSpanVariant},
     lists::{ListItem, ListVariant},
 };
@@ -11,7 +11,7 @@ use crate::graph::{
 static REFERENCE_DOCX: &[u8] = include_bytes!("../../templates/docx/reference.docx");
 
 /// !Experimental! Renders a Docx file based on a "manuscript" (Times New Roman, 12pt,
-/// double-spaced) template document. Some [`Asg`] blocks are still unsupported. 
+/// double-spaced) template document. Some [`Asg`] blocks are still unsupported.
 pub fn render_docx(graph: &Asg, output_path: &Path) -> DocxResult<()> {
     let cursor = Cursor::new(REFERENCE_DOCX);
     let docx = DocxFile::from_reader(cursor)?;
@@ -70,6 +70,24 @@ fn add_block_to_doc<'a>(doc: &mut Docx<'a>, block: &'a Block) {
         Block::LeafBlock(block) => {
             doc.document.push(para_from_leafblock(block));
         }
+        Block::Break(block) => match block.variant {
+            BreakVariant::Thematic => {
+                doc.document
+                    .push(
+                        Paragraph::default()
+                            .push_text("#")
+                            .property(ParagraphProperty {
+                                text_alignment: Some(TextAlignment {
+                                    val: Some(TextAlignmentType::Center),
+                                }),
+                                ..Default::default()
+                            }),
+                    );
+            }
+            BreakVariant::Page => {
+                todo!();
+            }
+        },
         Block::List(list_block) => {
             for block in &list_block.items {
                 if let Block::ListItem(list_item) = block {

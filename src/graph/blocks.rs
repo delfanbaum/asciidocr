@@ -801,7 +801,7 @@ pub struct Break {
     name: String,
     #[serde(rename = "type")]
     node_type: NodeTypes,
-    variant: BreakVariant,
+    pub variant: BreakVariant,
     location: Vec<Location>,
 }
 
