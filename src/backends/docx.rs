@@ -1,195 +1,123 @@
-use docx_rust::{document::*, formatting::*, Docx, DocxFile, DocxResult};
-use std::{io::Cursor, path::Path};
+use docx_rs::*;
+use std::{fs::File, path::Path};
 
 use crate::graph::{
     asg::Asg,
-    blocks::{Block, BreakVariant, LeafBlock, LeafBlockName},
+    blocks::Block,
     inlines::{Inline, InlineSpanVariant},
-    lists::{ListItem, ListVariant},
 };
 
-static REFERENCE_DOCX: &[u8] = include_bytes!("../../templates/docx/reference.docx");
-
-/// !Experimental! Renders a Docx file based on a "manuscript" (Times New Roman, 12pt,
-/// double-spaced) template document. Some [`Asg`] blocks are still unsupported.
-pub fn render_docx(graph: &Asg, output_path: &Path) -> DocxResult<()> {
-    let cursor = Cursor::new(REFERENCE_DOCX);
-    let docx = DocxFile::from_reader(cursor)?;
-    let donor_doc = docx.parse()?;
-    let mut doc = Docx::<'_> {
-        styles: donor_doc.styles.clone(),
-        ..Default::default()
-    };
-
-    // TK add a header
-    if let Some(header) = &graph.header {
-        let mut title = Paragraph::default().property(ParagraphProperty::default().style_id(
-            ParagraphStyleId {
-                value: std::borrow::Cow::Borrowed("Title"),
-            },
-        ));
-        for inline in header.title() {
-            for content in content_from_inline(inline, &mut vec![]) {
-                title = title.push(content);
-            }
-        }
-        doc.document.push(title);
-    }
-
+/// !Experimental! Renders a Docx file. Some [`Asg`] blocks are still unsupported.
+pub fn render_docx(graph: &Asg, output_path: &Path) -> Result<(), DocxError> {
+    let file = File::create(output_path).unwrap();
+    let mut docx = Docx::new();
     for block in graph.blocks.iter() {
-        add_block_to_doc(&mut doc, block);
+        docx = add_block_to_doc(docx, block)
     }
-
-    doc.write_file(output_path)
-        .expect("Error writing to output file");
+    docx.build().pack(file)?;
     Ok(())
 }
 
-fn add_block_to_doc<'a>(doc: &mut Docx<'a>, block: &'a Block) {
-    match block {
-        Block::Section(section) => {
-            if !section.title().is_empty() {
-                let style_id = format!("Heading{}", section.level);
-                let mut title = Paragraph::default().property(
-                    ParagraphProperty::default().style_id(ParagraphStyleId {
-                        value: style_id.into(),
-                    }),
-                );
-                for inline in section.title() {
-                    for content in content_from_inline(inline, &mut vec![]) {
-                        title = title.push(content);
-                    }
-                }
-                doc.document.push(title);
-            }
-
-            for block in section.blocks.iter() {
-                add_block_to_doc(doc, block)
-            }
-        }
-        Block::LeafBlock(block) => {
-            doc.document.push(para_from_leafblock(block));
-        }
-        Block::Break(block) => match block.variant {
-            BreakVariant::Thematic => {
-                doc.document
-                    .push(
-                        Paragraph::default()
-                            .push_text("#")
-                            .property(ParagraphProperty {
-                                text_alignment: Some(TextAlignment {
-                                    val: Some(TextAlignmentType::Center),
-                                }),
-                                ..Default::default()
-                            }),
-                    );
-            }
-            BreakVariant::Page => {
-                todo!();
-            }
-        },
-        Block::List(list_block) => {
-            for block in &list_block.items {
-                if let Block::ListItem(list_item) = block {
-                    for para in paras_from_list_item(list_item, list_block.variant.clone()) {
-                        doc.document.push(para);
-                    }
-                };
-            }
-        }
-        _ => {}
-    }
-    //doc
-}
-
-// TK is there a way to manage this so we don't need to recreate the para?
-fn para_from_leafblock(block: &LeafBlock) -> Paragraph {
-    let mut para = Paragraph::default();
-    for inline in block.inlines() {
-        for content in content_from_inline(inline, &mut vec![]) {
-            para = para.push(content);
+fn add_inlines_to_para(mut para: Paragraph, inlines: Vec<Inline>) -> Paragraph {
+    for inline in inlines.iter() {
+        for run in runs_from_inline(inline) {
+            para = para.add_run(run)
         }
     }
     para
 }
 
-/// "Simple" lists only for now
-fn paras_from_list_item(block: &ListItem, _variant: ListVariant) -> Vec<Paragraph> {
-    let mut paras = vec![];
-    let mut para =
-        Paragraph::default().property(ParagraphProperty::default().style_id(ParagraphStyleId {
-            value: "List Paragraph".into(),
-        }));
-    for inline in block.principal() {
-        for content in content_from_inline(inline, &mut vec![]) {
-            para = para.push(content);
-        }
-    }
-    // just do all lists as default for now
-
-    paras.push(para);
-    for child_block in block.blocks() {
-        if let Block::LeafBlock(leaf) = child_block {
-            if leaf.name == LeafBlockName::Paragraph {
-                let mut child_para = Paragraph::default();
-                for inline in block.principal() {
-                    for content in content_from_inline(inline, &mut vec![]) {
-                        child_para = child_para.push(content);
-                    }
-                }
-                child_para =
-                    child_para.property(ParagraphProperty::default().style_id("List Continue"));
-                paras.push(child_para);
-            } else {
-                todo!()
+fn add_block_to_doc(mut docx: Docx, block: &Block) -> Docx {
+    match block {
+        Block::Section(section) => {
+            if !section.title().is_empty() {
+                let mut para = Paragraph::new().style(&format!("Heading{}", section.level));
+                para = add_inlines_to_para(para, section.title());
+                docx = docx.add_paragraph(para)
             }
-        } else {
-            todo!()
-        }
-    }
 
-    paras
+            for block in section.blocks.iter() {
+                docx = add_block_to_doc(docx, block)
+            }
+        }
+        Block::LeafBlock(block) => {
+            let mut para = Paragraph::new();
+            para = add_inlines_to_para(para, block.inlines());
+            docx = docx.add_paragraph(para)
+        }
+        _ => todo!(),
+    }
+    docx
 }
 
-fn content_from_inline<'a>(
-    inline: Inline,
-    variants: &mut Vec<InlineSpanVariant>,
-) -> Vec<ParagraphContent<'a>> {
-    let mut contents: Vec<ParagraphContent<'a>> = Vec::new();
+fn runs_from_inline(inline: &Inline) -> Vec<Run> {
+    let mut variants: Vec<&InlineSpanVariant> = vec![];
+    let mut runs: Vec<Run> = vec![];
     match inline {
         Inline::InlineLiteral(lit) => {
-            let mut run = Run::default().push_text((lit.value_or_refd_char(), TextSpace::Preserve));
+            let mut run = Run::new().add_text(lit.value_or_refd_char());
             if !variants.is_empty() {
                 for variant in variants {
                     match variant {
-                        InlineSpanVariant::Strong => {
-                            run = run.property(CharacterProperty::default().bold(true));
-                        }
-                        InlineSpanVariant::Emphasis => {
-                            run = run.property(CharacterProperty::default().italics(true));
-                        }
+                        InlineSpanVariant::Strong => run = run.bold(),
+                        InlineSpanVariant::Emphasis => run = run.italic(),
                         _ => {} // TODO but not blocking; just adds the literal
                     }
                 }
             }
-            contents.push(ParagraphContent::Run(run));
+            runs.push(run)
         }
         Inline::InlineSpan(span) => {
-            variants.push(span.variant);
-            for inline in span.inlines {
-                contents.extend(content_from_inline(inline, variants))
+            variants.push(&span.variant);
+            for inline in span.inlines.iter() {
+                runs.extend(runs_from_inline_with_variant(inline, &mut variants))
             }
         }
-        Inline::InlineBreak(_) => contents.push(ParagraphContent::Run(
-            Run::default().push_break(BreakType::TextWrapping),
-        )),
+        Inline::InlineBreak(_) => runs.push(Run::new().add_break(BreakType::TextWrapping)),
         Inline::InlineRef(iref) => {
             // for now, just append the text; we can handle the actual linking later, as that's
             // more complicated
-            for inline in iref.inlines {
-                contents.extend(content_from_inline(inline, variants))
+            for inline in iref.inlines.iter() {
+                runs.extend(runs_from_inline_with_variant(inline, &mut variants))
             }
         }
     }
-    contents
+    runs
+}
+
+fn runs_from_inline_with_variant<'a>(
+    inline: &'a Inline,
+    variants: &mut Vec<&'a InlineSpanVariant>,
+) -> Vec<Run> {
+    let mut runs: Vec<Run> = Vec::new();
+    match inline {
+        Inline::InlineLiteral(lit) => {
+            let mut run = Run::new().add_text(lit.value_or_refd_char());
+            if !variants.is_empty() {
+                for variant in variants {
+                    match variant {
+                        InlineSpanVariant::Strong => run = run.bold(),
+                        InlineSpanVariant::Emphasis => run = run.italic(),
+                        _ => {} // TODO but not blocking; just adds the literal
+                    }
+                }
+            }
+            runs.push(run)
+        }
+        Inline::InlineSpan(span) => {
+            variants.push(&span.variant);
+            for inline in span.inlines.iter() {
+                runs.extend(runs_from_inline_with_variant(inline, variants))
+            }
+        }
+        Inline::InlineBreak(_) => runs.push(Run::new().add_break(BreakType::TextWrapping)),
+        Inline::InlineRef(iref) => {
+            // for now, just append the text; we can handle the actual linking later, as that's
+            // more complicated
+            for inline in iref.inlines.iter() {
+                runs.extend(runs_from_inline_with_variant(inline, variants))
+            }
+        }
+    }
+    runs
 }

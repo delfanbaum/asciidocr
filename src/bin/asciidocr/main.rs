@@ -11,7 +11,7 @@ use asciidocr::{
     scanner::Scanner,
 };
 
-#[cfg(feature = "docx")]
+//#[cfg(feature = "docx")]
 use asciidocr::backends::docx::render_docx;
 
 use cli::{read_input, read_output, Cli};
@@ -43,7 +43,7 @@ fn run(args: Cli) -> Result<()> {
             Ok(())
         }
 
-        #[cfg(feature = "docx")]
+        //#[cfg(feature = "docx")]
         Backends::Docx => {
             if let Some(output_path) = read_output(args) {
                 render_docx(&graph, &output_path).expect("Error rendering docx");
