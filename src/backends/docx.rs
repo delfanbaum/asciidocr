@@ -3,7 +3,7 @@ use std::{fs::File, path::Path};
 
 use crate::graph::{
     asg::Asg,
-    blocks::Block,
+    blocks::{Block, BreakVariant},
     inlines::{Inline, InlineSpanVariant},
 };
 
@@ -40,16 +40,37 @@ fn add_block_to_doc(mut docx: Docx, block: &Block) -> Docx {
                 docx = add_block_to_doc(docx, block)
             }
         }
+        Block::List(_) => todo!(),
+        Block::ListItem(_) => todo!(),
+        Block::DList(_) => todo!(),
+        Block::DListItem(_) => todo!(),
+        Block::Break(block) => match block.variant {
+            BreakVariant::Page => {
+                todo!()
+            }
+            BreakVariant::Thematic => {
+                docx = docx.add_paragraph(
+                    Paragraph::new()
+                        .add_run(Run::new().add_text("#"))
+                        .align(AlignmentType::Center),
+                )
+            }
+        },
+        Block::BlockMacro(_) => todo!(),
         Block::LeafBlock(block) => {
             let mut para = Paragraph::new();
             para = add_inlines_to_para(para, block.inlines());
             docx = docx.add_paragraph(para)
         }
+        Block::ParentBlock(_) => todo!(),
+        Block::BlockMetadata(_) => todo!(),
+        Block::TableCell(_) => todo!(),
         _ => todo!(),
     }
     docx
 }
 
+/// Creates runs from inlines, called from a block
 fn runs_from_inline(inline: &Inline) -> Vec<Run> {
     let mut variants: Vec<&InlineSpanVariant> = vec![];
     let mut runs: Vec<Run> = vec![];
@@ -85,6 +106,7 @@ fn runs_from_inline(inline: &Inline) -> Vec<Run> {
     runs
 }
 
+/// The version that allows for recursion, specifically nested inline spans
 fn runs_from_inline_with_variant<'a>(
     inline: &'a Inline,
     variants: &mut Vec<&'a InlineSpanVariant>,
