@@ -12,17 +12,13 @@ use crate::graph::{
 pub fn render_docx(graph: &Asg, output_path: &Path) -> Result<(), DocxError> {
     let file = File::create(output_path).unwrap();
     let mut writer = DocxWriter::new();
-    let mut docx = Docx::new();
-    let (normal, heading1, heading2, heading3, heading4, heading5, title) = writer.get_styles();
-    docx = docx
-        .header(writer.get_header())
+
+    // always add default style(s) and header; other styles are added as-needed
+    let (normal, title) = writer.default_styles();
+    let mut docx = Docx::new()
         .add_style(normal)
-        .add_style(heading1)
-        .add_style(heading2)
-        .add_style(heading3)
-        .add_style(heading4)
-        .add_style(heading5)
-        .add_style(title);
+        .add_style(title)
+        .header(writer.get_header());
 
     if let Some(header) = &graph.header {
         if !header.title.is_empty() {
@@ -52,7 +48,7 @@ impl DocxWriter {
         }
     }
 
-    fn get_styles(&self) -> (Style, Style, Style, Style, Style, Style, Style) {
+    fn default_styles(&self) -> (Style, Style) {
         let normal = Style {
             style_id: "Normal".into(),
             name: Name::new("Normal"),
@@ -65,33 +61,11 @@ impl DocxWriter {
             next: None,
             link: None,
         };
-        let heading1 = Style::new("Heading 1", StyleType::Paragraph)
-            .name("Heading 1")
-            .based_on("Normal")
-            .bold();
-        let heading2 = Style::new("Heading 2", StyleType::Paragraph)
-            .name("Heading 2")
-            .based_on("Normal")
-            .bold();
-        let heading3 = Style::new("Heading 3", StyleType::Paragraph)
-            .name("Heading 3")
-            .based_on("Normal")
-            .bold();
-        let heading4 = Style::new("Heading 4", StyleType::Paragraph)
-            .name("Heading 4")
-            .based_on("Normal")
-            .bold();
-        let heading5 = Style::new("Heading 5", StyleType::Paragraph)
-            .name("Heading 5")
-            .based_on("Normal")
-            .bold();
         let title = Style::new("Title", StyleType::Paragraph)
             .name("Title")
             .based_on("Normal")
             .bold();
-        (
-            normal, heading1, heading2, heading3, heading4, heading5, title,
-        )
+        (normal, title)
     }
 
     fn add_paragraph(&mut self, docx: Docx, mut para: Paragraph) -> Docx {
@@ -106,9 +80,15 @@ impl DocxWriter {
         match block {
             Block::Section(section) => {
                 if !section.title().is_empty() {
-                    let mut para = Paragraph::new().style(&format!("Heading {}", section.level));
+                    let heading_style_name = format!("Heading {}", section.level);
+                    let heading_style = Style::new(&heading_style_name, StyleType::Paragraph)
+                        .name(&heading_style_name)
+                        .based_on("Normal")
+                        .bold();
+                    let mut para = Paragraph::new().style(&heading_style_name);
                     para = add_inlines_to_para(para, section.title());
-                    docx = self.add_paragraph(docx, para)
+                    docx = docx.add_style(heading_style);
+                    docx = self.add_paragraph(docx, para);
                 }
 
                 for block in section.blocks.iter() {
@@ -116,11 +96,38 @@ impl DocxWriter {
                 }
             }
             Block::List(list) => {
+                docx = docx.add_style(
+                    Style::new("List Paragraph", StyleType::Paragraph)
+                        .name("List Paragraph")
+                        .based_on("Normal"),
+                );
                 match list.variant {
                     ListVariant::Ordered | ListVariant::Callout => {
-                        self.current_list_style = "List Paragraph".into();
+                        docx = docx.add_abstract_numbering(
+                            AbstractNumbering::new(1).add_level(
+                                Level::new(
+                                    0,
+                                    Start::new(1),
+                                    NumberFormat::new("decimal"),
+                                    LevelText::new("\t%1."),
+                                    LevelJc::new("left"),
+                                ) // TODO: some indent? Better indent?
+                            ),
+                        );
+                        self.current_list_style = "List Numbered".into();
                     }
-                    ListVariant::Unordered => self.current_list_style = "List Paragraph".into(),
+                    ListVariant::Unordered => {
+                        docx = docx.add_abstract_numbering(AbstractNumbering::new(2).add_level(
+                            Level::new(
+                                0,
+                                Start::new(1),
+                                NumberFormat::new("decimal"),
+                                LevelText::new("%1."),
+                                LevelJc::new("left"),
+                            ),
+                        ));
+                        self.current_list_style = "List Bullet".into();
+                    }
                 }
                 for item in list.items.iter() {
                     docx = self.add_block_to_doc(docx, item)
@@ -128,7 +135,13 @@ impl DocxWriter {
             }
             Block::ListItem(item) => {
                 // add principal with the correct variant match
-                let mut para = Paragraph::new().style(&self.current_list_style);
+                let mut para = Paragraph::new().style("List Paragraph");
+                match self.current_list_style.as_str() {
+                    "List Numbered" => {
+                        para = para.numbering(NumberingId::new(1), IndentLevel::new(0))
+                    }
+                    _ => {}
+                }
                 para = add_inlines_to_para(para, item.principal());
                 docx = self.add_paragraph(docx, para);
                 // add any children -- TODO style them as list continues
@@ -145,9 +158,16 @@ impl DocxWriter {
                     self.page_break_before = true;
                 }
                 BreakVariant::Thematic => {
+                    docx = docx.add_style(
+                        Style::new("Thematic Break", StyleType::Paragraph)
+                            .name("Thematic Break")
+                            .based_on("Normal")
+                            .align(AlignmentType::Center),
+                    );
                     docx = self.add_paragraph(
                         docx,
                         Paragraph::new()
+                            .style("Thematic Break")
                             .add_run(Run::new().add_text("#"))
                             .align(AlignmentType::Center),
                     )
@@ -155,7 +175,12 @@ impl DocxWriter {
             },
             Block::BlockMacro(_) => todo!(),
             Block::LeafBlock(block) => {
-                let mut para = Paragraph::new();
+                let mut para = Paragraph::new().indent(
+                    None,
+                    Some(SpecialIndentType::FirstLine(720)),
+                    None,
+                    None,
+                );
                 para = add_inlines_to_para(para, block.inlines());
                 docx = self.add_paragraph(docx, para)
             }
@@ -193,7 +218,8 @@ fn runs_from_inline(inline: &Inline) -> Vec<Run> {
     let mut runs: Vec<Run> = vec![];
     match inline {
         Inline::InlineLiteral(lit) => {
-            let mut run = Run::new().add_text(lit.value_or_refd_char());
+            // replace non-significant newlines with space, as it would appear in HTML
+            let mut run = Run::new().add_text(lit.value_or_refd_char().replace("\n", " "));
             if !variants.is_empty() {
                 for variant in variants {
                     match variant {
@@ -231,7 +257,7 @@ fn runs_from_inline_with_variant<'a>(
     let mut runs: Vec<Run> = Vec::new();
     match inline {
         Inline::InlineLiteral(lit) => {
-            let mut run = Run::new().add_text(lit.value_or_refd_char());
+            let mut run = Run::new().add_text(lit.value_or_refd_char().replace("\n", " "));
             if !variants.is_empty() {
                 for variant in variants {
                     match variant {
