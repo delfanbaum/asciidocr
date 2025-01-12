@@ -1019,13 +1019,13 @@ impl LeafBlock {
 pub struct ParentBlock {
     pub name: ParentBlockName,
     #[serde(skip_serializing_if = "Option::is_none")]
-    variant: Option<ParentBlockVarient>,
+    pub variant: Option<ParentBlockVarient>,
     #[serde(rename = "type")]
     node_type: NodeTypes,
     form: String, // required as "delimited", but really could also be "paragraph"
     #[serde(skip_serializing_if = "String::is_empty")]
     delimiter: String, // required, but if it should be "paragraph" it's empty
-    blocks: Vec<Block>,
+    pub blocks: Vec<Block>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub title: Vec<Inline>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -1068,6 +1068,18 @@ pub enum ParentBlockVarient {
     Note,
     Tip,
     Warning,
+}
+
+impl Display for ParentBlockVarient {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ParentBlockVarient::Caution => write!(f, "Caution"),
+            ParentBlockVarient::Important => write!(f, "Important"),
+            ParentBlockVarient::Note => write!(f, "Note"),
+            ParentBlockVarient::Tip => write!(f, "Tip"),
+            ParentBlockVarient::Warning => write!(f, "Warning"),
+        }
+    }
 }
 
 impl ParentBlock {

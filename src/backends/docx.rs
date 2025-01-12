@@ -3,7 +3,7 @@ use std::{fs::File, path::Path};
 
 use crate::graph::{
     asg::Asg,
-    blocks::{Block, BreakVariant},
+    blocks::{Block, BreakVariant, ParentBlockName},
     inlines::{Inline, InlineSpanVariant},
     lists::ListVariant,
 };
@@ -41,14 +41,14 @@ pub fn render_docx(graph: &Asg, output_path: &Path) -> Result<(), DocxError> {
 // holds some state for us
 struct DocxWriter {
     page_break_before: bool,
-    current_list_style: String, // hold it as a stack for nested lists
+    current_style: Option<String>,
 }
 
 impl DocxWriter {
     fn new() -> Self {
         DocxWriter {
             page_break_before: false,
-            current_list_style: "".into(),
+            current_style: None,
         }
     }
 
@@ -77,6 +77,13 @@ impl DocxWriter {
             para = para.page_break_before(true);
             self.page_break_before = false;
         }
+
+        if let Some(style) = &self.current_style {
+            if para.property.style.is_none() { // don't overwrite styles
+                para = para.style(style)
+            }
+        }
+
         docx.add_paragraph(para)
     }
 
@@ -116,7 +123,7 @@ impl DocxWriter {
                                 LevelJc::new("left"),
                             ), // TODO: some indent? Better indent?
                         ));
-                        self.current_list_style = "List Numbered".into();
+                        self.current_style = Some("List Numbered".into());
                     }
                     ListVariant::Unordered => {
                         docx = docx.add_abstract_numbering(AbstractNumbering::new(2).add_level(
@@ -128,7 +135,7 @@ impl DocxWriter {
                                 LevelJc::new("left"),
                             ),
                         ));
-                        self.current_list_style = "List Bullet".into();
+                        self.current_style = Some("List Bullet".into());
                     }
                 }
                 for item in list.items.iter() {
@@ -138,10 +145,13 @@ impl DocxWriter {
             Block::ListItem(item) => {
                 // add principal with the correct variant match
                 let mut para = Paragraph::new().style("List Paragraph");
-                match self.current_list_style.as_str() {
-                    "List Numbered" => {
-                        para = para.numbering(NumberingId::new(1), IndentLevel::new(0))
-                    }
+                match &self.current_style {
+                    Some(style) => match style.as_str() {
+                        "List Numbered" => {
+                            para = para.numbering(NumberingId::new(1), IndentLevel::new(0))
+                        }
+                        _ => {}
+                    },
                     _ => {}
                 }
                 para = add_inlines_to_para(para, item.principal());
@@ -186,7 +196,70 @@ impl DocxWriter {
                 para = add_inlines_to_para(para, block.inlines());
                 docx = self.add_paragraph(docx, para)
             }
-            Block::ParentBlock(_) => todo!(),
+            Block::ParentBlock(parent) => match parent.name {
+                ParentBlockName::Admonition => {
+                    self.current_style = Some("Admonition Text".into());
+                    docx = docx
+                        .add_style(
+                            Style::new("Admonition Title", StyleType::Paragraph)
+                                .name("Admonition Title")
+                                .based_on("Normal")
+                                .bold()
+                                .indent(Some(720), None, None, None),
+                        )
+                        .add_style(
+                            Style::new("Admonition Text", StyleType::Paragraph)
+                                .based_on("Normal")
+                                .indent(Some(720), None, None, None),
+                        );
+                    if let Some(variant) = &parent.variant {
+                        docx = self.add_paragraph(
+                            docx,
+                            Paragraph::new()
+                                .style("Admonition Title")
+                                .add_run(Run::new().add_text(variant.to_string())),
+                        )
+                    }
+                    for child in parent.blocks.iter() {
+                        docx = self.add_block_to_doc(docx, child)
+                    }
+                    self.current_style = None;
+                }
+                ParentBlockName::Example => {
+                    self.current_style = Some("Admonition Text".into());
+                    docx = docx
+                        .add_style(
+                            Style::new("Example Title", StyleType::Paragraph)
+                                .name("Example Title")
+                                .based_on("Normal")
+                                .bold()
+                                .indent(Some(720), None, None, None),
+                        )
+                        .add_style(
+                            Style::new("Example Text", StyleType::Paragraph)
+                                .based_on("Normal")
+                                .indent(Some(720), None, None, None),
+                        );
+                    if !parent.title.is_empty() {
+                        let mut title = Paragraph::new().style("Example Title");
+                        title = add_inlines_to_para(title, parent.title.clone());
+                        docx = self.add_paragraph(docx, title);
+                    }
+                    for child in parent.blocks.iter() {
+                        docx = self.add_block_to_doc(docx, child)
+                    }
+                    self.current_style = None;
+                }
+                ParentBlockName::Sidebar => todo!(),
+                ParentBlockName::Open => {
+                    for child in parent.blocks.iter() {
+                        docx = self.add_block_to_doc(docx, child)
+                    }
+                }
+                ParentBlockName::Quote => todo!(),
+                ParentBlockName::Table => todo!(),
+                ParentBlockName::FootnoteContainer => todo!(),
+            },
             Block::BlockMetadata(_) => todo!(),
             Block::TableCell(_) => todo!(),
             _ => todo!(),
