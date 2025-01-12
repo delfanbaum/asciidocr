@@ -22,15 +22,7 @@ pub fn render_docx(graph: &Asg, output_path: &Path) -> Result<(), DocxError> {
         .add_style(title)
         .header(writer.get_header())
         .page_size(inches(8.5), inches(11.0))
-        .page_margin(
-            PageMargin::new()
-                .top(DXA_INCH)
-                .left(DXA_INCH)
-                .right(DXA_INCH)
-                .bottom(DXA_INCH)
-                .header(720)
-                .footer(720),
-        );
+        .page_margin(writer.get_margins());
 
     if let Some(header) = &graph.header {
         if !header.title.is_empty() {
@@ -204,6 +196,16 @@ impl DocxWriter {
 
     fn get_header(&self) -> Header {
         Header::new().add_page_num(PageNum::new().align(AlignmentType::Right))
+    }
+
+    fn get_margins(&self) -> PageMargin {
+        PageMargin::new()
+            .top(DXA_INCH)
+            .left(DXA_INCH)
+            .right(DXA_INCH)
+            .bottom(DXA_INCH)
+            .header(720)
+            .footer(720)
     }
 }
 
