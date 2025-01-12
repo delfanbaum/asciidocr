@@ -5,7 +5,11 @@ use clap::Parser;
 use simple_logger::SimpleLogger;
 use std::{fs, path::PathBuf};
 
-use asciidocr::{backends::{htmls::render_htmlbook, Backends}, parser::Parser as AdocParser, scanner::Scanner};
+use asciidocr::{
+    backends::{htmls::render_htmlbook, Backends},
+    parser::Parser as AdocParser,
+    scanner::Scanner,
+};
 
 #[cfg(feature = "docx")]
 use asciidocr::backends::docx::render_docx;
