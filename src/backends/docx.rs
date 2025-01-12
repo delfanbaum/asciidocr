@@ -8,6 +8,8 @@ use crate::graph::{
     lists::ListVariant,
 };
 
+const DXA_INCH: i32 = 1440; // standard measuring unit in Word
+
 /// !Experimental! Renders a Docx file. Some [`Asg`] blocks are still unsupported.
 pub fn render_docx(graph: &Asg, output_path: &Path) -> Result<(), DocxError> {
     let file = File::create(output_path).unwrap();
@@ -18,7 +20,17 @@ pub fn render_docx(graph: &Asg, output_path: &Path) -> Result<(), DocxError> {
     let mut docx = Docx::new()
         .add_style(normal)
         .add_style(title)
-        .header(writer.get_header());
+        .header(writer.get_header())
+        .page_size(inches(8.5), inches(11.0))
+        .page_margin(
+            PageMargin::new()
+                .top(DXA_INCH)
+                .left(DXA_INCH)
+                .right(DXA_INCH)
+                .bottom(DXA_INCH)
+                .header(720)
+                .footer(720),
+        );
 
     if let Some(header) = &graph.header {
         if !header.title.is_empty() {
@@ -103,17 +115,15 @@ impl DocxWriter {
                 );
                 match list.variant {
                     ListVariant::Ordered | ListVariant::Callout => {
-                        docx = docx.add_abstract_numbering(
-                            AbstractNumbering::new(1).add_level(
-                                Level::new(
-                                    0,
-                                    Start::new(1),
-                                    NumberFormat::new("decimal"),
-                                    LevelText::new("\t%1."),
-                                    LevelJc::new("left"),
-                                ) // TODO: some indent? Better indent?
-                            ),
-                        );
+                        docx = docx.add_abstract_numbering(AbstractNumbering::new(1).add_level(
+                            Level::new(
+                                0,
+                                Start::new(1),
+                                NumberFormat::new("decimal"),
+                                LevelText::new("\t%1."),
+                                LevelJc::new("left"),
+                            ), // TODO: some indent? Better indent?
+                        ));
                         self.current_list_style = "List Numbered".into();
                     }
                     ListVariant::Unordered => {
@@ -193,13 +203,7 @@ impl DocxWriter {
     }
 
     fn get_header(&self) -> Header {
-        Header::new().add_page_num(
-            PageNum::new()
-                .wrap("none")
-                .v_anchor("text")
-                .h_anchor("margin")
-                .x_align("right"),
-        )
+        Header::new().add_page_num(PageNum::new().align(AlignmentType::Right))
     }
 }
 
@@ -285,4 +289,8 @@ fn runs_from_inline_with_variant<'a>(
         }
     }
     runs
+}
+
+fn inches(i: f32) -> u32 {
+    (DXA_INCH as f32 * i) as u32
 }
