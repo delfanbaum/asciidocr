@@ -58,7 +58,9 @@ impl DocxWriter {
             name: Name::new("Normal"),
             style_type: StyleType::Paragraph,
             run_property: RunProperty::new().size(24),
-            paragraph_property: ParagraphProperty::new().line_spacing(LineSpacing::new().line(480)),
+            paragraph_property: ParagraphProperty::new()
+                .line_spacing(LineSpacing::new().line(480))
+                .indent(None, Some(SpecialIndentType::FirstLine(720)), None, None),
             table_property: TableProperty::new(),
             table_cell_property: TableCellProperty::new(),
             based_on: None,
@@ -68,6 +70,7 @@ impl DocxWriter {
         let title = Style::new("Title", StyleType::Paragraph)
             .name("Title")
             .based_on("Normal")
+            .indent(None, Some(SpecialIndentType::FirstLine(0)), None, None)
             .bold();
         (normal, title)
     }
@@ -76,6 +79,31 @@ impl DocxWriter {
         if docx.styles.find_style_by_id(&style.style_id).is_none() {
             docx = docx.add_style(style)
         }
+        docx
+    }
+
+    fn add_title_and_text_styles(&self, mut docx: Docx, section_name: &str) -> Docx {
+        let title_style = format!("{} Title", section_name);
+        let text_style = format!("{} Text", section_name);
+        docx = self.add_style(
+            docx,
+            Style::new(&title_style, StyleType::Paragraph)
+                .name(&title_style)
+                .based_on("Title")
+                .bold(),
+        );
+        docx = self.add_style(
+            docx,
+            Style::new(&text_style, StyleType::Paragraph)
+                .name(&text_style)
+                .based_on("Normal")
+                .indent(
+                    Some(720),
+                    Some(SpecialIndentType::FirstLine(360)),
+                    Some(720),
+                    None,
+                ),
+        );
         docx
     }
 
@@ -88,7 +116,6 @@ impl DocxWriter {
         if let Some(style) = &self.current_style {
             if para.property.style.is_none() {
                 // don't overwrite styles
-                println!("Applying: {}", style);
                 para = para.style(style);
             }
         }
@@ -198,34 +225,14 @@ impl DocxWriter {
             },
             Block::BlockMacro(_) => todo!(),
             Block::LeafBlock(block) => {
-                let mut para = Paragraph::new().indent(
-                    None,
-                    Some(SpecialIndentType::FirstLine(720)),
-                    None,
-                    None,
-                );
+                let mut para = Paragraph::new();
                 para = add_inlines_to_para(para, block.inlines());
                 docx = self.add_paragraph(docx, para)
             }
             Block::ParentBlock(parent) => match parent.name {
                 ParentBlockName::Admonition => {
+                    docx = self.add_title_and_text_styles(docx, "Admonition");
                     self.current_style = Some("Admonition Text".into());
-                    docx = self.add_style(
-                        docx,
-                        Style::new("Admonition Text", StyleType::Paragraph)
-                            .name("Admonition Text")
-                            .indent(Some(720), None, None, None)
-                            .based_on("Normal"),
-                    );
-                    docx = self.add_style(
-                        docx,
-                        Style::new("Admonition Title", StyleType::Paragraph)
-                            .name("Admonition Title")
-                            .based_on("Normal")
-                            .next("Admonition Text")
-                            .bold()
-                            .indent(None, None, None, None),
-                    );
                     if let Some(variant) = &parent.variant {
                         docx = self.add_paragraph(
                             docx,
@@ -240,22 +247,8 @@ impl DocxWriter {
                     self.current_style = None;
                 }
                 ParentBlockName::Example => {
+                    docx = self.add_title_and_text_styles(docx, "Example");
                     self.current_style = Some("Example Text".into());
-                    docx = self.add_style(
-                        docx,
-                        Style::new("Example Title", StyleType::Paragraph)
-                            .name("Example Title")
-                            .based_on("Normal")
-                            .bold()
-                            .indent(None, None, None, None),
-                    );
-                    docx = self.add_style(
-                        docx,
-                        Style::new("Example Text", StyleType::Paragraph)
-                            .name("Example Text")
-                            .based_on("Normal")
-                            .indent(Some(720), None, None, None),
-                    );
                     if !parent.title.is_empty() {
                         let mut title = Paragraph::new().style("Example Title");
                         title = add_inlines_to_para(title, parent.title.clone());
@@ -266,7 +259,19 @@ impl DocxWriter {
                     }
                     self.current_style = None;
                 }
-                ParentBlockName::Sidebar => todo!(),
+                ParentBlockName::Sidebar => {
+                    docx = self.add_title_and_text_styles(docx, "Sidebar");
+                    self.current_style = Some("Sidebar Text".into());
+                    if !parent.title.is_empty() {
+                        let mut title = Paragraph::new().style("Sidebar Title");
+                        title = add_inlines_to_para(title, parent.title.clone());
+                        docx = self.add_paragraph(docx, title);
+                    }
+                    for child in parent.blocks.iter() {
+                        docx = self.add_block_to_doc(docx, child)
+                    }
+                    self.current_style = None;
+                }
                 ParentBlockName::Open => {
                     for child in parent.blocks.iter() {
                         docx = self.add_block_to_doc(docx, child)
@@ -274,7 +279,8 @@ impl DocxWriter {
                 }
                 ParentBlockName::Quote => todo!(),
                 ParentBlockName::Table => todo!(),
-                ParentBlockName::FootnoteContainer => todo!(),
+                // should not appear in this context, so just skip
+                ParentBlockName::FootnoteContainer => {}
             },
             Block::BlockMetadata(_) => todo!(),
             Block::TableCell(_) => todo!(),
