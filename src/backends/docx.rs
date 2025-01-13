@@ -88,7 +88,8 @@ impl DocxWriter {
         if let Some(style) = &self.current_style {
             if para.property.style.is_none() {
                 // don't overwrite styles
-                para = para.style(style)
+                println!("Applying: {}", style);
+                para = para.style(style);
             }
         }
 
@@ -211,20 +212,19 @@ impl DocxWriter {
                     self.current_style = Some("Admonition Text".into());
                     docx = self.add_style(
                         docx,
-                        Style::new("Admonition Title", StyleType::Paragraph)
-                            .name("Admonition Title")
-                            .based_on("Normal")
-                            .bold()
-                            .indent(Some(720), None, None, None),
+                        Style::new("Admonition Text", StyleType::Paragraph)
+                            .name("Admonition Text")
+                            .indent(Some(720), None, None, None)
+                            .based_on("Normal"),
                     );
                     docx = self.add_style(
                         docx,
-                        Style::new("Admonition Text", StyleType::Paragraph).indent(
-                            Some(720),
-                            None,
-                            None,
-                            None,
-                        ),
+                        Style::new("Admonition Title", StyleType::Paragraph)
+                            .name("Admonition Title")
+                            .based_on("Normal")
+                            .next("Admonition Text")
+                            .bold()
+                            .indent(None, None, None, None),
                     );
                     if let Some(variant) = &parent.variant {
                         docx = self.add_paragraph(
@@ -240,23 +240,21 @@ impl DocxWriter {
                     self.current_style = None;
                 }
                 ParentBlockName::Example => {
-                    self.current_style = Some("Admonition Text".into());
+                    self.current_style = Some("Example Text".into());
                     docx = self.add_style(
                         docx,
                         Style::new("Example Title", StyleType::Paragraph)
                             .name("Example Title")
                             .based_on("Normal")
                             .bold()
-                            .indent(Some(720), None, None, None),
+                            .indent(None, None, None, None),
                     );
                     docx = self.add_style(
                         docx,
-                        Style::new("Example Text", StyleType::Paragraph).indent(
-                            Some(720),
-                            None,
-                            None,
-                            None,
-                        ),
+                        Style::new("Example Text", StyleType::Paragraph)
+                            .name("Example Text")
+                            .based_on("Normal")
+                            .indent(Some(720), None, None, None),
                     );
                     if !parent.title.is_empty() {
                         let mut title = Paragraph::new().style("Example Title");
