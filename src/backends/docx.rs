@@ -72,6 +72,13 @@ impl DocxWriter {
         (normal, title)
     }
 
+    fn add_style(&self, mut docx: Docx, style: Style) -> Docx {
+        if docx.styles.find_style_by_id(&style.style_id).is_none() {
+            docx = docx.add_style(style)
+        }
+        docx
+    }
+
     fn add_paragraph(&mut self, docx: Docx, mut para: Paragraph) -> Docx {
         if self.page_break_before {
             para = para.page_break_before(true);
@@ -79,7 +86,8 @@ impl DocxWriter {
         }
 
         if let Some(style) = &self.current_style {
-            if para.property.style.is_none() { // don't overwrite styles
+            if para.property.style.is_none() {
+                // don't overwrite styles
                 para = para.style(style)
             }
         }
@@ -96,9 +104,10 @@ impl DocxWriter {
                         .name(&heading_style_name)
                         .based_on("Normal")
                         .bold();
+                    docx = self.add_style(docx, heading_style);
+
                     let mut para = Paragraph::new().style(&heading_style_name);
                     para = add_inlines_to_para(para, section.title());
-                    docx = docx.add_style(heading_style);
                     docx = self.add_paragraph(docx, para);
                 }
 
@@ -107,7 +116,8 @@ impl DocxWriter {
                 }
             }
             Block::List(list) => {
-                docx = docx.add_style(
+                docx = self.add_style(
+                    docx,
                     Style::new("List Paragraph", StyleType::Paragraph)
                         .name("List Paragraph")
                         .based_on("Normal"),
@@ -170,7 +180,8 @@ impl DocxWriter {
                     self.page_break_before = true;
                 }
                 BreakVariant::Thematic => {
-                    docx = docx.add_style(
+                    docx = self.add_style(
+                        docx,
                         Style::new("Thematic Break", StyleType::Paragraph)
                             .name("Thematic Break")
                             .based_on("Normal")
@@ -180,8 +191,7 @@ impl DocxWriter {
                         docx,
                         Paragraph::new()
                             .style("Thematic Break")
-                            .add_run(Run::new().add_text("#"))
-                            .align(AlignmentType::Center),
+                            .add_run(Run::new().add_text("#")),
                     )
                 }
             },
@@ -199,19 +209,23 @@ impl DocxWriter {
             Block::ParentBlock(parent) => match parent.name {
                 ParentBlockName::Admonition => {
                     self.current_style = Some("Admonition Text".into());
-                    docx = docx
-                        .add_style(
-                            Style::new("Admonition Title", StyleType::Paragraph)
-                                .name("Admonition Title")
-                                .based_on("Normal")
-                                .bold()
-                                .indent(Some(720), None, None, None),
-                        )
-                        .add_style(
-                            Style::new("Admonition Text", StyleType::Paragraph)
-                                .based_on("Normal")
-                                .indent(Some(720), None, None, None),
-                        );
+                    docx = self.add_style(
+                        docx,
+                        Style::new("Admonition Title", StyleType::Paragraph)
+                            .name("Admonition Title")
+                            .based_on("Normal")
+                            .bold()
+                            .indent(Some(720), None, None, None),
+                    );
+                    docx = self.add_style(
+                        docx,
+                        Style::new("Admonition Text", StyleType::Paragraph).indent(
+                            Some(720),
+                            None,
+                            None,
+                            None,
+                        ),
+                    );
                     if let Some(variant) = &parent.variant {
                         docx = self.add_paragraph(
                             docx,
@@ -227,19 +241,23 @@ impl DocxWriter {
                 }
                 ParentBlockName::Example => {
                     self.current_style = Some("Admonition Text".into());
-                    docx = docx
-                        .add_style(
-                            Style::new("Example Title", StyleType::Paragraph)
-                                .name("Example Title")
-                                .based_on("Normal")
-                                .bold()
-                                .indent(Some(720), None, None, None),
-                        )
-                        .add_style(
-                            Style::new("Example Text", StyleType::Paragraph)
-                                .based_on("Normal")
-                                .indent(Some(720), None, None, None),
-                        );
+                    docx = self.add_style(
+                        docx,
+                        Style::new("Example Title", StyleType::Paragraph)
+                            .name("Example Title")
+                            .based_on("Normal")
+                            .bold()
+                            .indent(Some(720), None, None, None),
+                    );
+                    docx = self.add_style(
+                        docx,
+                        Style::new("Example Text", StyleType::Paragraph).indent(
+                            Some(720),
+                            None,
+                            None,
+                            None,
+                        ),
+                    );
                     if !parent.title.is_empty() {
                         let mut title = Paragraph::new().style("Example Title");
                         title = add_inlines_to_para(title, parent.title.clone());
