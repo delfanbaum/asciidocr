@@ -33,5 +33,6 @@ fn parse_to_json_str(adoc_str: &str) -> PyResult<String> {
 
 #[pymodule]
 fn asciidocr(m: &Bound<'_, PyModule>) -> PyResult<()> {
-    m.add_function(wrap_pyfunction!(parse_to_html, m)?)
+    m.add_function(wrap_pyfunction!(parse_to_html, m)?);
+    m.add_function(wrap_pyfunction!(parse_to_json_str, m)?);
 }
