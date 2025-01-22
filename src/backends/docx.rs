@@ -57,7 +57,9 @@ impl DocxWriter {
             style_id: "Normal".into(),
             name: Name::new("Normal"),
             style_type: StyleType::Paragraph,
-            run_property: RunProperty::new().size(24),
+            run_property: RunProperty::new()
+                .size(24)
+                .fonts(RunFonts::new().ascii("Times New Roman")),
             paragraph_property: ParagraphProperty::new()
                 .line_spacing(LineSpacing::new().line(480))
                 .indent(None, Some(SpecialIndentType::FirstLine(720)), None, None),
@@ -364,6 +366,18 @@ fn runs_from_inline_with_variant<'a>(
                     match variant {
                         InlineSpanVariant::Strong => run = run.bold(),
                         InlineSpanVariant::Emphasis => run = run.italic(),
+                        InlineSpanVariant::Code => {
+                            run = run.fonts(RunFonts::new().ascii("Courier New"))
+                        }
+                        InlineSpanVariant::Mark => run = run.highlight("yellow"),
+                        InlineSpanVariant::Subscript => {
+                            run.run_property =
+                                RunProperty::new().vert_align(VertAlignType::SubScript)
+                        }
+                        InlineSpanVariant::Superscript => {
+                            run.run_property =
+                                RunProperty::new().vert_align(VertAlignType::SuperScript)
+                        }
                         _ => {} // TODO but not blocking; just adds the literal
                     }
                 }
