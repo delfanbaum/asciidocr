@@ -322,17 +322,7 @@ fn runs_from_inline(inline: &Inline) -> Vec<Run> {
     match inline {
         Inline::InlineLiteral(lit) => {
             // replace non-significant newlines with space, as it would appear in HTML
-            let mut run = Run::new().add_text(lit.value_or_refd_char().replace("\n", " "));
-            if !variants.is_empty() {
-                for variant in variants {
-                    match variant {
-                        InlineSpanVariant::Strong => run = run.bold(),
-                        InlineSpanVariant::Emphasis => run = run.italic(),
-                        _ => {} // TODO but not blocking; just adds the literal
-                    }
-                }
-            }
-            runs.push(run)
+            runs.push(Run::new().add_text(lit.value_or_refd_char().replace("\n", " ")));
         }
         Inline::InlineSpan(span) => {
             variants.push(&span.variant);
@@ -378,7 +368,10 @@ fn runs_from_inline_with_variant<'a>(
                             run.run_property =
                                 RunProperty::new().vert_align(VertAlignType::SuperScript)
                         }
-                        _ => {} // TODO but not blocking; just adds the literal
+                        InlineSpanVariant::Footnote => {
+                            eprintln!("Footnotes are not well supported; footnote text will be included in-line and higlighted for the time being.");
+                            run = run.highlight("blue")
+                        }
                     }
                 }
             }
