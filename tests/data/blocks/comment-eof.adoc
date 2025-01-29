@@ -1,0 +1,10 @@
+This should just be a single paragraph!
+
+////
+
+** Even if there are star and other characters
+
+The comment info in here should not be included,
+even if the final line is a comment block line.
+
+////

@@ -2,7 +2,12 @@
 
 use core::panic;
 use std::{
-    collections::{HashMap, VecDeque}, env, fmt::Debug, fs, path::{Path, PathBuf}, str::FromStr
+    collections::{HashMap, VecDeque},
+    env,
+    fmt::Debug,
+    fs,
+    path::{Path, PathBuf},
+    str::FromStr,
 };
 
 use log::{error, warn};
@@ -16,8 +21,8 @@ use crate::graph::{
     metadata::{AttributeType, ElementMetadata},
     nodes::{Header, Location},
 };
-use crate::scanner::Scanner;
 use crate::scanner::tokens::{Token, TokenType};
+use crate::scanner::Scanner;
 
 /// Parses a stream of tokens into an [`Asg`] (Abstract Syntax Graph), returning the graph once all
 /// tokens have been parsed.
@@ -167,7 +172,7 @@ impl Parser {
                         return;
                     }
                 }
-                TokenType::PassthroughBlock | TokenType::LiteralBlock => {
+                TokenType::PassthroughBlock | TokenType::LiteralBlock | TokenType::CommentBlock => {
                     if token.token_type() != token_type {
                         self.parse_text(token);
                         return;

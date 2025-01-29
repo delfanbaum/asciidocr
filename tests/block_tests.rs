@@ -115,6 +115,14 @@ fn test_delimited_blocks_no_meta_spaces(#[case] delimiter: &str, #[case] name: &
     assert_parsed_doc_matches_expected_asg_from_str(&adoc_str, &asg_json_str)
 }
 
+#[test]
+fn test_delimited_comment_at_eof() {
+    let fn_pattern = "blocks/comment-eof";
+    let adoc_fn = format!("{}.adoc", fn_pattern);
+    let asg_json_fn = format!("{}.json", fn_pattern);
+    assert_parsed_doc_matches_expected_asg(&adoc_fn, &asg_json_fn)
+}
+
 #[rstest]
 #[case::note("NOTE")]
 #[case::note("TIP")]
