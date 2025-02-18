@@ -146,12 +146,12 @@ impl DocxWriter {
                 }
             }
             Block::List(list) => {
-                docx = self.add_style(
-                    docx,
-                    Style::new("List Paragraph", StyleType::Paragraph)
-                        .name("List Paragraph")
-                        .based_on("Normal"),
-                );
+                //docx = self.add_style(
+                //    docx,
+                //    Style::new("List Paragraph", StyleType::Paragraph)
+                //        .name("List Paragraph")
+                //        .based_on("Normal"),
+                //);
                 match list.variant {
                     ListVariant::Ordered | ListVariant::Callout => {
                         docx = docx.add_abstract_numbering(AbstractNumbering::new(1).add_level(
@@ -159,11 +159,11 @@ impl DocxWriter {
                                 0,
                                 Start::new(1),
                                 NumberFormat::new("decimal"),
-                                LevelText::new("\t%1."),
+                                LevelText::new("%1."),
                                 LevelJc::new("left"),
                             ), // TODO: some indent? Better indent?
                         ));
-                        self.current_style = Some("List Numbered".into());
+                        self.current_style = Some("ListNumbered".into());
                     }
                     ListVariant::Unordered => {
                         docx = docx.add_abstract_numbering(AbstractNumbering::new(2).add_level(
@@ -175,7 +175,7 @@ impl DocxWriter {
                                 LevelJc::new("left"),
                             ),
                         ));
-                        self.current_style = Some("List Bullet".into());
+                        self.current_style = Some("ListParagraph".into());
                     }
                 }
                 for item in list.items.iter() {
@@ -184,10 +184,10 @@ impl DocxWriter {
             }
             Block::ListItem(item) => {
                 // add principal with the correct variant match
-                let mut para = Paragraph::new().style("List Paragraph");
+                let mut para = Paragraph::new().style("ListParagraph");
                 match &self.current_style {
                     Some(style) => match style.as_str() {
-                        "List Numbered" => {
+                        "ListNumbered" => {
                             para = para.numbering(NumberingId::new(1), IndentLevel::new(0))
                         }
                         _ => {}
