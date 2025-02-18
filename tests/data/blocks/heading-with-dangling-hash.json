@@ -3,33 +3,31 @@
   "type": "block",
   "blocks": [
     {
-      "name": "paragraph",
+      "name": "section",
       "type": "block",
-      "inlines": [
+      "title": [
         {
           "name": "text",
           "type": "string",
-          "value": "# This heading should only have text, not a highlighted #1",
+          "value": "This heading should only have text, not a highlighted #1",
           "location": [
             {
               "line": 1,
-              "col": 1
+              "col": 4
             },
             {
               "line": 1,
-              "col": 58
+              "col": 57
             }
           ]
         }
       ],
+      "level": 1,
+      "blocks": [],
       "location": [
         {
           "line": 1,
           "col": 1
-        },
-        {
-          "line": 1,
-          "col": 58
         }
       ]
     }
@@ -41,7 +39,7 @@
     },
     {
       "line": 1,
-      "col": 58
+      "col": 1
     }
   ]
 }

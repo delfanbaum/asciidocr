@@ -1,1 +1,1 @@
-# This heading should only have text, not a highlighted #1
+== This heading should only have text, not a highlighted #1
