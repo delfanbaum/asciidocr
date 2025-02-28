@@ -10,14 +10,23 @@ pub struct Cli {
     /// Asciidoc file for processing. To read from standard input (stdin), use "-".
     pub file: String,
 
-    /// Optionally provide a filename for the output.
+    /// Provide a filename for the output.
     /// To send to standard out (stdout), use "-".
     #[arg(short = 'o', long = "out-file")]
     pub output: Option<String>,
 
-    /// Optionally select a backend for conversion.
+    /// Select a backend for conversion.
     #[arg(value_enum, short = 'b', long = "backend", default_value = "htmlbook")]
     pub backend: Backends,
+
+    ///
+    #[arg(short = 'e', long = "embedded")]
+    pub embedded: Option<bool>,
+
+    /// Provide a stylesheet to be embedded inside the resultant document `head` (applies to the
+    /// HTML backend only; this flag is ignored when used with other backends)
+    #[arg(short = 's', long = "stylesheet")]
+    pub embed_stylesheet: Option<String>,
 }
 
 pub fn read_input(args: &Cli) -> String {
