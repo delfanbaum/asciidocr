@@ -185,14 +185,13 @@ impl DocxWriter {
             Block::ListItem(item) => {
                 // add principal with the correct variant match
                 let mut para = Paragraph::new().style("ListParagraph");
-                match &self.current_style {
-                    Some(style) => match style.as_str() {
+                if let Some(style) = &self.current_style {
+                    match style.as_str() {
                         "ListNumbered" => {
                             para = para.numbering(NumberingId::new(1), IndentLevel::new(0))
                         }
                         _ => {}
-                    },
-                    _ => {}
+                    }
                 }
                 para = add_inlines_to_para(para, item.principal());
                 docx = self.add_paragraph(docx, para);

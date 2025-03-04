@@ -20,12 +20,13 @@ pub struct Cli {
     pub backend: Backends,
 
     /// Produces an embeddable document, which includes only content that would normally fall
-    /// inside the `<body>` tags
+    /// inside the `<body>` tags (applies to the HTML backend only; this flag is ignored when used
+    /// with other backends).
     #[arg(short = 'e', long = "embedded")]
     pub embedded: bool,
 
     /// Provide a stylesheet to be embedded inside the resultant document `head` (applies to the
-    /// HTML backend only; this flag is ignored when used with other backends)
+    /// HTML backend only; this flag is ignored when used with other backends).
     #[arg(short = 's', long = "stylesheet")]
     pub embed_stylesheet: Option<String>,
 }

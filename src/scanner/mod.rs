@@ -17,7 +17,7 @@ pub struct Scanner<'a> {
     file_stack: Vec<String>,
 }
 
-impl<'a> Iterator for Scanner<'a> {
+impl Iterator for Scanner<'_> {
     type Item = Token;
 
     fn next(&mut self) -> Option<Self::Item> {
