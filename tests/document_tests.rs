@@ -35,6 +35,16 @@ fn test_nested_includes() {
 }
 
 #[test]
+/// Test that we pull reference text from the target into reference as an inline but when it's an
+/// include
+fn test_title_only() {
+    let fn_pattern = "documents/title-only";
+    let adoc_fn = format!("{}.adoc", fn_pattern);
+    let asg_json_fn = format!("{}.json", fn_pattern);
+    assert_parsed_doc_matches_expected_asg(&adoc_fn, &asg_json_fn)
+}
+
+#[test]
 ///Smoke test for "have we covered enough" -- will be added to as we go along and do not panic
 fn test_targeted_coverage() {
     let adoc_fn = "tests/data/documents/minimum.adoc";

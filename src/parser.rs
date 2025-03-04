@@ -26,6 +26,7 @@ use crate::scanner::Scanner;
 
 /// Parses a stream of tokens into an [`Asg`] (Abstract Syntax Graph), returning the graph once all
 /// tokens have been parsed.
+#[derive(Debug)]
 pub struct Parser {
     /// Where the parsing "starts," i.e., the adoc file passed to the script
     origin_directory: PathBuf,
@@ -327,11 +328,7 @@ impl Parser {
                 }
             }
 
-            _ => {
-                // self check
-                println!("\"{:?}\" not implemented", token.token_type());
-                todo!()
-            }
+            TokenType::Eof => self.check_and_move_header(asg),
         }
     }
 
@@ -367,6 +364,18 @@ impl Parser {
         self.force_new_block = true;
     }
 
+    /// Handle document header
+    fn check_and_move_header(&mut self, asg: &mut Asg) {
+        if !self.document_header.is_empty() {
+            self.document_header.consolidate();
+            asg.add_header(
+                self.document_header.clone(),
+                self.document_attributes.clone(),
+            )
+        }
+        self.in_document_header = false
+    }
+
     /// New line characters are arguably the most significant token "signal" we can get, and as
     /// such the parse function is a little complicated.
     fn parse_new_line_char(&mut self, token: Token, asg: &mut Asg) {
@@ -385,14 +394,7 @@ impl Parser {
             // clear any dangling newline
             self.dangling_newline = None;
             if self.in_document_header {
-                if !self.document_header.is_empty() {
-                    self.document_header.consolidate();
-                    asg.add_header(
-                        self.document_header.clone(),
-                        self.document_attributes.clone(),
-                    )
-                }
-                self.in_document_header = false
+                self.check_and_move_header(asg);
             } else {
                 // consolidate any dangling list items
                 if let Some(Block::ListItem(_)) = self.block_stack.last() {
@@ -1120,7 +1122,7 @@ impl Parser {
             if let Some(inline) = children.front_mut() {
                 match inline {
                     Inline::InlineLiteral(literal) => {
-                        literal.prepend_to_value(open_span_literal, open_span.locations())
+                        literal.prepend_to_value(open_span_literal, open_span.locations());
                     }
                     _ => todo!(),
                 }
@@ -1128,10 +1130,27 @@ impl Parser {
                 for child_inline in children {
                     self.inline_stack.insert(open_span_idx, child_inline)
                 }
+
+                // consolidate any resultant or remaining adjacent literals (this should be extracted to a function)
+                let mut temp_stack: VecDeque<Inline> = VecDeque::new();
+                let mut inline_stack_iter = self.inline_stack.iter_mut().peekable();
+                while inline_stack_iter.peek().is_some() {
+                    if let Some(current) = inline_stack_iter.next() {
+                        if let Inline::InlineLiteral(current_literal) = current {
+                            if let Some(Inline::InlineLiteral(next_literal)) =
+                                inline_stack_iter.next()
+                            {
+                                current_literal.combine_literals(next_literal.clone());
+                            }
+                        }
+                        temp_stack.push_back(current.clone());
+                    }
+                }
+                self.inline_stack = temp_stack;
             } else {
                 // ... or if there are no children, to the back
                 // this is hacky, but it is cleaner compared to the rest of the code just to
-                // create a token and reuse the existing function
+                // create a token and reuse the existing functio n
                 let (line, startcol, endcol) =
                     Location::destructure_inline_locations(open_span.locations());
                 let reconstituted_token = Token {

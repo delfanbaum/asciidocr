@@ -52,7 +52,7 @@ pub fn read_output(args: Cli) -> Option<PathBuf> {
                 match args.backend {
                     Backends::Htmlbook => out_destination.set_extension("html"),
                     Backends::Json => out_destination.set_extension("json"),
-                    #[cfg(feature = "docx")]
+                    //#[cfg(feature = "docx")]
                     Backends::Docx => out_destination.set_extension("docx"),
                 };
                 Some(out_destination)

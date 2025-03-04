@@ -73,6 +73,18 @@ impl Token {
         }
     }
 
+    pub fn final_token(line: usize, file_stack: Vec<String>) -> Self {
+        Token {
+            token_type: TokenType::Eof,
+            lexeme: "".to_string(),
+            literal: None,
+            line,
+            startcol: 0,
+            endcol: 0,
+            file_stack,
+        }
+    }
+
     /// Convince function to return the [`TokenType`] for matching
     pub fn token_type(&self) -> TokenType {
         self.token_type

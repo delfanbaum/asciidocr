@@ -1,4 +1,4 @@
-#[cfg(feature = "docx")]
+//#[cfg(feature = "docx")]
 #[cfg(test)]
 mod docx_tests {
     use std::fs;
