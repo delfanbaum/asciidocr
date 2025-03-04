@@ -5,6 +5,7 @@
 //! - Docx (experimental and still very much in-progress; but good enough for "simple" documents without tables, images, etc.)
 //!
 
+#[cfg(feature = "docx")]
 pub mod docx;
 pub mod htmls;
 
@@ -21,7 +22,7 @@ pub enum Backends {
     /// provided as FILE, this backend serves as an Asciidoc TCK adapter
     Json,
 
-    //#[cfg(feature = "docx")]
+    #[cfg(feature = "docx")]
     /// !Experimental! Produces a "manuscript-styled" DOCX document.
     Docx,
 }
