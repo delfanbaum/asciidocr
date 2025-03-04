@@ -619,6 +619,11 @@ impl InlineLiteral {
         self.location = Location::reconcile(self.location.clone(), inline.locations().clone());
     }
 
+    pub fn combine_literals(&mut self, inline: InlineLiteral) {
+        self.value.push_str(&inline.value());
+        self.location = Location::reconcile(self.location.clone(), inline.location.clone());
+    }
+
     pub fn prepend_to_value(&mut self, value: String, value_locations: Vec<Location>) {
         // add the value
         self.value.insert_str(0, &value);

@@ -1,45 +1,49 @@
 {
-  "name": "document",
-  "type": "block",
-  "blocks": [
-    {
-      "name": "section",
-      "type": "block",
-      "title": [
+    "name": "document",
+    "type": "block",
+    "blocks": [
         {
-          "name": "text",
-          "type": "string",
-          "value": "This heading should only have text, not a highlighted #1",
-          "location": [
-            {
-              "line": 1,
-              "col": 4
-            },
-            {
-              "line": 1,
-              "col": 57
-            }
-          ]
+            "name": "section",
+            "type": "block",
+            "title": [
+                {
+                    "name": "text",
+                    "type": "string",
+                    "value": "This heading should only have text, not a highlighted #1",
+                    "location": [
+                        {
+                            "line": 1,
+                            "col": 4
+                        },
+                        {
+                            "line": 1,
+                            "col": 59
+                        }
+                    ]
+                }
+            ],
+            "level": 1,
+            "blocks": [],
+            "location": [
+                {
+                    "line": 1,
+                    "col": 1
+                },
+                {
+                    "line": 1,
+                    "col": 59
+                }
+            ]
         }
-      ],
-      "level": 1,
-      "blocks": [],
-      "location": [
+    ],
+    "location": [
         {
-          "line": 1,
-          "col": 1
+            "line": 1,
+            "col": 1
+        },
+        {
+            "line": 1,
+            "col": 59
         }
-      ]
-    }
-  ],
-  "location": [
-    {
-      "line": 1,
-      "col": 1
-    },
-    {
-      "line": 1,
-      "col": 1
-    }
-  ]
+    ]
 }

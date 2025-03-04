@@ -13,6 +13,7 @@ pub struct Scanner<'a> {
     startcol: usize,
     current: usize,
     line: usize,
+    scanning: bool, // flag to let us know when we're done with a file
     file_stack: Vec<String>,
 }
 
@@ -23,6 +24,10 @@ impl<'a> Iterator for Scanner<'a> {
         if !self.is_at_end() {
             self.start = self.current;
             return Some(self.scan_token());
+        }
+        if self.scanning {
+            self.scanning = false;
+            return Some(Token::final_token(self.line, self.file_stack.clone()));
         }
         None
     }
@@ -36,6 +41,7 @@ impl<'a> Scanner<'a> {
             startcol: 1, // because asciidoc spec wants start/end locations
             current: 0,  // the character we're looking at *now*
             line: 1,
+            scanning: true,
             file_stack: vec![],
         }
     }
@@ -47,6 +53,7 @@ impl<'a> Scanner<'a> {
             startcol: 1, // because asciidoc spec wants start/end locations
             current: 0,  // the character we're looking at *now*
             line: 1,
+            scanning: true,
             file_stack,
         }
     }
@@ -199,7 +206,6 @@ impl<'a> Scanner<'a> {
                 {
                     self.current += 1;
                     self.add_token(TokenType::CloseDoubleQuote, true, 0)
-
                 } else {
                     self.handle_inline_formatting(
                         c,
@@ -674,9 +680,12 @@ mod tests {
 
     use super::*;
 
+    // NOTE: ignoring the EOF here for simplicity's sake
     fn scan_and_assert_eq(markup: &str, expected_tokens: Vec<Token>) {
         let s = Scanner::new(markup);
-        assert_eq!(s.collect::<Vec<Token>>(), expected_tokens);
+        let mut scanned_tokens = s.collect::<Vec<Token>>();
+        let _ = scanned_tokens.pop();
+        assert_eq!(scanned_tokens, expected_tokens);
     }
 
     fn newline_token_at(line: usize, col: usize) -> Token {

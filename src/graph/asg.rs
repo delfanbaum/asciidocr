@@ -92,6 +92,11 @@ impl Asg {
     pub fn consolidate_locations(&mut self) {
         if let Some(last_block) = self.blocks.last_mut() {
             self.location = Location::reconcile(self.location.clone(), last_block.locations())
+        } else {
+            // if there is only a header, for example, or nothing
+            if let Some(header) = &self.header {
+                self.location = Location::reconcile(self.location.clone(), header.location.clone())
+            }
         }
     }
 

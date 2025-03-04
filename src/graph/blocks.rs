@@ -572,9 +572,14 @@ impl Block {
     pub fn consolidate_locations(&mut self) {
         match self {
             Block::Section(block) => {
-                if let Some(last_inline) = block.blocks.last() {
+                // consolidate the inlines/title
+                if let Some(last_inline) = block.inlines.last() {
                     block.location =
                         Location::reconcile(block.location.clone(), last_inline.locations())
+                }
+                if let Some(last_block) = block.blocks.last() {
+                    block.location =
+                        Location::reconcile(block.location.clone(), last_block.locations())
                 }
             }
             Block::LeafBlock(block) => {
