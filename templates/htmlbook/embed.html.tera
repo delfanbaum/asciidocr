@@ -1,0 +1,6 @@
+{% import "inline.html.tera" as inline_macros %}
+{% import "block.html.tera" as block_macros %}
+
+{% for block in blocks %}
+    {{ block_macros::process_block(block=block,skip_tag=false) -}}
+{% endfor %}

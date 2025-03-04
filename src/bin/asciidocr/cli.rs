@@ -19,9 +19,10 @@ pub struct Cli {
     #[arg(value_enum, short = 'b', long = "backend", default_value = "htmlbook")]
     pub backend: Backends,
 
-    ///
+    /// Produces an embeddable document, which includes only content that would normally fall
+    /// inside the `<body>` tags
     #[arg(short = 'e', long = "embedded")]
-    pub embedded: Option<bool>,
+    pub embedded: bool,
 
     /// Provide a stylesheet to be embedded inside the resultant document `head` (applies to the
     /// HTML backend only; this flag is ignored when used with other backends)

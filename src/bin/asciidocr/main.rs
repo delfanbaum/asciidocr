@@ -35,7 +35,7 @@ fn run(args: Cli) -> Result<()> {
     let graph = AdocParser::new(PathBuf::from(&args.file)).parse(Scanner::new(&read_input(&args)));
     match args.backend {
         Backends::Htmlbook => {
-            render_string(render_htmlbook(&graph)?, read_output(args));
+            render_string(render_htmlbook(&graph, args.embedded)?, read_output(args));
             Ok(())
         }
         Backends::Json => {
