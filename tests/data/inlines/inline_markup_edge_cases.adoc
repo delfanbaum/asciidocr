@@ -1,0 +1,2 @@
+"#" for the thematic breaks was too much, maybe use a "~" instead, or "•",
+or just use white space.
