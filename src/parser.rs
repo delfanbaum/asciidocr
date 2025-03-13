@@ -714,6 +714,9 @@ impl Parser {
                 self.add_text_to_last_inline(newline_token);
                 self.dangling_newline = None;
             }
+            // check for any other dangling spans (otherwise they disappear!)
+            self.handle_dangling_spans();
+            // add any metadata to new inline
             if self.metadata.is_some() {
                 inline.add_metadata(self.metadata.as_ref().unwrap().clone());
                 self.metadata = None;
@@ -1095,25 +1098,13 @@ impl Parser {
         }
     }
 
-    fn add_inlines_to_block_stack(&mut self) {
-        // guard
-        if self.inline_stack.is_empty() {
-            return;
-        }
-
-        // dangling inlines
-        if self.in_inline_span {
-            // look for the last span in the stack
-            let Some(open_span_idx) = self
-                .inline_stack
-                .iter()
-                .rposition(|inline| inline.is_open())
-            else {
-                error!("Unknown error with mismatched inline style delimiters");
-                std::process::exit(70) // this might be useful to the user as opposed to a
-                                       // panic; exit code 70 is, I read, sometimes used for "EX_SOFTWARE", "Internal
-                                       // Software Error"
-            };
+    fn handle_dangling_spans(&mut self) {
+        // look for the last span in the stack
+        if let Some(open_span_idx) = self
+            .inline_stack
+            .iter()
+            .rposition(|inline| inline.is_open())
+        {
             let mut open_span = self.inline_stack.remove(open_span_idx).unwrap();
             let open_span_literal = open_span.produce_literal_from_self();
             // put the literal char into the stack as a literal...
@@ -1164,6 +1155,18 @@ impl Parser {
                 };
                 self.add_text_to_last_inline(reconstituted_token)
             }
+        }
+    }
+
+    fn add_inlines_to_block_stack(&mut self) {
+        // guard
+        if self.inline_stack.is_empty() {
+            return;
+        }
+
+        // dangling inlines
+        if self.in_inline_span {
+            self.handle_dangling_spans();
         }
 
         if let Some(last_block) = self.block_stack.last_mut() {
