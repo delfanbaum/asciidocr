@@ -1139,9 +1139,9 @@ impl Parser {
                 }
                 self.inline_stack = temp_stack;
             } else {
-                // ... or if there are no children, to the back
-                // this is hacky, but it is cleaner compared to the rest of the code just to
-                // create a token and reuse the existing functio n
+                // ... or if there are no children, add the token to the back of the last one; this
+                // is a little hacky, but it is cleaner compared to the rest of the code just to
+                // create a token and reuse the existing function
                 let (line, startcol, endcol) =
                     Location::destructure_inline_locations(open_span.locations());
                 let reconstituted_token = Token {
