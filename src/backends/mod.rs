@@ -7,6 +7,7 @@
 
 #[cfg(feature = "docx")]
 pub mod docx;
+
 pub mod htmls;
 
 use clap::ValueEnum;
