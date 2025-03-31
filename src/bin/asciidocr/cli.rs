@@ -58,6 +58,7 @@ pub fn read_output(args: Cli) -> Option<PathBuf> {
                     Backends::Json => out_destination.set_extension("json"),
                     #[cfg(feature = "docx")]
                     Backends::Docx => out_destination.set_extension("docx"),
+                    Backends::Term => todo!(),  // really this should never be reached
                 };
                 Some(out_destination)
             }

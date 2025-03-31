@@ -27,6 +27,9 @@ pub struct Asg {
     #[serde(skip)]
     /// Has of all IDs in the document, and the references they point to
     document_id_hash: HashMap<String, Vec<Inline>>,
+    #[serde(skip)]
+    /// Source of the graph, i.e., the asciidoc file that generated it
+    pub source: Option<String>,
     /// Document contents
     pub blocks: Vec<Block>,
     /// Marks the start and end of document
@@ -35,12 +38,12 @@ pub struct Asg {
 
 impl Default for Asg {
     fn default() -> Self {
-        Self::new()
+        Self::new(None)
     }
 }
 
 impl Asg {
-    pub fn new() -> Self {
+    pub fn new(source: Option<String>) -> Self {
         Asg {
             name: "document".to_string(),
             node_type: NodeTypes::Block,
@@ -48,6 +51,7 @@ impl Asg {
             header: None,
             document_id: "".to_string(),
             document_id_hash: HashMap::new(),
+            source,
             blocks: vec![],
             location: vec![Location::default()],
         }
@@ -140,6 +144,21 @@ impl Asg {
     pub fn word_count(&self) -> usize {
         self.all_text().split_whitespace().count()
     }
+
+    pub fn title(&self) -> String {
+        if let Some(header) = &self.header {
+            let mut header_text = String::new();
+            for inline in header.title.iter() {
+                header_text.push_str(&inline.extract_values_to_string());
+            }
+            header_text
+        } else {
+            match &self.source {
+                Some(source) => source.clone(),
+                None => "".to_string(),
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -167,7 +186,7 @@ mod tests {
             vec![],
             vec![footnote],
         ));
-        let mut graph = Asg::new();
+        let mut graph = Asg::default();
         graph.document_id = "test".into();
         graph.push_block(some_leaf);
         assert_eq!(graph.blocks.len(), 1);

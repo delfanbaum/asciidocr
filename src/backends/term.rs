@@ -12,19 +12,27 @@ use crate::graph::asg::Asg;
 
 #[derive(Default, Debug)]
 pub struct TermView {
+    graph: Asg,
     exit: bool,
 }
 
 impl TermView {
-    pub fn run(&mut self, terminal: &mut DefaultTerminal, asg: Asg) -> Result<()> {
+    pub fn new(graph: Asg) -> Self {
+        TermView {
+            graph,
+            exit: false,
+        }
+    }
+
+    pub fn run(mut self, terminal: &mut DefaultTerminal) -> Result<()> {
         while !self.exit {
-            terminal.draw(|frame| self.render(frame, &asg))?;
+            terminal.draw(|frame| self.render(frame))?;
             self.handle_events()?;
         }
         Ok(())
     }
 
-    pub fn render(&self, frame: &mut Frame, _asg: &Asg) {
+    pub fn render(&self, frame: &mut Frame) {
         frame.render_widget(self, frame.area());
     }
 
@@ -49,6 +57,7 @@ impl TermView {
     fn exit(&mut self) {
         self.exit = true
     }
+
 }
 
 impl Widget for &TermView {
@@ -56,12 +65,12 @@ impl Widget for &TermView {
     where
         Self: Sized,
     {
-        let title = Line::from(" Counter App Tutorial ".bold());
+        let title = Line::from(self.graph.title().bold());
         let instructions = Line::from(vec![
-            " Decrement ".into(),
-            "<Left>".blue().bold(),
-            " Increment ".into(),
-            "<Right>".blue().bold(),
+            " Scroll Up ".into(),
+            "<k, up-arror>".blue().bold(),
+            " Scroll down ".into(),
+            "<j, down-arrow>".blue().bold(),
             " Quit ".into(),
             "<Q> ".blue().bold(),
         ]);

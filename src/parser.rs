@@ -29,6 +29,8 @@ use crate::scanner::Scanner;
 #[derive(Debug)]
 pub struct Parser {
     /// Where the parsing "starts," i.e., the adoc file passed to the script
+    origin: PathBuf,
+    /// Directory from which the parsing "starts"
     origin_directory: PathBuf,
     /// allows for "what just happened" matching
     last_token_type: TokenType,
@@ -96,6 +98,7 @@ impl Parser {
             .unwrap_or(&env::current_dir().unwrap())
             .to_path_buf();
         Parser {
+            origin,
             origin_directory,
             last_token_type: TokenType::Eof,
             document_header: None,
@@ -122,7 +125,15 @@ impl Parser {
     where
         I: Iterator<Item = Token>,
     {
-        let mut asg = Asg::new();
+        // TODO add origin as source if not directory
+        let mut asg = Asg::default();
+        if self.origin.exists() {
+            if let Some(file_str) = self.origin.file_name() {
+                if let Some(s) = file_str.to_str() {
+                    asg.source = Some(s.to_string())
+                }
+            }
+        }
         for token in tokens {
             let token_type = token.token_type();
             self.token_into(token, &mut asg);
