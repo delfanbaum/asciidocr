@@ -3,12 +3,14 @@ use ratatui::{
     crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind},
     style::Stylize,
     symbols::border,
-    text::Line,
-    widgets::{Block, Paragraph, Widget},
+    text::{Line, Text},
+    widgets::{Block, Paragraph, Widget, Wrap},
     DefaultTerminal, Frame,
 };
 
 use crate::graph::asg::Asg;
+
+use super::components::line_from_block;
 
 #[derive(Default, Debug)]
 pub struct TermView {
@@ -72,18 +74,23 @@ impl Widget for &TermView {
             " Scroll down ".into(),
             "<j, down-arrow>".blue().bold(),
             " Quit ".into(),
-            "<Q> ".blue().bold(),
+            "<q> ".blue().bold(),
         ]);
-        let block = Block::bordered()
+        let container = Block::bordered()
             .title(title.centered())
             .title_bottom(instructions.centered())
             .border_set(border::THICK);
 
-        let counter_text = "foo";
+        let mut contents: Vec<Line> = vec![];
 
-        Paragraph::new(counter_text)
-            .centered()
-            .block(block)
+        for block in self.graph.blocks.iter() {
+            contents.push(line_from_block(block))
+        }
+        let text = Text::from(contents);
+
+        Paragraph::new(text)
+            .block(container)
+            .wrap(Wrap { trim: true })
             .render(area, buf);
     }
 }
