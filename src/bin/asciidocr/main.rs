@@ -6,7 +6,7 @@ use simple_logger::SimpleLogger;
 use std::{fs, path::PathBuf};
 
 use asciidocr::{
-    backends::{htmls::render_htmlbook, term::TermView, Backends},
+    backends::{htmls::render_htmlbook, terminal::viewer::TermView, Backends},
     parser::Parser as AdocParser,
     scanner::Scanner,
 };
