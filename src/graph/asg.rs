@@ -140,21 +140,6 @@ impl Asg {
         }
         graph_text
     }
-
-    pub fn title(&self) -> String {
-        if let Some(header) = &self.header {
-            let mut header_text = String::new();
-            for inline in header.title.iter() {
-                header_text.push_str(&inline.extract_values_to_string());
-            }
-            header_text
-        } else {
-            match &self.source {
-                Some(source) => source.clone(),
-                None => "".to_string(),
-            }
-        }
-    }
 }
 
 #[cfg(test)]
