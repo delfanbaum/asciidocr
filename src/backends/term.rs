@@ -18,10 +18,7 @@ pub struct TermView {
 
 impl TermView {
     pub fn new(graph: Asg) -> Self {
-        TermView {
-            graph,
-            exit: false,
-        }
+        TermView { graph, exit: false }
     }
 
     pub fn run(mut self, terminal: &mut DefaultTerminal) -> Result<()> {
@@ -57,7 +54,6 @@ impl TermView {
     fn exit(&mut self) {
         self.exit = true
     }
-
 }
 
 impl Widget for &TermView {
@@ -65,7 +61,11 @@ impl Widget for &TermView {
     where
         Self: Sized,
     {
-        let title = Line::from(self.graph.title().bold());
+        let title = match &self.graph.source {
+            Some(title) => Line::from(format!(" {title} ").bold()),
+            None => Line::from(" STDIN "),
+        };
+
         let instructions = Line::from(vec![
             " Scroll Up ".into(),
             "<k, up-arror>".blue().bold(),
