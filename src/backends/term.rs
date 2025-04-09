@@ -5,85 +5,112 @@ use anyhow::Result;
 use std::io::Write;
 use termcolor::{Buffer, BufferWriter, Color, ColorSpec, WriteColor};
 
-pub fn render_to_term(graph: &Asg) -> Result<()> {
-    let bufwriter = BufferWriter::stdout(termcolor::ColorChoice::Auto);
-    let mut buffer = bufwriter.buffer();
-
-    for block in graph.blocks.iter() {
-        render_block(block, &mut buffer, &bufwriter)?;
-        buffer.reset()?;
-    }
-    bufwriter.print(&buffer)?;
-
-    Ok(())
+pub struct TermRenderer {
+    writer: BufferWriter,
+    buffer: Buffer,
+    line_length: usize,
+    count: usize,
 }
 
-fn render_block(block: &Block, buffer: &mut Buffer, writer: &BufferWriter) -> Result<()> {
-    for inline in block.inlines() {
-        render_inline(inline, buffer, writer, true)?
+impl Default for TermRenderer {
+    fn default() -> Self {
+        Self::new(80)
     }
-
-    // newlines after block
-    write!(buffer, "\n\n")?;
-    Ok(())
 }
 
-fn render_inline(
-    inline: &Inline,
-    buffer: &mut Buffer,
-    writer: &BufferWriter,
-    reset: bool,
-) -> Result<()> {
-    match inline {
-        Inline::InlineLiteral(literal) => {
-            write!(buffer, "{}", literal.string_repr())?;
+impl TermRenderer {
+    pub fn new(line_length: usize) -> Self {
+        let writer = BufferWriter::stdout(termcolor::ColorChoice::Auto);
+        let buffer = writer.buffer();
+        Self {
+            writer,
+            buffer,
+            line_length,
+            count: 0,
         }
-        Inline::InlineSpan(ref span) => match span.variant {
-            InlineSpanVariant::Strong => {
-                buffer.set_color(&ColorSpec::new().set_bold(true))?;
-                for inline in span.inlines.iter() {
-                    render_inline(inline, buffer, writer, false)?;
-                }
-            }
-            InlineSpanVariant::Emphasis => {
-                buffer.set_color(&ColorSpec::new().set_italic(true))?;
-                for inline in span.inlines.iter() {
-                    render_inline(inline, buffer, writer, false)?;
-                }
-            }
-            InlineSpanVariant::Mark => {
-                buffer.set_color(&ColorSpec::new().set_fg(Some(Color::Yellow)))?;
-                for inline in span.inlines.iter() {
-                    render_inline(inline, buffer, writer, false)?;
-                }
-            }
-            InlineSpanVariant::Code => {
-                buffer.set_color(&ColorSpec::new().set_fg(Some(Color::Red)))?;
-                for inline in span.inlines.iter() {
-                    render_inline(inline, buffer, writer, false)?;
-                }
-            }
-            InlineSpanVariant::Superscript | InlineSpanVariant::Subscript => {
-                buffer.set_color(&ColorSpec::new().set_fg(Some(Color::Blue)))?;
-                for inline in span.inlines.iter() {
-                    render_inline(inline, buffer, writer, false)?;
-                }
-            }
+    }
 
-            InlineSpanVariant::Footnote => {
-                buffer.set_color(&ColorSpec::new().set_fg(Some(Color::Magenta)))?;
-                for inline in span.inlines.iter() {
-                    render_inline(inline, buffer, writer, false)?;
-                }
-            }
-        },
-        Inline::InlineBreak(_) => {
-            write!(buffer, "\n")?;
+    pub fn render_to_term(&mut self, graph: &Asg) -> Result<()> {
+        for block in graph.blocks.iter() {
+            self.render_block(block)?;
+            self.buffer.reset()?;
         }
-        _ => {}
+        Ok(self.writer.print(&self.buffer)?)
     }
-    if reset {
-        buffer.reset()?;
+
+    fn bufwrite(&mut self, contents: &str) -> Result<()> {
+        // TODO... count the words and
+        Ok(write!(self.buffer, "{}", contents)?)
     }
-    Ok(())
+
+    fn render_block(&mut self, block: &Block) -> Result<()> {
+        for inline in block.inlines() {
+            self.render_inline(inline, true)?
+        }
+
+        // newlines after block
+        self.bufwrite("\n\n")?;
+        Ok(())
+    }
+
+    fn render_inline(&mut self, inline: &Inline, reset: bool) -> Result<()> {
+        match inline {
+            Inline::InlineLiteral(literal) => {
+                self.bufwrite(&literal.string_repr())?;
+            }
+            Inline::InlineSpan(ref span) => match span.variant {
+                InlineSpanVariant::Strong => {
+                    self.buffer.set_color(ColorSpec::new().set_bold(true))?;
+                    for inline in span.inlines.iter() {
+                        self.render_inline(inline, false)?
+                    }
+                }
+                InlineSpanVariant::Emphasis => {
+                    self.buffer.set_color(ColorSpec::new().set_italic(true))?;
+                    for inline in span.inlines.iter() {
+                        self.render_inline(inline, false)?
+                    }
+                }
+                InlineSpanVariant::Mark => {
+                    self.buffer
+                        .set_color(ColorSpec::new().set_fg(Some(Color::Yellow)))?;
+                    for inline in span.inlines.iter() {
+                        self.render_inline(inline, false)?
+                    }
+                }
+                InlineSpanVariant::Code => {
+                    self.buffer
+                        .set_color(ColorSpec::new().set_fg(Some(Color::Red)))?;
+                    for inline in span.inlines.iter() {
+                        self.render_inline(inline, false)?
+                    }
+                }
+                InlineSpanVariant::Superscript | InlineSpanVariant::Subscript => {
+                    self.buffer
+                        .set_color(ColorSpec::new().set_fg(Some(Color::Blue)))?;
+                    for inline in span.inlines.iter() {
+                        self.render_inline(inline, false)?
+                    }
+                }
+
+                InlineSpanVariant::Footnote => {
+                    self.buffer
+                        .set_color(ColorSpec::new().set_fg(Some(Color::Magenta)))?;
+                    self.bufwrite("[")?;
+                    for inline in span.inlines.iter() {
+                        self.render_inline(inline, false)?
+                    }
+                    self.bufwrite("]")?;
+                }
+            },
+            Inline::InlineBreak(_) => {
+                self.bufwrite("\n")?;
+            }
+            _ => {}
+        }
+        if reset {
+            self.buffer.reset()?;
+        }
+        Ok(())
+    }
 }

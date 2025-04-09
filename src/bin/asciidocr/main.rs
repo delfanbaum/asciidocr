@@ -6,7 +6,7 @@ use simple_logger::SimpleLogger;
 use std::{fs, path::PathBuf};
 
 use asciidocr::{
-    backends::{htmls::render_htmlbook, term::render_to_term, Backends},
+    backends::{htmls::render_htmlbook, term::TermRenderer, Backends},
     parser::Parser as AdocParser,
     scanner::Scanner,
 };
@@ -58,7 +58,11 @@ fn run(args: Cli) -> Result<()> {
             }
         }
 
-        Backends::Term => render_to_term(&graph),
+        Backends::Term => {
+            let mut renderer = TermRenderer::default();
+            renderer.render_to_term(&graph)?;
+            Ok(())
+        }
     }
 }
 
