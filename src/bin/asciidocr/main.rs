@@ -6,7 +6,7 @@ use simple_logger::SimpleLogger;
 use std::{fs, path::PathBuf};
 
 use asciidocr::{
-    backends::{htmls::render_htmlbook, Backends},
+    backends::{htmls::render_htmlbook, term::render_to_term, Backends},
     parser::Parser as AdocParser,
     scanner::Scanner,
 };
@@ -14,7 +14,7 @@ use asciidocr::{
 #[cfg(feature = "docx")]
 use asciidocr::backends::docx::render_docx;
 
-use cli::{read_input, read_output, Cli};
+use cli::{get_output_dest, read_input, Cli};
 
 fn main() {
     SimpleLogger::new()
@@ -39,17 +39,17 @@ fn run(args: Cli) -> Result<()> {
 
     match args.backend {
         Backends::Htmlbook => {
-            render_string(render_htmlbook(&graph)?, read_output(args));
+            render_string(render_htmlbook(&graph)?, get_output_dest(args));
             Ok(())
         }
         Backends::Json => {
-            render_string(serde_json::to_string_pretty(&graph)?, read_output(args));
+            render_string(serde_json::to_string_pretty(&graph)?, get_output_dest(args));
             Ok(())
         }
 
         #[cfg(feature = "docx")]
         Backends::Docx => {
-            if let Some(output_path) = read_output(args) {
+            if let Some(output_path) = get_output_dest(args) {
                 render_docx(&graph, &output_path).expect("Error rendering docx");
                 Ok(())
             } else {
@@ -58,7 +58,7 @@ fn run(args: Cli) -> Result<()> {
             }
         }
 
-        Backends::Term => todo!(),
+        Backends::Term => render_to_term(&graph),
     }
 }
 

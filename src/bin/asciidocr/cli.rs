@@ -37,7 +37,7 @@ pub fn read_input(args: &Cli) -> String {
     }
 }
 
-pub fn read_output(args: Cli) -> Option<PathBuf> {
+pub fn get_output_dest(args: Cli) -> Option<PathBuf> {
     match args.output {
         Some(ref output) => {
             if output == "-" {
