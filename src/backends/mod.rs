@@ -8,7 +8,7 @@
 #[cfg(feature = "docx")]
 pub mod docx;
 
-pub mod terminal; // probably this ends up under a feature as well
+pub mod term; // probably this ends up under a feature as well
 
 pub mod htmls;
 
