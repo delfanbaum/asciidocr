@@ -13,6 +13,7 @@ pub fn render_to_term(graph: &Asg) -> Result<()> {
         render_block(block, &mut buffer, &bufwriter)?;
         buffer.reset()?;
     }
+    bufwriter.print(&buffer)?;
 
     Ok(())
 }
@@ -24,7 +25,6 @@ fn render_block(block: &Block, buffer: &mut Buffer, writer: &BufferWriter) -> Re
 
     // newlines after block
     write!(buffer, "\n\n")?;
-    writer.print(&buffer)?;
     Ok(())
 }
 
@@ -37,7 +37,6 @@ fn render_inline(
     match inline {
         Inline::InlineLiteral(literal) => {
             write!(buffer, "{}", literal.string_repr())?;
-            writer.print(&buffer)?;
         }
         Inline::InlineSpan(ref span) => match span.variant {
             InlineSpanVariant::Strong => {
@@ -80,11 +79,9 @@ fn render_inline(
         },
         Inline::InlineBreak(_) => {
             write!(buffer, "\n")?;
-            writer.print(&buffer)?;
         }
         _ => {}
     }
-    buffer.clear();
     if reset {
         buffer.reset()?;
     }
