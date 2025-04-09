@@ -17,7 +17,6 @@ clap = {version = "4.5.20", features=["derive"]}
 docx-rs = {version="0.4.17", optional=true}
 log = "0.4.22"
 once_cell = "1.20.2"
-ratatui = "0.29.0"
 regex = "1.11.1"
 serde = {version = "1.0.210", features=["derive"]}
 serde_json = "1.0.128"

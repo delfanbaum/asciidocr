@@ -659,6 +659,11 @@ impl InlineLiteral {
             self.value.clone()
         }
     }
+
+    // provides a string representation with internal newlines removed
+    pub fn string_repr(&self) -> String {
+        self.value_or_refd_char().replace("\n", " ")
+    }
 }
 
 #[derive(Serialize, Clone, Debug)]
