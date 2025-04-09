@@ -6,7 +6,7 @@ use simple_logger::SimpleLogger;
 use std::{fs, path::PathBuf};
 
 use asciidocr::{
-    backends::{htmls::render_htmlbook, terminal::viewer::TermView, Backends},
+    backends::{htmls::render_htmlbook, Backends},
     parser::Parser as AdocParser,
     scanner::Scanner,
 };
@@ -58,13 +58,7 @@ fn run(args: Cli) -> Result<()> {
             }
         }
 
-        Backends::Term => {
-            let mut terminal = ratatui::init();
-            let viewer = TermView::new(graph);
-            let result = viewer.run(&mut terminal);
-            ratatui::restore();
-            result
-        }
+        Backends::Term => todo!(),
     }
 }
 
