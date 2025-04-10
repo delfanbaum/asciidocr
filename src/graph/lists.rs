@@ -13,7 +13,7 @@ pub struct List {
     name: String,
     #[serde(rename = "type")]
     node_type: NodeTypes,
-    marker: String,
+    pub marker: String,
     pub variant: ListVariant,
     pub items: Vec<Block>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -100,6 +100,10 @@ impl ListItem {
 
     pub fn principal(&self) -> Vec<Inline> {
         self.principal.clone()
+    }
+
+    pub fn has_blocks(&self) -> bool {
+        !self.blocks().is_empty()
     }
 
     pub fn blocks(&self) -> Vec<Block> {
@@ -224,6 +228,10 @@ impl DListItem {
 
     pub fn locations(&self) -> Vec<Location> {
         self.location.clone()
+    }
+
+    pub fn has_blocks(&self) -> bool {
+        !self.blocks.is_empty()
     }
 
     pub fn extract_footnotes(&mut self, count: usize, document_id: &str) -> Vec<Block> {
