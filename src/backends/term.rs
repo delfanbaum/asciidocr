@@ -33,8 +33,6 @@ impl TermRenderer {
     }
 
     pub fn render_to_term(&mut self, graph: &Asg) -> Result<()> {
-        // clear screen
-        print!("\x1B[2J\x1B[1;1H");
         if let Some(header) = &graph.header {
             self.buffer
                 .set_color(ColorSpec::new().set_fg(Some(Color::Magenta)).set_bold(true))?;
