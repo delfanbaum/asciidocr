@@ -45,6 +45,15 @@ fn test_title_only() {
 }
 
 #[test]
+/// Test dangling spans in title
+fn test_title_dangling_span() {
+    let fn_pattern = "documents/title-dangling-span";
+    let adoc_fn = format!("{}.adoc", fn_pattern);
+    let asg_json_fn = format!("{}.json", fn_pattern);
+    assert_parsed_doc_matches_expected_asg(&adoc_fn, &asg_json_fn)
+}
+
+#[test]
 ///Smoke test for "have we covered enough" -- will be added to as we go along and do not panic
 fn test_targeted_coverage() {
     let adoc_fn = "tests/data/documents/minimum.adoc";
