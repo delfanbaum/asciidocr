@@ -33,7 +33,7 @@ pub struct Parser {
     /// allows for "what just happened" matching
     last_token_type: TokenType,
     /// optional document header
-    document_header: Header,
+    document_header: Option<Header>,
     /// document-level attributes, used for replacements, etc.
     document_attributes: HashMap<String, String>,
     /// holding ground for graph blocks until it's time to push to the main graph
@@ -53,8 +53,6 @@ pub struct Parser {
     /// appends text to block or inline regardless of markup, token, etc. (will need to change
     /// if/when we handle code callouts)
     open_parse_after_as_text_type: Option<TokenType>,
-    // convenience flags
-    in_document_header: bool,
     /// designates whether we're to be adding inlines to the previous block until a newline
     in_block_line: bool,
     /// designates whether new literal text should be added to the last span
@@ -100,7 +98,7 @@ impl Parser {
         Parser {
             origin_directory,
             last_token_type: TokenType::Eof,
-            document_header: Header::new(),
+            document_header: None,
             document_attributes: HashMap::new(),
             block_stack: vec![],
             inline_stack: VecDeque::new(),
@@ -108,7 +106,6 @@ impl Parser {
             block_title: None,
             metadata: None,
             open_delimited_block_lines: vec![],
-            in_document_header: false,
             in_block_line: false,
             in_inline_span: false,
             in_block_continuation: false,
@@ -146,8 +143,8 @@ impl Parser {
 
     fn token_into(&mut self, token: Token, asg: &mut Asg) {
         // if we are not starting with a document-heading acceptable token, get out
-        if self.in_document_header && !token.can_be_in_document_header() {
-            self.in_document_header = false;
+        if self.document_header.is_some() && !token.can_be_in_document_header() {
+            self.check_and_move_header(asg);
         }
 
         if let Some(token_type) = self.open_parse_after_as_text_type {
@@ -192,7 +189,7 @@ impl Parser {
 
         match token.token_type() {
             // document header, headings and section parsing
-            TokenType::Heading1 => self.parse_level_0_heading(token, asg),
+            TokenType::Heading1 => self.parse_title(token, asg),
             TokenType::Heading2 => self.parse_section_headings(token, 1, asg),
             TokenType::Heading3 => self.parse_section_headings(token, 2, asg),
             TokenType::Heading4 => self.parse_section_headings(token, 3, asg),
@@ -328,7 +325,11 @@ impl Parser {
                 }
             }
 
-            TokenType::Eof => self.check_and_move_header(asg),
+            TokenType::Eof => {
+                if self.document_header.is_some() {
+                    self.check_and_move_header(asg)
+                }
+            }
         }
     }
 
@@ -366,14 +367,15 @@ impl Parser {
 
     /// Handle document header
     fn check_and_move_header(&mut self, asg: &mut Asg) {
-        if !self.document_header.is_empty() {
-            self.document_header.consolidate();
-            asg.add_header(
-                self.document_header.clone(),
-                self.document_attributes.clone(),
-            )
+        self.add_inlines_to_block_stack();
+        if let Some(header) = &mut self.document_header {
+            if !header.is_empty() {
+                header.consolidate();
+                asg.add_header(header.clone(), self.document_attributes.clone())
+            }
         }
-        self.in_document_header = false
+
+        self.document_header = None;
     }
 
     /// New line characters are arguably the most significant token "signal" we can get, and as
@@ -393,7 +395,7 @@ impl Parser {
         if [TokenType::NewLineChar, TokenType::Eof].contains(&self.last_token_type) {
             // clear any dangling newline
             self.dangling_newline = None;
-            if self.in_document_header {
+            if self.document_header.is_some() {
                 self.check_and_move_header(asg);
             } else {
                 // consolidate any dangling list items
@@ -621,30 +623,20 @@ impl Parser {
 
     //fn parse_block_label(&mut self, token: Token, asg: &mut Asg) {}
 
-    fn parse_level_0_heading(&mut self, token: Token, asg: &mut Asg) {
+    fn parse_title(&mut self, token: Token, _asg: &mut Asg) {
         if token.first_location() == Location::default() {
-            self.in_document_header = true
-        }
-        if self.in_document_header {
-            self.document_header.location.extend(token.locations());
             self.in_block_line = true;
+            let mut header = Header::new();
+            header.location.extend(token.locations());
+
+            self.document_header = Some(header)
         } else {
-            if let Some(last_block) = self.block_stack.pop() {
-                match last_block {
-                    Block::Section(section) => {
-                        if section.level == 1 {
-                            self.add_to_block_stack_or_graph(asg, Block::Section(section))
-                        } else {
-                            self.push_block_to_stack(Block::Section(section))
-                        }
-                    }
-                    _ => self.push_block_to_stack(last_block),
-                }
-            }
-            self.add_to_block_stack_or_graph(
-                asg,
-                Block::Section(Section::new("".to_string(), 1, token.first_location())),
+            // should error
+            error!(
+                "Parse error at line {}: Level 0 headings (=) are only allowed at the top of a document",
+                token.line
             );
+            std::process::exit(1)
         }
     }
 
@@ -687,42 +679,28 @@ impl Parser {
 
     /// Generic parser for inline spans that close themselves
     fn parse_inline_span(&mut self, mut inline: Inline) {
-        if self.in_document_header && self.in_block_line {
-            if let Some(last_inline) = self.document_header.title.last_mut() {
-                if inline == *last_inline {
-                    last_inline.reconcile_locations(inline.locations());
-                    self.in_inline_span = false;
-                    return;
-                }
+        if let Some(last_inline) = self.inline_stack.back_mut() {
+            if inline == *last_inline {
+                last_inline.reconcile_locations(inline.locations());
+                last_inline.close();
+                self.in_inline_span = false;
+                return;
             }
-            if self.metadata.is_some() {
-                inline.add_metadata(self.metadata.as_ref().unwrap().clone());
-                self.metadata = None;
-            }
-            self.document_header.title.push(inline);
-        } else {
-            if let Some(last_inline) = self.inline_stack.back_mut() {
-                if inline == *last_inline {
-                    last_inline.reconcile_locations(inline.locations());
-                    last_inline.close();
-                    self.in_inline_span = false;
-                    return;
-                }
-            }
-            // handle newline tokens prior to constrained spans
-            if let Some(newline_token) = self.dangling_newline.clone() {
-                self.add_text_to_last_inline(newline_token);
-                self.dangling_newline = None;
-            }
-            // check for any other dangling spans (otherwise they disappear!)
-            self.handle_dangling_spans();
-            // add any metadata to new inline
-            if self.metadata.is_some() {
-                inline.add_metadata(self.metadata.as_ref().unwrap().clone());
-                self.metadata = None;
-            }
-            self.inline_stack.push_back(inline)
         }
+        // handle newline tokens prior to constrained spans
+        if let Some(newline_token) = self.dangling_newline.clone() {
+            self.add_text_to_last_inline(newline_token);
+            self.dangling_newline = None;
+        }
+        // check for any other dangling spans (otherwise they disappear!)
+        self.handle_dangling_spans();
+        // add any metadata to new inline
+        if self.metadata.is_some() {
+            inline.add_metadata(self.metadata.as_ref().unwrap().clone());
+            self.metadata = None;
+        }
+        self.inline_stack.push_back(inline);
+
         self.in_inline_span = true;
     }
 
@@ -834,112 +812,46 @@ impl Parser {
     }
 
     fn parse_text(&mut self, token: Token) {
-        if self.in_document_header && self.in_block_line {
-            if let Some(inline) = self.document_header.title.last_mut() {
-                match inline {
-                    Inline::InlineLiteral(lit) => lit.add_text_from_token(&token),
-                    Inline::InlineSpan(span) => {
-                        let inline_lit =
-                            Inline::InlineLiteral(InlineLiteral::new_text_from_token(&token));
-                        if self.in_inline_span {
-                            span.add_inline(inline_lit)
-                        } else {
-                            self.document_header.title.push(inline_lit)
-                        }
-                    }
-                    Inline::InlineRef(_) => {
-                        error!(
-                            "Inline references are not allowed in document titles: line {}",
-                            token.line
-                        );
-                        std::process::exit(1)
-                    }
-                    Inline::InlineBreak(_) => {
-                        error!(
-                            "Line breaks (+) are not allowed in document titles: line {}",
-                            token.line
-                        );
-                        std::process::exit(1)
-                    }
-                }
-            } else {
-                self.document_header.title.push(Inline::InlineLiteral(
+        if let Some(newline_token) = self.dangling_newline.clone() {
+            if self.preserve_newline_text {
+                // add the newline as such
+                self.inline_stack.push_back(Inline::InlineLiteral(
+                    InlineLiteral::new_text_from_token(&newline_token),
+                ));
+                // clear the newline
+                self.dangling_newline = None;
+                // add the new text separately
+                self.inline_stack.push_back(Inline::InlineLiteral(
                     InlineLiteral::new_text_from_token(&token),
                 ));
+                return;
+            } else {
+                self.add_text_to_last_inline(newline_token);
+                self.dangling_newline = None;
             }
-        } else {
-            if let Some(newline_token) = self.dangling_newline.clone() {
-                if self.preserve_newline_text {
-                    // add the newline as such
-                    self.inline_stack.push_back(Inline::InlineLiteral(
-                        InlineLiteral::new_text_from_token(&newline_token),
-                    ));
-                    // clear the newline
-                    self.dangling_newline = None;
-                    // add the new text separately
-                    self.inline_stack.push_back(Inline::InlineLiteral(
-                        InlineLiteral::new_text_from_token(&token),
-                    ));
-                    return;
-                } else {
-                    self.add_text_to_last_inline(newline_token);
-                    self.dangling_newline = None;
-                }
-            }
-            self.add_text_to_last_inline(token)
         }
+        self.add_text_to_last_inline(token)
     }
 
     fn parse_charref(&mut self, token: Token) {
         let inline_lit = Inline::InlineLiteral(InlineLiteral::new_charref_from_token(&token));
-        if self.in_document_header && self.in_block_line {
-            if let Some(inline) = self.document_header.title.last_mut() {
-                match inline {
-                    Inline::InlineLiteral(_) => self.document_header.title.push(inline_lit),
-                    Inline::InlineSpan(span) => {
-                        if self.in_inline_span {
-                            span.add_inline(inline_lit)
-                        } else {
-                            self.document_header.title.push(inline_lit)
-                        }
-                    }
-                    Inline::InlineRef(_) => {
-                        error!(
-                            "Inline references are not allowed in document titles: line {}",
-                            token.line
-                        );
-                        std::process::exit(1)
-                    }
-                    Inline::InlineBreak(_) => {
-                        error!(
-                            "Line breaks (+) are not allowed in document titles: line {}",
-                            token.line
-                        );
-                        std::process::exit(1)
-                    }
-                }
+        if let Some(newline_token) = self.dangling_newline.clone() {
+            if self.preserve_newline_text {
+                // add the newline as such
+                self.inline_stack.push_back(Inline::InlineLiteral(
+                    InlineLiteral::new_text_from_token(&newline_token),
+                ));
+                // clear the newline
+                self.dangling_newline = None;
+                // add the new text separately
+                self.inline_stack.push_back(inline_lit);
+                return;
             } else {
-                self.document_header.title.push(inline_lit);
+                self.add_text_to_last_inline(newline_token);
+                self.dangling_newline = None;
             }
-        } else {
-            if let Some(newline_token) = self.dangling_newline.clone() {
-                if self.preserve_newline_text {
-                    // add the newline as such
-                    self.inline_stack.push_back(Inline::InlineLiteral(
-                        InlineLiteral::new_text_from_token(&newline_token),
-                    ));
-                    // clear the newline
-                    self.dangling_newline = None;
-                    // add the new text separately
-                    self.inline_stack.push_back(inline_lit);
-                    return;
-                } else {
-                    self.add_text_to_last_inline(newline_token);
-                    self.dangling_newline = None;
-                }
-            }
-            self.add_text_to_last_inline(token)
         }
+        self.add_text_to_last_inline(token)
     }
 
     fn parse_delimited_leaf_block(&mut self, token: Token) {
@@ -1167,6 +1079,13 @@ impl Parser {
         // dangling inlines
         if self.in_inline_span {
             self.handle_dangling_spans();
+        }
+
+        if let Some(header) = &mut self.document_header {
+            while !self.inline_stack.is_empty() {
+                header.title.push(self.inline_stack.pop_front().unwrap());
+            }
+            return;
         }
 
         if let Some(last_block) = self.block_stack.last_mut() {
