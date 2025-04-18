@@ -36,3 +36,6 @@ pub mod backends;
 pub mod graph;
 pub mod parser;
 pub mod scanner;
+
+#[cfg(feature = "docx")]
+mod python;
