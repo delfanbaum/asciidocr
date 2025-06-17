@@ -487,7 +487,7 @@ impl Parser {
                 .canonicalize()
                 .unwrap_or_else(|_| {
                     panic!(
-                        "Uanble to canonicalize include path: {:?}",
+                        "Unable to canonicalize include path: {:?}",
                         self.origin_directory.join(target.clone())
                     )
                 });
@@ -507,12 +507,15 @@ impl Parser {
             for token in
                 Scanner::new_with_stack(&open_file(resolved_target), self.file_stack.clone())
             {
-                self.token_into(token, asg)
+                let token_type = token.token_type();
+                self.token_into(token, asg);
+                self.last_token_type = token_type;
             }
         } else {
             for token in
                 Scanner::new_with_stack(&open_file(resolved_target), self.file_stack.clone())
             {
+                self.last_token_type = TokenType::Text;
                 self.parse_text(token)
             }
         }

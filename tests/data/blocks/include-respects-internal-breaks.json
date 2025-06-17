@@ -1,0 +1,62 @@
+{
+  "name": "document",
+  "type": "block",
+  "blocks": [
+    {
+      "name": "paragraph",
+      "type": "block",
+      "inlines": [
+        {
+          "name": "text",
+          "type": "string",
+          "value": "This is just a test to see if things get combined. For example, this should all\nbe one inline.",
+          "location": [
+            {
+              "line": 1,
+              "col": 1,
+              "file": [
+                "para-internal-line-break.adoc"
+              ]
+            },
+            {
+              "line": 2,
+              "col": 14,
+              "file": [
+                "para-internal-line-break.adoc"
+              ]
+            }
+          ]
+        }
+      ],
+      "location": [
+        {
+          "line": 1,
+          "col": 1,
+          "file": [
+            "para-internal-line-break.adoc"
+          ]
+        },
+        {
+          "line": 2,
+          "col": 14,
+          "file": [
+            "para-internal-line-break.adoc"
+          ]
+        }
+      ]
+    }
+  ],
+  "location": [
+    {
+      "line": 1,
+      "col": 1
+    },
+    {
+      "line": 2,
+      "col": 14,
+      "file": [
+        "para-internal-line-break.adoc"
+      ]
+    }
+  ]
+}
