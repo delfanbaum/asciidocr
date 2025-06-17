@@ -515,7 +515,12 @@ impl Parser {
             for token in
                 Scanner::new_with_stack(&open_file(resolved_target), self.file_stack.clone())
             {
-                self.last_token_type = TokenType::Text;
+                // allow EOFs to pass through; otherwise just parse as text
+                if matches!(token.token_type(), TokenType::Eof) {
+                    self.last_token_type = TokenType::Eof;
+                } else {
+                    self.last_token_type = TokenType::Text;
+                }
                 self.parse_text(token)
             }
         }
