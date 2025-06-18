@@ -18,6 +18,10 @@ pub struct Cli {
     /// Optionally select a backend for conversion.
     #[arg(value_enum, short = 'b', long = "backend", default_value = "htmlbook")]
     pub backend: Backends,
+
+    /// Print a document word count (excludes comments, markup characters, etc.)
+    #[arg(short, long = "count-words")]
+    pub count: bool,
 }
 
 pub fn read_input(args: &Cli) -> String {

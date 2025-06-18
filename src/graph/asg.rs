@@ -136,6 +136,10 @@ impl Asg {
         }
         graph_text
     }
+
+    pub fn word_count(&self) -> usize {
+        self.all_text().split_whitespace().count()
+    }
 }
 
 #[cfg(test)]

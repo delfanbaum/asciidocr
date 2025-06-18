@@ -33,6 +33,10 @@ fn main() {
 
 fn run(args: Cli) -> Result<()> {
     let graph = AdocParser::new(PathBuf::from(&args.file)).parse(Scanner::new(&read_input(&args)));
+    if args.count {
+        println!("{} words in {}", graph.word_count(), args.file)
+    }
+
     match args.backend {
         Backends::Htmlbook => {
             render_string(render_htmlbook(&graph)?, read_output(args));
