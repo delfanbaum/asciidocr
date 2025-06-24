@@ -1,10 +1,11 @@
 [package]
 name = "asciidocr"
-version = "0.1.8"
+version = "0.1.9"
 readme = "README.md"
 license = "MIT"
 edition = "2021"
 description = "A CLI and library for processing and converting asciidoc files"
+documentation = "https://docs.rs/asciidocr"
 repository = "https://github.com/delfanbaum/asciidocr"
 keywords = ["asciidoc", "lightweight-markup", "htmlbook"]
 categories = ["command-line-utilities", "parser-implementations", "text-processing"]
