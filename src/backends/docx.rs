@@ -1,4 +1,6 @@
 use docx_rs::*;
+use once_cell::sync::Lazy;
+use regex::Regex;
 use std::{fs::File, path::Path};
 
 use crate::graph::{
@@ -9,6 +11,7 @@ use crate::graph::{
 };
 
 const DXA_INCH: i32 = 1440; // standard measuring unit in Word
+static RE_WHITESPACE_NEWLINE: Lazy<Regex> = Lazy::new(|| Regex::new(r#"\s*\n"#).unwrap());
 
 /// !Experimental! Renders a Docx file. Some [`Asg`] blocks are still unsupported.
 pub fn render_docx(graph: &Asg, output_path: &Path) -> Result<(), DocxError> {
@@ -92,6 +95,7 @@ impl DocxWriter {
             Style::new(&title_style, StyleType::Paragraph)
                 .name(&title_style)
                 .based_on("Title")
+                .indent(None, Some(SpecialIndentType::FirstLine(0)), None, None)
                 .bold(),
         );
         docx = self.add_style(
@@ -133,6 +137,7 @@ impl DocxWriter {
                     let heading_style = Style::new(&heading_style_name, StyleType::Paragraph)
                         .name(&heading_style_name)
                         .based_on("Normal")
+                        .indent(None, Some(SpecialIndentType::FirstLine(0)), None, None)
                         .bold();
                     docx = self.add_style(docx, heading_style);
 
@@ -322,7 +327,10 @@ fn runs_from_inline(inline: &Inline) -> Vec<Run> {
     match inline {
         Inline::InlineLiteral(lit) => {
             // replace non-significant newlines with space, as it would appear in HTML
-            runs.push(Run::new().add_text(lit.value_or_refd_char().replace("\n", " ")));
+            runs.push(
+                Run::new()
+                    .add_text(RE_WHITESPACE_NEWLINE.replace_all(&lit.value_or_refd_char(), " ")),
+            );
         }
         Inline::InlineSpan(span) => {
             variants.push(&span.variant);
