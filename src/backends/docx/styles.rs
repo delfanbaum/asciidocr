@@ -10,6 +10,7 @@ pub enum DocumentStyles {
     Quote,
     Verse,
     ListParagraph,
+    NumberedListParagraph(usize),
     ThematicBreak,
 }
 
@@ -25,6 +26,7 @@ impl DocumentStyles {
             DocumentStyles::Quote => "Quote".into(),
             DocumentStyles::Verse => "Verse".into(),
             DocumentStyles::ListParagraph => "ListParagraph".into(),
+            DocumentStyles::NumberedListParagraph(id) => format!("NumberedListParagraph_{}", id),
             DocumentStyles::ThematicBreak => "ThematicBreak".into(),
         }
     }
@@ -122,7 +124,28 @@ impl DocumentStyles {
                     Some(0),
                     None,
                 ),
+            DocumentStyles::ListParagraph => Style::new("ListParagraph", StyleType::Paragraph)
+                .name("ListParagraph")
+                .based_on("Normal")
+                .indent(None, Some(SpecialIndentType::FirstLine(0)), None, None),
+            DocumentStyles::NumberedListParagraph(id) => {
+                let id = format!("NumberedListParagraph_{}", id);
+                Style::new(&id, StyleType::Paragraph)
+                    .name(id)
+                    .indent(None, Some(SpecialIndentType::FirstLine(0)), None, None)
+            }
             _ => todo!(),
         }
+    }
+
+    // convenience functions for common styles
+    pub fn normal() -> Style {
+        Self::Normal.generate()
+    }
+    pub fn no_spacing() -> Style {
+        Self::NoSpacing.generate()
+    }
+    pub fn title() -> Style {
+        Self::Title.generate()
     }
 }
