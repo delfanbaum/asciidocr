@@ -10,6 +10,8 @@ use crate::graph::{
     lists::ListVariant,
 };
 
+use super::styles::DocumentStyles;
+
 const DXA_INCH: i32 = 1440; // standard measuring unit in Word
 static RE_WHITESPACE_NEWLINE: Lazy<Regex> = Lazy::new(|| Regex::new(r#"\s*\n"#).unwrap());
 
@@ -19,9 +21,10 @@ pub fn render_docx(graph: &Asg, output_path: &Path) -> Result<(), DocxError> {
     let mut writer = DocxWriter::new();
 
     // always add default style(s) and header; other styles are added as-needed
-    let (normal, title) = writer.default_styles();
+    let (normal, nospacing, title) = writer.default_styles();
     let mut docx = Docx::new()
         .add_style(normal)
+        .add_style(nospacing)
         .add_style(title)
         .header(writer.get_header())
         .page_size(inches(8.5), inches(11.0))
@@ -55,29 +58,12 @@ impl DocxWriter {
         }
     }
 
-    fn default_styles(&self) -> (Style, Style) {
-        let normal = Style {
-            style_id: "Normal".into(),
-            name: Name::new("Normal"),
-            style_type: StyleType::Paragraph,
-            run_property: RunProperty::new()
-                .size(24)
-                .fonts(RunFonts::new().ascii("Times New Roman")),
-            paragraph_property: ParagraphProperty::new()
-                .line_spacing(LineSpacing::new().line(480))
-                .indent(None, Some(SpecialIndentType::FirstLine(720)), None, None),
-            table_property: TableProperty::new(),
-            table_cell_property: TableCellProperty::new(),
-            based_on: None,
-            next: None,
-            link: None,
-        };
-        let title = Style::new("Title", StyleType::Paragraph)
-            .name("Title")
-            .based_on("Normal")
-            .indent(None, Some(SpecialIndentType::FirstLine(0)), None, None)
-            .bold();
-        (normal, title)
+    fn default_styles(&self) -> (Style, Style, Style) {
+        (
+            DocumentStyles::Normal.generate(),
+            DocumentStyles::NoSpacing.generate(),
+            DocumentStyles::Title.generate(),
+        )
     }
 
     fn add_style(&self, mut docx: Docx, style: Style) -> Docx {
@@ -88,27 +74,13 @@ impl DocxWriter {
     }
 
     fn add_title_and_text_styles(&self, mut docx: Docx, section_name: &str) -> Docx {
-        let title_style = format!("{} Title", section_name);
-        let text_style = format!("{} Text", section_name);
         docx = self.add_style(
             docx,
-            Style::new(&title_style, StyleType::Paragraph)
-                .name(&title_style)
-                .based_on("Title")
-                .indent(None, Some(SpecialIndentType::FirstLine(0)), None, None)
-                .bold(),
+            DocumentStyles::SectionTitle(section_name.into()).generate(),
         );
         docx = self.add_style(
             docx,
-            Style::new(&text_style, StyleType::Paragraph)
-                .name(&text_style)
-                .based_on("Normal")
-                .indent(
-                    Some(720),
-                    Some(SpecialIndentType::FirstLine(360)),
-                    Some(720),
-                    None,
-                ),
+            DocumentStyles::SectionText(section_name.into()).generate(),
         );
         docx
     }
@@ -133,15 +105,10 @@ impl DocxWriter {
         match block {
             Block::Section(section) => {
                 if !section.title().is_empty() {
-                    let heading_style_name = format!("Heading {}", section.level);
-                    let heading_style = Style::new(&heading_style_name, StyleType::Paragraph)
-                        .name(&heading_style_name)
-                        .based_on("Normal")
-                        .indent(None, Some(SpecialIndentType::FirstLine(0)), None, None)
-                        .bold();
+                    let heading_style = DocumentStyles::Heading(section.level).generate();
+                    let mut para = Paragraph::new().style(&heading_style.style_id);
                     docx = self.add_style(docx, heading_style);
 
-                    let mut para = Paragraph::new().style(&heading_style_name);
                     para = add_inlines_to_para(para, section.title());
                     docx = self.add_paragraph(docx, para);
                 }
@@ -153,8 +120,8 @@ impl DocxWriter {
             Block::List(list) => {
                 docx = self.add_style(
                     docx,
-                    Style::new("List Paragraph", StyleType::Paragraph)
-                        .name("List Paragraph")
+                    Style::new("ListParagraph", StyleType::Paragraph)
+                        .name("ListParagraph")
                         .based_on("Normal")
                         .indent(None, Some(SpecialIndentType::FirstLine(0)), None, None),
                 );
@@ -181,7 +148,7 @@ impl DocxWriter {
                                 LevelJc::new("left"),
                             ),
                         ));
-                        self.current_style = Some("List Paragraph".into());
+                        self.current_style = Some("ListParagraph".into());
                     }
                 }
                 for item in list.items.iter() {
@@ -190,7 +157,7 @@ impl DocxWriter {
             }
             Block::ListItem(item) => {
                 // add principal with the correct variant match
-                let mut para = Paragraph::new().style("List Paragraph");
+                let mut para = Paragraph::new().style("ListParagraph");
                 match &self.current_style {
                     Some(style) => match style.as_str() {
                         "List Numbered" => {
@@ -221,6 +188,7 @@ impl DocxWriter {
                         Style::new("Thematic Break", StyleType::Paragraph)
                             .name("Thematic Break")
                             .based_on("Normal")
+                            .indent(None, Some(SpecialIndentType::FirstLine(0)), None, None)
                             .align(AlignmentType::Center),
                     );
                     docx = self.add_paragraph(
@@ -285,7 +253,36 @@ impl DocxWriter {
                         docx = self.add_block_to_doc(docx, child)
                     }
                 }
-                ParentBlockName::Quote => todo!(),
+                ParentBlockName::Quote => {
+                    docx = self.add_style(
+                        docx,
+                        Style::new("Quote", StyleType::Paragraph)
+                            .name("Quote")
+                            .based_on("No Spacing")
+                            .italic()
+                            .next("Normal")
+                            .indent(
+                                Some(720),
+                                Some(SpecialIndentType::FirstLine(0)),
+                                Some(720),
+                                None,
+                            ),
+                    );
+                    self.current_style = Some("Quote".into());
+                    for child in parent.blocks.iter() {
+                        docx = self.add_block_to_doc(docx, child)
+                    }
+                    if let Some(metadata) = &parent.metadata {
+                        if let Some(attribution) = metadata.attributes.get("attribution") {
+                            let para = Paragraph::new()
+                                .line_spacing(LineSpacing::new().after(480))
+                                .add_run(Run::new().add_text(format!("— {}\n", attribution)));
+
+                            docx = self.add_paragraph(docx, para)
+                        }
+                    }
+                    self.current_style = None
+                }
                 ParentBlockName::Table => todo!(),
                 // should not appear in this context, so just skip
                 ParentBlockName::FootnoteContainer => {}
