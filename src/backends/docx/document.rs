@@ -10,6 +10,7 @@ use crate::graph::{
     lists::ListVariant,
 };
 
+use super::numbering::add_bullet_abstract_numbering;
 use super::styles::DocumentStyles;
 
 const DXA_INCH: i32 = 1440; // standard measuring unit in Word
@@ -59,6 +60,7 @@ fn asciidocr_default_docx() -> Docx {
 // holds some state for us
 struct DocxWriter {
     page_break_before: bool,
+    abstract_numbering: usize,
     numbering: usize,
     current_style: DocumentStyles,
 }
@@ -67,6 +69,7 @@ impl DocxWriter {
     fn new() -> Self {
         DocxWriter {
             page_break_before: false,
+            abstract_numbering: 0,
             numbering: 0,
             current_style: DocumentStyles::Normal,
         }
@@ -120,13 +123,29 @@ impl DocxWriter {
                 }
             }
             Block::List(list) => {
-                docx = self.add_style(docx, DocumentStyles::ListParagraph.generate());
+                self.numbering += 1;
                 match list.variant {
                     ListVariant::Ordered | ListVariant::Callout => {
-                        self.numbering += 1;
-                        self.current_style = DocumentStyles::NumberedListParagraph(self.numbering)
+                        self.current_style = DocumentStyles::OrderedListParagraph(self.numbering);
+                        docx = self.add_style(docx, self.current_style.generate());
                     }
-                    ListVariant::Unordered => self.current_style = DocumentStyles::ListParagraph,
+                    ListVariant::Unordered => {
+                        docx = self.add_style(docx, DocumentStyles::ListParagraph.generate());
+                        if self.abstract_numbering == 0 {
+                            // really only do this once
+                            self.abstract_numbering += 1;
+                            docx = docx
+                                .add_abstract_numbering(add_bullet_abstract_numbering(
+                                    self.abstract_numbering,
+                                ))
+                                .add_numbering(Numbering::new(
+                                    self.numbering,
+                                    self.abstract_numbering,
+                                ))
+                        }
+
+                        self.current_style = DocumentStyles::ListParagraph;
+                    }
                 }
                 for item in list.items.iter() {
                     docx = self.add_block_to_doc(docx, item)
@@ -136,14 +155,10 @@ impl DocxWriter {
                 // add principal with the correct variant match
                 let mut para = Paragraph::new();
 
-                if let DocumentStyles::NumberedListParagraph(id) = self.current_style {
-                    para = para.style(&self.current_style.style_id())
-                        .numbering(NumberingId::new(id), IndentLevel::new(0))
-                } else {
-                    para = para.style(&self.current_style.style_id());
-                }
+                para = para
+                    .style(&self.current_style.style_id())
+                    .numbering(NumberingId::new(self.numbering), IndentLevel::new(0));
                 para = add_inlines_to_para(para, item.principal());
-                dbg!(&para);
                 docx = self.add_paragraph(docx, para);
                 // add any children -- TODO style them as list continues
                 if !item.blocks.is_empty() {
