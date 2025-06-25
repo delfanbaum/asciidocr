@@ -59,7 +59,7 @@ fn asciidocr_default_docx() -> Docx {
 // holds some state for us
 struct DocxWriter {
     page_break_before: bool,
-    abstract_numbering: usize,
+    numbering: usize,
     current_style: DocumentStyles,
 }
 
@@ -67,7 +67,7 @@ impl DocxWriter {
     fn new() -> Self {
         DocxWriter {
             page_break_before: false,
-            abstract_numbering: 0,
+            numbering: 0,
             current_style: DocumentStyles::Normal,
         }
     }
@@ -123,19 +123,8 @@ impl DocxWriter {
                 docx = self.add_style(docx, DocumentStyles::ListParagraph.generate());
                 match list.variant {
                     ListVariant::Ordered | ListVariant::Callout => {
-                        self.abstract_numbering += 1;
-                        docx = docx.add_abstract_numbering(
-                            AbstractNumbering::new(self.abstract_numbering).add_level(
-                                Level::new(
-                                    0,
-                                    Start::new(1),
-                                    NumberFormat::new("decimal"),
-                                    LevelText::new("%1."),
-                                    LevelJc::new("left"),
-                                ), // TODO: some indent? Better indent?
-                            ),
-                        );
-                        self.current_style = DocumentStyles::NumberedListParagraph(1)
+                        self.numbering += 1;
+                        self.current_style = DocumentStyles::NumberedListParagraph(self.numbering)
                     }
                     ListVariant::Unordered => self.current_style = DocumentStyles::ListParagraph,
                 }
