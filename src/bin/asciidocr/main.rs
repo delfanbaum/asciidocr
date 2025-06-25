@@ -12,7 +12,7 @@ use asciidocr::{
 };
 
 #[cfg(feature = "docx")]
-use asciidocr::backends::docx::document::render_docx;
+use asciidocr::backends::docx::render_docx;
 
 use cli::{read_input, read_output, Cli};
 

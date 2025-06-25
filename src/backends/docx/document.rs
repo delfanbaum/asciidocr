@@ -1,10 +1,11 @@
-use docx_rs::*;
+use docx_rs::{
+    AlignmentType, BreakType, Docx, Header, IndentLevel, LineSpacing, Numbering, NumberingId,
+    PageMargin, PageNum, Paragraph, Run, RunFonts, RunProperty, Style, VertAlignType,
+};
 use once_cell::sync::Lazy;
 use regex::Regex;
-use std::{fs::File, path::Path};
 
 use crate::graph::{
-    asg::Asg,
     blocks::{Block, BreakVariant, ParentBlockName},
     inlines::{Inline, InlineSpanVariant},
     lists::ListVariant,
@@ -16,30 +17,7 @@ use super::styles::DocumentStyles;
 const DXA_INCH: i32 = 1440; // standard measuring unit in Word
 static RE_WHITESPACE_NEWLINE: Lazy<Regex> = Lazy::new(|| Regex::new(r#"\s*\n"#).unwrap());
 
-/// !Experimental! Renders a Docx file. Some [`Asg`] blocks are still unsupported.
-pub fn render_docx(graph: &Asg, output_path: &Path) -> Result<(), DocxError> {
-    let file = File::create(output_path).unwrap();
-    let mut writer = DocxWriter::new();
-    let mut docx = asciidocr_default_docx();
-
-    // Add document title if present
-    if let Some(header) = &graph.header {
-        if !header.title.is_empty() {
-            let mut para = Paragraph::new().style("Title");
-            para = add_inlines_to_para(para, header.title());
-            docx = docx.add_paragraph(para);
-        }
-    }
-
-    // Add document contents
-    for block in graph.blocks.iter() {
-        docx = writer.add_block_to_doc(docx, block)
-    }
-    docx.build().pack(file)?;
-    Ok(())
-}
-
-fn asciidocr_default_docx() -> Docx {
+pub fn asciidocr_default_docx() -> Docx {
     Docx::new()
         .add_style(DocumentStyles::normal())
         .add_style(DocumentStyles::no_spacing())
@@ -58,7 +36,7 @@ fn asciidocr_default_docx() -> Docx {
 }
 
 // holds some state for us
-struct DocxWriter {
+pub struct DocxWriter {
     page_break_before: bool,
     abstract_numbering: usize,
     numbering: usize,
@@ -66,7 +44,7 @@ struct DocxWriter {
 }
 
 impl DocxWriter {
-    fn new() -> Self {
+    pub fn new() -> Self {
         DocxWriter {
             page_break_before: false,
             abstract_numbering: 0,
@@ -106,7 +84,7 @@ impl DocxWriter {
         docx.add_paragraph(para)
     }
 
-    fn add_block_to_doc(&mut self, mut docx: Docx, block: &Block) -> Docx {
+    pub fn add_block_to_doc(&mut self, mut docx: Docx, block: &Block) -> Docx {
         match block {
             Block::Section(section) => {
                 if !section.title().is_empty() {
@@ -174,14 +152,7 @@ impl DocxWriter {
                     self.page_break_before = true;
                 }
                 BreakVariant::Thematic => {
-                    docx = self.add_style(
-                        docx,
-                        Style::new("Thematic Break", StyleType::Paragraph)
-                            .name("Thematic Break")
-                            .based_on("Normal")
-                            .indent(None, Some(SpecialIndentType::FirstLine(0)), None, None)
-                            .align(AlignmentType::Center),
-                    );
+                    docx = self.add_style(docx, DocumentStyles::ThematicBreak.generate());
                     docx = self.add_paragraph(
                         docx,
                         Paragraph::new()
@@ -284,7 +255,7 @@ impl DocxWriter {
 }
 
 /// Adds inlines to a given paragraph
-fn add_inlines_to_para(mut para: Paragraph, inlines: Vec<Inline>) -> Paragraph {
+pub fn add_inlines_to_para(mut para: Paragraph, inlines: Vec<Inline>) -> Paragraph {
     for inline in inlines.iter() {
         for run in runs_from_inline(inline) {
             para = para.add_run(run)

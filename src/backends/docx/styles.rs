@@ -1,4 +1,7 @@
-use docx_rs::*;
+use docx_rs::{
+    LineSpacing, Name, ParagraphProperty, RunFonts, RunProperty, SpecialIndentType, Style,
+    StyleType, TableCellProperty, TableProperty,
+};
 
 pub enum DocumentStyles {
     Normal,

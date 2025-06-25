@@ -1,4 +1,5 @@
-use docx_rs::*;
+use docx_rs::{AbstractNumbering, Level, LevelJc, LevelText, NumberFormat, Start};
+
 // Temporary function to get this working
 //
 pub fn add_bullet_abstract_numbering(id: usize) -> AbstractNumbering {
