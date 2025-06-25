@@ -47,7 +47,7 @@ pub fn render_docx(graph: &Asg, output_path: &Path) -> Result<(), DocxError> {
 // holds some state for us
 struct DocxWriter {
     page_break_before: bool,
-    current_style: Option<String>,
+    current_style: Option<DocumentStyles>,
 }
 
 impl DocxWriter {
@@ -94,7 +94,7 @@ impl DocxWriter {
         if let Some(style) = &self.current_style {
             if para.property.style.is_none() {
                 // don't overwrite styles
-                para = para.style(style);
+                para = para.style(&style.style_id());
             }
         }
 
@@ -136,7 +136,7 @@ impl DocxWriter {
                                 LevelJc::new("left"),
                             ), // TODO: some indent? Better indent?
                         ));
-                        self.current_style = Some("List Numbered".into());
+                        self.current_style = Some(DocumentStyles::ListParagraph)
                     }
                     ListVariant::Unordered => {
                         docx = docx.add_abstract_numbering(AbstractNumbering::new(2).add_level(
@@ -148,7 +148,7 @@ impl DocxWriter {
                                 LevelJc::new("left"),
                             ),
                         ));
-                        self.current_style = Some("ListParagraph".into());
+                        self.current_style = Some(DocumentStyles::ListParagraph)
                     }
                 }
                 for item in list.items.iter() {
@@ -158,15 +158,15 @@ impl DocxWriter {
             Block::ListItem(item) => {
                 // add principal with the correct variant match
                 let mut para = Paragraph::new().style("ListParagraph");
-                match &self.current_style {
-                    Some(style) => match style.as_str() {
-                        "List Numbered" => {
-                            para = para.numbering(NumberingId::new(1), IndentLevel::new(0))
-                        }
-                        _ => {}
-                    },
-                    _ => {}
-                }
+                // match &self.current_style {
+                //     Some(style) => match style.as_str() {
+                //         "List Numbered" => {
+                //             para = para.numbering(NumberingId::new(1), IndentLevel::new(0))
+                //         }
+                //         _ => {}
+                //     },
+                //     _ => {}
+                // }
                 para = add_inlines_to_para(para, item.principal());
                 docx = self.add_paragraph(docx, para);
                 // add any children -- TODO style them as list continues
@@ -201,6 +201,10 @@ impl DocxWriter {
             },
             Block::BlockMacro(_) => todo!(),
             Block::LeafBlock(block) => {
+                if matches!(block.name, crate::graph::blocks::LeafBlockName::Verse) {
+                    docx = self.add_style(docx, DocumentStyles::Verse.generate());
+                    self.current_style = Some(DocumentStyles::Verse)
+                }
                 let mut para = Paragraph::new();
                 para = add_inlines_to_para(para, block.inlines());
                 docx = self.add_paragraph(docx, para)
@@ -208,7 +212,8 @@ impl DocxWriter {
             Block::ParentBlock(parent) => match parent.name {
                 ParentBlockName::Admonition => {
                     docx = self.add_title_and_text_styles(docx, "Admonition");
-                    self.current_style = Some("Admonition Text".into());
+                    self.current_style =
+                        Some(DocumentStyles::SectionTitle("Admonition Text".into()));
                     if let Some(variant) = &parent.variant {
                         docx = self.add_paragraph(
                             docx,
@@ -224,7 +229,8 @@ impl DocxWriter {
                 }
                 ParentBlockName::Example => {
                     docx = self.add_title_and_text_styles(docx, "Example");
-                    self.current_style = Some("Example Text".into());
+                    self.current_style =
+                        Some(DocumentStyles::SectionTitle("Example Text".into()));
                     if !parent.title.is_empty() {
                         let mut title = Paragraph::new().style("Example Title");
                         title = add_inlines_to_para(title, parent.title.clone());
@@ -237,7 +243,8 @@ impl DocxWriter {
                 }
                 ParentBlockName::Sidebar => {
                     docx = self.add_title_and_text_styles(docx, "Sidebar");
-                    self.current_style = Some("Sidebar Text".into());
+                    self.current_style =
+                        Some(DocumentStyles::SectionTitle("Sidebar Text".into()));
                     if !parent.title.is_empty() {
                         let mut title = Paragraph::new().style("Sidebar Title");
                         title = add_inlines_to_para(title, parent.title.clone());
@@ -254,21 +261,8 @@ impl DocxWriter {
                     }
                 }
                 ParentBlockName::Quote => {
-                    docx = self.add_style(
-                        docx,
-                        Style::new("Quote", StyleType::Paragraph)
-                            .name("Quote")
-                            .based_on("No Spacing")
-                            .italic()
-                            .next("Normal")
-                            .indent(
-                                Some(720),
-                                Some(SpecialIndentType::FirstLine(0)),
-                                Some(720),
-                                None,
-                            ),
-                    );
-                    self.current_style = Some("Quote".into());
+                    docx = self.add_style(docx, DocumentStyles::Quote.generate());
+                    self.current_style = Some(DocumentStyles::Quote);
                     for child in parent.blocks.iter() {
                         docx = self.add_block_to_doc(docx, child)
                     }

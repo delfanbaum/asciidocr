@@ -8,11 +8,27 @@ pub enum DocumentStyles {
     SectionTitle(String),
     SectionText(String),
     Quote,
+    Verse,
     ListParagraph,
     ThematicBreak,
 }
 
 impl DocumentStyles {
+    pub fn style_id(&self) -> String {
+        match self {
+            DocumentStyles::Normal => "Normal".into(),
+            DocumentStyles::NoSpacing => "No Spacing".into(),
+            DocumentStyles::Title => "Title".into(),
+            DocumentStyles::Heading(level) => format!("Heading {}", level),
+            DocumentStyles::SectionTitle(section_name) => format!("{} Title", section_name),
+            DocumentStyles::SectionText(section_name) => format!("{} Text", section_name),
+            DocumentStyles::Quote => "Quote".into(),
+            DocumentStyles::Verse => "Verse".into(),
+            DocumentStyles::ListParagraph => "ListParagraph".into(),
+            DocumentStyles::ThematicBreak => "ThematicBreak".into(),
+        }
+    }
+
     pub fn generate(&self) -> Style {
         match self {
             DocumentStyles::Normal => Style {
@@ -84,6 +100,28 @@ impl DocumentStyles {
                         None,
                     )
             }
+            DocumentStyles::Quote => Style::new("Quote", StyleType::Paragraph)
+                .name("Quote")
+                .based_on("No Spacing")
+                .italic()
+                .next("Normal")
+                .indent(
+                    Some(720),
+                    Some(SpecialIndentType::FirstLine(0)),
+                    Some(720),
+                    None,
+                ),
+            DocumentStyles::Verse => Style::new("Verse", StyleType::Paragraph)
+                .name("Verse")
+                .based_on("No Spacing")
+                .italic()
+                .next("Normal")
+                .indent(
+                    Some(0),
+                    Some(SpecialIndentType::Hanging(720)),
+                    Some(0),
+                    None,
+                ),
             _ => todo!(),
         }
     }
