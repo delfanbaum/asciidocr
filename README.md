@@ -3,6 +3,8 @@
 A(n in-progress, but more or less functional) Rust tool/library for processing
 Asciidoc files.
 
+_Now with a fairly high-functioning `docx` backend_! (See feature flag.)
+
 ## Installation
 
 Right now the crate provides an `asciidocr` executable with a default HTML
