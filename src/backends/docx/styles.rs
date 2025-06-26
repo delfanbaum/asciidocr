@@ -3,6 +3,7 @@ use docx_rs::{
     Style, StyleType, TableCellProperty, TableProperty,
 };
 
+#[derive(Debug)]
 pub enum DocumentStyles {
     Normal,
     NoSpacing,
@@ -103,7 +104,6 @@ impl DocumentStyles {
                 Style::new(&style_name, StyleType::Paragraph)
                     .name(&style_name)
                     .based_on("Normal")
-                    .bold()
                     .indent(
                         Some(720),
                         Some(SpecialIndentType::FirstLine(360)),
@@ -141,7 +141,7 @@ impl DocumentStyles {
                 let id = format!("NumberedListParagraph_{}", id);
                 Style::new(&id, StyleType::Paragraph)
                     .name(id)
-                    .based_on("Normal)")
+                    .based_on("Normal")
                     .indent(None, Some(SpecialIndentType::FirstLine(0)), None, None)
             }
             DocumentStyles::DefinitionTerm => Style::new("Definition Term", StyleType::Paragraph)

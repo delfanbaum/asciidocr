@@ -2,6 +2,7 @@
 pub mod document;
 pub mod numbering;
 pub mod styles;
+pub mod units;
 
 use std::{fs::File, path::Path};
 

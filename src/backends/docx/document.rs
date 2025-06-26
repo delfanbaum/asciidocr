@@ -16,8 +16,8 @@ use crate::graph::{
 
 use super::numbering::add_bullet_abstract_numbering;
 use super::styles::DocumentStyles;
+use super::units::{inches, DXA_INCH};
 
-const DXA_INCH: i32 = 1440; // standard measuring unit in Word
 static RE_WHITESPACE_NEWLINE: Lazy<Regex> = Lazy::new(|| Regex::new(r#"\s*\n"#).unwrap());
 
 pub fn asciidocr_default_docx() -> Docx {
@@ -54,25 +54,6 @@ impl DocxWriter {
             numbering: 0,
             current_style: DocumentStyles::Normal,
         }
-    }
-
-    fn add_style(&self, mut docx: Docx, style: Style) -> Docx {
-        if docx.styles.find_style_by_id(&style.style_id).is_none() {
-            docx = docx.add_style(style)
-        }
-        docx
-    }
-
-    fn add_title_and_text_styles(&self, mut docx: Docx, section_name: &str) -> Docx {
-        docx = self.add_style(
-            docx,
-            DocumentStyles::SectionTitle(section_name.into()).generate(),
-        );
-        docx = self.add_style(
-            docx,
-            DocumentStyles::SectionText(section_name.into()).generate(),
-        );
-        docx
     }
 
     fn add_paragraph(&mut self, docx: Docx, mut para: Paragraph) -> Docx {
@@ -222,29 +203,29 @@ impl DocxWriter {
     }
 
     fn add_parent_block(&mut self, mut docx: Docx, parent: &ParentBlock, name: &str) -> Docx {
-        docx = self.add_title_and_text_styles(docx, name);
-        self.current_style = DocumentStyles::SectionTitle(format!("{} Text", name));
         // admonitions
         if let Some(variant) = &parent.variant {
+            docx = self.set_style(docx, DocumentStyles::SectionTitle(name.into()));
             docx = self.add_paragraph(
                 docx,
-                Paragraph::new()
-                    .style(&format!("{} Title", name))
-                    .add_run(Run::new().add_text(variant.to_string())),
+                Paragraph::new().add_run(Run::new().add_text(variant.to_string())),
             )
         }
         // examples and sidebars
         if !parent.title.is_empty() {
-            let mut title = Paragraph::new().style("Example Title");
+            docx = self.set_style(docx, DocumentStyles::SectionTitle(name.into()));
+            let mut title = Paragraph::new();
             title = add_inlines_to_para(title, parent.title.clone());
             docx = self.add_paragraph(docx, title);
         }
+        docx = self.set_style(docx, DocumentStyles::SectionText(name.into()));
         for child in parent.blocks.iter() {
             docx = self.add_block_to_doc(docx, child)
         }
         self.reset_style();
         docx
     }
+
     fn add_quote(&mut self, mut docx: Docx, parent: &ParentBlock) -> Docx {
         docx = self.set_style(docx, DocumentStyles::Quote);
         for child in parent.blocks.iter() {
@@ -287,6 +268,13 @@ impl DocxWriter {
             }
         }
         docx.add_table(Table::new(rows))
+    }
+
+    fn add_style(&self, mut docx: Docx, style: Style) -> Docx {
+        if docx.styles.find_style_by_id(&style.style_id).is_none() {
+            docx = docx.add_style(style)
+        }
+        docx
     }
 
     fn set_style(&mut self, docx: Docx, style: DocumentStyles) -> Docx {
@@ -390,8 +378,4 @@ fn runs_from_inline_with_variant<'a>(
         }
     }
     runs
-}
-
-fn inches(i: f32) -> u32 {
-    (DXA_INCH as f32 * i) as u32
 }
