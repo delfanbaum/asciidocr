@@ -1,15 +1,17 @@
-use std::usize;
+use std::{fs::File, io::Read, usize};
 
 use docx_rs::{
     AlignmentType, BreakType, Docx, Header, IndentLevel, LineSpacing, Numbering, NumberingId,
-    PageMargin, PageNum, Paragraph, Run, RunFonts, RunProperty, Style, Table, TableCell, TableRow,
-    VertAlignType,
+    PageMargin, PageNum, Paragraph, Pic, Run, RunFonts, RunProperty, Style, Table, TableCell,
+    TableRow, VertAlignType,
 };
 use once_cell::sync::Lazy;
 use regex::Regex;
 
 use crate::graph::{
-    blocks::{Block, BreakVariant, ParentBlock, ParentBlockName, Section},
+    blocks::{
+        Block, BlockMacro, BlockMacroName, BreakVariant, ParentBlock, ParentBlockName, Section,
+    },
     inlines::{Inline, InlineSpanVariant},
     lists::{DListItem, List, ListItem, ListVariant},
 };
@@ -89,7 +91,6 @@ impl DocxWriter {
                         self.add_paragraph(docx, Paragraph::new().add_run(Run::new().add_text("#")))
                 }
             },
-            Block::BlockMacro(_) => todo!(),
             Block::LeafBlock(block) => {
                 if matches!(block.name, crate::graph::blocks::LeafBlockName::Verse) {
                     docx = self.add_style(docx, DocumentStyles::Verse.generate());
@@ -114,8 +115,9 @@ impl DocxWriter {
                 ParentBlockName::Table => docx = self.add_table(docx, parent),
                 ParentBlockName::FootnoteContainer => {} // should never appear in this context
             },
-            Block::BlockMetadata(_) => todo!(),
+            Block::BlockMacro(block) => docx = self.add_block_macro(docx, block),
             Block::TableCell(_) => {} // handled directly in the parent block
+            Block::BlockMetadata(_) => {} // not implemented by parser
             Block::SectionBody => {}  // not implemented by parser
             Block::NonSectionBlockBody(_) => {} // not implemented by parser
             Block::DiscreteHeading => {} // not implemented by parser
@@ -268,6 +270,20 @@ impl DocxWriter {
             }
         }
         docx.add_table(Table::new(rows))
+    }
+
+    fn add_block_macro(&mut self, mut docx: Docx, block: &BlockMacro) -> Docx {
+        // TODO better error handling
+        if matches!(block.name, BlockMacroName::Image) {
+            let mut img = File::open(block.target.clone()).expect("Error opening image file");
+            let mut buf = vec![];
+            let _ = img.read_to_end(&mut buf).expect("Error reading image file");
+            let pic = Pic::new(&buf);
+            docx = docx.add_paragraph(Paragraph::new().add_run(Run::new().add_image(pic)));
+        } else {
+            todo!()
+        }
+        docx
     }
 
     fn add_style(&self, mut docx: Docx, style: Style) -> Docx {

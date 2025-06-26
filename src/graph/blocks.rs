@@ -881,11 +881,11 @@ impl Break {
 
 #[derive(Serialize, Clone, Debug)]
 pub struct BlockMacro {
-    name: BlockMacroName,
+    pub name: BlockMacroName,
     #[serde(rename = "type")]
     node_type: NodeTypes,
     form: String,
-    target: String,
+    pub target: String,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub caption: Vec<Inline>,
     #[serde(skip_serializing_if = "Option::is_none")]
