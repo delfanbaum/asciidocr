@@ -9,9 +9,9 @@ use once_cell::sync::Lazy;
 use regex::Regex;
 
 use crate::graph::{
-    blocks::{Block, BreakVariant, ParentBlockName},
+    blocks::{Block, BreakVariant, ParentBlock, ParentBlockName, Section},
     inlines::{Inline, InlineSpanVariant},
-    lists::ListVariant,
+    lists::{DListItem, List, ListItem, ListVariant},
 };
 
 use super::numbering::add_bullet_abstract_numbering;
@@ -89,86 +89,15 @@ impl DocxWriter {
 
     pub fn add_block_to_doc(&mut self, mut docx: Docx, block: &Block) -> Docx {
         match block {
-            Block::Section(section) => {
-                if !section.title().is_empty() {
-                    docx = self.set_style(docx, DocumentStyles::Heading(section.level));
-                    let mut para = Paragraph::new();
-                    para = add_inlines_to_para(para, section.title());
-                    docx = self.add_paragraph(docx, para);
-                }
-
-                for block in section.blocks.iter() {
-                    docx = self.add_block_to_doc(docx, block)
-                }
-            }
-            Block::List(list) => {
-                self.numbering += 1;
-                match list.variant {
-                    ListVariant::Ordered | ListVariant::Callout => {
-                        docx = self
-                            .set_style(docx, DocumentStyles::OrderedListParagraph(self.numbering))
-                    }
-                    ListVariant::Unordered => {
-                        docx = self.set_style(docx, DocumentStyles::ListParagraph);
-                        if self.abstract_numbering == 0 {
-                            // really only do this once
-                            self.abstract_numbering += 1;
-                            docx = docx
-                                .add_abstract_numbering(add_bullet_abstract_numbering(
-                                    self.abstract_numbering,
-                                ))
-                                .add_numbering(Numbering::new(
-                                    self.numbering,
-                                    self.abstract_numbering,
-                                ))
-                        }
-                    }
-                }
-                for item in list.items.iter() {
-                    docx = self.add_block_to_doc(docx, item)
-                }
-            }
-            Block::ListItem(item) => {
-                // add principal with the correct variant match
-                let mut para = Paragraph::new();
-
-                para = para
-                    .style(&self.current_style.style_id())
-                    .numbering(NumberingId::new(self.numbering), IndentLevel::new(0));
-                para = add_inlines_to_para(para, item.principal());
-                docx = self.add_paragraph(docx, para);
-                // add any children -- TODO style them as list continues
-                if !item.blocks.is_empty() {
-                    for block in item.blocks.iter() {
-                        docx = self.add_block_to_doc(docx, block)
-                    }
-                }
-            }
+            Block::Section(section) => docx = self.add_section(docx, section),
+            Block::List(list) => docx = self.add_list(docx, list),
+            Block::ListItem(item) => docx = self.add_list_item(docx, item),
             Block::DList(list) => {
                 for item in list.items.iter() {
                     docx = self.add_block_to_doc(docx, item)
                 }
             }
-            Block::DListItem(item) => {
-                // add terms
-                docx = self.set_style(docx, DocumentStyles::DefinitionTerm);
-                let mut terms_para = Paragraph::new();
-                terms_para = add_inlines_to_para(terms_para, item.terms());
-                docx = self.add_paragraph(docx, terms_para);
-
-                // add principal and anything else
-                docx = self.set_style(docx, DocumentStyles::Definition);
-                let mut para = Paragraph::new().style(&self.current_style.style_id());
-                para = add_inlines_to_para(para, item.principal());
-                docx = self.add_paragraph(docx, para);
-
-                // add any children -- TODO style them as list continues
-                if !item.blocks.is_empty() {
-                    for block in item.blocks.iter() {
-                        docx = self.add_block_to_doc(docx, block)
-                    }
-                }
-            }
+            Block::DListItem(item) => docx = self.add_dlist_item(docx, item),
             Block::Break(block) => match block.variant {
                 BreakVariant::Page => {
                     self.page_break_before = true;
@@ -191,93 +120,17 @@ impl DocxWriter {
             }
             Block::ParentBlock(parent) => match parent.name {
                 ParentBlockName::Admonition => {
-                    docx = self.add_title_and_text_styles(docx, "Admonition");
-                    self.current_style = DocumentStyles::SectionTitle("Admonition Text".into());
-                    if let Some(variant) = &parent.variant {
-                        docx = self.add_paragraph(
-                            docx,
-                            Paragraph::new()
-                                .style("Admonition Title")
-                                .add_run(Run::new().add_text(variant.to_string())),
-                        )
-                    }
-                    for child in parent.blocks.iter() {
-                        docx = self.add_block_to_doc(docx, child)
-                    }
-                    self.reset_style();
+                    docx = self.add_parent_block(docx, parent, "Admonition")
                 }
-                ParentBlockName::Example => {
-                    docx = self.add_title_and_text_styles(docx, "Example");
-                    self.current_style = DocumentStyles::SectionTitle("Example Text".into());
-                    if !parent.title.is_empty() {
-                        let mut title = Paragraph::new().style("Example Title");
-                        title = add_inlines_to_para(title, parent.title.clone());
-                        docx = self.add_paragraph(docx, title);
-                    }
-                    for child in parent.blocks.iter() {
-                        docx = self.add_block_to_doc(docx, child)
-                    }
-                    self.reset_style();
-                }
-                ParentBlockName::Sidebar => {
-                    docx = self.add_title_and_text_styles(docx, "Sidebar");
-                    self.current_style = DocumentStyles::SectionTitle("Sidebar Text".into());
-                    if !parent.title.is_empty() {
-                        let mut title = Paragraph::new().style("Sidebar Title");
-                        title = add_inlines_to_para(title, parent.title.clone());
-                        docx = self.add_paragraph(docx, title);
-                    }
-                    for child in parent.blocks.iter() {
-                        docx = self.add_block_to_doc(docx, child)
-                    }
-                    self.reset_style();
-                }
+                ParentBlockName::Example => docx = self.add_parent_block(docx, parent, "Example"),
+                ParentBlockName::Sidebar => docx = self.add_parent_block(docx, parent, "Sidebar"),
                 ParentBlockName::Open => {
                     for child in parent.blocks.iter() {
                         docx = self.add_block_to_doc(docx, child)
                     }
                 }
-                ParentBlockName::Quote => {
-                    docx = self.set_style(docx, DocumentStyles::Quote);
-                    for child in parent.blocks.iter() {
-                        docx = self.add_block_to_doc(docx, child)
-                    }
-                    if let Some(metadata) = &parent.metadata {
-                        if let Some(attribution) = metadata.attributes.get("attribution") {
-                            let para = Paragraph::new()
-                                .line_spacing(LineSpacing::new().after(480))
-                                .add_run(Run::new().add_text(format!("— {}\n", attribution)));
-
-                            docx = self.add_paragraph(docx, para)
-                        }
-                    }
-                    self.reset_style();
-                }
-                ParentBlockName::Table => {
-                    // TODO: headers on tables
-                    docx = self.set_style(docx, DocumentStyles::Table);
-                    let mut cols: usize = 0;
-                    if let Some(ref metadata) = parent.metadata {
-                        if let Some(col_num) = metadata.attributes.get("cols") {
-                            cols = col_num.parse().expect("Invalid column designation")
-                        }
-                    }
-                    let mut rows: Vec<TableRow> = vec![];
-                    let num_cells = parent.blocks.len();
-                    let mut current_row: Vec<TableCell> = vec![];
-                    for (idx, block) in parent.blocks.iter().enumerate() {
-                        let mut para = Paragraph::new().style(&DocumentStyles::Table.style_id());
-                        para = add_inlines_to_para(para, block.inlines());
-                        let cell = TableCell::new().add_paragraph(para);
-                        current_row.push(cell);
-                        // see if we need a new row
-                        if idx > 0 && (idx + 1) % cols == 0 && idx + 1 != num_cells {
-                            rows.push(TableRow::new(current_row.clone()));
-                            current_row.clear()
-                        }
-                    }
-                    docx = docx.add_table(Table::new(rows))
-                }
+                ParentBlockName::Quote => docx = self.add_quote(docx, parent),
+                ParentBlockName::Table => docx = self.add_table(docx, parent),
                 ParentBlockName::FootnoteContainer => {} // should never appear in this context
             },
             Block::BlockMetadata(_) => todo!(),
@@ -287,6 +140,153 @@ impl DocxWriter {
             Block::DiscreteHeading => {} // not implemented by parser
         }
         docx
+    }
+
+    fn add_list(&mut self, mut docx: Docx, list: &List) -> Docx {
+        self.numbering += 1;
+        match list.variant {
+            ListVariant::Ordered | ListVariant::Callout => {
+                docx = self.set_style(docx, DocumentStyles::OrderedListParagraph(self.numbering))
+            }
+            ListVariant::Unordered => {
+                docx = self.set_style(docx, DocumentStyles::ListParagraph);
+                if self.abstract_numbering == 0 {
+                    // really only do this once
+                    self.abstract_numbering += 1;
+                    docx = docx
+                        .add_abstract_numbering(add_bullet_abstract_numbering(
+                            self.abstract_numbering,
+                        ))
+                        .add_numbering(Numbering::new(self.numbering, self.abstract_numbering))
+                }
+            }
+        }
+        for item in list.items.iter() {
+            docx = self.add_block_to_doc(docx, item)
+        }
+        docx
+    }
+
+    fn add_list_item(&mut self, mut docx: Docx, item: &ListItem) -> Docx {
+        // add principal with the correct variant match
+        let mut para = Paragraph::new();
+
+        para = para
+            .style(&self.current_style.style_id())
+            .numbering(NumberingId::new(self.numbering), IndentLevel::new(0));
+        para = add_inlines_to_para(para, item.principal());
+        docx = self.add_paragraph(docx, para);
+        // add any children -- TODO style them as list continues
+        if !item.blocks.is_empty() {
+            for block in item.blocks.iter() {
+                docx = self.add_block_to_doc(docx, block)
+            }
+        }
+        docx
+    }
+
+    fn add_dlist_item(&mut self, mut docx: Docx, item: &DListItem) -> Docx {
+        // add terms
+        docx = self.set_style(docx, DocumentStyles::DefinitionTerm);
+        let mut terms_para = Paragraph::new();
+        terms_para = add_inlines_to_para(terms_para, item.terms());
+        docx = self.add_paragraph(docx, terms_para);
+
+        // add principal and anything else
+        docx = self.set_style(docx, DocumentStyles::Definition);
+        let mut para = Paragraph::new().style(&self.current_style.style_id());
+        para = add_inlines_to_para(para, item.principal());
+        docx = self.add_paragraph(docx, para);
+
+        // add any children -- TODO style them as list continues
+        if !item.blocks.is_empty() {
+            for block in item.blocks.iter() {
+                docx = self.add_block_to_doc(docx, block)
+            }
+        }
+        docx
+    }
+
+    fn add_section(&mut self, mut docx: Docx, section: &Section) -> Docx {
+        if !section.title().is_empty() {
+            docx = self.set_style(docx, DocumentStyles::Heading(section.level));
+            let mut para = Paragraph::new();
+            para = add_inlines_to_para(para, section.title());
+            docx = self.add_paragraph(docx, para);
+        }
+
+        for block in section.blocks.iter() {
+            docx = self.add_block_to_doc(docx, block)
+        }
+        docx
+    }
+
+    fn add_parent_block(&mut self, mut docx: Docx, parent: &ParentBlock, name: &str) -> Docx {
+        docx = self.add_title_and_text_styles(docx, name);
+        self.current_style = DocumentStyles::SectionTitle(format!("{} Text", name));
+        // admonitions
+        if let Some(variant) = &parent.variant {
+            docx = self.add_paragraph(
+                docx,
+                Paragraph::new()
+                    .style(&format!("{} Title", name))
+                    .add_run(Run::new().add_text(variant.to_string())),
+            )
+        }
+        // examples and sidebars
+        if !parent.title.is_empty() {
+            let mut title = Paragraph::new().style("Example Title");
+            title = add_inlines_to_para(title, parent.title.clone());
+            docx = self.add_paragraph(docx, title);
+        }
+        for child in parent.blocks.iter() {
+            docx = self.add_block_to_doc(docx, child)
+        }
+        self.reset_style();
+        docx
+    }
+    fn add_quote(&mut self, mut docx: Docx, parent: &ParentBlock) -> Docx {
+        docx = self.set_style(docx, DocumentStyles::Quote);
+        for child in parent.blocks.iter() {
+            docx = self.add_block_to_doc(docx, child)
+        }
+        if let Some(metadata) = &parent.metadata {
+            if let Some(attribution) = metadata.attributes.get("attribution") {
+                let para = Paragraph::new()
+                    .line_spacing(LineSpacing::new().after(480))
+                    .add_run(Run::new().add_text(format!("— {}\n", attribution)));
+
+                docx = self.add_paragraph(docx, para)
+            }
+        }
+        self.reset_style();
+        docx
+    }
+
+    fn add_table(&mut self, mut docx: Docx, table: &ParentBlock) -> Docx {
+        // TODO: headers on tables
+        docx = self.set_style(docx, DocumentStyles::Table);
+        let mut cols: usize = 0;
+        if let Some(ref metadata) = table.metadata {
+            if let Some(col_num) = metadata.attributes.get("cols") {
+                cols = col_num.parse().expect("Invalid column designation")
+            }
+        }
+        let mut rows: Vec<TableRow> = vec![];
+        let num_cells = table.blocks.len();
+        let mut current_row: Vec<TableCell> = vec![];
+        for (idx, block) in table.blocks.iter().enumerate() {
+            let mut para = Paragraph::new().style(&DocumentStyles::Table.style_id());
+            para = add_inlines_to_para(para, block.inlines());
+            let cell = TableCell::new().add_paragraph(para);
+            current_row.push(cell);
+            // see if we need a new row
+            if idx > 0 && (idx + 1) % cols == 0 && idx + 1 != num_cells {
+                rows.push(TableRow::new(current_row.clone()));
+                current_row.clear()
+            }
+        }
+        docx.add_table(Table::new(rows))
     }
 
     fn set_style(&mut self, docx: Docx, style: DocumentStyles) -> Docx {
