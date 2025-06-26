@@ -7,6 +7,7 @@ use docx_rs::{
 pub enum DocumentStyles {
     Normal,
     NoSpacing,
+    Monospace,
     Title,
     Heading(usize),
     SectionTitle(String),
@@ -26,6 +27,7 @@ impl DocumentStyles {
         match self {
             DocumentStyles::Normal => "Normal".into(),
             DocumentStyles::NoSpacing => "No Spacing".into(),
+            DocumentStyles::Monospace => "Monospace".into(),
             DocumentStyles::Title => "Title".into(),
             DocumentStyles::Heading(level) => format!("Heading {}", level),
             DocumentStyles::SectionTitle(section_name) => format!("{} Title", section_name),
@@ -69,6 +71,25 @@ impl DocumentStyles {
                 paragraph_property: ParagraphProperty::new().indent(
                     None,
                     Some(SpecialIndentType::FirstLine(720)),
+                    None,
+                    None,
+                ),
+                table_property: TableProperty::new(),
+                table_cell_property: TableCellProperty::new(),
+                based_on: None,
+                next: None,
+                link: None,
+            },
+            DocumentStyles::Monospace => Style {
+                style_id: "Monospace".into(),
+                name: Name::new("Monospace"),
+                style_type: StyleType::Paragraph,
+                run_property: RunProperty::new()
+                    .size(24)
+                    .fonts(RunFonts::new().ascii("Courier New")),
+                paragraph_property: ParagraphProperty::new().indent(
+                    None,
+                    Some(SpecialIndentType::FirstLine(0)),
                     None,
                     None,
                 ),

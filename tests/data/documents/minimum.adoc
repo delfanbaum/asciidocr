@@ -57,3 +57,16 @@ ____
 My love is like a red, red rose
 ____
 
+And a table:
+
+[cols="1,1"]
+|===
+|Cell in *column* 1, *row* 1 
+|Cell in column 2, row 1 
+
+|Cell in column 1, row 2
+|Cell in column 2, row 2
+
+|Cell in column 1, row 3
+|Cell in column 2, row 3 
+|===

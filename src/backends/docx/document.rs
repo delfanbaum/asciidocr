@@ -10,7 +10,8 @@ use regex::Regex;
 
 use crate::graph::{
     blocks::{
-        Block, BlockMacro, BlockMacroName, BreakVariant, ParentBlock, ParentBlockName, Section,
+        Block, BlockMacro, BlockMacroName, BreakVariant, LeafBlockName, ParentBlock,
+        ParentBlockName, Section,
     },
     inlines::{Inline, InlineSpanVariant},
     lists::{DListItem, List, ListItem, ListVariant},
@@ -92,9 +93,14 @@ impl DocxWriter {
                 }
             },
             Block::LeafBlock(block) => {
-                if matches!(block.name, crate::graph::blocks::LeafBlockName::Verse) {
-                    docx = self.add_style(docx, DocumentStyles::Verse.generate());
-                    self.current_style = DocumentStyles::Verse
+                match block.name {
+                    LeafBlockName::Verse => {
+                        docx = self.set_style(docx, DocumentStyles::Verse);
+                    }
+                    LeafBlockName::Listing | LeafBlockName::Literal => {
+                        docx = self.set_style(docx, DocumentStyles::Monospace);
+                    }
+                    _ => {}
                 }
                 let mut para = Paragraph::new();
                 para = add_inlines_to_para(para, block.inlines());

@@ -22,4 +22,18 @@ mod docx_tests {
             Err(_) => assert!(false),
         }
     }
+
+    #[test]
+    fn test_no_todo_failures_for_expected_elements() {
+        let test_dir = PathBuf::from("tests/data/");
+        let adoc_fn = "documents/minimum.adoc";
+        let parsed_asg = Parser::new(test_dir.join(adoc_fn)).parse(Scanner::new(
+            &fs::read_to_string(test_dir.join(adoc_fn)).expect("Unable to find adoc"),
+        ));
+        let temp_docx = NamedTempFile::new().unwrap();
+        match render_docx(&parsed_asg, &temp_docx.path()) {
+            Ok(_) => assert!(true),
+            Err(_) => assert!(false),
+        }
+    }
 }
