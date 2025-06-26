@@ -218,6 +218,14 @@ impl DListItem {
         self.terms.push(inline)
     }
 
+    pub fn terms(&self) -> Vec<Inline> {
+        self.terms.clone()
+    }
+
+    pub fn principal(&self) -> Vec<Inline> {
+        self.principal.clone()
+    }
+
     pub fn add_inline(&mut self, inline: Inline) {
         self.principal.push(inline)
     }

@@ -88,10 +88,8 @@ impl DocxWriter {
         match block {
             Block::Section(section) => {
                 if !section.title().is_empty() {
-                    let heading_style = DocumentStyles::Heading(section.level).generate();
-                    let mut para = Paragraph::new().style(&heading_style.style_id);
-                    docx = self.add_style(docx, heading_style);
-
+                    docx = self.set_style(docx, DocumentStyles::Heading(section.level));
+                    let mut para = Paragraph::new();
                     para = add_inlines_to_para(para, section.title());
                     docx = self.add_paragraph(docx, para);
                 }
@@ -104,11 +102,11 @@ impl DocxWriter {
                 self.numbering += 1;
                 match list.variant {
                     ListVariant::Ordered | ListVariant::Callout => {
-                        self.current_style = DocumentStyles::OrderedListParagraph(self.numbering);
-                        docx = self.add_style(docx, self.current_style.generate());
+                        docx = self
+                            .set_style(docx, DocumentStyles::OrderedListParagraph(self.numbering))
                     }
                     ListVariant::Unordered => {
-                        docx = self.add_style(docx, DocumentStyles::ListParagraph.generate());
+                        docx = self.set_style(docx, DocumentStyles::ListParagraph);
                         if self.abstract_numbering == 0 {
                             // really only do this once
                             self.abstract_numbering += 1;
@@ -121,8 +119,6 @@ impl DocxWriter {
                                     self.abstract_numbering,
                                 ))
                         }
-
-                        self.current_style = DocumentStyles::ListParagraph;
                     }
                 }
                 for item in list.items.iter() {
@@ -145,20 +141,14 @@ impl DocxWriter {
                     }
                 }
             }
-            Block::DList(_) => todo!(),
-            Block::DListItem(_) => todo!(),
             Block::Break(block) => match block.variant {
                 BreakVariant::Page => {
                     self.page_break_before = true;
                 }
                 BreakVariant::Thematic => {
-                    docx = self.add_style(docx, DocumentStyles::ThematicBreak.generate());
-                    docx = self.add_paragraph(
-                        docx,
-                        Paragraph::new()
-                            .style("Thematic Break")
-                            .add_run(Run::new().add_text("#")),
-                    )
+                    docx = self.set_style(docx, DocumentStyles::ThematicBreak);
+                    docx =
+                        self.add_paragraph(docx, Paragraph::new().add_run(Run::new().add_text("#")))
                 }
             },
             Block::BlockMacro(_) => todo!(),
@@ -220,8 +210,7 @@ impl DocxWriter {
                     }
                 }
                 ParentBlockName::Quote => {
-                    docx = self.add_style(docx, DocumentStyles::Quote.generate());
-                    self.current_style = DocumentStyles::Quote;
+                    docx = self.set_style(docx, DocumentStyles::Quote);
                     for child in parent.blocks.iter() {
                         docx = self.add_block_to_doc(docx, child)
                     }
@@ -240,6 +229,31 @@ impl DocxWriter {
                 // should not appear in this context, so just skip
                 ParentBlockName::FootnoteContainer => {}
             },
+            Block::DList(list) => {
+                for item in list.items.iter() {
+                    docx = self.add_block_to_doc(docx, item)
+                }
+            }
+            Block::DListItem(item) => {
+                // add terms
+                docx = self.set_style(docx, DocumentStyles::DefinitionTerm);
+                let mut terms_para = Paragraph::new();
+                terms_para = add_inlines_to_para(terms_para, item.terms());
+                docx = self.add_paragraph(docx, terms_para);
+
+                // add principal and anything else
+                docx = self.set_style(docx, DocumentStyles::Definition);
+                let mut para = Paragraph::new().style(&self.current_style.style_id());
+                para = add_inlines_to_para(para, item.principal());
+                docx = self.add_paragraph(docx, para);
+
+                // add any children -- TODO style them as list continues
+                if !item.blocks.is_empty() {
+                    for block in item.blocks.iter() {
+                        docx = self.add_block_to_doc(docx, block)
+                    }
+                }
+            }
             Block::BlockMetadata(_) => todo!(),
             Block::TableCell(_) => todo!(),
             Block::SectionBody => todo!(),
@@ -247,6 +261,11 @@ impl DocxWriter {
             Block::DiscreteHeading => todo!(),
         }
         docx
+    }
+
+    fn set_style(&mut self, docx: Docx, style: DocumentStyles) -> Docx {
+        self.current_style = style;
+        self.add_style(docx, self.current_style.generate())
     }
 
     fn reset_style(&mut self) {

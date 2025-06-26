@@ -2,7 +2,6 @@ use core::panic;
 use std::{
     collections::{HashMap, VecDeque},
     fmt::Display,
-    iter,
 };
 
 use log::warn;
@@ -177,7 +176,7 @@ impl Inline {
                 if span.node_form == InlineSpanForm::Unconstrained {
                     literal = literal
                         .chars()
-                        .flat_map(|c| iter::repeat(c).take(2))
+                        .flat_map(|c| std::iter::repeat_n(c, 2))
                         .collect::<String>();
                 }
                 literal

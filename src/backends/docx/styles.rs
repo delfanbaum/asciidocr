@@ -1,6 +1,6 @@
 use docx_rs::{
-    LineSpacing, Name, ParagraphProperty, RunFonts, RunProperty, SpecialIndentType, Style,
-    StyleType, TableCellProperty, TableProperty,
+    AlignmentType, LineSpacing, Name, ParagraphProperty, RunFonts, RunProperty, SpecialIndentType,
+    Style, StyleType, TableCellProperty, TableProperty,
 };
 
 pub enum DocumentStyles {
@@ -14,6 +14,8 @@ pub enum DocumentStyles {
     Verse,
     ListParagraph,
     OrderedListParagraph(usize),
+    DefinitionTerm,
+    Definition,
     ThematicBreak,
 }
 
@@ -30,6 +32,8 @@ impl DocumentStyles {
             DocumentStyles::Verse => "Verse".into(),
             DocumentStyles::ListParagraph => "ListParagraph".into(),
             DocumentStyles::OrderedListParagraph(id) => format!("NumberedListParagraph_{}", id),
+            DocumentStyles::DefinitionTerm => "Definition Term".into(),
+            DocumentStyles::Definition => "Definition".into(),
             DocumentStyles::ThematicBreak => "ThematicBreak".into(),
         }
     }
@@ -138,7 +142,20 @@ impl DocumentStyles {
                     .based_on("Normal)")
                     .indent(None, Some(SpecialIndentType::FirstLine(0)), None, None)
             }
-            _ => todo!(),
+            DocumentStyles::DefinitionTerm => Style::new("Definition Term", StyleType::Paragraph)
+                .name("Definition Term")
+                .based_on("Normal")
+                .indent(None, Some(SpecialIndentType::FirstLine(0)), None, None)
+                .bold(),
+            DocumentStyles::Definition => Style::new("Definition", StyleType::Paragraph)
+                .name("Definition")
+                .based_on("Normal")
+                .indent(Some(720), Some(SpecialIndentType::FirstLine(0)), None, None),
+            DocumentStyles::ThematicBreak => Style::new("Thematic Break", StyleType::Paragraph)
+                .name("Thematic Break")
+                .based_on("Normal")
+                .align(AlignmentType::Center)
+                .bold(),
         }
     }
 
