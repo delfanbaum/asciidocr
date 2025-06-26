@@ -283,42 +283,87 @@ impl Block {
         }
     }
 
-    pub fn inlines(&mut self) -> Vec<&mut Inline> {
+    pub fn inlines(&self) -> Vec<Inline> {
+        let mut inlines: Vec<Inline> = vec![];
+        match self {
+            // parents
+            Block::Section(block) => {
+                inlines.extend(block.inlines.clone());
+                for child in block.blocks.iter() {
+                    inlines.extend(child.inlines())
+                }
+            }
+            Block::ParentBlock(block) => {
+                inlines.extend(block.title.clone());
+                for child in block.blocks.iter() {
+                    inlines.extend(child.inlines())
+                }
+            }
+            Block::List(block) => {
+                for child in block.items.iter() {
+                    inlines.extend(child.inlines())
+                }
+            }
+            Block::DList(block) => {
+                for child in block.items.iter() {
+                    inlines.extend(child.inlines())
+                }
+            }
+            Block::ListItem(block) => {
+                inlines.extend(block.principal.clone());
+                for child in block.blocks.iter() {
+                    inlines.extend(child.inlines())
+                }
+            }
+            Block::DListItem(block) => {
+                inlines.extend(block.principal.clone());
+                for child in block.blocks.iter() {
+                    inlines.extend(child.inlines())
+                }
+            }
+            Block::LeafBlock(block) => inlines.extend(block.inlines.clone()),
+            Block::TableCell(block) => inlines.extend(block.inlines.clone()),
+            _ => {} // remaining blocks don't have inlines
+        }
+
+        inlines
+    }
+    pub fn inlines_mut(&mut self) -> Vec<&mut Inline> {
         let mut inlines: Vec<&mut Inline> = vec![];
         match self {
             // parents
             Block::Section(block) => {
                 inlines.extend(block.inlines.iter_mut());
                 for child in block.blocks.iter_mut() {
-                    inlines.extend(child.inlines())
+                    inlines.extend(child.inlines_mut())
                 }
             }
             Block::ParentBlock(block) => {
                 inlines.extend(block.title.iter_mut());
                 for child in block.blocks.iter_mut() {
-                    inlines.extend(child.inlines())
+                    inlines.extend(child.inlines_mut())
                 }
             }
             Block::List(block) => {
                 for child in block.items.iter_mut() {
-                    inlines.extend(child.inlines())
+                    inlines.extend(child.inlines_mut())
                 }
             }
             Block::DList(block) => {
                 for child in block.items.iter_mut() {
-                    inlines.extend(child.inlines())
+                    inlines.extend(child.inlines_mut())
                 }
             }
             Block::ListItem(block) => {
                 inlines.extend(block.principal.iter_mut());
                 for child in block.blocks.iter_mut() {
-                    inlines.extend(child.inlines())
+                    inlines.extend(child.inlines_mut())
                 }
             }
             Block::DListItem(block) => {
                 inlines.extend(block.principal.iter_mut());
                 for child in block.blocks.iter_mut() {
-                    inlines.extend(child.inlines())
+                    inlines.extend(child.inlines_mut())
                 }
             }
             Block::LeafBlock(block) => inlines.extend(block.inlines.iter_mut()),

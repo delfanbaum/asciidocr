@@ -105,7 +105,7 @@ impl Asg {
     /// title, notify the user
     fn consolidate_xrefs(&mut self) {
         for block in self.blocks.iter_mut() {
-            for inline in block.inlines() {
+            for inline in block.inlines_mut() {
                 // easier to push the matching down to the Inline enum
                 inline.attempt_xref_standardization(&self.document_id_hash);
             }

@@ -1,6 +1,9 @@
+use std::usize;
+
 use docx_rs::{
     AlignmentType, BreakType, Docx, Header, IndentLevel, LineSpacing, Numbering, NumberingId,
-    PageMargin, PageNum, Paragraph, Run, RunFonts, RunProperty, Style, VertAlignType,
+    PageMargin, PageNum, Paragraph, Run, RunFonts, RunProperty, Style, Table, TableCell, TableRow,
+    VertAlignType,
 };
 use once_cell::sync::Lazy;
 use regex::Regex;
@@ -141,6 +144,31 @@ impl DocxWriter {
                     }
                 }
             }
+            Block::DList(list) => {
+                for item in list.items.iter() {
+                    docx = self.add_block_to_doc(docx, item)
+                }
+            }
+            Block::DListItem(item) => {
+                // add terms
+                docx = self.set_style(docx, DocumentStyles::DefinitionTerm);
+                let mut terms_para = Paragraph::new();
+                terms_para = add_inlines_to_para(terms_para, item.terms());
+                docx = self.add_paragraph(docx, terms_para);
+
+                // add principal and anything else
+                docx = self.set_style(docx, DocumentStyles::Definition);
+                let mut para = Paragraph::new().style(&self.current_style.style_id());
+                para = add_inlines_to_para(para, item.principal());
+                docx = self.add_paragraph(docx, para);
+
+                // add any children -- TODO style them as list continues
+                if !item.blocks.is_empty() {
+                    for block in item.blocks.iter() {
+                        docx = self.add_block_to_doc(docx, block)
+                    }
+                }
+            }
             Block::Break(block) => match block.variant {
                 BreakVariant::Page => {
                     self.page_break_before = true;
@@ -225,40 +253,38 @@ impl DocxWriter {
                     }
                     self.reset_style();
                 }
-                ParentBlockName::Table => todo!(),
-                // should not appear in this context, so just skip
-                ParentBlockName::FootnoteContainer => {}
-            },
-            Block::DList(list) => {
-                for item in list.items.iter() {
-                    docx = self.add_block_to_doc(docx, item)
-                }
-            }
-            Block::DListItem(item) => {
-                // add terms
-                docx = self.set_style(docx, DocumentStyles::DefinitionTerm);
-                let mut terms_para = Paragraph::new();
-                terms_para = add_inlines_to_para(terms_para, item.terms());
-                docx = self.add_paragraph(docx, terms_para);
-
-                // add principal and anything else
-                docx = self.set_style(docx, DocumentStyles::Definition);
-                let mut para = Paragraph::new().style(&self.current_style.style_id());
-                para = add_inlines_to_para(para, item.principal());
-                docx = self.add_paragraph(docx, para);
-
-                // add any children -- TODO style them as list continues
-                if !item.blocks.is_empty() {
-                    for block in item.blocks.iter() {
-                        docx = self.add_block_to_doc(docx, block)
+                ParentBlockName::Table => {
+                    // TODO: headers on tables
+                    docx = self.set_style(docx, DocumentStyles::Table);
+                    let mut cols: usize = 0;
+                    if let Some(ref metadata) = parent.metadata {
+                        if let Some(col_num) = metadata.attributes.get("cols") {
+                            cols = col_num.parse().expect("Invalid column designation")
+                        }
                     }
+                    let mut rows: Vec<TableRow> = vec![];
+                    let num_cells = parent.blocks.len();
+                    let mut current_row: Vec<TableCell> = vec![];
+                    for (idx, block) in parent.blocks.iter().enumerate() {
+                        let mut para = Paragraph::new().style(&DocumentStyles::Table.style_id());
+                        para = add_inlines_to_para(para, block.inlines());
+                        let cell = TableCell::new().add_paragraph(para);
+                        current_row.push(cell);
+                        // see if we need a new row
+                        if idx > 0 && (idx + 1) % cols == 0 && idx + 1 != num_cells {
+                            rows.push(TableRow::new(current_row.clone()));
+                            current_row.clear()
+                        }
+                    }
+                    docx = docx.add_table(Table::new(rows))
                 }
-            }
+                ParentBlockName::FootnoteContainer => {} // should never appear in this context
+            },
             Block::BlockMetadata(_) => todo!(),
-            Block::TableCell(_) => todo!(),
-            Block::SectionBody => todo!(),
-            Block::NonSectionBlockBody(_) => todo!(),
-            Block::DiscreteHeading => todo!(),
+            Block::TableCell(_) => {} // handled directly in the parent block
+            Block::SectionBody => {}  // not implemented by parser
+            Block::NonSectionBlockBody(_) => {} // not implemented by parser
+            Block::DiscreteHeading => {} // not implemented by parser
         }
         docx
     }

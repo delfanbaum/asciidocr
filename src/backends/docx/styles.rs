@@ -17,6 +17,7 @@ pub enum DocumentStyles {
     DefinitionTerm,
     Definition,
     ThematicBreak,
+    Table,
 }
 
 impl DocumentStyles {
@@ -35,6 +36,7 @@ impl DocumentStyles {
             DocumentStyles::DefinitionTerm => "Definition Term".into(),
             DocumentStyles::Definition => "Definition".into(),
             DocumentStyles::ThematicBreak => "ThematicBreak".into(),
+            DocumentStyles::Table => "Table".into(),
         }
     }
 
@@ -156,6 +158,10 @@ impl DocumentStyles {
                 .based_on("Normal")
                 .align(AlignmentType::Center)
                 .bold(),
+            DocumentStyles::Table => Style::new("Table", StyleType::Paragraph)
+                .name("Table")
+                .based_on("Normal")
+                .indent(None, Some(SpecialIndentType::FirstLine(0)), None, None),
         }
     }
 
