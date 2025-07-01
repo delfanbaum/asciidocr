@@ -2,7 +2,9 @@ use std::{fs, path::PathBuf};
 
 use asciidocr::{backends::htmls::render_htmlbook, parser::Parser, scanner::Scanner};
 use assert_json_diff::assert_json_eq;
+use image::RgbImage;
 use serde_json::{json, Value};
+use tempfile::NamedTempFile;
 
 /// Given a pattern "parent/filename" inside tests/data, assert that the filename.adoc produces
 /// the expected abstract syntax graph found in filename.json
@@ -40,4 +42,11 @@ pub fn assert_rendered_htmlbook_matches_expected(adoc_fn: &str, html_fn: &str) {
         fs::read_to_string(test_dir.join(html_fn)).expect("Unable to read expectd html file");
     expected_html.retain(|c| !c.is_whitespace());
     assert_eq!(rendered_html, expected_html);
+}
+
+pub fn generate_temp_image() -> NamedTempFile {
+    let img_path = NamedTempFile::with_suffix(".png").unwrap();
+    let img = RgbImage::new(32, 32);
+    img.save(&img_path.path()).expect("Error creating image");
+    img_path
 }
