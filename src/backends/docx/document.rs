@@ -202,6 +202,8 @@ impl DocxWriter {
             let mut para = Paragraph::new();
             para = add_inlines_to_para(para, section.title());
             docx = self.add_paragraph(docx, para);
+            // to ensure we go back
+            self.reset_style();
         }
 
         for block in section.blocks.iter() {
