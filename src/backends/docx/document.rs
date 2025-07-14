@@ -325,6 +325,7 @@ pub fn add_inlines_to_para(mut para: Paragraph, inlines: Vec<Inline>) -> Paragra
 fn runs_from_inline(inline: &Inline) -> Vec<Run> {
     let mut variants: Vec<&InlineSpanVariant> = vec![];
     let mut runs: Vec<Run> = vec![];
+    dbg!(&inline);
     match inline {
         Inline::InlineLiteral(lit) => {
             // replace non-significant newlines with space, as it would appear in HTML

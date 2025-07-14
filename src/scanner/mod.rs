@@ -1617,6 +1617,38 @@ mod tests {
     }
 
     #[test]
+    fn inline_charref_spaces() {
+        let markup = "bar &mdash; bar";
+        let expected_tokens = vec![
+            Token::new_default(
+                TokenType::Text,
+                "bar ".to_string(),
+                Some("bar ".to_string()),
+                1,
+                1,
+                4,
+            ),
+            Token::new_default(
+                TokenType::CharRef,
+                "&mdash;".to_string(),
+                Some("&mdash;".to_string()),
+                1,
+                5,
+                11,
+            ),
+            Token::new_default(
+                TokenType::Text,
+                " bar".to_string(),
+                Some(" bar".to_string()),
+                1,
+                12,
+                15,
+            ),
+        ];
+        scan_and_assert_eq(&markup, expected_tokens);
+    }
+
+    #[test]
     fn document_attribute_name_value() {
         let markup = ":foo: bar\n";
         let expected_tokens = vec![

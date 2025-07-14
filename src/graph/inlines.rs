@@ -11,6 +11,7 @@ use super::{
     macros::target_and_attrs_from_token,
     metadata::ElementMetadata,
     nodes::{Location, NodeTypes},
+    substitutions::CHARREF_MAP,
 };
 use crate::scanner::tokens::{Token, TokenType};
 
@@ -637,20 +638,9 @@ impl InlineLiteral {
     pub fn value_or_refd_char(&self) -> String {
         // In HTML these just get passed through, but for certain outputs we want to do replacements. This
         // is obviously an incomplete table.
-        let charref_entities: HashMap<String, &str> = HashMap::from([
-            (String::from("&nbsp;"), " "),
-            (String::from("&mdash;"), "—"),
-            (String::from("&ndash;"), "—"),
-            (String::from("&dollar;"), "$"),
-            (String::from("&amp;"), "&"),
-            (String::from("&gt;"), ">"),
-            (String::from("&lt;"), "<"),
-            (String::from("&equals;"), "="),
-            (String::from("&plus;"), "+"),
-        ]);
-
         if matches!(self.name, InlineLiteralName::Charref) {
-            match charref_entities.get(&self.value) {
+            let charrefs = CHARREF_MAP.lock().unwrap();
+            match charrefs.get(&self.value) {
                 Some(entity) => entity.to_string(),
                 None => self.value.clone(),
             }
@@ -692,6 +682,7 @@ mod tests {
     use crate::scanner::tokens::{Token, TokenType};
 
     use super::*;
+    use rstest::rstest;
 
     #[test]
     fn xref_from_token() {
@@ -744,5 +735,24 @@ mod tests {
                 &"Pause".to_string()
             )
         }
+    }
+
+    #[rstest]
+    #[case::nbsp("&nbsp;", " ")]
+    #[case::mdash("&mdash;", "—")]
+    #[case::ndash("&ndash;", "—")]
+    #[case::dollar("&dollar;", "$")]
+    #[case::amp("&amp;", "&")]
+    #[case::gt("&gt;", ">")]
+    #[case::lt("&lt;", "<")]
+    #[case::equals("&equals;", "=")]
+    #[case::plus("&plus;", "+")]
+    fn test_value_or_refd_char(#[case] entity: &str, #[case] replacement: &str) {
+        let inline = InlineLiteral::new(
+            InlineLiteralName::Charref,
+            entity.into(),
+            vec![Location::default(), Location::default()],
+        );
+        assert_eq!(inline.value_or_refd_char(), replacement)
     }
 }

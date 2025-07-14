@@ -15,7 +15,7 @@ use log::{error, warn};
 use crate::graph::{
     asg::Asg,
     blocks::{Block, BlockMacro, Break, LeafBlock, ParentBlock, Section, TableCell},
-    inlines::{Inline, InlineLiteral, InlineRef, InlineSpan, LineBreak},
+    inlines::{Inline, InlineLiteral, InlineLiteralName, InlineRef, InlineSpan, LineBreak},
     lists::{DList, DListItem, List, ListItem, ListVariant},
     macros::target_and_attrs_from_token,
     metadata::{AttributeType, ElementMetadata},
@@ -859,7 +859,7 @@ impl Parser {
                 self.dangling_newline = None;
             }
         }
-        self.add_text_to_last_inline(token)
+        self.inline_stack.push_back(inline_lit)
     }
 
     fn parse_delimited_leaf_block(&mut self, token: Token) {
@@ -1000,7 +1000,13 @@ impl Parser {
                         self.inline_stack.push_back(inline_literal)
                     }
                 }
-                Inline::InlineLiteral(prior_literal) => prior_literal.add_text_from_token(&token),
+                Inline::InlineLiteral(prior_literal) => {
+                    if matches!(prior_literal.name, InlineLiteralName::Charref) {
+                        self.inline_stack.push_back(inline_literal)
+                    } else {
+                        prior_literal.add_text_from_token(&token)
+                    }
+                }
                 Inline::InlineRef(inline_ref) => {
                     if !self.close_parent_after_push {
                         inline_ref.add_text_from_token(token)

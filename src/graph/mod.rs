@@ -13,3 +13,4 @@ pub mod lists;
 pub mod macros;
 pub mod metadata;
 pub mod nodes;
+pub mod substitutions;
