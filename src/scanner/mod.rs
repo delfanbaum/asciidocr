@@ -5,6 +5,14 @@ use core::str;
 use log::error;
 use tokens::{Token, TokenType};
 
+use self::tokens::TokenError;
+
+#[derive(thiserror::Error, Debug)]
+pub enum ScannerError {
+    #[error(transparent)]
+    Token(#[from] TokenError),
+}
+
 #[derive(Debug)]
 /// Scans an asciidoc `&str` into [`Token`]s to be consumed by the Parser.
 pub struct Scanner<'a> {
@@ -18,16 +26,17 @@ pub struct Scanner<'a> {
 }
 
 impl Iterator for Scanner<'_> {
-    type Item = Token;
+    type Item = Result<Token, ScannerError>;
 
     fn next(&mut self) -> Option<Self::Item> {
         if !self.is_at_end() {
             self.start = self.current;
+
             return Some(self.scan_token());
         }
         if self.scanning {
             self.scanning = false;
-            return Some(Token::final_token(self.line, self.file_stack.clone()));
+            return Some(Ok(Token::final_token(self.line, self.file_stack.clone())));
         }
         None
     }
@@ -58,7 +67,7 @@ impl<'a> Scanner<'a> {
         }
     }
 
-    fn scan_token(&mut self) -> Token {
+    fn scan_token(&mut self) -> Result<Token, ScannerError> {
         let c = self.source.as_bytes()[self.current] as char;
         self.current += 1; // this instead of the "advance" function in "Crafting Interpreters"
 
@@ -99,7 +108,7 @@ impl<'a> Scanner<'a> {
             '+' | '*' | '-' | '_' | '/' | '=' | '.' => {
                 if self.starts_new_line() && self.starts_repeated_char_line(c, 4) {
                     self.current += 3; // the remaining repeated chars
-                    self.add_token(TokenType::block_from_char(c), false, 0)
+                    self.add_token(TokenType::block_from_char(c)?, false, 0)
                 } else {
                     match c {
                         '=' => {
@@ -395,7 +404,7 @@ impl<'a> Scanner<'a> {
         token_type: TokenType,
         include_literal: bool,
         advance_line_after: usize,
-    ) -> Token {
+    ) -> Result<Token, ScannerError> {
         let text = &self.source[self.start..self.current];
         let mut literal = None;
         if include_literal {
@@ -431,10 +440,10 @@ impl<'a> Scanner<'a> {
             }
         }
         token.validate();
-        token
+        Ok(token)
     }
 
-    fn add_heading(&mut self) -> Token {
+    fn add_heading(&mut self) -> Result<Token, ScannerError> {
         while self.peek() == '=' {
             self.current += 1
         }
@@ -454,13 +463,13 @@ impl<'a> Scanner<'a> {
 
     /// adds the list item token, then includes the rest of the list item (until a new block or
     /// another list item marker) in an Text
-    fn add_list_item(&mut self, list_item_token: TokenType) -> Token {
+    fn add_list_item(&mut self, list_item_token: TokenType) -> Result<Token, ScannerError> {
         self.current += 1; // advance past the space, which we'll include in the token lexeme
         self.add_token(list_item_token, false, 0)
     }
 
     /// Adds the block image, consuming the target as well as any attributes
-    fn add_block_image(&mut self) -> Token {
+    fn add_block_image(&mut self) -> Result<Token, ScannerError> {
         while self.peek() != ']' {
             self.current += 1
         }
@@ -469,7 +478,7 @@ impl<'a> Scanner<'a> {
     }
 
     /// Adds the block image, consuming the target as well as any attributes
-    fn add_inline_image(&mut self) -> Token {
+    fn add_inline_image(&mut self) -> Result<Token, ScannerError> {
         while self.peek() != ']' {
             self.current += 1
         }
@@ -478,7 +487,7 @@ impl<'a> Scanner<'a> {
     }
 
     /// Adds the include image, consuming the target as well as any attributes
-    fn add_include(&mut self) -> Token {
+    fn add_include(&mut self) -> Result<Token, ScannerError> {
         while self.peek() != ']' {
             self.current += 1
         }
@@ -487,7 +496,7 @@ impl<'a> Scanner<'a> {
     }
 
     /// Adds contents into a TableCell token, regardless of other formatting (simpler to re-scan later)
-    fn add_table_cell(&mut self) -> Token {
+    fn add_table_cell(&mut self) -> Result<Token, ScannerError> {
         while !['\n', '\0', '|'].contains(&self.peek()) {
             self.current += 1
         }
@@ -500,7 +509,7 @@ impl<'a> Scanner<'a> {
     }
 
     /// Adds the link, consuming the target but not any attributes
-    fn add_link(&mut self) -> Token {
+    fn add_link(&mut self) -> Result<Token, ScannerError> {
         while self.peek() != '[' {
             self.current += 1
         }
@@ -508,7 +517,7 @@ impl<'a> Scanner<'a> {
         self.add_token(TokenType::LinkMacro, true, 0)
     }
 
-    fn add_inline_style(&mut self) -> Token {
+    fn add_inline_style(&mut self) -> Result<Token, ScannerError> {
         while self.peek() != ']' {
             self.current += 1
         }
@@ -517,7 +526,7 @@ impl<'a> Scanner<'a> {
     }
 
     // adds block anchors, e.g., "\n[[some_block_id]]\n"
-    fn add_cross_reference(&mut self) -> Token {
+    fn add_cross_reference(&mut self) -> Result<Token, ScannerError> {
         while self.peeks_ahead(2) != ">>" && !self.is_at_end() {
             self.current += 1
         }
@@ -526,7 +535,7 @@ impl<'a> Scanner<'a> {
     }
 
     // adds block anchors, e.g., "\n[[some_block_id]]\n"
-    fn add_block_anchor(&mut self) -> Token {
+    fn add_block_anchor(&mut self) -> Result<Token, ScannerError> {
         while self.peeks_ahead(3) != "]]\n" && !self.is_at_end() {
             self.current += 1
         }
@@ -534,7 +543,7 @@ impl<'a> Scanner<'a> {
         self.add_token(TokenType::BlockAnchor, true, 0)
     }
 
-    fn add_text_until_next_markup(&mut self) -> Token {
+    fn add_text_until_next_markup(&mut self) -> Result<Token, ScannerError> {
         // "inline" chars that could be markup; the newline condition prevents
         // capturing significant block markup chars
         // Chars: newline, bold, italic, code, super, subscript, footnote, pass, link, end inline macro, definition list marker, highlighted, inline admonition initial chars, inline images
@@ -605,7 +614,7 @@ impl<'a> Scanner<'a> {
         c: char,
         constrained: TokenType,
         unconstrained: TokenType,
-    ) -> Token {
+    ) -> Result<Token, ScannerError> {
         // guard clause against dangling markup
         if self.peek() == ' ' && self.peek_back() == ' ' {
             self.add_text_until_next_markup()
@@ -626,7 +635,7 @@ impl<'a> Scanner<'a> {
         }
     }
 
-    fn handle_text_symbol_replacement_parens(&mut self) -> Token {
+    fn handle_text_symbol_replacement_parens(&mut self) -> Result<Token, ScannerError> {
         while self.peek() != ')' {
             self.current += 1
         }
@@ -724,7 +733,12 @@ mod tests {
     // NOTE: ignoring the EOF here for simplicity's sake
     fn scan_and_assert_eq(markup: &str, expected_tokens: Vec<Token>) {
         let s = Scanner::new(markup);
-        let mut scanned_tokens = s.collect::<Vec<Token>>();
+        // let mut scanned_tokens = s.collect::<Vec<Result<Token, ScannerError>>>();
+        // let (mut scanned_tokens, errors): (Vec<_>, Vec<_>) = s.into_iter().partition(|r| r.is_ok());
+        let mut scanned_tokens: Vec<Token> = s
+            .into_iter()
+            .filter_map(|result| result.as_ref().ok().cloned())
+            .collect();
         let _ = scanned_tokens.pop();
         assert_eq!(scanned_tokens, expected_tokens);
     }
@@ -2085,7 +2099,11 @@ mod tests {
             1,
             2,
         );
-        let scanned = Scanner::new(&markup).collect::<Vec<Token>>();
+
+        let scanned: Vec<Token> = Scanner::new(&markup)
+            .into_iter()
+            .filter_map(|result| result.as_ref().ok().cloned())
+            .collect();
         if pass {
             assert_eq!(scanned.first().unwrap(), &expected)
         } else {
@@ -2104,7 +2122,10 @@ mod tests {
             6,
             7,
         );
-        let mut scanned = Scanner::new(&markup).collect::<Vec<Token>>();
+        let mut scanned: Vec<Token> = Scanner::new(&markup)
+            .into_iter()
+            .filter_map(|result| result.as_ref().ok().cloned())
+            .collect();
         scanned.pop(); // get rid of EOF token
         assert_eq!(scanned.last().unwrap(), &expected)
     }

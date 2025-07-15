@@ -1,5 +1,11 @@
 use crate::graph::nodes::Location;
 
+#[derive(thiserror::Error, Debug)]
+pub enum TokenError {
+    #[error("Invalid character match to produce block TokenType")]
+    CharacterMatch,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 /// Produced by the Scanner; contains the text, location information about itself, and what
 /// file it came from (helpful when sorting out `include::` directives... and because its required
@@ -162,36 +168,17 @@ impl Token {
             }
             TokenType::CharRef => {
                 match self.lexeme.as_str() {
-                    "(C)" => {
-                        self.literal = Some("&#169;".into())
-                    }
-                    "(R)" => {
-                        self.literal = Some("&#174;".into())
-                    }
-                    "(TM)" => {
-                        self.literal = Some("&#8482;".into())
-                    }
-                    "..." => {
-                        self.literal = Some("&#8230;".into())
-                    }
-                    "->" => {
-                        self.literal = Some("&#8594;".into())
-                    }
-                    "=>" => {
-                        self.literal = Some("&#8658;".into())
-                    }
-                    "<-" => {
-                        self.literal = Some("&#8592;".into())
-                    }
-                    "<=" => {
-                        self.literal = Some("&#8656;".into())
-                    }
-                    "--" => {
-                        self.literal = Some("&#8212;".into())
-                    }
+                    "(C)" => self.literal = Some("&#169;".into()),
+                    "(R)" => self.literal = Some("&#174;".into()),
+                    "(TM)" => self.literal = Some("&#8482;".into()),
+                    "..." => self.literal = Some("&#8230;".into()),
+                    "->" => self.literal = Some("&#8594;".into()),
+                    "=>" => self.literal = Some("&#8658;".into()),
+                    "<-" => self.literal = Some("&#8592;".into()),
+                    "<=" => self.literal = Some("&#8656;".into()),
+                    "--" => self.literal = Some("&#8212;".into()),
                     _ => {} // do nothing
                 }
-
             }
             _ => {}
         }
@@ -318,16 +305,16 @@ pub enum TokenType {
 }
 
 impl TokenType {
-    pub(crate) fn block_from_char(c: char) -> Self {
+    pub(crate) fn block_from_char(c: char) -> Result<TokenType, TokenError> {
         match c {
-            '+' => Self::PassthroughBlock,
-            '*' => Self::SidebarBlock,
-            '-' => Self::SourceBlock,
-            '_' => Self::QuoteVerseBlock,
-            '/' => Self::CommentBlock,
-            '=' => Self::ExampleBlock,
-            '.' => Self::LiteralBlock,
-            _ => panic!("Invalid character match to produce block TokenType"),
+            '+' => Ok(Self::PassthroughBlock),
+            '*' => Ok(Self::SidebarBlock),
+            '-' => Ok(Self::SourceBlock),
+            '_' => Ok(Self::QuoteVerseBlock),
+            '/' => Ok(Self::CommentBlock),
+            '=' => Ok(Self::ExampleBlock),
+            '.' => Ok(Self::LiteralBlock),
+            _ => Err(TokenError::CharacterMatch),
         }
     }
 

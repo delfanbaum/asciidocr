@@ -1,6 +1,4 @@
 //! Parses a stream of tokens into an [`Asg`] (Abstract Syntax Graph)
-
-use core::panic;
 use std::{
     collections::{HashMap, VecDeque},
     env,
@@ -12,17 +10,43 @@ use std::{
 
 use log::{error, warn};
 
-use crate::graph::{
-    asg::Asg,
-    blocks::{Block, BlockMacro, Break, LeafBlock, ParentBlock, Section, TableCell},
-    inlines::{Inline, InlineLiteral, InlineLiteralName, InlineRef, InlineSpan, LineBreak},
-    lists::{DList, DListItem, List, ListItem, ListVariant},
-    macros::target_and_attrs_from_token,
-    metadata::{AttributeType, ElementMetadata},
-    nodes::{Header, Location},
-};
-use crate::scanner::tokens::{Token, TokenType};
 use crate::scanner::Scanner;
+use crate::{
+    graph::blocks::BlockError,
+    scanner::tokens::{Token, TokenType},
+};
+use crate::{
+    graph::{
+        asg::Asg,
+        blocks::{Block, BlockMacro, Break, LeafBlock, ParentBlock, Section, TableCell},
+        inlines::{Inline, InlineLiteral, InlineLiteralName, InlineRef, InlineSpan, LineBreak},
+        lists::{DList, DListItem, List, ListItem, ListVariant},
+        macros::target_and_attrs_from_token,
+        metadata::{AttributeType, ElementMetadata},
+        nodes::{Header, Location},
+    },
+    scanner::ScannerError,
+};
+
+#[derive(thiserror::Error, Debug)]
+pub enum ParserError {
+    #[error(transparent)]
+    Scanner(#[from] ScannerError),
+    #[error(transparent)]
+    Block(#[from] BlockError),
+    #[error("Parse error line {0}: Level 0 headings are only allowed at the top of a document")]
+    TopLevelHeading(usize),
+    #[error("Parse error line {0}: Invalid open_parse_after_as_text_type occurance")]
+    OpenParse(usize),
+    #[error("Parse error line: Attempted to close a non-existent delimited block")]
+    DelimitedBlock,
+    #[error("Parse error line {0}: Unexpected block in Block::ParentBlock")]
+    ParentBlock(usize),
+    #[error("Parse error line {0}: Unable to Uanble to canonicalize include path: {1:?}")]
+    IncludeError(usize, String),
+    #[error("Parser error: Tried to add last block when block stack was empty.")]
+    BlockStack,
+}
 
 /// Parses a stream of tokens into an [`Asg`] (Abstract Syntax Graph), returning the graph once all
 /// tokens have been parsed.
@@ -118,33 +142,38 @@ impl Parser {
     }
 
     /// Parses the stream of tokens provided by the [`Scanner`].
-    pub fn parse<I>(&mut self, tokens: I) -> Asg
+    pub fn parse<I>(&mut self, tokens: I) -> Result<Asg, ParserError>
     where
-        I: Iterator<Item = Token>,
+        I: Iterator<Item = Result<Token, ScannerError>>,
     {
         let mut asg = Asg::new();
-        for token in tokens {
-            let token_type = token.token_type();
-            self.token_into(token, &mut asg);
+        for result in tokens {
+            match result {
+                Ok(token) => {
+                    let token_type = token.token_type();
+                    self.token_into(token, &mut asg)?;
 
-            self.last_token_type = token_type;
+                    self.last_token_type = token_type;
+                }
+                Err(e) => return Err(ParserError::Scanner(e)),
+            }
         }
 
         // add any dangling inlines
-        self.add_inlines_to_block_stack();
+        self.add_inlines_to_block_stack()?;
         // add any dangling blocks (most often sections)
         while !self.block_stack.is_empty() {
-            self.add_last_block_to_graph(&mut asg);
+            self.add_last_block_to_graph(&mut asg)?;
         }
         // cleanup the final tree locations and xrefs
         asg.consolidate();
-        asg
+        Ok(asg)
     }
 
-    fn token_into(&mut self, token: Token, asg: &mut Asg) {
+    fn token_into(&mut self, token: Token, asg: &mut Asg) -> Result<(), ParserError> {
         // if we are not starting with a document-heading acceptable token, get out
         if self.document_header.is_some() && !token.can_be_in_document_header() {
-            self.check_and_move_header(asg);
+            self.check_and_move_header(asg)?;
         }
 
         if let Some(token_type) = self.open_parse_after_as_text_type {
@@ -153,8 +182,8 @@ impl Parser {
                     if token.token_type() == TokenType::QuoteVerseBlock || token.is_inline() {
                         self.open_parse_after_as_text_type = Some(token_type);
                     } else {
-                        self.parse_text(token);
-                        return;
+                        self.parse_text(token)?;
+                        return Ok(());
                     }
                 }
                 TokenType::PassthroughInlineMacro => {
@@ -166,21 +195,21 @@ impl Parser {
                     {
                         self.open_parse_after_as_text_type = Some(token_type)
                     } else {
-                        self.parse_text(token);
-                        return;
+                        self.parse_text(token)?;
+                        return Ok(());
                     }
                 }
                 TokenType::PassthroughBlock | TokenType::LiteralBlock | TokenType::CommentBlock => {
                     if token.token_type() != token_type {
-                        self.parse_text(token);
-                        return;
+                        self.parse_text(token)?;
+                        return Ok(());
                     }
                 }
                 TokenType::SourceBlock => {
                     // allow callouts in the source block
                     if ![token_type, TokenType::CodeCallout].contains(&token.token_type()) {
-                        self.parse_text(token);
-                        return;
+                        self.parse_text(token)?;
+                        return Ok(());
                     }
                 }
                 _ => self.open_parse_after_as_text_type = Some(token_type),
@@ -205,6 +234,7 @@ impl Parser {
                 self.in_block_line = true;
                 // clear out any dangling newlines
                 self.dangling_newline = None;
+                Ok(())
             }
             TokenType::BlockAnchor => self.parse_block_anchor_attributes(token),
             TokenType::ElementAttributes => self.parse_block_element_attributes(token),
@@ -252,10 +282,9 @@ impl Parser {
             // breaks
             TokenType::PageBreak => self.parse_page_break(token, asg),
             TokenType::ThematicBreak => self.parse_thematic_break(token, asg),
-            TokenType::LineContinuation => self
+            TokenType::LineContinuation => {self
                 .inline_stack
-                .push_back(Inline::InlineBreak(LineBreak::new_from_token(token))),
-
+                .push_back(Inline::InlineBreak(LineBreak::new_from_token(token)));Ok(())},
             // delimited blocks
             TokenType::SidebarBlock
             | TokenType::OpenBlock
@@ -270,15 +299,16 @@ impl Parser {
                 // check if it's verse
                 if let Some(metadata) = &self.metadata {
                     if metadata.declared_type == Some(AttributeType::Verse) {
-                        self.parse_delimited_leaf_block(token);
-                        return;
+                        self.parse_delimited_leaf_block(token)?;
+                        return Ok(());
                     }
                 } else if self.open_parse_after_as_text_type.is_some() {
-                    self.parse_delimited_leaf_block(token);
-                    return;
+                    self.parse_delimited_leaf_block(token)?;
+                    return Ok(());
                 }
 
-                self.parse_delimited_parent_block(token);
+                self.parse_delimited_parent_block(token)?;
+                Ok(())
             }
 
             // the following should probably be consumed into the above
@@ -320,6 +350,7 @@ impl Parser {
                         self.force_new_block = true;
                         self.open_parse_after_as_text_type = None;
                     }
+                    Ok(())
                 } else {
                     self.parse_delimited_leaf_block(token)
                 }
@@ -327,19 +358,20 @@ impl Parser {
 
             TokenType::Eof => {
                 if self.document_header.is_some() {
-                    self.check_and_move_header(asg)
+                    self.check_and_move_header(asg)?
                 }
+                Ok(())
             }
         }
     }
 
-    fn parse_attribute(&mut self, token: Token) {
+    fn parse_attribute(&mut self, token: Token) -> Result<(), ParserError> {
         let binding = token.text();
         let mut attr_components: Vec<&str> = binding.split_terminator(':').collect();
         attr_components.remove(0); // throw away initial "" in the list
         if attr_components.is_empty() {
             warn!("Empty attributes list at line: {}", token.line);
-            return;
+            return Ok(());
         }
         let key = attr_components.first().unwrap().to_string();
         // values should be trimmed
@@ -348,26 +380,30 @@ impl Parser {
             value = String::from("")
         }
         self.document_attributes.insert(key, value);
+        Ok(())
     }
 
-    fn parse_block_anchor_attributes(&mut self, token: Token) {
+    fn parse_block_anchor_attributes(&mut self, token: Token) -> Result<(), ParserError> {
         self.add_metadata_from_token(token);
         self.force_new_block = true;
+        Ok(())
     }
 
     /// parses element attribute lists into self.block_metadata, which then is applied later
-    fn parse_block_element_attributes(&mut self, token: Token) {
+    fn parse_block_element_attributes(&mut self, token: Token) -> Result<(), ParserError> {
         self.add_metadata_from_token(token);
         self.force_new_block = true;
+        Ok(())
     }
-    fn parse_inline_element_attributes(&mut self, token: Token) {
+    fn parse_inline_element_attributes(&mut self, token: Token) -> Result<(), ParserError> {
         self.metadata = Some(ElementMetadata::new_inline_meta_from_token(token));
         self.force_new_block = true;
+        Ok(())
     }
 
     /// Handle document header
-    fn check_and_move_header(&mut self, asg: &mut Asg) {
-        self.add_inlines_to_block_stack();
+    fn check_and_move_header(&mut self, asg: &mut Asg) -> Result<(), ParserError> {
+        self.add_inlines_to_block_stack()?;
         if let Some(header) = &mut self.document_header {
             if !header.is_empty() {
                 header.consolidate();
@@ -376,11 +412,12 @@ impl Parser {
         }
 
         self.document_header = None;
+        Ok(())
     }
 
     /// New line characters are arguably the most significant token "signal" we can get, and as
     /// such the parse function is a little complicated.
-    fn parse_new_line_char(&mut self, token: Token, asg: &mut Asg) {
+    fn parse_new_line_char(&mut self, token: Token, asg: &mut Asg) -> Result<(), ParserError> {
         // newline exits a title, TK line continuation
         self.in_block_line = false;
 
@@ -396,29 +433,29 @@ impl Parser {
             // clear any dangling newline
             self.dangling_newline = None;
             if self.document_header.is_some() {
-                self.check_and_move_header(asg);
+                self.check_and_move_header(asg)?;
             } else {
                 // consolidate any dangling list items
                 if let Some(Block::ListItem(_)) = self.block_stack.last() {
-                    self.add_last_list_item_to_list();
+                    self.add_last_list_item_to_list()?;
                 } else if let Some(Block::DListItem(_)) = self.block_stack.last() {
-                    self.add_last_list_item_to_list();
+                    self.add_last_list_item_to_list()?;
                 }
                 // clear out any inlines
                 self.in_inline_span = false;
-                self.add_inlines_to_block_stack();
+                self.add_inlines_to_block_stack()?;
                 // and then force a new block hereafter
                 self.force_new_block = true;
                 if let Some(last_block) = self.block_stack.pop() {
                     // check for dangling list items
                     if !last_block.is_section() && self.open_delimited_block_lines.is_empty() {
-                        self.add_to_block_stack_or_graph(asg, last_block);
+                        self.add_to_block_stack_or_graph(asg, last_block)?;
                         if self.close_parent_after_push && !self.block_stack.is_empty() {
-                            self.add_last_to_block_stack_or_graph(asg);
+                            self.add_last_to_block_stack_or_graph(asg)?;
                             self.close_parent_after_push = false;
                         }
                     } else {
-                        self.push_block_to_stack(last_block)
+                        self.push_block_to_stack(last_block)?
                     }
                 } // if Some(last_block)
             }
@@ -428,9 +465,10 @@ impl Parser {
         } else {
             self.dangling_newline = Some(token);
         }
+        Ok(())
     }
 
-    fn parse_thematic_break(&mut self, token: Token, asg: &mut Asg) {
+    fn parse_thematic_break(&mut self, token: Token, asg: &mut Asg) -> Result<(), ParserError> {
         self.add_to_block_stack_or_graph(
             asg,
             Block::Break(Break::new(
@@ -440,7 +478,7 @@ impl Parser {
         )
     }
 
-    fn parse_page_break(&mut self, token: Token, asg: &mut Asg) {
+    fn parse_page_break(&mut self, token: Token, asg: &mut Asg) -> Result<(), ParserError> {
         self.add_to_block_stack_or_graph(
             asg,
             Block::Break(Break::new(
@@ -451,11 +489,12 @@ impl Parser {
     }
 
     // Comments
-    fn parse_comment(&self) {
+    fn parse_comment(&self) -> Result<(), ParserError> {
         // for now, do nothing
+        Ok(())
     }
 
-    fn parse_include(&mut self, token: Token, asg: &mut Asg) {
+    fn parse_include(&mut self, token: Token, asg: &mut Asg) -> Result<(), ParserError> {
         // ignore any attributes for the time being
         let (target, _) = target_and_attrs_from_token(&token);
         // calculate target, given that it's relative; if there is something on the stack, use
@@ -471,26 +510,15 @@ impl Parser {
                     resolved_target.push(parent)
                 }
             }
-            resolved_target = resolved_target
-                .join(target.clone())
-                .canonicalize()
-                .unwrap_or_else(|_| {
-                    panic!(
-                        "Uanble to canonicalize include path: {:?}",
-                        self.origin_directory.join(target.clone())
-                    )
-                });
+            resolved_target = match resolved_target.join(target.clone()).canonicalize() {
+                Ok(p) => p,
+                Err(_) => return Err(ParserError::IncludeError(token.line, target)),
+            }
         } else {
-            resolved_target = self
-                .origin_directory
-                .join(target.clone())
-                .canonicalize()
-                .unwrap_or_else(|_| {
-                    panic!(
-                        "Unable to canonicalize include path: {:?}",
-                        self.origin_directory.join(target.clone())
-                    )
-                });
+            resolved_target = match self.origin_directory.join(target.clone()).canonicalize() {
+                Ok(p) => p,
+                Err(_) => return Err(ParserError::IncludeError(token.line, target)),
+            }
         }
         self.file_stack.push(target.clone());
 
@@ -498,47 +526,55 @@ impl Parser {
 
         // Match filetype, if adoc scan into tokens, adding the location, then parse...
         if matches!(
-            Path::new(&target)
-                .extension()
-                .unwrap_or_else(|| panic!("Invalid file path: {}", target))
-                .to_str(),
-            Some("adoc") | Some("asciidoc") | Some("txt")
+            target.split('.').last().unwrap_or(""),
+            "adoc" | "asciidoc" | "txt"
         ) {
-            for token in
+            for result in
                 Scanner::new_with_stack(&open_file(resolved_target), self.file_stack.clone())
             {
-                let token_type = token.token_type();
-                self.token_into(token, asg);
-                self.last_token_type = token_type;
+                match result {
+                    Ok(token) => {
+                        let token_type = token.token_type();
+                        self.token_into(token, asg)?;
+                        self.last_token_type = token_type;
+                    }
+                    Err(_) => todo!(),
+                }
             }
         } else {
-            for token in
+            for result in
                 Scanner::new_with_stack(&open_file(resolved_target), self.file_stack.clone())
             {
-                // allow EOFs to pass through; otherwise just parse as text
-                if matches!(token.token_type(), TokenType::Eof) {
-                    self.last_token_type = TokenType::Eof;
-                } else {
-                    self.last_token_type = TokenType::Text;
+                match result {
+                    Ok(token) => {
+                        // allow EOFs to pass through; otherwise just parse as text
+                        if matches!(token.token_type(), TokenType::Eof) {
+                            self.last_token_type = TokenType::Eof;
+                        } else {
+                            self.last_token_type = TokenType::Text;
+                        }
+                        self.parse_text(token)?;
+                    }
+                    Err(e) => return Err(ParserError::Scanner(e)),
                 }
-                self.parse_text(token)
             }
         }
 
         // clean up inlines
-        self.add_inlines_to_block_stack();
+        self.add_inlines_to_block_stack()?;
 
         // get the blocks stack back to where it was
         while self.block_stack.len() > current_block_stack_len {
-            self.add_last_block_to_graph(asg)
+            self.add_last_block_to_graph(asg)?
         }
         // ...then pop the file off the stack
         self.file_stack.pop();
+        Ok(())
     }
 
     /// Gathers preceding inlines into the "terms" attribute on DListItem, then adds what follows
     /// as you would for a normal list
-    fn parse_description_list_term(&mut self, token: Token) {
+    fn parse_description_list_term(&mut self, token: Token) -> Result<(), ParserError> {
         // create the list item
         let mut dlist_item = DListItem::new_from_token(token);
         // ensure we're not forcing a new block, given that all sorts of things can follow
@@ -555,7 +591,7 @@ impl Parser {
             // remove the newline, since we don't care about that anymore
             next_terms.pop_front();
             // add the other inlines
-            self.add_inlines_to_block_stack();
+            self.add_inlines_to_block_stack()?;
             // then add the next terms back
             self.inline_stack.append(&mut next_terms);
         }
@@ -567,18 +603,19 @@ impl Parser {
         if self.block_stack.last().is_some()
             && self.block_stack.last().unwrap().is_definition_list_item()
         {
-            self.add_last_list_item_to_list()
+            self.add_last_list_item_to_list()?
         } else {
             // we need to create the list first
-            self.push_block_to_stack(Block::DList(DList::new(dlist_item.locations().clone())));
+            self.push_block_to_stack(Block::DList(DList::new(dlist_item.locations().clone())))?;
         }
         // either way, add the new list item
-        self.push_block_to_stack(Block::DListItem(dlist_item));
+        self.push_block_to_stack(Block::DListItem(dlist_item))?;
         // preserve newlines for now
         self.preserve_newline_text = true;
+        Ok(())
     }
 
-    fn parse_ordered_list_item(&mut self, token: Token, asg: &mut Asg) {
+    fn parse_ordered_list_item(&mut self, token: Token, asg: &mut Asg) -> Result<(), ParserError> {
         // clear any dangling newlines
         self.dangling_newline = None;
         let list_item = ListItem::new(token.lexeme.clone(), token.locations());
@@ -587,7 +624,7 @@ impl Parser {
         if self.block_stack.last().is_some()
             && self.block_stack.last().unwrap().is_ordered_list_item()
         {
-            self.add_last_list_item_to_list()
+            self.add_last_list_item_to_list()?
         } else {
             // we need to create the list first
             let mut list = List::new(ListVariant::Ordered, token.locations().clone());
@@ -597,18 +634,18 @@ impl Parser {
                 if let Some(block) = self.block_stack.last() {
                     if block.is_source_block() {
                         // we need to add this before we create the new list
-                        self.add_last_to_block_stack_or_graph(asg);
+                        self.add_last_to_block_stack_or_graph(asg)?;
                     }
                 }
                 list.metadata = Some(ElementMetadata::new_with_role("colist".to_string()));
             }
-            self.push_block_to_stack(Block::List(list));
+            self.push_block_to_stack(Block::List(list))?;
         }
         // either way, add the new list item
-        self.push_block_to_stack(Block::ListItem(list_item));
+        self.push_block_to_stack(Block::ListItem(list_item))
     }
     //
-    fn parse_unordered_list_item(&mut self, token: Token) {
+    fn parse_unordered_list_item(&mut self, token: Token) -> Result<(), ParserError> {
         // clear any dangling newlines
         self.dangling_newline = None;
         let list_item = ListItem::new(token.lexeme.clone(), token.locations());
@@ -617,42 +654,43 @@ impl Parser {
         if self.block_stack.last().is_some()
             && self.block_stack.last().unwrap().is_unordered_list_item()
         {
-            self.add_last_list_item_to_list()
+            self.add_last_list_item_to_list()?
         } else {
             // we need to create the list first
             self.push_block_to_stack(Block::List(List::new(
                 ListVariant::Unordered,
                 token.locations().clone(),
-            )));
+            )))?;
         }
         // either way, add the new list item
-        self.push_block_to_stack(Block::ListItem(list_item));
+        self.push_block_to_stack(Block::ListItem(list_item))
     }
 
     //fn parse_block_label(&mut self, token: Token, asg: &mut Asg) {}
 
-    fn parse_title(&mut self, token: Token, _asg: &mut Asg) {
+    fn parse_title(&mut self, token: Token, _asg: &mut Asg) -> Result<(), ParserError> {
         if token.first_location() == Location::default() {
             self.in_block_line = true;
             let mut header = Header::new();
             header.location.extend(token.locations());
 
-            self.document_header = Some(header)
+            self.document_header = Some(header);
+            Ok(())
         } else {
-            // should error
-            error!(
-                "Parse error at line {}: Level 0 headings (=) are only allowed at the top of a document",
-                token.line
-            );
-            std::process::exit(1)
+            Err(ParserError::TopLevelHeading(token.line))
         }
     }
 
-    fn parse_section_headings(&mut self, token: Token, level: usize, asg: &mut Asg) {
+    fn parse_section_headings(
+        &mut self,
+        token: Token,
+        level: usize,
+        asg: &mut Asg,
+    ) -> Result<(), ParserError> {
         // if the last section is at the same level, we need to push that up, otherwise the
         // accordion effect gets screwy with section levels
         if let Some(Block::Section(_)) = self.block_stack.last() {
-            self.add_last_to_block_stack_or_graph(asg)
+            self.add_last_to_block_stack_or_graph(asg)?
         }
         //if let Some(Block::Section(last_section)) = self.block_stack.last() {
         //    if last_section.level >= level {
@@ -664,35 +702,38 @@ impl Parser {
             "".to_string(),
             level,
             token.first_location(),
-        )));
+        )))?;
         // let us know we're in a block line
         self.in_block_line = true;
         // clear any dangling newlines, since we don't want these added to the title
         self.dangling_newline = None;
         // let us know that we want to add to the section title for a little bit
         self.force_new_block = false;
+        Ok(())
     }
 
-    fn parse_admonition_para_syntax(&mut self, token: Token) {
+    fn parse_admonition_para_syntax(&mut self, token: Token) -> Result<(), ParserError> {
         self.block_stack
             .push(Block::ParentBlock(ParentBlock::new_from_token(token)));
         self.close_parent_after_push = true;
+        Ok(())
     }
 
-    fn parse_block_continuation(&mut self, _token: Token) {
-        self.add_inlines_to_block_stack();
+    fn parse_block_continuation(&mut self, _token: Token) -> Result<(), ParserError> {
+        self.add_inlines_to_block_stack()?;
         self.in_block_continuation = true;
         self.force_new_block = true;
+        Ok(())
     }
 
     /// Generic parser for inline spans that close themselves
-    fn parse_inline_span(&mut self, mut inline: Inline) {
+    fn parse_inline_span(&mut self, mut inline: Inline) -> Result<(), ParserError> {
         if let Some(last_inline) = self.inline_stack.back_mut() {
             if inline == *last_inline {
                 last_inline.reconcile_locations(inline.locations());
                 last_inline.close();
                 self.in_inline_span = false;
-                return;
+                return Ok(());
             }
         }
         // handle newline tokens prior to constrained spans
@@ -710,14 +751,16 @@ impl Parser {
         self.inline_stack.push_back(inline);
 
         self.in_inline_span = true;
+        Ok(())
     }
 
-    fn parse_link_macro(&mut self, token: Token) {
+    fn parse_link_macro(&mut self, token: Token) -> Result<(), ParserError> {
         self.inline_stack
-            .push_back(Inline::InlineRef(InlineRef::new_link_from_token(token)))
+            .push_back(Inline::InlineRef(InlineRef::new_link_from_token(token)));
+        Ok(())
     }
 
-    fn parse_block_image(&mut self, token: Token, asg: &mut Asg) {
+    fn parse_block_image(&mut self, token: Token, asg: &mut Asg) -> Result<(), ParserError> {
         let mut image_block = BlockMacro::new_image_from_token(token);
         if let Some(metadata) = &self.metadata {
             // TODO see if there is a cleaner way to manage the borrowing here.
@@ -728,30 +771,33 @@ impl Parser {
             image_block.caption = caption.clone();
             self.block_title = None
         }
-        self.add_to_block_stack_or_graph(asg, Block::BlockMacro(image_block));
+        self.add_to_block_stack_or_graph(asg, Block::BlockMacro(image_block))
     }
 
-    fn parse_inline_image_macro(&mut self, token: Token) {
+    fn parse_inline_image_macro(&mut self, token: Token) -> Result<(), ParserError> {
         self.inline_stack
             .push_back(Inline::InlineRef(InlineRef::new_inline_image_from_token(
                 token,
             )));
         self.close_parent_after_push = true;
+        Ok(())
     }
 
-    fn parse_footnote_macro(&mut self, token: Token) {
+    fn parse_footnote_macro(&mut self, token: Token) -> Result<(), ParserError> {
         self.inline_stack
             .push_back(Inline::InlineSpan(InlineSpan::inline_span_from_token(
                 token,
             )));
         self.in_inline_span = true;
+        Ok(())
     }
 
-    fn parse_passthrough_inline_macro(&mut self, token: Token) {
-        self.open_parse_after_as_text_type = Some(token.token_type())
+    fn parse_passthrough_inline_macro(&mut self, token: Token) -> Result<(), ParserError> {
+        self.open_parse_after_as_text_type = Some(token.token_type());
+        Ok(())
     }
 
-    fn parse_inline_macro_close(&mut self, token: Token) {
+    fn parse_inline_macro_close(&mut self, token: Token) -> Result<(), ParserError> {
         if let Some(TokenType::PassthroughInlineMacro) = self.open_parse_after_as_text_type {
             self.open_parse_after_as_text_type = None
         } else if let Some(inline_macro_idx) = self
@@ -776,11 +822,12 @@ impl Parser {
         } else {
             self.add_text_to_last_inline(token);
         }
+        Ok(())
     }
 
     /// attribute references become literals, but we need to replace them with the appropriate
     /// values from the document header first
-    fn parse_attribute_reference(&mut self, mut token: Token) {
+    fn parse_attribute_reference(&mut self, mut token: Token) -> Result<(), ParserError> {
         // the "{attribute}"
         let attribute_ref = token.text();
         let attribute_target: &str = &attribute_ref[1..attribute_ref.len() - 1];
@@ -795,16 +842,18 @@ impl Parser {
             warn!("Missing document attribute: {}", attribute_target);
         }
         // then add it as literal text
-        self.parse_text(token);
+        self.parse_text(token)?;
+        Ok(())
     }
 
-    fn parse_cross_reference(&mut self, token: Token) {
+    fn parse_cross_reference(&mut self, token: Token) -> Result<(), ParserError> {
         self.inline_stack
             .push_back(Inline::InlineRef(InlineRef::new_xref_from_token(token)));
         self.close_parent_after_push = true;
+        Ok(())
     }
 
-    fn parse_code_callout(&mut self, token: Token) {
+    fn parse_code_callout(&mut self, token: Token) -> Result<(), ParserError> {
         if let Some(value) = self.document_attributes.get("icons") {
             if value == "true" {
                 if let Some(_last_inline) = self.inline_stack.back_mut() {
@@ -817,9 +866,10 @@ impl Parser {
             .push_back(Inline::InlineSpan(InlineSpan::inline_span_from_token(
                 token,
             )));
+        Ok(())
     }
 
-    fn parse_text(&mut self, token: Token) {
+    fn parse_text(&mut self, token: Token) -> Result<(), ParserError> {
         if let Some(newline_token) = self.dangling_newline.clone() {
             if self.preserve_newline_text {
                 // add the newline as such
@@ -832,16 +882,17 @@ impl Parser {
                 self.inline_stack.push_back(Inline::InlineLiteral(
                     InlineLiteral::new_text_from_token(&token),
                 ));
-                return;
+                return Ok(());
             } else {
                 self.add_text_to_last_inline(newline_token);
                 self.dangling_newline = None;
             }
         }
-        self.add_text_to_last_inline(token)
+        self.add_text_to_last_inline(token);
+        Ok(())
     }
 
-    fn parse_charref(&mut self, token: Token) {
+    fn parse_charref(&mut self, token: Token) -> Result<(), ParserError> {
         let inline_lit = Inline::InlineLiteral(InlineLiteral::new_charref_from_token(&token));
         if let Some(newline_token) = self.dangling_newline.clone() {
             if self.preserve_newline_text {
@@ -853,37 +904,40 @@ impl Parser {
                 self.dangling_newline = None;
                 // add the new text separately
                 self.inline_stack.push_back(inline_lit);
-                return;
+                return Ok(());
             } else {
                 self.add_text_to_last_inline(newline_token);
                 self.dangling_newline = None;
             }
         }
-        self.inline_stack.push_back(inline_lit)
+        self.inline_stack.push_back(inline_lit);
+        Ok(())
     }
 
-    fn parse_delimited_leaf_block(&mut self, token: Token) {
+    fn parse_delimited_leaf_block(&mut self, token: Token) -> Result<(), ParserError> {
         if self.open_parse_after_as_text_type.is_some() {
             // ensure inlines are added appropriately
-            self.add_inlines_to_block_stack();
+            self.add_inlines_to_block_stack()?;
             match self.block_stack.pop() {
                 Some(mut open_leaf) => {
                     open_leaf.add_locations(token.locations().clone());
-                    self.push_block_to_stack(open_leaf);
+                    self.push_block_to_stack(open_leaf)?;
                     self.open_parse_after_as_text_type = None;
+                    Ok(())
                 }
-                None => panic!("Invalid open_parse_after_as_text_type occurance"),
-            };
+                None => Err(ParserError::OpenParse(token.line)),
+            }
         } else {
             self.open_parse_after_as_text_type = Some(token.token_type());
             let block = LeafBlock::new_from_token(token);
-            self.push_block_to_stack(Block::LeafBlock(block));
+            self.push_block_to_stack(Block::LeafBlock(block))?;
             // note that we're to just add
             self.force_new_block = false;
+            Ok(())
         }
     }
 
-    fn parse_delimited_parent_block(&mut self, token: Token) {
+    fn parse_delimited_parent_block(&mut self, token: Token) -> Result<(), ParserError> {
         let delimiter_line = token.first_location().line;
         let mut block = ParentBlock::new_from_token(token);
         // clear the dangling newline
@@ -902,17 +956,14 @@ impl Parser {
         {
             let matched_block = self.block_stack.remove(parent_block_idx);
             let Block::ParentBlock(mut matched) = matched_block else {
-                panic!(
-                    "Unexpected block in Block::ParentBlock: line {}",
-                    delimiter_line
-                );
+                return Err(ParserError::ParentBlock(delimiter_line));
             };
             if matched == block {
                 // close any dangling inlines BEFORE opening the delimited block lines
-                self.add_inlines_to_block_stack();
+                self.add_inlines_to_block_stack()?;
                 // remove the open delimiter line from the count and confirm we're nested properly
                 let Some(line) = self.open_delimited_block_lines.pop() else {
-                    panic!("Attempted to close a non-existent delimited block");
+                    return Err(ParserError::DelimitedBlock);
                 };
                 if line != matched.opening_line() {
                     warn!("Error nesting delimited blocks, see line {}", line)
@@ -925,15 +976,15 @@ impl Parser {
                 //
                 let mut delimited_block = Block::ParentBlock(matched);
                 while !blocks_to_add.is_empty() {
-                    delimited_block.push_block(blocks_to_add.pop_front().unwrap())
+                    delimited_block.push_block(blocks_to_add.pop_front().unwrap())?
                 }
                 if delimited_block.is_table() {
-                    delimited_block.consolidate_table_info();
+                    delimited_block.consolidate_table_info()?;
                 }
-                self.push_block_to_stack(delimited_block);
+                self.push_block_to_stack(delimited_block)?;
                 // close any continuations
                 self.in_block_continuation = false;
-                return;
+                return Ok(());
             } else {
                 self.block_stack
                     .insert(parent_block_idx, Block::ParentBlock(matched));
@@ -941,33 +992,39 @@ impl Parser {
         }
         // note the open block line
         self.open_delimited_block_lines.push(delimiter_line);
-        self.push_block_to_stack(Block::ParentBlock(block));
+        self.push_block_to_stack(Block::ParentBlock(block))
     }
 
-    fn parse_table_cell(&mut self, token: Token, asg: &mut Asg) {
+    fn parse_table_cell(&mut self, token: Token, asg: &mut Asg) -> Result<(), ParserError> {
         // take the token text, which begins with a `|`, and then use everything after
         let cell_contents = token.text()[1..].to_string();
         let cell_line = token.first_location().line;
         let cell_col = token.first_location().col;
 
-        self.push_block_to_stack(Block::TableCell(TableCell::new_from_token(token)));
+        self.push_block_to_stack(Block::TableCell(TableCell::new_from_token(token)))?;
 
         // create new inlines from the stack, clearing any dangling newlines
         self.dangling_newline = None;
-        for mut inline_token in Scanner::new(&cell_contents) {
-            // update the line numbering for the token to match the table cell mathematically, in
-            // case my vague memory of multi-line cells is correct
-            inline_token.update_token_loc_offsets_by(cell_line, cell_col);
-            self.token_into(inline_token, asg);
+        for result in Scanner::new(&cell_contents) {
+            match result {
+                Ok(mut inline_token) => {
+                    // update the line numbering for the token to match the table cell mathematically, in
+                    // case my vague memory of multi-line cells is correct
+                    inline_token.update_token_loc_offsets_by(cell_line, cell_col);
+                    self.token_into(inline_token, asg)?;
+                }
+                Err(e) => return Err(ParserError::Scanner(e)),
+            }
         }
         // clear all the things to ensure inlines get added appropriately
         self.in_block_line = false;
         self.force_new_block = false;
         // then add them to the stack, i.e., to the recently added TableCell
-        self.add_inlines_to_block_stack();
+        self.add_inlines_to_block_stack()?;
+        Ok(())
     }
 
-    fn push_block_to_stack(&mut self, mut block: Block) {
+    fn push_block_to_stack(&mut self, mut block: Block) -> Result<(), ParserError> {
         // we only want to push on continue if we're not in an open delimited block (which will
         // close itself, emptying the open_delimited_block_lines)
         if self.in_block_continuation && self.open_delimited_block_lines.is_empty() {
@@ -978,7 +1035,7 @@ impl Parser {
                 );
                 std::process::exit(1)
             };
-            last_block.push_block(block);
+            last_block.push_block(block)?;
             self.in_block_continuation = false;
         } else {
             if self.metadata.is_some() {
@@ -987,6 +1044,7 @@ impl Parser {
             }
             self.block_stack.push(block)
         }
+        Ok(())
     }
 
     fn add_text_to_last_inline(&mut self, token: Token) {
@@ -1084,10 +1142,10 @@ impl Parser {
         }
     }
 
-    fn add_inlines_to_block_stack(&mut self) {
+    fn add_inlines_to_block_stack(&mut self) -> Result<(), ParserError> {
         // guard
         if self.inline_stack.is_empty() {
-            return;
+            return Ok(());
         }
 
         // dangling inlines
@@ -1099,16 +1157,16 @@ impl Parser {
             while !self.inline_stack.is_empty() {
                 header.title.push(self.inline_stack.pop_front().unwrap());
             }
-            return;
+            return Ok(());
         }
 
         if let Some(last_block) = self.block_stack.last_mut() {
             if last_block.takes_inlines() && !self.in_block_line && !self.force_new_block {
                 while !self.inline_stack.is_empty() {
                     let inline = self.inline_stack.pop_front().unwrap();
-                    last_block.push_inline(inline);
+                    last_block.push_inline(inline)?;
                 }
-                return;
+                return Ok(());
             }
         }
         // create a new para from the locations of the first span (subsequent locations are
@@ -1126,7 +1184,7 @@ impl Parser {
         ));
         while !self.inline_stack.is_empty() {
             if let Some(inline) = self.inline_stack.pop_front() {
-                para_block.push_inline(inline)
+                para_block.push_inline(inline)?
             }
         }
         if self.in_block_continuation && self.open_delimited_block_lines.is_empty() {
@@ -1137,8 +1195,8 @@ impl Parser {
                 );
                 std::process::exit(1)
             };
-            last_block.push_block(para_block);
-            return;
+            last_block.push_block(para_block)?;
+            return Ok(());
         }
 
         if let Some(ref block_metadata) = self.metadata {
@@ -1155,9 +1213,9 @@ impl Parser {
                     vec![],
                     vec![],
                 ));
-                quote_block.push_block(para_block);
-                self.push_block_to_stack(quote_block);
-                return;
+                quote_block.push_block(para_block)?;
+                self.push_block_to_stack(quote_block)?;
+                return Ok(());
             }
         }
         self.push_block_to_stack(para_block)
@@ -1173,54 +1231,61 @@ impl Parser {
         }
     }
 
-    fn add_last_list_item_to_list(&mut self) {
+    fn add_last_list_item_to_list(&mut self) -> Result<(), ParserError> {
         // clear out any forced new blocks
         self.force_new_block = false;
         // add the inlines to the list item
-        self.add_inlines_to_block_stack();
+        self.add_inlines_to_block_stack()?;
         // then add it to the list
         let last_item = self.block_stack.pop().unwrap();
         // if the last thing is a list item, add it to the list
         if matches!(last_item, Block::ListItem(_) | Block::DListItem(_)) {
             if let Some(list) = self.block_stack.last_mut() {
-                list.push_block(last_item)
+                list.push_block(last_item)?
             }
         } else {
             // otherwise return the list to the open block stack, and create a new unordered
             // list item
-            self.push_block_to_stack(last_item);
+            self.push_block_to_stack(last_item)?;
         }
+        Ok(())
     }
 
-    fn add_to_block_stack_or_graph(&mut self, asg: &mut Asg, mut block: Block) {
+    fn add_to_block_stack_or_graph(
+        &mut self,
+        asg: &mut Asg,
+        mut block: Block,
+    ) -> Result<(), ParserError> {
         if let Some(last_block) = self.block_stack.last_mut() {
             if last_block.takes_block_of_type(&block) {
-                last_block.push_block(block);
-                return;
+                last_block.push_block(block)?;
+                return Ok(());
             }
         }
         if self.metadata.is_some() {
             block.add_metadata(self.metadata.as_ref().unwrap().clone());
             self.metadata = None;
         }
-        asg.push_block(block)
+        asg.push_block(block);
+        Ok(())
     }
 
-    fn add_last_to_block_stack_or_graph(&mut self, asg: &mut Asg) {
+    fn add_last_to_block_stack_or_graph(&mut self, asg: &mut Asg) -> Result<(), ParserError> {
         if let Some(last_block) = self.block_stack.pop() {
             if let Some(prior_block) = self.block_stack.last_mut() {
                 if prior_block.takes_block_of_type(&last_block) {
-                    prior_block.push_block(last_block);
-                    return;
+                    prior_block.push_block(last_block)?;
+                    return Ok(());
                 }
             }
-            asg.push_block(last_block)
+            asg.push_block(last_block);
+            Ok(())
         } else {
-            panic!("Tried to add last block when block stack was empty.")
+            Err(ParserError::BlockStack)
         }
     }
 
-    fn add_last_block_to_graph(&mut self, asg: &mut Asg) {
+    fn add_last_block_to_graph(&mut self, asg: &mut Asg) -> Result<(), ParserError>{
         if let Some(mut block) = self.block_stack.pop() {
             if self.metadata.is_some() {
                 block.add_metadata(self.metadata.as_ref().unwrap().clone());
@@ -1228,7 +1293,7 @@ impl Parser {
             }
             if let Some(next_last_block) = self.block_stack.last_mut() {
                 if next_last_block.takes_block_of_type(&block) {
-                    next_last_block.push_block(block);
+                    next_last_block.push_block(block)?;
                 } else {
                     asg.push_block(block)
                 }
@@ -1236,6 +1301,7 @@ impl Parser {
                 asg.push_block(block)
             }
         }
+        Ok(())
     }
 }
 

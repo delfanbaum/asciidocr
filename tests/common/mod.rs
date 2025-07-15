@@ -10,21 +10,26 @@ use tempfile::NamedTempFile;
 /// the expected abstract syntax graph found in filename.json
 pub fn assert_parsed_doc_matches_expected_asg(adoc_fn: &str, asg_json_fn: &str) {
     let test_dir = PathBuf::from("tests/data/");
-    let parsed_asg = json!(Parser::new(test_dir.join(adoc_fn)).parse(Scanner::new(
-        &fs::read_to_string(test_dir.join(adoc_fn)).expect("Unable to find adoc")
-    )));
+    let parsed_asg = Parser::new(test_dir.join(adoc_fn))
+        .parse(Scanner::new(
+            &fs::read_to_string(test_dir.join(adoc_fn)).expect("Unable to find adoc"),
+        ))
+        .expect("Unable to parse input file");
+    let asg_as_json = json!(parsed_asg);
 
     let expected_asg: Value = serde_json::from_str(
         &fs::read_to_string(test_dir.join(asg_json_fn)).expect("Unable to find asg json"),
     )
     .unwrap();
-    assert_json_eq!(parsed_asg, expected_asg);
+    assert_json_eq!(asg_as_json, expected_asg);
 }
 
 /// Given an asciidoc string and an expected abstract syntax graph json string, assert that the
 /// parser produces the correct json from the asciidoc
 pub fn assert_parsed_doc_matches_expected_asg_from_str(adoc_str: &str, asg_json_str: &str) {
-    let parsed_asg = json!(Parser::default().parse(Scanner::new(adoc_str)));
+    let parsed_asg = json!(Parser::default()
+        .parse(Scanner::new(adoc_str))
+        .expect("Unable to parse input file"));
     let expected_asg: Value = serde_json::from_str(asg_json_str).unwrap();
     assert_json_eq!(parsed_asg, expected_asg);
 }
@@ -33,9 +38,13 @@ pub fn assert_parsed_doc_matches_expected_asg_from_str(adoc_str: &str, asg_json_
 /// blocks, inlines, etc., are correct
 pub fn assert_rendered_htmlbook_matches_expected(adoc_fn: &str, html_fn: &str) {
     let test_dir = PathBuf::from("tests/data/");
-    let mut rendered_html = render_htmlbook(&Parser::new(test_dir.join(adoc_fn)).parse(
-        Scanner::new(&fs::read_to_string(test_dir.join(adoc_fn)).expect("Unable to find adoc")),
-    ))
+    let mut rendered_html = render_htmlbook(
+        &Parser::new(test_dir.join(adoc_fn))
+            .parse(Scanner::new(
+                &fs::read_to_string(test_dir.join(adoc_fn)).expect("Unable to find adoc"),
+            ))
+            .expect("Unable to parse input file"),
+    )
     .expect("Unable to render HTML from document");
     rendered_html.retain(|c| !c.is_whitespace());
     let mut expected_html =

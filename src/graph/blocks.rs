@@ -1,4 +1,3 @@
-use core::panic;
 use log::error;
 use std::{collections::HashMap, fmt::Display};
 
@@ -12,6 +11,18 @@ use crate::graph::{
     nodes::{Location, NodeTypes},
 };
 use crate::scanner::tokens::{Token, TokenType};
+
+#[derive(thiserror::Error, Debug)]
+pub enum BlockError {
+    #[error("Attempted to push dangling ListItem to parent block")]
+    DanglingList,
+    #[error("Attempted to add something other than a TableCell to a Table")]
+    TableCell,
+    #[error("push_block not implemented for {0}")]
+    NotImplemented(Block),
+    #[error("Incorrect function call: consolidate_table_info on non-table block")]
+    IncorrectCall,
+}
 
 /// Blocks Enum, containing all possible document blocks
 #[derive(Serialize, PartialEq, Clone, Debug)]
@@ -68,7 +79,7 @@ impl Block {
         }
     }
 
-    pub fn push_block(&mut self, block: Block) {
+    pub fn push_block(&mut self, block: Block) -> Result<(), BlockError> {
         match self {
             Block::Section(section) => {
                 if block.is_section() {
@@ -92,26 +103,27 @@ impl Block {
             Block::ParentBlock(parent_block) => {
                 if matches!(block, Block::ListItem(_)) {
                     let Some(last) = parent_block.blocks.last_mut() else {
-                        panic!("Attempted to push dangling ListItem to parent block")
+                        return Err(BlockError::DanglingList);
                     };
                     if matches!(last, Block::List(_)) {
                         last.push_block(block);
                         last.consolidate_locations();
                     } else {
-                        panic!("Attempted to push dangling ListItem to parent block")
+                        return Err(BlockError::DanglingList);
                     }
                 } else if matches!(parent_block.name, ParentBlockName::Table)
                     && !matches!(block, Block::TableCell(_))
                 {
                     // sanity-guard
-                    panic!("Attempted to add something other than a TableCell to a Table")
+                    return Err(BlockError::TableCell);
                 } else {
                     parent_block.blocks.push(block)
                 }
             }
-            _ => panic!("push_block not implemented for {}", self),
+            _ => return Err(BlockError::NotImplemented(self.clone())),
         }
         self.consolidate_locations();
+        Ok(())
     }
 
     pub fn takes_inlines(&self) -> bool {
@@ -125,15 +137,16 @@ impl Block {
         )
     }
 
-    pub fn push_inline(&mut self, inline: Inline) {
+    pub fn push_inline(&mut self, inline: Inline) -> Result<(), BlockError> {
         match self {
             Block::Section(section) => section.inlines.push(inline),
             Block::LeafBlock(block) => block.inlines.push(inline),
             Block::ListItem(list_item) => list_item.add_inline(inline),
             Block::DListItem(list_item) => list_item.add_inline(inline),
             Block::TableCell(table_cell) => table_cell.inlines.push(inline),
-            _ => panic!("push_block not implemented for {}", self),
+            _ => return Err(BlockError::NotImplemented(self.clone())),
         }
+        Ok(())
     }
 
     pub fn takes_block_of_type(&self, block: &Block) -> bool {
@@ -208,9 +221,9 @@ impl Block {
         }
     }
 
-    pub fn consolidate_table_info(&mut self) {
+    pub fn consolidate_table_info(&mut self) -> Result<(), BlockError> {
         let Block::ParentBlock(table) = self else {
-            panic!("Incorrect function call: consolidate_table_info on non-table block")
+            return Err(BlockError::IncorrectCall);
         };
         // check if there is an implicit header
         if table.blocks.len() >= 2 {
@@ -251,8 +264,9 @@ impl Block {
                 error!("Error creating table at Line: {}", first_cell_line);
                 std::process::exit(1)
             };
-            metadata.simplify_cols()
+            metadata.simplify_cols();
         }
+        Ok(())
     }
 
     pub fn has_blocks(&self) -> bool {
