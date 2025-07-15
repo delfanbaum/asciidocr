@@ -184,6 +184,9 @@ impl Token {
                     "<=" => {
                         self.literal = Some("&#8656;".into())
                     }
+                    "--" => {
+                        self.literal = Some("&#8212;".into())
+                    }
                     _ => {} // do nothing
                 }
 

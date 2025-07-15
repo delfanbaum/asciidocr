@@ -116,11 +116,13 @@ impl<'a> Scanner<'a> {
                         }
                         '-' => {
                             if self.peek() == '>' {
+                                // is it a '->'?
                                 self.current += 1;
                                 self.add_token(TokenType::CharRef, false, 0)
-                            }
-                            // check if it's an open block
-                            else if self.starts_new_line() && self.starts_repeated_char_line(c, 2)
+                            } else if self.starts_text_symbol_replace_emdash() {
+                                self.current += 1;
+                                self.add_token(TokenType::CharRef, false, 0)
+                            } else if self.starts_new_line() && self.starts_repeated_char_line(c, 2)
                             {
                                 self.current += 1;
                                 // since we consume the newline as a part of the block, add a line
@@ -538,7 +540,7 @@ impl<'a> Scanner<'a> {
         // Chars: newline, bold, italic, code, super, subscript, footnote, pass, link, end inline macro, definition list marker, highlighted, inline admonition initial chars, inline images
         while ![
             '\n', '*', '_', '`', '^', '~', 'f', 'p', 'h', ']', '[', ':', '#', 'N', 'T', 'I', 'C',
-            'W', '&', '{', '+', 'i', '<', '\'', '\"',
+            'W', '&', '{', '+', 'i', '<', '\'', '\"', '-',
         ]
         .contains(&self.peek())
             && !self.is_at_end()
@@ -674,6 +676,11 @@ impl<'a> Scanner<'a> {
 
     fn starts_text_symbol_replace_parens(&mut self) -> bool {
         ["C)", "R)"].contains(&self.peeks_ahead(2)) || self.peeks_ahead(3) == "TM)"
+    }
+
+    fn starts_text_symbol_replace_emdash(&mut self) -> bool {
+        let after_char = self.peeks_ahead(2).chars().last().unwrap();
+        self.peek() == '-' && (after_char.is_alphanumeric() || [' ', '\0'].contains(&after_char))
     }
 
     fn is_at_end(&self) -> bool {
@@ -2025,5 +2032,80 @@ mod tests {
             markup.len(),
         )];
         scan_and_assert_eq(&markup, expected_tokens);
+    }
+    #[test]
+    // note that ^ and ~ transformations are handled better by the parser
+    fn character_replacements_emdash_alone() {
+        let markup = "--".to_string();
+        let expected_tokens = vec![Token::new_default(
+            TokenType::CharRef,
+            "--".to_string(),
+            Some("&#8212;".to_string()),
+            1,
+            1,
+            markup.len(),
+        )];
+        scan_and_assert_eq(&markup, expected_tokens);
+    }
+    #[test]
+    fn character_replacements_emdash_space() {
+        let markup = "-- ".to_string();
+        let expected_tokens = vec![
+            Token::new_default(
+                TokenType::CharRef,
+                "--".to_string(),
+                Some("&#8212;".to_string()),
+                1,
+                1,
+                2,
+            ),
+            Token::new_default(
+                TokenType::Text,
+                " ".to_string(),
+                Some(" ".to_string()),
+                1,
+                3,
+                3,
+            ),
+        ];
+        scan_and_assert_eq(&markup, expected_tokens);
+    }
+
+    #[rstest]
+    #[case("1", true)]
+    #[case("a", true)]
+    #[case("(", false)]
+    fn character_replacements_emdash_alpha_numeric(#[case] next_char: &str, #[case] pass: bool) {
+        let markup = format!("--{}", next_char);
+        let expected = Token::new_default(
+            TokenType::CharRef,
+            "--".to_string(),
+            Some("&#8212;".to_string()),
+            1,
+            1,
+            2,
+        );
+        let scanned = Scanner::new(&markup).collect::<Vec<Token>>();
+        if pass {
+            assert_eq!(scanned.first().unwrap(), &expected)
+        } else {
+            assert_ne!(scanned.first().unwrap(), &expected)
+        }
+    }
+
+    #[test]
+    fn character_replacements_emdash_inline() {
+        let markup = "This --".to_string();
+        let expected = Token::new_default(
+            TokenType::CharRef,
+            "--".to_string(),
+            Some("&#8212;".to_string()),
+            1,
+            6,
+            7,
+        );
+        let mut scanned = Scanner::new(&markup).collect::<Vec<Token>>();
+        scanned.pop(); // get rid of EOF token
+        assert_eq!(scanned.last().unwrap(), &expected)
     }
 }
