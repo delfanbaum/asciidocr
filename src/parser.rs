@@ -530,7 +530,7 @@ impl Parser {
 
         // Match filetype, if adoc scan into tokens, adding the location, then parse...
         if matches!(
-            target.split('.').last().unwrap_or(""),
+            target.split('.').next_back().unwrap_or(""),
             "adoc" | "asciidoc" | "txt"
         ) {
             for result in

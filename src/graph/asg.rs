@@ -176,10 +176,10 @@ mod tests {
         ));
         let mut graph = Asg::new();
         graph.document_id = "test".into();
-        graph.push_block(some_leaf);
+        let _ = graph.push_block(some_leaf);
         assert_eq!(graph.blocks.len(), 1);
         // just spot-check that we break them out; the actual logic is checked elsewhere
-        graph.standardize_footnotes();
+        let _ = graph.standardize_footnotes();
         assert_eq!(graph.blocks.len(), 2);
         // but also spot-check that we add the document_id, if any
         let Some(Block::LeafBlock(leaf)) = graph.blocks.first() else {

@@ -18,7 +18,7 @@ mod docx_tests {
         let adoc_fn = "blocks/para-single-line.adoc";
         let parsed_asg = Parser::new(test_dir.join(adoc_fn)).parse(Scanner::new(
             &fs::read_to_string(test_dir.join(adoc_fn)).expect("Unable to find adoc"),
-        ));
+        )).expect("Failed to parse document");
         let temp_docx = NamedTempFile::new().unwrap();
         match render_docx(&parsed_asg, &temp_docx.path()) {
             Ok(_) => assert!(true),
@@ -39,7 +39,7 @@ mod docx_tests {
             &temp_image.path().display().to_string(),
         );
 
-        let parsed_asg = Parser::new(test_dir.join(adoc_fn)).parse(Scanner::new(&adoc_str));
+        let parsed_asg = Parser::new(test_dir.join(adoc_fn)).parse(Scanner::new(&adoc_str)).expect("Failed to parse document");
         match render_docx(&parsed_asg, &temp_docx.path()) {
             Ok(_) => assert!(true),
             Err(_) => assert!(false),

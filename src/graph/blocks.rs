@@ -19,7 +19,7 @@ pub enum BlockError {
     #[error("Attempted to add something other than a TableCell to a Table")]
     TableCell,
     #[error("push_block not implemented for {0}")]
-    NotImplemented(Block),
+    NotImplemented(String),
     #[error("Incorrect function call: consolidate_table_info on non-table block")]
     IncorrectCall,
     #[error("Missing location information for block")]
@@ -124,7 +124,7 @@ impl Block {
                     parent_block.blocks.push(block)
                 }
             }
-            _ => return Err(BlockError::NotImplemented(self.clone())),
+            _ => return Err(BlockError::NotImplemented(format!("{}", self))),
         }
         self.consolidate_locations();
         Ok(())
@@ -148,7 +148,7 @@ impl Block {
             Block::ListItem(list_item) => list_item.add_inline(inline),
             Block::DListItem(list_item) => list_item.add_inline(inline),
             Block::TableCell(table_cell) => table_cell.inlines.push(inline),
-            _ => return Err(BlockError::NotImplemented(self.clone())),
+            _ => return Err(BlockError::NotImplemented(format!("{}", self)))
         }
         Ok(())
     }

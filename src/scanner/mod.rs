@@ -762,18 +762,18 @@ mod tests {
     }
 
     #[rstest]
-    #[case("++++\n".to_string(), TokenType::PassthroughBlock)]
-    #[case("****\n".to_string(), TokenType::SidebarBlock)]
-    #[case("----\n".to_string(), TokenType::SourceBlock)]
-    #[case("____\n".to_string(), TokenType::QuoteVerseBlock)]
-    #[case("____\n".to_string(), TokenType::QuoteVerseBlock)]
-    #[case("====\n".to_string(), TokenType::ExampleBlock)]
-    #[case("....\n".to_string(), TokenType::LiteralBlock)]
-    fn fenced_block_delimiter_start(#[case] markup: String, #[case] expected_token: TokenType) {
+    #[case("++++\n", TokenType::PassthroughBlock)]
+    #[case("****\n", TokenType::SidebarBlock)]
+    #[case("----\n", TokenType::SourceBlock)]
+    #[case("____\n", TokenType::QuoteVerseBlock)]
+    #[case("____\n", TokenType::QuoteVerseBlock)]
+    #[case("====\n", TokenType::ExampleBlock)]
+    #[case("....\n", TokenType::LiteralBlock)]
+    fn fenced_block_delimiter_start(#[case] markup: &str, #[case] expected_token: TokenType) {
         let expected_tokens = vec![
             Token::new_default(
                 expected_token,
-                markup.clone()[..4].to_string(),
+                markup.to_string()[..4].to_string(),
                 None,
                 1,
                 1,
@@ -781,24 +781,24 @@ mod tests {
             ),
             Token::new_default(TokenType::NewLineChar, "\n".to_string(), None, 1, 5, 5),
         ];
-        scan_and_assert_eq(&markup, expected_tokens);
+        scan_and_assert_eq(markup, expected_tokens);
     }
 
     #[rstest]
-    #[case("\n\n++++\n".to_string(), TokenType::PassthroughBlock)]
-    #[case("\n\n****\n".to_string(), TokenType::SidebarBlock)]
-    #[case("\n\n----\n".to_string(), TokenType::SourceBlock)]
-    #[case("\n\n____\n".to_string(), TokenType::QuoteVerseBlock)]
-    #[case("\n\n////\n".to_string(), TokenType::CommentBlock)]
-    #[case("\n\n====\n".to_string(), TokenType::ExampleBlock)]
-    #[case("\n\n....\n".to_string(), TokenType::LiteralBlock)]
-    fn fenced_block_delimiter_new_block(#[case] markup: String, #[case] expected_token: TokenType) {
+    #[case("\n\n++++\n", TokenType::PassthroughBlock)]
+    #[case("\n\n****\n", TokenType::SidebarBlock)]
+    #[case("\n\n----\n", TokenType::SourceBlock)]
+    #[case("\n\n____\n", TokenType::QuoteVerseBlock)]
+    #[case("\n\n////\n", TokenType::CommentBlock)]
+    #[case("\n\n====\n", TokenType::ExampleBlock)]
+    #[case("\n\n....\n", TokenType::LiteralBlock)]
+    fn fenced_block_delimiter_new_block(#[case] markup: &str, #[case] expected_token: TokenType) {
         let expected_tokens = vec![
             Token::new_default(TokenType::NewLineChar, "\n".to_string(), None, 1, 1, 1),
             Token::new_default(TokenType::NewLineChar, "\n".to_string(), None, 2, 1, 1),
             Token::new_default(
                 expected_token,
-                markup.clone()[2..6].to_string(),
+                markup.to_string()[2..6].to_string(),
                 None,
                 3,
                 1,
@@ -806,16 +806,16 @@ mod tests {
             ),
             Token::new_default(TokenType::NewLineChar, "\n".to_string(), None, 3, 5, 5),
         ];
-        scan_and_assert_eq(&markup, expected_tokens);
+        scan_and_assert_eq(markup, expected_tokens);
     }
 
     #[test]
     fn open_block_beginning() {
-        let markup = "--\n".to_string();
+        let markup = "--\n";
         let expected_tokens = vec![
             Token::new_default(
                 TokenType::OpenBlock,
-                markup.clone()[..2].to_string(),
+                markup.to_string()[..2].to_string(),
                 None,
                 1,
                 1,
@@ -823,19 +823,19 @@ mod tests {
             ),
             Token::new_default(TokenType::NewLineChar, "\n".to_string(), None, 1, 3, 3),
         ];
-        scan_and_assert_eq(&markup, expected_tokens);
+        scan_and_assert_eq(markup, expected_tokens);
     }
 
     #[test]
     fn open_block_new_block() {
-        let markup = "\n\n--\n".to_string();
+        let markup = "\n\n--\n";
         let expected_tokens = vec![
             Token::new_default(TokenType::NewLineChar, "\n".to_string(), None, 1, 1, 1),
             Token::new_default(TokenType::NewLineChar, "\n".to_string(), None, 2, 1, 1),
             Token::new_default(TokenType::OpenBlock, "--".to_string(), None, 3, 1, 2),
             Token::new_default(TokenType::NewLineChar, "\n".to_string(), None, 3, 3, 3),
         ];
-        scan_and_assert_eq(&markup, expected_tokens);
+        scan_and_assert_eq(markup, expected_tokens);
     }
 
     #[rstest]
@@ -902,14 +902,14 @@ mod tests {
     #[test]
     fn block_introduction() {
         // skip the "i"
-        let markup = ".Some ttle\n".to_string();
+        let markup = ".Some ttle\n";
         let title = "Some ttle".to_string();
         let expected_tokens = vec![
             Token::new_default(TokenType::BlockLabel, ".".to_string(), None, 1, 1, 1),
             Token::new_default(TokenType::Text, title.clone(), Some(title), 1, 2, 10),
             Token::new_default(TokenType::NewLineChar, "\n".to_string(), None, 1, 11, 11),
         ];
-        scan_and_assert_eq(&markup, expected_tokens);
+        scan_and_assert_eq(markup, expected_tokens);
     }
 
     #[rstest]
@@ -1033,7 +1033,7 @@ mod tests {
                 markup.len(),
             ),
         ];
-        scan_and_assert_eq(&markup, expected_tokens);
+        scan_and_assert_eq(markup, expected_tokens);
     }
 
     #[test]
@@ -1308,7 +1308,7 @@ mod tests {
                 9,
             ),
         ];
-        scan_and_assert_eq(&markup, expected_tokens);
+        scan_and_assert_eq(markup, expected_tokens);
     }
 
     #[test]
@@ -1341,7 +1341,7 @@ mod tests {
                 9,
             ),
         ];
-        scan_and_assert_eq(&markup, expected_tokens);
+        scan_and_assert_eq(markup, expected_tokens);
     }
 
     #[test]
@@ -1374,7 +1374,7 @@ mod tests {
                 11,
             ),
         ];
-        scan_and_assert_eq(&markup, expected_tokens);
+        scan_and_assert_eq(markup, expected_tokens);
     }
 
     #[test]
@@ -1414,7 +1414,7 @@ mod tests {
                 28,
             ),
         ];
-        scan_and_assert_eq(&markup, expected_tokens);
+        scan_and_assert_eq(markup, expected_tokens);
     }
 
     #[test]
@@ -1446,7 +1446,7 @@ mod tests {
                 25,
             ),
         ];
-        scan_and_assert_eq(&markup, expected_tokens);
+        scan_and_assert_eq(markup, expected_tokens);
     }
 
     #[test]
@@ -1460,7 +1460,7 @@ mod tests {
             1,
             32,
         )];
-        scan_and_assert_eq(&markup, expected_tokens);
+        scan_and_assert_eq(markup, expected_tokens);
     }
 
     #[test]
@@ -1484,7 +1484,7 @@ mod tests {
                 28,
             ),
         ];
-        scan_and_assert_eq(&markup, expected_tokens);
+        scan_and_assert_eq(markup, expected_tokens);
     }
 
     #[test]
@@ -1548,7 +1548,7 @@ mod tests {
                 21,
             ),
         ];
-        scan_and_assert_eq(&markup, expected_tokens);
+        scan_and_assert_eq(markup, expected_tokens);
     }
 
     #[test]
@@ -1582,7 +1582,7 @@ mod tests {
             ),
             Token::new_default(TokenType::Mark, "#".to_string(), None, 1, 19, 19),
         ];
-        scan_and_assert_eq(&markup, expected_tokens);
+        scan_and_assert_eq(markup, expected_tokens);
     }
 
     #[test]
@@ -1609,7 +1609,7 @@ mod tests {
             ),
             Token::new_default(TokenType::Mark, "#".to_string(), None, 2, 14, 14),
         ];
-        scan_and_assert_eq(&markup, expected_tokens);
+        scan_and_assert_eq(markup, expected_tokens);
     }
     #[test]
     fn inline_style_new_block() {
@@ -1636,7 +1636,7 @@ mod tests {
             ),
             Token::new_default(TokenType::Mark, "#".to_string(), None, 3, 14, 14),
         ];
-        scan_and_assert_eq(&markup, expected_tokens);
+        scan_and_assert_eq(markup, expected_tokens);
     }
 
     #[test]
@@ -1668,7 +1668,7 @@ mod tests {
                 13,
             ),
         ];
-        scan_and_assert_eq(&markup, expected_tokens);
+        scan_and_assert_eq(markup, expected_tokens);
     }
 
     #[test]
@@ -1700,7 +1700,7 @@ mod tests {
                 15,
             ),
         ];
-        scan_and_assert_eq(&markup, expected_tokens);
+        scan_and_assert_eq(markup, expected_tokens);
     }
 
     #[test]
@@ -1717,7 +1717,7 @@ mod tests {
             ),
             Token::new_default(TokenType::NewLineChar, "\n".to_string(), None, 1, 10, 10),
         ];
-        scan_and_assert_eq(&markup, expected_tokens);
+        scan_and_assert_eq(markup, expected_tokens);
     }
 
     #[test]
@@ -1749,7 +1749,7 @@ mod tests {
                 11,
             ),
         ];
-        scan_and_assert_eq(&markup, expected_tokens);
+        scan_and_assert_eq(markup, expected_tokens);
     }
 
     #[test]
@@ -1763,7 +1763,7 @@ mod tests {
             1,
             11,
         )];
-        scan_and_assert_eq(&markup, expected_tokens);
+        scan_and_assert_eq(markup, expected_tokens);
     }
 
     #[test]
@@ -1777,7 +1777,7 @@ mod tests {
             1,
             23,
         )];
-        scan_and_assert_eq(&markup, expected_tokens);
+        scan_and_assert_eq(markup, expected_tokens);
     }
 
     #[rstest]
@@ -1854,7 +1854,7 @@ mod tests {
             newline_token_at(4, 10),
             Token::new_default(TokenType::Table, "|===".to_string(), None, 5, 1, 4),
         ];
-        scan_and_assert_eq(&markup, expected_tokens);
+        scan_and_assert_eq(markup, expected_tokens);
     }
 
     #[test]
@@ -1891,7 +1891,7 @@ mod tests {
             newline_token_at(3, 20),
             Token::new_default(TokenType::Table, "|===".to_string(), None, 4, 1, 4),
         ];
-        scan_and_assert_eq(&markup, expected_tokens);
+        scan_and_assert_eq(markup, expected_tokens);
     }
 
     // this previously panicked at byte index 13 because it is not a char boundary; should now pass
@@ -1936,7 +1936,7 @@ mod tests {
                 file_stack: vec![],
             },
         ];
-        scan_and_assert_eq(&markup, expected_tokens);
+        scan_and_assert_eq(markup, expected_tokens);
     }
 
     #[test]
@@ -1961,7 +1961,7 @@ mod tests {
             ),
             Token::new_default(TokenType::NewLineChar, "\n".to_string(), None, 1, 11, 11),
         ];
-        scan_and_assert_eq(&markup, expected_tokens);
+        scan_and_assert_eq(markup, expected_tokens);
     }
     #[test]
     fn code_callout_list() {
@@ -1984,7 +1984,7 @@ mod tests {
                 7,
             ),
         ];
-        scan_and_assert_eq(&markup, expected_tokens);
+        scan_and_assert_eq(markup, expected_tokens);
     }
 
     #[rstest]
@@ -2045,7 +2045,7 @@ mod tests {
             1,
             markup.len(),
         )];
-        scan_and_assert_eq(&markup, expected_tokens);
+        scan_and_assert_eq(markup, expected_tokens);
     }
     #[test]
     // note that ^ and ~ transformations are handled better by the parser
@@ -2101,7 +2101,6 @@ mod tests {
         );
 
         let scanned: Vec<Token> = Scanner::new(&markup)
-            .into_iter()
             .filter_map(|result| result.as_ref().ok().cloned())
             .collect();
         if pass {
@@ -2123,7 +2122,6 @@ mod tests {
             7,
         );
         let mut scanned: Vec<Token> = Scanner::new(&markup)
-            .into_iter()
             .filter_map(|result| result.as_ref().ok().cloned())
             .collect();
         scanned.pop(); // get rid of EOF token
