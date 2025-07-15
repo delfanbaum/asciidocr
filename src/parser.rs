@@ -10,7 +10,7 @@ use std::{
 
 use log::{error, warn};
 
-use crate::scanner::Scanner;
+use crate::{graph::asg::AsgError, scanner::Scanner};
 use crate::{
     graph::blocks::BlockError,
     scanner::tokens::{Token, TokenType},
@@ -34,6 +34,8 @@ pub enum ParserError {
     Scanner(#[from] ScannerError),
     #[error(transparent)]
     Block(#[from] BlockError),
+    #[error(transparent)]
+    Asg(#[from] AsgError),
     #[error("Parse error line {0}: Level 0 headings are only allowed at the top of a document")]
     TopLevelHeading(usize),
     #[error("Parse error line {0}: Invalid open_parse_after_as_text_type occurance")]
@@ -46,6 +48,8 @@ pub enum ParserError {
     IncludeError(usize, String),
     #[error("Parser error: Tried to add last block when block stack was empty.")]
     BlockStack,
+    #[error("Parse error: invalid block continuation; no previous block")]
+    BlockContinuation,
 }
 
 /// Parses a stream of tokens into an [`Asg`] (Abstract Syntax Graph), returning the graph once all
@@ -714,7 +718,7 @@ impl Parser {
 
     fn parse_admonition_para_syntax(&mut self, token: Token) -> Result<(), ParserError> {
         self.block_stack
-            .push(Block::ParentBlock(ParentBlock::new_from_token(token)));
+            .push(Block::ParentBlock(ParentBlock::new_from_token(token)?));
         self.close_parent_after_push = true;
         Ok(())
     }
@@ -929,7 +933,7 @@ impl Parser {
             }
         } else {
             self.open_parse_after_as_text_type = Some(token.token_type());
-            let block = LeafBlock::new_from_token(token);
+            let block = LeafBlock::new_from_token(token)?;
             self.push_block_to_stack(Block::LeafBlock(block))?;
             // note that we're to just add
             self.force_new_block = false;
@@ -939,7 +943,7 @@ impl Parser {
 
     fn parse_delimited_parent_block(&mut self, token: Token) -> Result<(), ParserError> {
         let delimiter_line = token.first_location().line;
-        let mut block = ParentBlock::new_from_token(token);
+        let mut block = ParentBlock::new_from_token(token)?;
         // clear the dangling newline
         self.dangling_newline = None;
 
@@ -965,7 +969,7 @@ impl Parser {
                 let Some(line) = self.open_delimited_block_lines.pop() else {
                     return Err(ParserError::DelimitedBlock);
                 };
-                if line != matched.opening_line() {
+                if line != matched.opening_line()? {
                     warn!("Error nesting delimited blocks, see line {}", line)
                 }
                 // update the final location
@@ -1029,11 +1033,7 @@ impl Parser {
         // close itself, emptying the open_delimited_block_lines)
         if self.in_block_continuation && self.open_delimited_block_lines.is_empty() {
             let Some(last_block) = self.block_stack.last_mut() else {
-                error!(
-                    "Line {}: Invalid block continuation: no previous block",
-                    block.line()
-                );
-                std::process::exit(1)
+                return Err(ParserError::BlockContinuation);
             };
             last_block.push_block(block)?;
             self.in_block_continuation = false;
@@ -1189,11 +1189,7 @@ impl Parser {
         }
         if self.in_block_continuation && self.open_delimited_block_lines.is_empty() {
             let Some(last_block) = self.block_stack.last_mut() else {
-                error!(
-                    "Line {}: Invalid block continuation: no previous block",
-                    para_block.line()
-                );
-                std::process::exit(1)
+                return Err(ParserError::BlockContinuation);
             };
             last_block.push_block(para_block)?;
             return Ok(());
@@ -1266,7 +1262,7 @@ impl Parser {
             block.add_metadata(self.metadata.as_ref().unwrap().clone());
             self.metadata = None;
         }
-        asg.push_block(block);
+        asg.push_block(block)?;
         Ok(())
     }
 
@@ -1278,14 +1274,14 @@ impl Parser {
                     return Ok(());
                 }
             }
-            asg.push_block(last_block);
+            asg.push_block(last_block)?;
             Ok(())
         } else {
             Err(ParserError::BlockStack)
         }
     }
 
-    fn add_last_block_to_graph(&mut self, asg: &mut Asg) -> Result<(), ParserError>{
+    fn add_last_block_to_graph(&mut self, asg: &mut Asg) -> Result<(), ParserError> {
         if let Some(mut block) = self.block_stack.pop() {
             if self.metadata.is_some() {
                 block.add_metadata(self.metadata.as_ref().unwrap().clone());
@@ -1295,10 +1291,10 @@ impl Parser {
                 if next_last_block.takes_block_of_type(&block) {
                     next_last_block.push_block(block)?;
                 } else {
-                    asg.push_block(block)
+                    asg.push_block(block)?
                 }
             } else {
-                asg.push_block(block)
+                asg.push_block(block)?
             }
         }
         Ok(())

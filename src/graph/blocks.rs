@@ -22,6 +22,10 @@ pub enum BlockError {
     NotImplemented(Block),
     #[error("Incorrect function call: consolidate_table_info on non-table block")]
     IncorrectCall,
+    #[error("Missing location information for block")]
+    Location,
+    #[error("Tried to create a block from an invalid Token.")]
+    InvalidToken,
 }
 
 /// Blocks Enum, containing all possible document blocks
@@ -85,7 +89,7 @@ impl Block {
                 if block.is_section() {
                     if let Some(possible_section) = section.blocks.last_mut() {
                         if possible_section.takes_block_of_type(&block) {
-                            possible_section.push_block(block);
+                            possible_section.push_block(block)?;
                         } else {
                             section.blocks.push(block);
                         }
@@ -106,7 +110,7 @@ impl Block {
                         return Err(BlockError::DanglingList);
                     };
                     if matches!(last, Block::List(_)) {
-                        last.push_block(block);
+                        last.push_block(block)?;
                         last.consolidate_locations();
                     } else {
                         return Err(BlockError::DanglingList);
@@ -229,8 +233,8 @@ impl Block {
         if table.blocks.len() >= 2 {
             // if the cells in the first row are on the same line, either serves as cols
             // designation
-            let first_cell_line = table.blocks[0].line();
-            if first_cell_line == table.blocks[1].line() {
+            let first_cell_line = table.blocks[0].line()?;
+            if first_cell_line == table.blocks[1].line()? {
                 // check for an implicit header
                 if first_cell_line == table.location[0].line + 1 {
                     if let Some(ref mut metadata) = table.metadata {
@@ -242,9 +246,13 @@ impl Block {
                     }
                 }
                 // count for implicit column designation
-                let cols = table.blocks.iter().fold(0usize, |acc, block| {
-                    acc + (block.line() == first_cell_line) as usize
-                });
+                let cols = table
+                    .blocks
+                    .iter()
+                    .fold(0usize, |acc, block| match block.line() {
+                        Ok(line) => acc + (line == first_cell_line) as usize,
+                        Err(_) => acc, // shouldn't ever happen
+                    });
                 if let Some(ref mut metadata) = table.metadata {
                     if !metadata.attributes.contains_key("cols") {
                         metadata
@@ -702,12 +710,12 @@ impl Block {
         }
     }
 
-    pub fn line(&self) -> usize {
+    pub fn line(&self) -> Result<usize, BlockError> {
         let locs = self.locations();
-        let Some(first_location) = locs.first() else {
-            panic!("{:?} is missing location information", self)
-        };
-        first_location.line
+        match locs.first() {
+            Some(first_location) => Ok(first_location.line),
+            None => Err(BlockError::Location),
+        }
     }
 
     pub fn add_metadata(&mut self, metadata: ElementMetadata) {
@@ -1033,28 +1041,26 @@ impl LeafBlock {
     }
 
     /// Creates a delimited block from based on the token type
-    pub fn new_from_token(token: Token) -> Self {
+    pub fn new_from_token(token: Token) -> Result<Self, BlockError> {
         match token.token_type() {
-            TokenType::PassthroughBlock => Self::new_delimited_block(token, LeafBlockName::Pass),
-            TokenType::LiteralBlock => Self::new_delimited_block(token, LeafBlockName::Literal),
-            TokenType::SourceBlock => Self::new_delimited_block(token, LeafBlockName::Listing),
-            TokenType::CommentBlock => Self::new_delimited_block(token, LeafBlockName::Listing),
-            TokenType::QuoteVerseBlock => Self::new_delimited_block(token, LeafBlockName::Verse),
-            _ => panic!(
-                "Can't create delimited leaf block from this type of token: {:?}",
-                token
-            ),
+            TokenType::PassthroughBlock => {
+                Ok(Self::new_delimited_block(token, LeafBlockName::Pass))
+            }
+            TokenType::LiteralBlock => Ok(Self::new_delimited_block(token, LeafBlockName::Literal)),
+            TokenType::SourceBlock => Ok(Self::new_delimited_block(token, LeafBlockName::Listing)),
+            TokenType::CommentBlock => Ok(Self::new_delimited_block(token, LeafBlockName::Listing)),
+            TokenType::QuoteVerseBlock => {
+                Ok(Self::new_delimited_block(token, LeafBlockName::Verse))
+            }
+            _ => Err(BlockError::InvalidToken),
         }
     }
 
-    pub fn opening_line(&self) -> usize {
-        let Some(first_location) = self.location.first() else {
-            panic!(
-                "{}",
-                format!("Missing location information for: {:?}", self)
-            )
-        };
-        first_location.line
+    pub fn opening_line(&self) -> Result<usize, BlockError> {
+        match self.location.first() {
+            Some(first_location) => Ok(first_location.line),
+            None => Err(BlockError::Location),
+        }
     }
 
     pub fn inlines(&self) -> Vec<Inline> {
@@ -1167,80 +1173,80 @@ impl ParentBlock {
         }
     }
 
-    pub fn new_from_token(token: Token) -> Self {
+    pub fn new_from_token(token: Token) -> Result<Self, BlockError> {
         match token.token_type() {
-            TokenType::SidebarBlock => ParentBlock::new(
+            TokenType::SidebarBlock => Ok(ParentBlock::new(
                 ParentBlockName::Sidebar,
                 None,
                 token.text(),
                 vec![],
                 token.locations(),
-            ),
-            TokenType::ExampleBlock => ParentBlock::new(
+            )),
+            TokenType::ExampleBlock => Ok(ParentBlock::new(
                 ParentBlockName::Example,
                 None,
                 token.text(),
                 vec![],
                 token.locations(),
-            ),
-            TokenType::QuoteVerseBlock => ParentBlock::new(
+            )),
+            TokenType::QuoteVerseBlock => Ok(ParentBlock::new(
                 ParentBlockName::Quote,
                 None,
                 token.text(),
                 vec![],
                 token.locations(),
-            ),
-            TokenType::OpenBlock => ParentBlock::new(
+            )),
+            TokenType::OpenBlock => Ok(ParentBlock::new(
                 ParentBlockName::Open,
                 None,
                 token.text(),
                 vec![],
                 token.locations(),
-            ),
-            TokenType::NotePara => ParentBlock::new(
+            )),
+            TokenType::NotePara => Ok(ParentBlock::new(
                 ParentBlockName::Admonition,
                 Some(ParentBlockVarient::Note),
                 token.text(),
                 vec![],
                 token.locations(),
-            ),
-            TokenType::TipPara => ParentBlock::new(
+            )),
+            TokenType::TipPara => Ok(ParentBlock::new(
                 ParentBlockName::Admonition,
                 Some(ParentBlockVarient::Tip),
                 token.text(),
                 vec![],
                 token.locations(),
-            ),
-            TokenType::ImportantPara => ParentBlock::new(
+            )),
+            TokenType::ImportantPara => Ok(ParentBlock::new(
                 ParentBlockName::Admonition,
                 Some(ParentBlockVarient::Important),
                 token.text(),
                 vec![],
                 token.locations(),
-            ),
-            TokenType::CautionPara => ParentBlock::new(
+            )),
+            TokenType::CautionPara => Ok(ParentBlock::new(
                 ParentBlockName::Admonition,
                 Some(ParentBlockVarient::Caution),
                 token.text(),
                 vec![],
                 token.locations(),
-            ),
-            TokenType::WarningPara => ParentBlock::new(
+            )),
+            TokenType::WarningPara => Ok(ParentBlock::new(
                 ParentBlockName::Admonition,
                 Some(ParentBlockVarient::Warning),
                 token.text(),
                 vec![],
                 token.locations(),
-            ),
-            TokenType::Table => ParentBlock::new(
+            )),
+            TokenType::Table => Ok(ParentBlock::new(
                 ParentBlockName::Table,
                 None,
                 token.text(),
                 vec![],
                 token.locations(),
-            ),
+            )),
 
-            _ => panic!("Tried to create a ParentBlock from an invalid Token."),
+            _ => Err(BlockError::InvalidToken),
         }
     }
 
@@ -1254,14 +1260,11 @@ impl ParentBlock {
         )
     }
 
-    pub fn opening_line(&self) -> usize {
-        let Some(first_location) = self.location.first() else {
-            panic!(
-                "{}",
-                format!("Missing location information for: {:?}", self)
-            )
-        };
-        first_location.line
+    pub fn opening_line(&self) -> Result<usize, BlockError> {
+        match self.location.first() {
+            Some(first_location) => Ok(first_location.line),
+            None => Err(BlockError::Location),
+        }
     }
 }
 
