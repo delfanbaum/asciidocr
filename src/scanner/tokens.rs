@@ -91,6 +91,8 @@ impl Token {
     }
 
     /// Returns the Token's text content
+    /// NOTE: for typographers' quotes, this inserts the characters instead of the entities; this
+    /// may change in future releases.
     pub fn text(&self) -> String {
         match self.token_type() {
             TokenType::OpenDoubleQuote => "“".into(),
