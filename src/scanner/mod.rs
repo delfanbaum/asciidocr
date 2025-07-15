@@ -80,6 +80,9 @@ impl<'a> Scanner<'a> {
                 if self.starts_repeated_char_line(c, 3) {
                     self.current += 2;
                     self.add_token(TokenType::PageBreak, false, 0)
+                } else if ['-', '='].contains(&self.peek()) {
+                    self.current += 1;
+                    self.add_token(TokenType::CharRef, false, 0)
                 } else if self.peek() == '<' {
                     self.add_cross_reference()
                 } else if self.starts_new_line() && self.starts_code_callout_list_item() {
@@ -100,16 +103,25 @@ impl<'a> Scanner<'a> {
                 } else {
                     match c {
                         '=' => {
+                            if self.peek() == '>' {
+                                self.current += 1;
+                                self.add_token(TokenType::CharRef, false, 0)
+                            }
                             // possible heading
-                            if self.starts_new_line() {
+                            else if self.starts_new_line() {
                                 self.add_heading()
                             } else {
                                 self.add_text_until_next_markup()
                             }
                         }
                         '-' => {
+                            if self.peek() == '>' {
+                                self.current += 1;
+                                self.add_token(TokenType::CharRef, false, 0)
+                            }
                             // check if it's an open block
-                            if self.starts_new_line() && self.starts_repeated_char_line(c, 2) {
+                            else if self.starts_new_line() && self.starts_repeated_char_line(c, 2)
+                            {
                                 self.current += 1;
                                 // since we consume the newline as a part of the block, add a line
                                 self.add_token(TokenType::OpenBlock, false, 0)
@@ -159,7 +171,10 @@ impl<'a> Scanner<'a> {
                         ),
                         // ordered list item or section title
                         '.' => {
-                            if self.starts_new_line() {
+                            if self.peeks_ahead(2) == ".." {
+                                self.current += 2;
+                                self.add_token(TokenType::CharRef, false, 0)
+                            } else if self.starts_new_line() {
                                 if self.peek() == ' ' {
                                     self.add_list_item(TokenType::OrderedListItem)
                                 } else {
@@ -227,6 +242,13 @@ impl<'a> Scanner<'a> {
                 } else if self.peek_back() != ' ' && [": ", ":\n"].contains(&self.peeks_ahead(2)) {
                     self.current += 2;
                     self.add_token(TokenType::DescriptionListMarker, false, 0)
+                } else {
+                    self.add_text_until_next_markup()
+                }
+            }
+            '(' => {
+                if self.starts_text_symbol_replace_parens() {
+                    self.handle_text_symbol_replacement_parens()
                 } else {
                     self.add_text_until_next_markup()
                 }
@@ -602,6 +624,14 @@ impl<'a> Scanner<'a> {
         }
     }
 
+    fn handle_text_symbol_replacement_parens(&mut self) -> Token {
+        while self.peek() != ')' {
+            self.current += 1
+        }
+        self.current += 1;
+        self.add_token(TokenType::CharRef, true, 0)
+    }
+
     /// Checks for lines such as [quote], [verse, Mary Oliver], [source, python], etc.
     fn starts_attribution_line(&mut self) -> bool {
         let current_placeholder = self.current;
@@ -640,6 +670,10 @@ impl<'a> Scanner<'a> {
         }
         self.current += 1;
         self.peek() == '\n' // callouts MUST be last chars in line
+    }
+
+    fn starts_text_symbol_replace_parens(&mut self) -> bool {
+        ["C)", "R)"].contains(&self.peeks_ahead(2)) || self.peeks_ahead(3) == "TM)"
     }
 
     fn is_at_end(&self) -> bool {
@@ -1968,6 +2002,28 @@ mod tests {
                 7,
             ),
         ];
+        scan_and_assert_eq(&markup, expected_tokens);
+    }
+
+    #[rstest]
+    #[case("(C)", "&#169;")]
+    #[case("(R)", "&#174;")]
+    #[case("(TM)", "&#8482;")]
+    #[case("...", "&#8230;")]
+    #[case("->", "&#8594;")]
+    #[case("=>", "&#8658;")]
+    #[case("<-", "&#8592;")]
+    #[case("<=", "&#8656;")]
+    // note that ^ and ~ transformations are handled better by the parser
+    fn character_replacements_minus_emdash(#[case] markup: &str, #[case] replacement: &str) {
+        let expected_tokens = vec![Token::new_default(
+            TokenType::CharRef,
+            markup.to_string(),
+            Some(replacement.to_string()),
+            1,
+            1,
+            markup.len(),
+        )];
         scan_and_assert_eq(&markup, expected_tokens);
     }
 }

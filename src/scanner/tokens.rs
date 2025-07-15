@@ -148,7 +148,8 @@ impl Token {
     }
 
     /// Performs some sanity-check validations; currently checking for characters that aren't
-    /// allowed in, for example, IDs
+    /// allowed in, for example, IDs, as well as performs the character substitutions for
+    /// Charref entities, following asciidoctor
     pub fn validate(&mut self) {
         match self.token_type() {
             TokenType::BlockAnchor | TokenType::CrossReference => {
@@ -156,6 +157,36 @@ impl Token {
                 if self.lexeme.contains(' ') || self.lexeme.contains('\n') {
                     self.token_type = TokenType::Text
                 }
+            }
+            TokenType::CharRef => {
+                match self.lexeme.as_str() {
+                    "(C)" => {
+                        self.literal = Some("&#169;".into())
+                    }
+                    "(R)" => {
+                        self.literal = Some("&#174;".into())
+                    }
+                    "(TM)" => {
+                        self.literal = Some("&#8482;".into())
+                    }
+                    "..." => {
+                        self.literal = Some("&#8230;".into())
+                    }
+                    "->" => {
+                        self.literal = Some("&#8594;".into())
+                    }
+                    "=>" => {
+                        self.literal = Some("&#8658;".into())
+                    }
+                    "<-" => {
+                        self.literal = Some("&#8592;".into())
+                    }
+                    "<=" => {
+                        self.literal = Some("&#8656;".into())
+                    }
+                    _ => {} // do nothing
+                }
+
             }
             _ => {}
         }
