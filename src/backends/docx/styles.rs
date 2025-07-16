@@ -156,7 +156,7 @@ impl DocumentStyles {
                 ),
             DocumentStyles::ListParagraph => Style::new("ListParagraph", StyleType::Paragraph)
                 .name("ListParagraph")
-                .based_on("Normal")
+                .based_on("No Spacing")
                 .indent(None, Some(SpecialIndentType::FirstLine(0)), None, None),
             DocumentStyles::OrderedListParagraph(id) => {
                 let id = format!("NumberedListParagraph_{}", id);

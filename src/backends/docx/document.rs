@@ -41,9 +41,18 @@ pub fn asciidocr_default_docx() -> Docx {
         )
 }
 
+#[derive(thiserror::Error, Debug)]
+pub enum DocxError {
+    #[error(transparent)]
+    FileError(#[from] std::io::Error),
+    #[error("Docx error: Invalid column designation")]
+    ColumnError
+}
+
 // holds some state for us
 pub struct DocxWriter {
     page_break_before: bool,
+    line_break_before: bool,
     abstract_numbering: usize,
     numbering: usize,
     current_style: DocumentStyles,
@@ -53,13 +62,14 @@ impl DocxWriter {
     pub fn new() -> Self {
         DocxWriter {
             page_break_before: false,
+            line_break_before: false,
             abstract_numbering: 0,
             numbering: 0,
             current_style: DocumentStyles::Normal,
         }
     }
 
-    fn add_paragraph(&mut self, docx: Docx, mut para: Paragraph) -> Docx {
+    fn add_paragraph(&mut self, docx: Docx, mut para: Paragraph) -> Result<Docx, DocxError> {
         if self.page_break_before {
             para = para.page_break_before(true);
             self.page_break_before = false;
@@ -68,77 +78,77 @@ impl DocxWriter {
         // set current style
         para = para.style(&self.current_style.style_id());
 
-        docx.add_paragraph(para)
+        Ok(docx.add_paragraph(para))
     }
 
-    pub fn add_block_to_doc(&mut self, mut docx: Docx, block: &Block) -> Docx {
+    pub fn add_block_to_doc(&mut self, mut docx: Docx, block: &Block) -> Result<Docx, DocxError> {
         match block {
-            Block::Section(section) => docx = self.add_section(docx, section),
-            Block::List(list) => docx = self.add_list(docx, list),
-            Block::ListItem(item) => docx = self.add_list_item(docx, item),
+            Block::Section(section) => docx = self.add_section(docx, section)?,
+            Block::List(list) => docx = self.add_list(docx, list)?,
+            Block::ListItem(item) => docx = self.add_list_item(docx, item)?,
             Block::DList(list) => {
                 for item in list.items.iter() {
-                    docx = self.add_block_to_doc(docx, item)
+                    docx = self.add_block_to_doc(docx, item)?
                 }
             }
-            Block::DListItem(item) => docx = self.add_dlist_item(docx, item),
+            Block::DListItem(item) => docx = self.add_dlist_item(docx, item)?,
             Block::Break(block) => match block.variant {
                 BreakVariant::Page => {
                     self.page_break_before = true;
                 }
                 BreakVariant::Thematic => {
-                    docx = self.set_style(docx, DocumentStyles::ThematicBreak);
+                    docx = self.set_style(docx, DocumentStyles::ThematicBreak)?;
                     docx =
-                        self.add_paragraph(docx, Paragraph::new().add_run(Run::new().add_text("#")))
+                        self.add_paragraph(docx, Paragraph::new().add_run(Run::new().add_text("#")))?
                 }
             },
             Block::LeafBlock(block) => {
                 match block.name {
                     LeafBlockName::Verse => {
-                        docx = self.set_style(docx, DocumentStyles::Verse);
+                        docx = self.set_style(docx, DocumentStyles::Verse)?;
                     }
                     LeafBlockName::Listing | LeafBlockName::Literal => {
-                        docx = self.set_style(docx, DocumentStyles::Monospace);
+                        docx = self.set_style(docx, DocumentStyles::Monospace)?;
                     }
                     _ => {}
                 }
                 let mut para = Paragraph::new();
-                para = add_inlines_to_para(para, block.inlines());
-                docx = self.add_paragraph(docx, para)
+                para = self.add_inlines_to_para(para, block.inlines());
+                docx = self.add_paragraph(docx, para)?
             }
             Block::ParentBlock(parent) => match parent.name {
                 ParentBlockName::Admonition => {
-                    docx = self.add_parent_block(docx, parent, "Admonition")
+                    docx = self.add_parent_block(docx, parent, "Admonition")?
                 }
-                ParentBlockName::Example => docx = self.add_parent_block(docx, parent, "Example"),
-                ParentBlockName::Sidebar => docx = self.add_parent_block(docx, parent, "Sidebar"),
+                ParentBlockName::Example => docx = self.add_parent_block(docx, parent, "Example")?,
+                ParentBlockName::Sidebar => docx = self.add_parent_block(docx, parent, "Sidebar")?,
                 ParentBlockName::Open => {
                     for child in parent.blocks.iter() {
-                        docx = self.add_block_to_doc(docx, child)
+                        docx = self.add_block_to_doc(docx, child)?
                     }
                 }
-                ParentBlockName::Quote => docx = self.add_quote(docx, parent),
-                ParentBlockName::Table => docx = self.add_table(docx, parent),
+                ParentBlockName::Quote => docx = self.add_quote(docx, parent)?,
+                ParentBlockName::Table => docx = self.add_table(docx, parent)?,
                 ParentBlockName::FootnoteContainer => {} // should never appear in this context
             },
-            Block::BlockMacro(block) => docx = self.add_block_macro(docx, block),
+            Block::BlockMacro(block) => docx = self.add_block_macro(docx, block)?,
             Block::TableCell(_) => {} // handled directly in the parent block
             Block::BlockMetadata(_) => {} // not implemented by parser
             Block::SectionBody => {}  // not implemented by parser
             Block::NonSectionBlockBody(_) => {} // not implemented by parser
             Block::DiscreteHeading => {} // not implemented by parser
         }
-        docx
+        Ok(docx)
     }
 
-    fn add_list(&mut self, mut docx: Docx, list: &List) -> Docx {
+    fn add_list(&mut self, mut docx: Docx, list: &List) -> Result<Docx, DocxError> {
         self.numbering += 1;
         match list.variant {
             ListVariant::Ordered | ListVariant::Callout => {
-                docx = self.set_style(docx, DocumentStyles::OrderedListParagraph(self.numbering))
+                docx = self.set_style(docx, DocumentStyles::OrderedListParagraph(self.numbering))?
             }
             ListVariant::Unordered => {
-                docx = self.set_style(docx, DocumentStyles::ListParagraph);
+                docx = self.set_style(docx, DocumentStyles::ListParagraph)?;
                 if self.abstract_numbering == 0 {
                     // really only do this once
                     self.abstract_numbering += 1;
@@ -151,95 +161,95 @@ impl DocxWriter {
             }
         }
         for item in list.items.iter() {
-            docx = self.add_block_to_doc(docx, item)
+            docx = self.add_block_to_doc(docx, item)?
         }
-        docx
+        Ok(docx)
     }
 
-    fn add_list_item(&mut self, mut docx: Docx, item: &ListItem) -> Docx {
+    fn add_list_item(&mut self, mut docx: Docx, item: &ListItem) -> Result<Docx, DocxError> {
         // add principal with the correct variant match
         let mut para = Paragraph::new();
 
         para = para
             .style(&self.current_style.style_id())
             .numbering(NumberingId::new(self.numbering), IndentLevel::new(0));
-        para = add_inlines_to_para(para, item.principal());
-        docx = self.add_paragraph(docx, para);
+        para = self.add_inlines_to_para(para, item.principal());
+        docx = self.add_paragraph(docx, para)?;
         // add any children -- TODO style them as list continues
         if !item.blocks.is_empty() {
             for block in item.blocks.iter() {
-                docx = self.add_block_to_doc(docx, block)
+                docx = self.add_block_to_doc(docx, block)?
             }
         }
-        docx
+        Ok(docx)
     }
 
-    fn add_dlist_item(&mut self, mut docx: Docx, item: &DListItem) -> Docx {
+    fn add_dlist_item(&mut self, mut docx: Docx, item: &DListItem) -> Result<Docx, DocxError> {
         // add terms
-        docx = self.set_style(docx, DocumentStyles::DefinitionTerm);
+        docx = self.set_style(docx, DocumentStyles::DefinitionTerm)?;
         let mut terms_para = Paragraph::new();
-        terms_para = add_inlines_to_para(terms_para, item.terms());
-        docx = self.add_paragraph(docx, terms_para);
+        terms_para = self.add_inlines_to_para(terms_para, item.terms());
+        docx = self.add_paragraph(docx, terms_para)?;
 
         // add principal and anything else
-        docx = self.set_style(docx, DocumentStyles::Definition);
+        docx = self.set_style(docx, DocumentStyles::Definition)?;
         let mut para = Paragraph::new().style(&self.current_style.style_id());
-        para = add_inlines_to_para(para, item.principal());
-        docx = self.add_paragraph(docx, para);
+        para = self.add_inlines_to_para(para, item.principal());
+        docx = self.add_paragraph(docx, para)?;
 
         // add any children -- TODO style them as list continues
         if !item.blocks.is_empty() {
             for block in item.blocks.iter() {
-                docx = self.add_block_to_doc(docx, block)
+                docx = self.add_block_to_doc(docx, block)?
             }
         }
-        docx
+        Ok(docx)
     }
 
-    fn add_section(&mut self, mut docx: Docx, section: &Section) -> Docx {
+    fn add_section(&mut self, mut docx: Docx, section: &Section) -> Result<Docx, DocxError> {
         if !section.title().is_empty() {
-            docx = self.set_style(docx, DocumentStyles::Heading(section.level));
+            docx = self.set_style(docx, DocumentStyles::Heading(section.level))?;
             let mut para = Paragraph::new();
-            para = add_inlines_to_para(para, section.title());
-            docx = self.add_paragraph(docx, para);
+            para = self.add_inlines_to_para(para, section.title());
+            docx = self.add_paragraph(docx, para)?;
             // to ensure we go back
             self.reset_style();
         }
 
         for block in section.blocks.iter() {
-            docx = self.add_block_to_doc(docx, block)
+            docx = self.add_block_to_doc(docx, block)?
         }
-        docx
+        Ok(docx)
     }
 
-    fn add_parent_block(&mut self, mut docx: Docx, parent: &ParentBlock, name: &str) -> Docx {
+    fn add_parent_block(&mut self, mut docx: Docx, parent: &ParentBlock, name: &str) -> Result<Docx, DocxError> {
         // admonitions
         if let Some(variant) = &parent.variant {
-            docx = self.set_style(docx, DocumentStyles::SectionTitle(name.into()));
+            docx = self.set_style(docx, DocumentStyles::SectionTitle(name.into()))?;
             docx = self.add_paragraph(
                 docx,
                 Paragraph::new().add_run(Run::new().add_text(variant.to_string())),
-            )
+            )?
         }
         // examples and sidebars
         if !parent.title.is_empty() {
-            docx = self.set_style(docx, DocumentStyles::SectionTitle(name.into()));
+            docx = self.set_style(docx, DocumentStyles::SectionTitle(name.into()))?;
             let mut title = Paragraph::new();
-            title = add_inlines_to_para(title, parent.title.clone());
-            docx = self.add_paragraph(docx, title);
+            title = self.add_inlines_to_para(title, parent.title.clone());
+            docx = self.add_paragraph(docx, title)?;
         }
-        docx = self.set_style(docx, DocumentStyles::SectionText(name.into()));
+        docx = self.set_style(docx, DocumentStyles::SectionText(name.into()))?;
         for child in parent.blocks.iter() {
-            docx = self.add_block_to_doc(docx, child)
+            docx = self.add_block_to_doc(docx, child)?
         }
         self.reset_style();
-        docx
+        Ok(docx)
     }
 
-    fn add_quote(&mut self, mut docx: Docx, parent: &ParentBlock) -> Docx {
-        docx = self.set_style(docx, DocumentStyles::Quote);
+    fn add_quote(&mut self, mut docx: Docx, parent: &ParentBlock) -> Result<Docx, DocxError> {
+        docx = self.set_style(docx, DocumentStyles::Quote)?;
         for child in parent.blocks.iter() {
-            docx = self.add_block_to_doc(docx, child)
+            docx = self.add_block_to_doc(docx, child)?
         }
         if let Some(metadata) = &parent.metadata {
             if let Some(attribution) = metadata.attributes.get("attribution") {
@@ -247,20 +257,23 @@ impl DocxWriter {
                     .line_spacing(LineSpacing::new().after(480))
                     .add_run(Run::new().add_text(format!("— {}\n", attribution)));
 
-                docx = self.add_paragraph(docx, para)
+                docx = self.add_paragraph(docx, para)?
             }
         }
         self.reset_style();
-        docx
+        Ok(docx)
     }
 
-    fn add_table(&mut self, mut docx: Docx, table: &ParentBlock) -> Docx {
+    fn add_table(&mut self, mut docx: Docx, table: &ParentBlock) -> Result<Docx, DocxError> {
         // TODO: headers on tables
-        docx = self.set_style(docx, DocumentStyles::Table);
+        docx = self.set_style(docx, DocumentStyles::Table)?;
         let mut cols: usize = 0;
         if let Some(ref metadata) = table.metadata {
             if let Some(col_num) = metadata.attributes.get("cols") {
-                cols = col_num.parse().expect("Invalid column designation")
+                cols = match col_num.parse() {
+                    Ok(c) => c,
+                    Err(_) => return Err(DocxError::ColumnError)
+                }
             }
         }
         let mut rows: Vec<TableRow> = vec![];
@@ -268,7 +281,7 @@ impl DocxWriter {
         let mut current_row: Vec<TableCell> = vec![];
         for (idx, block) in table.blocks.iter().enumerate() {
             let mut para = Paragraph::new().style(&DocumentStyles::Table.style_id());
-            para = add_inlines_to_para(para, block.inlines());
+            para = self.add_inlines_to_para(para, block.inlines());
             let cell = TableCell::new().add_paragraph(para);
             current_row.push(cell);
             // see if we need a new row
@@ -277,31 +290,30 @@ impl DocxWriter {
                 current_row.clear()
             }
         }
-        docx.add_table(Table::new(rows))
+        Ok(docx.add_table(Table::new(rows)))
     }
 
-    fn add_block_macro(&mut self, mut docx: Docx, block: &BlockMacro) -> Docx {
-        // TODO better error handling
+    fn add_block_macro(&mut self, mut docx: Docx, block: &BlockMacro) -> Result<Docx, DocxError> {
         if matches!(block.name, BlockMacroName::Image) {
-            let mut img = File::open(block.target.clone()).expect("Error opening image file");
+            let mut img = File::open(block.target.clone())?;
             let mut buf = vec![];
-            let _ = img.read_to_end(&mut buf).expect("Error reading image file");
+            let _ = img.read_to_end(&mut buf)?;
             let pic = Pic::new(&buf);
             docx = docx.add_paragraph(Paragraph::new().add_run(Run::new().add_image(pic)));
         } else {
             todo!()
         }
-        docx
+        Ok(docx)
     }
 
-    fn add_style(&self, mut docx: Docx, style: Style) -> Docx {
+    fn add_style(&self, mut docx: Docx, style: Style) -> Result<Docx, DocxError> {
         if docx.styles.find_style_by_id(&style.style_id).is_none() {
             docx = docx.add_style(style)
         }
-        docx
+        Ok(docx)
     }
 
-    fn set_style(&mut self, docx: Docx, style: DocumentStyles) -> Docx {
+    fn set_style(&mut self, docx: Docx, style: DocumentStyles) -> Result<Docx, DocxError> {
         self.current_style = style;
         self.add_style(docx, self.current_style.generate())
     }
@@ -309,97 +321,112 @@ impl DocxWriter {
     fn reset_style(&mut self) {
         self.current_style = DocumentStyles::Normal;
     }
-}
 
-/// Adds inlines to a given paragraph
-pub fn add_inlines_to_para(mut para: Paragraph, inlines: Vec<Inline>) -> Paragraph {
-    for inline in inlines.iter() {
-        for run in runs_from_inline(inline) {
-            para = para.add_run(run)
-        }
-    }
-    para
-}
-
-/// Creates runs from inlines, called from a block
-fn runs_from_inline(inline: &Inline) -> Vec<Run> {
-    let mut variants: Vec<&InlineSpanVariant> = vec![];
-    let mut runs: Vec<Run> = vec![];
-    match inline {
-        Inline::InlineLiteral(lit) => {
-            // replace non-significant newlines with space, as it would appear in HTML
-            runs.push(
-                Run::new()
-                    .add_text(RE_WHITESPACE_NEWLINE.replace_all(&lit.value_or_refd_char(), " ")),
-            );
-        }
-        Inline::InlineSpan(span) => {
-            variants.push(&span.variant);
-            for inline in span.inlines.iter() {
-                runs.extend(runs_from_inline_with_variant(inline, &mut variants))
+    /// Adds inlines to a given paragraph
+    pub fn add_inlines_to_para(&mut self, mut para: Paragraph, inlines: Vec<Inline>) -> Paragraph {
+        for inline in inlines.iter() {
+            for run in self.runs_from_inline(inline) {
+                para = para.add_run(run)
             }
         }
-        Inline::InlineBreak(_) => runs.push(Run::new().add_break(BreakType::TextWrapping)),
-        Inline::InlineRef(iref) => {
-            // for now, just append the text; we can handle the actual linking later, as that's
-            // more complicated
-            for inline in iref.inlines.iter() {
-                runs.extend(runs_from_inline_with_variant(inline, &mut variants))
+        para
+    }
+
+    /// Creates runs from inlines, called from a block
+    fn runs_from_inline(&mut self, inline: &Inline) -> Vec<Run> {
+        let mut variants: Vec<&InlineSpanVariant> = vec![];
+        let mut runs: Vec<Run> = vec![];
+        match inline {
+            Inline::InlineLiteral(lit) => {
+                let mut literal_text = lit.value_or_refd_char();
+                if self.line_break_before {
+                    literal_text = literal_text.trim_start().into();
+                    self.line_break_before = false;
+                }
+                runs.push(
+                    Run::new().add_text(RE_WHITESPACE_NEWLINE.replace_all(&literal_text, " ")),
+                );
+            }
+            Inline::InlineSpan(span) => {
+                variants.push(&span.variant);
+                for inline in span.inlines.iter() {
+                    runs.extend(self.runs_from_inline_with_variant(inline, &mut variants))
+                }
+            }
+            Inline::InlineBreak(_) => {
+                runs.push(Run::new().add_break(BreakType::TextWrapping));
+                self.line_break_before = true;
+            }
+            Inline::InlineRef(iref) => {
+                // for now, just append the text; we can handle the actual linking later, as that's
+                // more complicated
+                for inline in iref.inlines.iter() {
+                    runs.extend(self.runs_from_inline_with_variant(inline, &mut variants))
+                }
             }
         }
+        runs
     }
-    runs
-}
 
-/// The version that allows for recursion, specifically nested inline spans
-fn runs_from_inline_with_variant<'a>(
-    inline: &'a Inline,
-    variants: &mut Vec<&'a InlineSpanVariant>,
-) -> Vec<Run> {
-    let mut runs: Vec<Run> = Vec::new();
-    match inline {
-        Inline::InlineLiteral(lit) => {
-            let mut run = Run::new().add_text(lit.value_or_refd_char().replace("\n", " "));
-            if !variants.is_empty() {
-                for variant in variants {
-                    match variant {
-                        InlineSpanVariant::Strong => run = run.bold(),
-                        InlineSpanVariant::Emphasis => run = run.italic(),
-                        InlineSpanVariant::Code => {
-                            run = run.fonts(RunFonts::new().ascii("Courier New"))
-                        }
-                        InlineSpanVariant::Mark => run = run.highlight("yellow"),
-                        InlineSpanVariant::Subscript => {
-                            run.run_property =
-                                RunProperty::new().vert_align(VertAlignType::SubScript)
-                        }
-                        InlineSpanVariant::Superscript => {
-                            run.run_property =
-                                RunProperty::new().vert_align(VertAlignType::SuperScript)
-                        }
-                        InlineSpanVariant::Footnote => {
-                            eprintln!("Footnotes are not well supported; footnote text will be included in-line and higlighted for the time being.");
-                            run = run.highlight("blue")
+    /// The version that allows for recursion, specifically nested inline spans
+    fn runs_from_inline_with_variant<'a>(
+        &mut self,
+        inline: &'a Inline,
+        variants: &mut Vec<&'a InlineSpanVariant>,
+    ) -> Vec<Run> {
+        let mut runs: Vec<Run> = Vec::new();
+        match inline {
+            Inline::InlineLiteral(lit) => {
+                let mut literal_text = lit.value_or_refd_char().replace("\n", " ");
+                if self.line_break_before {
+                    literal_text = literal_text.trim_start().into();
+                    self.line_break_before = false;
+                }
+                let mut run = Run::new().add_text(literal_text);
+                if !variants.is_empty() {
+                    for variant in variants {
+                        match variant {
+                            InlineSpanVariant::Strong => run = run.bold(),
+                            InlineSpanVariant::Emphasis => run = run.italic(),
+                            InlineSpanVariant::Code => {
+                                run = run.fonts(RunFonts::new().ascii("Courier New"))
+                            }
+                            InlineSpanVariant::Mark => run = run.highlight("yellow"),
+                            InlineSpanVariant::Subscript => {
+                                run.run_property =
+                                    RunProperty::new().vert_align(VertAlignType::SubScript)
+                            }
+                            InlineSpanVariant::Superscript => {
+                                run.run_property =
+                                    RunProperty::new().vert_align(VertAlignType::SuperScript)
+                            }
+                            InlineSpanVariant::Footnote => {
+                                eprintln!("Footnotes are not well supported; footnote text will be included in-line and higlighted for the time being.");
+                                run = run.highlight("blue")
+                            }
                         }
                     }
                 }
+                runs.push(run)
             }
-            runs.push(run)
-        }
-        Inline::InlineSpan(span) => {
-            variants.push(&span.variant);
-            for inline in span.inlines.iter() {
-                runs.extend(runs_from_inline_with_variant(inline, variants))
+            Inline::InlineSpan(span) => {
+                variants.push(&span.variant);
+                for inline in span.inlines.iter() {
+                    runs.extend(self.runs_from_inline_with_variant(inline, variants))
+                }
+            }
+            Inline::InlineBreak(_) => {
+                runs.push(Run::new().add_break(BreakType::TextWrapping));
+                self.line_break_before = true;
+            }
+            Inline::InlineRef(iref) => {
+                // for now, just append the text; we can handle the actual linking later, as that's
+                // more complicated
+                for inline in iref.inlines.iter() {
+                    runs.extend(self.runs_from_inline_with_variant(inline, variants))
+                }
             }
         }
-        Inline::InlineBreak(_) => runs.push(Run::new().add_break(BreakType::TextWrapping)),
-        Inline::InlineRef(iref) => {
-            // for now, just append the text; we can handle the actual linking later, as that's
-            // more complicated
-            for inline in iref.inlines.iter() {
-                runs.extend(runs_from_inline_with_variant(inline, variants))
-            }
-        }
+        runs
     }
-    runs
 }

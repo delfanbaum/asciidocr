@@ -542,7 +542,7 @@ impl Parser {
                         self.token_into(token, asg)?;
                         self.last_token_type = token_type;
                     }
-                    Err(_) => todo!(),
+                    Err(e) => return Err(ParserError::Scanner(e)),
                 }
             }
         } else {

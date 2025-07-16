@@ -20,7 +20,7 @@ pub fn render_docx(graph: &Asg, output_path: &Path) -> Result<(), DocxError> {
     if let Some(header) = &graph.header {
         if !header.title.is_empty() {
             let mut para = Paragraph::new().style("Title");
-            para = document::add_inlines_to_para(para, header.title());
+            para = writer.add_inlines_to_para(para, header.title());
             docx = docx.add_paragraph(para);
         }
     }
