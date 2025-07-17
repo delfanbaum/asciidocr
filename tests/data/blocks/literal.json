@@ -11,7 +11,7 @@
         {
           "name": "text",
           "type": "string",
-          "value": "\nAnd, as I am an *honest* Puck,\nIf we have unearned luck\nNow to 'scape the serpent's tongue,\nWe will make amends ere long;\nElse the Puck a liar call;\nSo, good night unto you all.\n",
+          "value": "\nAnd, as I am an *honest* Puck,\nIf we have unearned luck\nNow to 'scape the serpent&#8217;s tongue,\nWe will make amends ere long;\nElse the Puck a liar call;\nSo, good night unto you all.\n",
           "location": [
             {
               "line": 1,

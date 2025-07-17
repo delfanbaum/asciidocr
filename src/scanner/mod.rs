@@ -81,6 +81,11 @@ impl<'a> Scanner<'a> {
                 } else if ['\0', ' ', '\n'].contains(&self.peek_back()) && self.peek() == '`' {
                     self.current += 1;
                     self.add_token(TokenType::OpenSingleQuote, true, 0)
+                } else if ["s ", "s\n"].contains(&self.peeks_ahead(2))
+                // edge at end case
+                    || (self.peeks_ahead(2) == "\0" && self.peek() == 's')
+                {
+                    self.add_token(TokenType::CharRef, false, 0)
                 } else {
                     self.add_text_until_next_markup()
                 }
@@ -1963,6 +1968,7 @@ mod tests {
         ];
         scan_and_assert_eq(markup, expected_tokens);
     }
+
     #[test]
     fn code_callout_list() {
         let markup = "<1> Bar";
@@ -1982,6 +1988,103 @@ mod tests {
                 1,
                 5,
                 7,
+            ),
+        ];
+        scan_and_assert_eq(markup, expected_tokens);
+    }
+
+    #[test]
+    fn typographers_apostrophe() {
+        let markup = "Joe's ";
+        let expected_tokens = vec![
+            Token::new_default(
+                TokenType::Text,
+                "Joe".to_string(),
+                Some("Joe".to_string()),
+                1,
+                1,
+                3,
+            ),
+            Token::new_default(
+                TokenType::CharRef,
+                "'".to_string(),
+                Some("&#8217;".to_string()),
+                1,
+                4,
+                4,
+            ),
+            Token::new_default(
+                TokenType::Text,
+                "s ".to_string(),
+                Some("s ".to_string()),
+                1,
+                5,
+                6,
+            ),
+        ];
+        scan_and_assert_eq(markup, expected_tokens);
+    }
+
+    #[test]
+    fn typographers_apostrophe_newline() {
+        let markup = "Joe's\n";
+        let expected_tokens = vec![
+            Token::new_default(
+                TokenType::Text,
+                "Joe".to_string(),
+                Some("Joe".to_string()),
+                1,
+                1,
+                3,
+            ),
+            Token::new_default(
+                TokenType::CharRef,
+                "'".to_string(),
+                Some("&#8217;".to_string()),
+                1,
+                4,
+                4,
+            ),
+            Token::new_default(
+                TokenType::Text,
+                "s".to_string(),
+                Some("s".to_string()),
+                1,
+                5,
+                5,
+            ),
+            Token::new_default(TokenType::NewLineChar, "\n".to_string(), None, 1, 6, 6),
+        ];
+        scan_and_assert_eq(markup, expected_tokens);
+    }
+
+    #[test]
+    fn typographers_apostrophe_eof() {
+        let markup = "Joe's";
+        let expected_tokens = vec![
+            Token::new_default(
+                TokenType::Text,
+                "Joe".to_string(),
+                Some("Joe".to_string()),
+                1,
+                1,
+                3,
+            ),
+            Token::new_default(
+                TokenType::CharRef,
+                "'".to_string(),
+                Some("&#8217;".to_string()),
+                1,
+                4,
+                4,
+            ),
+            Token::new_default(
+                TokenType::Text,
+                "s".to_string(),
+                Some("s".to_string()),
+                1,
+                5,
+                5,
             ),
         ];
         scan_and_assert_eq(markup, expected_tokens);
