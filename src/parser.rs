@@ -199,20 +199,20 @@ impl Parser {
                     {
                         self.open_parse_after_as_text_type = Some(token_type)
                     } else {
-                        self.parse_text(token)?;
+                        self.pass_text_through(token)?;
                         return Ok(());
                     }
                 }
                 TokenType::PassthroughBlock | TokenType::LiteralBlock | TokenType::CommentBlock => {
                     if token.token_type() != token_type {
-                        self.parse_text(token)?;
+                        self.pass_text_through(token)?;
                         return Ok(());
                     }
                 }
                 TokenType::SourceBlock => {
                     // allow callouts in the source block
                     if ![token_type, TokenType::CodeCallout].contains(&token.token_type()) {
-                        self.parse_text(token)?;
+                        self.pass_text_through(token)?;
                         return Ok(());
                     }
                 }
@@ -896,6 +896,29 @@ impl Parser {
         Ok(())
     }
 
+    fn pass_text_through(&mut self, token: Token) -> Result<(), ParserError> {
+        if let Some(newline_token) = self.dangling_newline.clone() {
+            if self.preserve_newline_text {
+                // add the newline as such
+                self.inline_stack.push_back(Inline::InlineLiteral(
+                    InlineLiteral::new_text_from_token(&newline_token),
+                ));
+                // clear the newline
+                self.dangling_newline = None;
+                // add the new text separately
+                self.inline_stack.push_back(Inline::InlineLiteral(
+                    InlineLiteral::new_text_from_token_pass(&token),
+                ));
+                return Ok(());
+            } else {
+                self.add_text_to_last_inline(newline_token);
+                self.dangling_newline = None;
+            }
+        }
+        self.pass_text_to_last_inline(token);
+        Ok(())
+    }
+
     fn parse_charref(&mut self, token: Token) -> Result<(), ParserError> {
         let inline_lit = Inline::InlineLiteral(InlineLiteral::new_charref_from_token(&token));
         if let Some(newline_token) = self.dangling_newline.clone() {
@@ -1068,6 +1091,41 @@ impl Parser {
                 Inline::InlineRef(inline_ref) => {
                     if !self.close_parent_after_push {
                         inline_ref.add_text_from_token(token)
+                    } else {
+                        self.inline_stack.push_back(inline_literal)
+                    }
+                }
+                Inline::InlineBreak(_) => {
+                    // can't add to the back, so just add the literal
+                    self.inline_stack.push_back(inline_literal)
+                }
+            }
+        } else {
+            self.inline_stack.push_back(inline_literal)
+        }
+    }
+
+    fn pass_text_to_last_inline(&mut self, token: Token) {
+        let inline_literal = Inline::InlineLiteral(InlineLiteral::new_text_from_token_pass(&token));
+        if let Some(last_inline) = self.inline_stack.back_mut() {
+            match last_inline {
+                Inline::InlineSpan(span) => {
+                    if self.in_inline_span {
+                        span.add_inline(inline_literal);
+                    } else {
+                        self.inline_stack.push_back(inline_literal)
+                    }
+                }
+                Inline::InlineLiteral(prior_literal) => {
+                    if matches!(prior_literal.name, InlineLiteralName::Charref) {
+                        self.inline_stack.push_back(inline_literal)
+                    } else {
+                        prior_literal.pass_text_from_token(&token)
+                    }
+                }
+                Inline::InlineRef(inline_ref) => {
+                    if !self.close_parent_after_push {
+                        inline_ref.pass_text_from_token(token)
                     } else {
                         self.inline_stack.push_back(inline_literal)
                     }

@@ -14,7 +14,7 @@ this should work.
 {%- macro process_block(block, skip_tag) -%}
 {%- set local_skip_tag = false -%}
 {#- Handle breaks separately; makes the logic easier -#}
-{%- if block.name in ["paragraph", "listing", "verse", "pass"] %}
+{%- if block.name in ["paragraph", "listing", "verse", "pass", "literal"] %}
     {{ leaf_block_macros::process_leaf_block(block=block) }}
 {%- elif block.name == "table" -%}
     {{ table_macros::process_table(block=block) }}

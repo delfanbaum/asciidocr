@@ -567,6 +567,19 @@ impl InlineRef {
             self.inlines.push(inline_literal)
         }
     }
+
+    pub fn pass_text_from_token(&mut self, token: Token) {
+        let inline_literal = Inline::InlineLiteral(InlineLiteral::new_text_from_token_pass(&token));
+        if let Some(last_inline) = self.inlines.last_mut() {
+            match last_inline {
+                Inline::InlineSpan(span) => span.add_inline(inline_literal),
+                Inline::InlineLiteral(prior_literal) => prior_literal.pass_text_from_token(&token),
+                _ => panic!("Can't add text to last token in this context"),
+            }
+        } else {
+            self.inlines.push(inline_literal)
+        }
+    }
 }
 
 #[derive(Serialize, PartialEq, Clone, Debug)]
@@ -604,9 +617,24 @@ impl InlineLiteral {
         InlineLiteral::new(InlineLiteralName::Charref, token.text(), token.locations())
     }
 
+    /// Passes the lexeme through, e.g., when we're in a source or literal block
+    pub fn new_text_from_token_pass(token: &Token) -> Self {
+        InlineLiteral::new(
+            InlineLiteralName::Text,
+            token.lexeme.clone(),
+            token.locations(),
+        )
+    }
+
     /// Add text and reconcile location information from a given (text) token
     pub fn add_text_from_token(&mut self, token: &Token) {
         self.value.push_str(&token.text());
+        self.location = Location::reconcile(self.location.clone(), token.locations());
+    }
+
+    /// Add text and reconcile location information from a given (text) token
+    pub fn pass_text_from_token(&mut self, token: &Token) {
+        self.value.push_str(&token.lexeme.clone());
         self.location = Location::reconcile(self.location.clone(), token.locations());
     }
 
