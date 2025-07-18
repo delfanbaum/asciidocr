@@ -6,7 +6,7 @@ use crate::graph::{
 use crate::scanner::tokens::Token;
 use serde::Serialize;
 
-use super::metadata::ElementMetadata;
+use super::{blocks::BlockError, metadata::ElementMetadata};
 
 #[derive(Serialize, Clone, Debug)]
 pub struct List {
@@ -106,7 +106,11 @@ impl ListItem {
         self.blocks.clone()
     }
 
-    pub fn extract_footnotes(&mut self, count: usize, document_id: &str) -> Vec<Block> {
+    pub fn extract_footnotes(
+        &mut self,
+        count: usize,
+        document_id: &str,
+    ) -> Result<Vec<Block>, BlockError> {
         let mut local_count = count;
         let mut extracted: Vec<Block> = Vec::new();
         for idx in 0..self.principal.len() {
@@ -114,7 +118,7 @@ impl ListItem {
                 local_count += 1;
                 let inline_span = self.principal.remove(idx);
                 let Inline::InlineSpan(mut footnote) = inline_span else {
-                    panic!("Bad is_footnote match")
+                    return Err(BlockError::Footnote("Bad is_footnote match".to_string()));
                 };
                 // deconstruct it
                 let (definition_id, replacement_span, footnote_contents) =
@@ -131,11 +135,11 @@ impl ListItem {
             }
         }
         for child in self.blocks.iter_mut() {
-            let child_footnoes = child.extract_footnote_definitions(local_count, document_id);
+            let child_footnoes = child.extract_footnote_definitions(local_count, document_id)?;
             local_count += child_footnoes.len();
             extracted.extend(child_footnoes);
         }
-        extracted
+        Ok(extracted)
     }
 }
 
@@ -234,7 +238,11 @@ impl DListItem {
         self.location.clone()
     }
 
-    pub fn extract_footnotes(&mut self, count: usize, document_id: &str) -> Vec<Block> {
+    pub fn extract_footnotes(
+        &mut self,
+        count: usize,
+        document_id: &str,
+    ) -> Result<Vec<Block>, BlockError> {
         let mut local_count = count;
         let mut extracted: Vec<Block> = Vec::new();
         for idx in 0..self.principal.len() {
@@ -242,7 +250,7 @@ impl DListItem {
                 local_count += 1;
                 let inline_span = self.principal.remove(idx);
                 let Inline::InlineSpan(mut footnote) = inline_span else {
-                    panic!("Bad is_footnote match")
+                    return Err(BlockError::Footnote("Bad is_footnote match".to_string()));
                 };
                 // deconstruct it
                 let (definition_id, replacement_span, footnote_contents) =
@@ -259,10 +267,10 @@ impl DListItem {
             }
         }
         for child in self.blocks.iter_mut() {
-            let child_footnoes = child.extract_footnote_definitions(local_count, document_id);
+            let child_footnoes = child.extract_footnote_definitions(local_count, document_id)?;
             local_count += child_footnoes.len();
             extracted.extend(child_footnoes);
         }
-        extracted
+        Ok(extracted)
     }
 }

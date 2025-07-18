@@ -1,4 +1,4 @@
-use log::error;
+use log::{error, warn};
 use std::{collections::HashMap, fmt::Display};
 
 use serde::Serialize;
@@ -26,6 +26,8 @@ pub enum BlockError {
     Location,
     #[error("Tried to create a block from an invalid Token.")]
     InvalidToken,
+    #[error("Footnote error: {0}")]
+    Footnote(String),
 }
 
 /// Blocks Enum, containing all possible document blocks
@@ -402,7 +404,7 @@ impl Block {
         &mut self,
         footnote_count: usize,
         document_id: &str,
-    ) -> Vec<Block> {
+    ) -> Result<Vec<Block>, BlockError> {
         // setup references
         let mut local_count = footnote_count;
         // setup list to return
@@ -413,7 +415,7 @@ impl Block {
             Block::Section(block) => {
                 for child in block.blocks.iter_mut() {
                     let child_footnoes =
-                        child.extract_footnote_definitions(extracted.len(), document_id);
+                        child.extract_footnote_definitions(extracted.len(), document_id)?;
                     local_count += child_footnoes.len();
                     extracted.extend(child_footnoes);
                 }
@@ -421,7 +423,7 @@ impl Block {
             Block::ParentBlock(block) => {
                 for child in block.blocks.iter_mut() {
                     let child_footnoes =
-                        child.extract_footnote_definitions(extracted.len(), document_id);
+                        child.extract_footnote_definitions(extracted.len(), document_id)?;
                     local_count += child_footnoes.len();
                     extracted.extend(child_footnoes);
                 }
@@ -429,7 +431,7 @@ impl Block {
             Block::List(block) => {
                 for child in block.items.iter_mut() {
                     let child_footnoes =
-                        child.extract_footnote_definitions(extracted.len(), document_id);
+                        child.extract_footnote_definitions(extracted.len(), document_id)?;
                     local_count += child_footnoes.len();
                     extracted.extend(child_footnoes);
                 }
@@ -437,16 +439,16 @@ impl Block {
             Block::DList(block) => {
                 for child in block.items.iter_mut() {
                     let child_footnoes =
-                        child.extract_footnote_definitions(extracted.len(), document_id);
+                        child.extract_footnote_definitions(extracted.len(), document_id)?;
                     extracted.extend(child_footnoes);
                 }
             }
             Block::ListItem(block) => {
-                let child_footnotes = block.extract_footnotes(extracted.len(), document_id);
+                let child_footnotes = block.extract_footnotes(extracted.len(), document_id)?;
                 extracted.extend(child_footnotes);
             }
             Block::DListItem(block) => {
-                let child_footnotes = block.extract_footnotes(extracted.len(), document_id);
+                let child_footnotes = block.extract_footnotes(extracted.len(), document_id)?;
                 extracted.extend(child_footnotes);
             }
             // nonparents
@@ -456,7 +458,7 @@ impl Block {
                         local_count += 1;
                         let inline_span = block.inlines.remove(idx);
                         let Inline::InlineSpan(mut footnote) = inline_span else {
-                            panic!("Bad is_footnote match")
+                            return Err(BlockError::Footnote("Bad is_footnote match".to_string()))
                         };
                         // deconstruct it
                         let (definition_id, replacement_span, footnote_contents) =
@@ -477,7 +479,7 @@ impl Block {
                           // reached
         }
 
-        extracted
+        Ok(extracted)
     }
 
     pub fn create_id(&mut self) {
@@ -725,7 +727,7 @@ impl Block {
         // guard against invalid inline use
         if metadata.inline_metadata {
             // TODO this is a warning, not a panic
-            panic!("Invalid inline class markup.")
+            warn!("Invalid inline class markup.")
         }
         match self {
             Block::LeafBlock(block) => block.metadata = Some(metadata),
@@ -1325,7 +1327,7 @@ mod tests {
             vec![],
             vec![footnote],
         ));
-        let extracted = some_leaf.extract_footnote_definitions(0, "");
+        let extracted = some_leaf.extract_footnote_definitions(0, "").expect("Error extracting footnote definitions");
         let Block::LeafBlock(result) = some_leaf else {
             panic!("Destroyed the leaf block somehow")
         };

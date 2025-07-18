@@ -126,7 +126,7 @@ impl Asg {
         let mut footnote_defs: Vec<Block> = vec![];
         for block in self.blocks.iter_mut() {
             footnote_defs
-                .extend(block.extract_footnote_definitions(footnote_defs.len(), &self.document_id));
+                .extend(block.extract_footnote_definitions(footnote_defs.len(), &self.document_id)?);
         }
         // create a parent block to hold the footnote definitions
         self.push_block(Block::ParentBlock(ParentBlock::new_footnotes_container(
