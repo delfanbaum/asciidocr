@@ -42,11 +42,13 @@ pub fn asciidocr_default_docx() -> Docx {
 }
 
 #[derive(thiserror::Error, Debug)]
-pub enum DocxError {
+pub enum DocxRenderError {
     #[error(transparent)]
     FileError(#[from] std::io::Error),
     #[error("Docx error: Invalid column designation")]
-    ColumnError
+    ColumnError,
+    #[error("Docx error: error writing file")]
+    ZipFileError,
 }
 
 // holds some state for us
@@ -69,7 +71,7 @@ impl DocxWriter {
         }
     }
 
-    fn add_paragraph(&mut self, docx: Docx, mut para: Paragraph) -> Result<Docx, DocxError> {
+    fn add_paragraph(&mut self, docx: Docx, mut para: Paragraph) -> Result<Docx, DocxRenderError> {
         if self.page_break_before {
             para = para.page_break_before(true);
             self.page_break_before = false;
@@ -81,7 +83,11 @@ impl DocxWriter {
         Ok(docx.add_paragraph(para))
     }
 
-    pub fn add_block_to_doc(&mut self, mut docx: Docx, block: &Block) -> Result<Docx, DocxError> {
+    pub fn add_block_to_doc(
+        &mut self,
+        mut docx: Docx,
+        block: &Block,
+    ) -> Result<Docx, DocxRenderError> {
         match block {
             Block::Section(section) => docx = self.add_section(docx, section)?,
             Block::List(list) => docx = self.add_list(docx, list)?,
@@ -98,8 +104,8 @@ impl DocxWriter {
                 }
                 BreakVariant::Thematic => {
                     docx = self.set_style(docx, DocumentStyles::ThematicBreak)?;
-                    docx =
-                        self.add_paragraph(docx, Paragraph::new().add_run(Run::new().add_text("#")))?
+                    docx = self
+                        .add_paragraph(docx, Paragraph::new().add_run(Run::new().add_text("#")))?
                 }
             },
             Block::LeafBlock(block) => {
@@ -120,8 +126,12 @@ impl DocxWriter {
                 ParentBlockName::Admonition => {
                     docx = self.add_parent_block(docx, parent, "Admonition")?
                 }
-                ParentBlockName::Example => docx = self.add_parent_block(docx, parent, "Example")?,
-                ParentBlockName::Sidebar => docx = self.add_parent_block(docx, parent, "Sidebar")?,
+                ParentBlockName::Example => {
+                    docx = self.add_parent_block(docx, parent, "Example")?
+                }
+                ParentBlockName::Sidebar => {
+                    docx = self.add_parent_block(docx, parent, "Sidebar")?
+                }
                 ParentBlockName::Open => {
                     for child in parent.blocks.iter() {
                         docx = self.add_block_to_doc(docx, child)?
@@ -141,7 +151,7 @@ impl DocxWriter {
         Ok(docx)
     }
 
-    fn add_list(&mut self, mut docx: Docx, list: &List) -> Result<Docx, DocxError> {
+    fn add_list(&mut self, mut docx: Docx, list: &List) -> Result<Docx, DocxRenderError> {
         self.numbering += 1;
         match list.variant {
             ListVariant::Ordered | ListVariant::Callout => {
@@ -166,7 +176,7 @@ impl DocxWriter {
         Ok(docx)
     }
 
-    fn add_list_item(&mut self, mut docx: Docx, item: &ListItem) -> Result<Docx, DocxError> {
+    fn add_list_item(&mut self, mut docx: Docx, item: &ListItem) -> Result<Docx, DocxRenderError> {
         // add principal with the correct variant match
         let mut para = Paragraph::new();
 
@@ -184,7 +194,11 @@ impl DocxWriter {
         Ok(docx)
     }
 
-    fn add_dlist_item(&mut self, mut docx: Docx, item: &DListItem) -> Result<Docx, DocxError> {
+    fn add_dlist_item(
+        &mut self,
+        mut docx: Docx,
+        item: &DListItem,
+    ) -> Result<Docx, DocxRenderError> {
         // add terms
         docx = self.set_style(docx, DocumentStyles::DefinitionTerm)?;
         let mut terms_para = Paragraph::new();
@@ -206,7 +220,7 @@ impl DocxWriter {
         Ok(docx)
     }
 
-    fn add_section(&mut self, mut docx: Docx, section: &Section) -> Result<Docx, DocxError> {
+    fn add_section(&mut self, mut docx: Docx, section: &Section) -> Result<Docx, DocxRenderError> {
         if !section.title().is_empty() {
             docx = self.set_style(docx, DocumentStyles::Heading(section.level))?;
             let mut para = Paragraph::new();
@@ -222,7 +236,12 @@ impl DocxWriter {
         Ok(docx)
     }
 
-    fn add_parent_block(&mut self, mut docx: Docx, parent: &ParentBlock, name: &str) -> Result<Docx, DocxError> {
+    fn add_parent_block(
+        &mut self,
+        mut docx: Docx,
+        parent: &ParentBlock,
+        name: &str,
+    ) -> Result<Docx, DocxRenderError> {
         // admonitions
         if let Some(variant) = &parent.variant {
             docx = self.set_style(docx, DocumentStyles::SectionTitle(name.into()))?;
@@ -246,7 +265,7 @@ impl DocxWriter {
         Ok(docx)
     }
 
-    fn add_quote(&mut self, mut docx: Docx, parent: &ParentBlock) -> Result<Docx, DocxError> {
+    fn add_quote(&mut self, mut docx: Docx, parent: &ParentBlock) -> Result<Docx, DocxRenderError> {
         docx = self.set_style(docx, DocumentStyles::Quote)?;
         for child in parent.blocks.iter() {
             docx = self.add_block_to_doc(docx, child)?
@@ -264,7 +283,7 @@ impl DocxWriter {
         Ok(docx)
     }
 
-    fn add_table(&mut self, mut docx: Docx, table: &ParentBlock) -> Result<Docx, DocxError> {
+    fn add_table(&mut self, mut docx: Docx, table: &ParentBlock) -> Result<Docx, DocxRenderError> {
         // TODO: headers on tables
         docx = self.set_style(docx, DocumentStyles::Table)?;
         let mut cols: usize = 0;
@@ -272,7 +291,7 @@ impl DocxWriter {
             if let Some(col_num) = metadata.attributes.get("cols") {
                 cols = match col_num.parse() {
                     Ok(c) => c,
-                    Err(_) => return Err(DocxError::ColumnError)
+                    Err(_) => return Err(DocxRenderError::ColumnError),
                 }
             }
         }
@@ -293,7 +312,11 @@ impl DocxWriter {
         Ok(docx.add_table(Table::new(rows)))
     }
 
-    fn add_block_macro(&mut self, mut docx: Docx, block: &BlockMacro) -> Result<Docx, DocxError> {
+    fn add_block_macro(
+        &mut self,
+        mut docx: Docx,
+        block: &BlockMacro,
+    ) -> Result<Docx, DocxRenderError> {
         if matches!(block.name, BlockMacroName::Image) {
             let mut img = File::open(block.target.clone())?;
             let mut buf = vec![];
@@ -306,14 +329,14 @@ impl DocxWriter {
         Ok(docx)
     }
 
-    fn add_style(&self, mut docx: Docx, style: Style) -> Result<Docx, DocxError> {
+    fn add_style(&self, mut docx: Docx, style: Style) -> Result<Docx, DocxRenderError> {
         if docx.styles.find_style_by_id(&style.style_id).is_none() {
             docx = docx.add_style(style)
         }
         Ok(docx)
     }
 
-    fn set_style(&mut self, docx: Docx, style: DocumentStyles) -> Result<Docx, DocxError> {
+    fn set_style(&mut self, docx: Docx, style: DocumentStyles) -> Result<Docx, DocxRenderError> {
         self.current_style = style;
         self.add_style(docx, self.current_style.generate())
     }

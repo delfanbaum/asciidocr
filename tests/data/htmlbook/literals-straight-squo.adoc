@@ -1,0 +1,14 @@
+This should not have a typographer's apostrophe: `foo's`.
+
+Neither should this:
+
+[source]
+----
+My good dog's bone
+----
+
+Or this:
+
+....
+My good dog's bone
+....

@@ -19,6 +19,8 @@
     {% elif block.name == "verse" -%}
         {%- set tag = "pre" -%}
         {%- set data_type = "verse" -%}
+    {% elif block.name == "literal" -%}
+        {%- set tag = "pre" -%}
     {% elif block.name == "pass" -%}
     {%- endif -%}
 {%- if tag -%}<{{tag}}

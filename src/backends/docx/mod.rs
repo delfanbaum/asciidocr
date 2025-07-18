@@ -6,12 +6,16 @@ pub mod units;
 
 use std::{fs::File, path::Path};
 
-use docx_rs::{DocxError, Paragraph};
+use docx_rs::Paragraph;
 
 use crate::graph::asg::Asg;
 
+use self::document::DocxRenderError;
+
+use super::ConversionError;
+
 /// !Experimental! Renders a Docx file. Some [`Asg`] blocks are still unsupported.
-pub fn render_docx(graph: &Asg, output_path: &Path) -> Result<(), DocxError> {
+pub fn render_docx(graph: &Asg, output_path: &Path) -> Result<(), ConversionError> {
     let file = File::create(output_path).unwrap();
     let mut writer = document::DocxWriter::new();
     let mut docx = document::asciidocr_default_docx();
@@ -27,8 +31,10 @@ pub fn render_docx(graph: &Asg, output_path: &Path) -> Result<(), DocxError> {
 
     // Add document contents
     for block in graph.blocks.iter() {
-        docx = writer.add_block_to_doc(docx, block)
+        docx = writer.add_block_to_doc(docx, block)?
     }
-    docx.build().pack(file)?;
-    Ok(())
+    match docx.build().pack(file) {
+        Ok(_) => Ok(()),
+        Err(_) => Err(ConversionError::DocxRender(DocxRenderError::ZipFileError)),
+    }
 }

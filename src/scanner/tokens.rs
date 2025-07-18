@@ -177,6 +177,7 @@ impl Token {
                     "<-" => self.literal = Some("&#8592;".into()),
                     "<=" => self.literal = Some("&#8656;".into()),
                     "--" => self.literal = Some("&#8212;".into()),
+                    "'" => self.literal = Some("&#8217;".into()),
                     _ => {} // do nothing
                 }
             }

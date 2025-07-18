@@ -983,7 +983,7 @@ pub struct LeafBlock {
 #[serde(rename_all = "lowercase")]
 pub enum LeafBlockName {
     Listing,
-    Literal, // TK not handling now
+    Literal,
     Paragraph,
     Pass,
     Stem, // TK not handling now

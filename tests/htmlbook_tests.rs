@@ -75,6 +75,22 @@ fn footnotes() {
 }
 
 #[test]
+fn literal_blocks() {
+    let fn_pattern = String::from("htmlbook/literal");
+    let adoc_fn = format!("{}.adoc", fn_pattern);
+    let html_fn = format!("{}.html", fn_pattern);
+    assert_rendered_htmlbook_matches_expected(&adoc_fn, &html_fn)
+}
+
+#[test]
+fn literals_straight_quotes() {
+    let fn_pattern = String::from("htmlbook/literals-straight-squo");
+    let adoc_fn = format!("{}.adoc", fn_pattern);
+    let html_fn = format!("{}.html", fn_pattern);
+    assert_rendered_htmlbook_matches_expected(&adoc_fn, &html_fn)
+}
+
+#[test]
 fn passthroughs() {
     let fn_pattern = String::from("htmlbook/passthroughs");
     let adoc_fn = format!("{}.adoc", fn_pattern);
