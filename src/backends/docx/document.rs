@@ -1,4 +1,4 @@
-use std::{fs::File, io::Read, usize};
+use std::{fs::File, io::Read};
 
 use docx_rs::{
     AlignmentType, BreakType, Docx, Header, IndentLevel, LineSpacing, Numbering, NumberingId,
@@ -58,6 +58,12 @@ pub struct DocxWriter {
     abstract_numbering: usize,
     numbering: usize,
     current_style: DocumentStyles,
+}
+
+impl Default for DocxWriter {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl DocxWriter {
