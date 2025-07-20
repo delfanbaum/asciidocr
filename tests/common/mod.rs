@@ -3,7 +3,7 @@ use std::{fs, path::PathBuf};
 use asciidocr::{backends::htmls::render_htmlbook, parser::Parser, scanner::Scanner};
 use assert_json_diff::assert_json_eq;
 use image::RgbImage;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use tempfile::NamedTempFile;
 
 /// Given a pattern "parent/filename" inside tests/data, assert that the filename.adoc produces
@@ -27,9 +27,11 @@ pub fn assert_parsed_doc_matches_expected_asg(adoc_fn: &str, asg_json_fn: &str) 
 /// Given an asciidoc string and an expected abstract syntax graph json string, assert that the
 /// parser produces the correct json from the asciidoc
 pub fn assert_parsed_doc_matches_expected_asg_from_str(adoc_str: &str, asg_json_str: &str) {
-    let parsed_asg = json!(Parser::default()
-        .parse(Scanner::new(adoc_str))
-        .expect("Unable to parse input file"));
+    let parsed_asg = json!(
+        Parser::default()
+            .parse(Scanner::new(adoc_str))
+            .expect("Unable to parse input file")
+    );
     let expected_asg: Value = serde_json::from_str(asg_json_str).unwrap();
     assert_json_eq!(parsed_asg, expected_asg);
 }

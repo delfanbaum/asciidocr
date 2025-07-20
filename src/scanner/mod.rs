@@ -379,7 +379,7 @@ impl<'a> Scanner<'a> {
             '|' => {
                 if self.starts_new_line() && self.peeks_ahead(3) == "===" {
                     self.current += 3; // don't consume the newline
-                                       // check to make sure the next char is a newline or EOF
+                    // check to make sure the next char is a newline or EOF
                     if ['\n', '\0'].contains(&self.peek()) {
                         self.add_token(TokenType::Table, false, 0)
                     } else {

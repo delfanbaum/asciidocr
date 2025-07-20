@@ -155,7 +155,6 @@ fn test_charref() {
     assert_parsed_doc_matches_expected_asg(&adoc_fn, &asg_json_fn)
 }
 
-
 /// Inline images
 #[test]
 fn test_image_no_attributes() {

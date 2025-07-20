@@ -16,9 +16,11 @@ mod docx_tests {
     fn first_test_for_sanity() {
         let test_dir = PathBuf::from("tests/data/");
         let adoc_fn = "blocks/para-single-line.adoc";
-        let parsed_asg = Parser::new(test_dir.join(adoc_fn)).parse(Scanner::new(
-            &fs::read_to_string(test_dir.join(adoc_fn)).expect("Unable to find adoc"),
-        )).expect("Failed to parse document");
+        let parsed_asg = Parser::new(test_dir.join(adoc_fn))
+            .parse(Scanner::new(
+                &fs::read_to_string(test_dir.join(adoc_fn)).expect("Unable to find adoc"),
+            ))
+            .expect("Failed to parse document");
         let temp_docx = NamedTempFile::new().unwrap();
         match render_docx(&parsed_asg, &temp_docx.path()) {
             Ok(_) => assert!(true),
@@ -32,7 +34,7 @@ mod docx_tests {
         let adoc_fn = "documents/minimum.adoc";
         let temp_docx = NamedTempFile::new().unwrap();
         let temp_image = generate_temp_image();
-        // mock out an image for the purposes of the test 
+        // mock out an image for the purposes of the test
         let mut adoc_str = fs::read_to_string(test_dir.join(adoc_fn)).expect("Unable to find adoc");
         adoc_str = adoc_str.replace(
             "example_image.png",
@@ -41,7 +43,9 @@ mod docx_tests {
         // note that list continuations don't work yet!
         adoc_str = adoc_str.replace("+\n--\nSuch as this.\n--\n", "");
 
-        let parsed_asg = Parser::new(test_dir.join(adoc_fn)).parse(Scanner::new(&adoc_str)).expect("Failed to parse document");
+        let parsed_asg = Parser::new(test_dir.join(adoc_fn))
+            .parse(Scanner::new(&adoc_str))
+            .expect("Failed to parse document");
         match render_docx(&parsed_asg, &temp_docx.path()) {
             Ok(_) => assert!(true),
             Err(_) => assert!(false),

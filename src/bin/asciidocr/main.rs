@@ -6,7 +6,7 @@ use simple_logger::SimpleLogger;
 use std::{fs, path::PathBuf};
 
 use asciidocr::{
-    backends::{htmls::render_htmlbook, Backends},
+    backends::{Backends, htmls::render_htmlbook},
     parser::Parser as AdocParser,
     scanner::Scanner,
 };
@@ -14,7 +14,7 @@ use asciidocr::{
 #[cfg(feature = "docx")]
 use asciidocr::backends::docx::render_docx;
 
-use cli::{read_input, read_output, Cli};
+use cli::{Cli, read_input, read_output};
 
 fn main() {
     SimpleLogger::new()
@@ -32,7 +32,8 @@ fn main() {
 }
 
 fn run(args: Cli) -> Result<()> {
-    let graph = AdocParser::new(PathBuf::from(&args.file)).parse(Scanner::new(&read_input(&args)))?;
+    let graph =
+        AdocParser::new(PathBuf::from(&args.file)).parse(Scanner::new(&read_input(&args)))?;
     if args.count {
         println!("{} words in {}", graph.word_count(), args.file)
     }

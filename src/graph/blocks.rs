@@ -150,7 +150,7 @@ impl Block {
             Block::ListItem(list_item) => list_item.add_inline(inline),
             Block::DListItem(list_item) => list_item.add_inline(inline),
             Block::TableCell(table_cell) => table_cell.inlines.push(inline),
-            _ => return Err(BlockError::NotImplemented(format!("{}", self)))
+            _ => return Err(BlockError::NotImplemented(format!("{}", self))),
         }
         Ok(())
     }
@@ -290,7 +290,7 @@ impl Block {
     /// Helper when we need to move child blocks from one Block to another
     pub fn extract_blocks(&mut self) -> Vec<Block> {
         match self {
-            Block::List(ref mut list) => list.items.drain(..).collect(),
+            Block::List(list) => list.items.drain(..).collect(),
             _ => {
                 let v: Vec<Block> = Vec::new();
                 v
@@ -458,7 +458,7 @@ impl Block {
                         local_count += 1;
                         let inline_span = block.inlines.remove(idx);
                         let Inline::InlineSpan(mut footnote) = inline_span else {
-                            return Err(BlockError::Footnote("Bad is_footnote match".to_string()))
+                            return Err(BlockError::Footnote("Bad is_footnote match".to_string()));
                         };
                         // deconstruct it
                         let (definition_id, replacement_span, footnote_contents) =
@@ -1327,7 +1327,9 @@ mod tests {
             vec![],
             vec![footnote],
         ));
-        let extracted = some_leaf.extract_footnote_definitions(0, "").expect("Error extracting footnote definitions");
+        let extracted = some_leaf
+            .extract_footnote_definitions(0, "")
+            .expect("Error extracting footnote definitions");
         let Block::LeafBlock(result) = some_leaf else {
             panic!("Destroyed the leaf block somehow")
         };

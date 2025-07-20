@@ -19,7 +19,7 @@ use crate::graph::{
 
 use super::numbering::add_bullet_abstract_numbering;
 use super::styles::DocumentStyles;
-use super::units::{inches, DXA_INCH};
+use super::units::{DXA_INCH, inches};
 
 static RE_WHITESPACE_NEWLINE: Lazy<Regex> = Lazy::new(|| Regex::new(r#"\s*\n"#).unwrap());
 
@@ -430,7 +430,9 @@ impl DocxWriter {
                                     RunProperty::new().vert_align(VertAlignType::SuperScript)
                             }
                             InlineSpanVariant::Footnote => {
-                                eprintln!("Footnotes are not well supported; footnote text will be included in-line and higlighted for the time being.");
+                                eprintln!(
+                                    "Footnotes are not well supported; footnote text will be included in-line and higlighted for the time being."
+                                );
                                 run = run.highlight("blue")
                             }
                         }

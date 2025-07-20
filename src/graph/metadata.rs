@@ -1,6 +1,6 @@
 use std::{collections::HashMap, fmt::Debug};
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use once_cell::sync::Lazy;
 use regex::Regex;
 use serde::Serialize;
