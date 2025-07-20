@@ -3,65 +3,63 @@
   "type": "block",
   "blocks": [
     {
-      "name": "verse",
+      "name": "paragraph",
       "type": "block",
-      "form": "delimited",
-      "delimiter": "____",
       "inlines": [
         {
           "name": "text",
           "type": "string",
-          "value": "And, as I am an honest Puck,\nIf we have unearned luck\nNow to 'scape the serpent",
+          "value": "bar ",
           "location": [
             {
-              "line": 3,
+              "line": 1,
               "col": 1
             },
             {
-              "line": 5,
-              "col": 25
+              "line": 1,
+              "col": 4
             }
           ]
         },
         {
           "name": "charref",
           "type": "string",
-          "value": "&#8217;",
+          "value": "&mdash;",
           "location": [
             {
-              "line": 5,
-              "col": 26
+              "line": 1,
+              "col": 5
             },
             {
-              "line": 5,
-              "col": 26
+              "line": 1,
+              "col": 11
             }
           ]
         },
         {
           "name": "text",
           "type": "string",
-          "value": "s tongue,\nWe will make amends ere long;\nElse the Puck a liar call;\nSo, good night unto you all.",
+          "value": " foo.",
           "location": [
             {
-              "line": 5,
-              "col": 27
+              "line": 1,
+              "col": 12
             },
             {
-              "line": 8,
-              "col": 28
+              "line": 1,
+              "col": 16
             }
           ]
         }
       ],
       "location": [
         {
-          "line": 2,
+          "line": 1,
           "col": 1
         },
         {
-          "line": 9,
-          "col": 4
+          "line": 1,
+          "col": 16
         }
       ]
     }
@@ -72,8 +70,8 @@
       "col": 1
     },
     {
-      "line": 9,
-      "col": 4
+      "line": 1,
+      "col": 16
     }
   ]
 }

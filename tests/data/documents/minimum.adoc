@@ -42,7 +42,14 @@ And open blocks:
 Some inside the block shit.
 --
 
-Eventually, too, we want to handle images, but maybe later. In the short term,
+Eventually, too, we want to handle images, but maybe later.
+
+_Just kidding!_ We support images:
+
+image::example_image.png[]
+
+
+In the short term,
 maybe we do quotes, like:
 
 [quote, somebody]
@@ -57,3 +64,16 @@ ____
 My love is like a red, red rose
 ____
 
+And a table:
+
+[cols="1,1"]
+|===
+|Cell in *column* 1, *row* 1 
+|Cell in column 2, row 1 
+
+|Cell in column 1, row 2
+|Cell in column 2, row 2
+
+|Cell in column 1, row 3
+|Cell in column 2, row 3 
+|===

@@ -68,3 +68,7 @@ of interest, open an issue.
 https://docs.asciidoctor.org/asciidoc/latest/blocks/collapsible/[Collapsible
 blocks]:: Again, this feels a more web-oriented feature; at least for the
 moment, we're targeting document creation.
+
+== Limitations of the DOCX Backend
+
+* List continuations

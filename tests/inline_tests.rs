@@ -146,6 +146,15 @@ fn test_super_and_sub() {
     assert_parsed_doc_matches_expected_asg(&adoc_fn, &asg_json_fn)
 }
 
+/// charref entities are processed by themselves
+#[test]
+fn test_charref() {
+    let fn_pattern = "inlines/charrefs";
+    let adoc_fn = format!("{}.adoc", fn_pattern);
+    let asg_json_fn = format!("{}.json", fn_pattern);
+    assert_parsed_doc_matches_expected_asg(&adoc_fn, &asg_json_fn)
+}
+
 
 /// Inline images
 #[test]

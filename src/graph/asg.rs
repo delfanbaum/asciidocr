@@ -2,9 +2,15 @@ use std::collections::HashMap;
 
 use serde::Serialize;
 
-use super::blocks::{Block, ParentBlock};
+use super::blocks::{Block, BlockError, ParentBlock};
 use super::inlines::Inline;
 use super::nodes::{Header, Location, NodeTypes};
+
+#[derive(thiserror::Error, Debug)]
+pub enum AsgError {
+    #[error(transparent)]
+    Block(#[from] BlockError),
+}
 
 /// Abstract Syntax Graph used to represent an asciidoc document
 /// roughly meaning to follow the "official" schema:
@@ -70,13 +76,13 @@ impl Asg {
     }
 
     /// Adds a block (tree) to the "root" of the document
-    pub fn push_block(&mut self, mut block: Block) {
+    pub fn push_block(&mut self, mut block: Block) -> Result<(), AsgError> {
         block.consolidate_locations();
         self.document_id_hash.extend(block.id_hashes());
         if block.is_section() {
             if let Some(possible_section) = self.blocks.last_mut() {
                 if possible_section.takes_block_of_type(&block) {
-                    possible_section.push_block(block);
+                    possible_section.push_block(block)?;
                 } else {
                     self.blocks.push(block);
                 }
@@ -86,6 +92,7 @@ impl Asg {
         } else {
             self.blocks.push(block)
         }
+        Ok(())
     }
 
     /// Consolidates location information about the tree
@@ -105,7 +112,7 @@ impl Asg {
     /// title, notify the user
     fn consolidate_xrefs(&mut self) {
         for block in self.blocks.iter_mut() {
-            for inline in block.inlines() {
+            for inline in block.inlines_mut() {
                 // easier to push the matching down to the Inline enum
                 inline.attempt_xref_standardization(&self.document_id_hash);
             }
@@ -114,12 +121,12 @@ impl Asg {
 
     /// Pulls footnote definitions into a separate block, replacing the inlines with references to
     /// the definitions
-    pub fn standardize_footnotes(&mut self) {
+    pub fn standardize_footnotes(&mut self) -> Result<(), AsgError> {
         // Until the spec says otherwise, put footnote definitions in leaf blocks
         let mut footnote_defs: Vec<Block> = vec![];
         for block in self.blocks.iter_mut() {
             footnote_defs
-                .extend(block.extract_footnote_definitions(footnote_defs.len(), &self.document_id));
+                .extend(block.extract_footnote_definitions(footnote_defs.len(), &self.document_id)?);
         }
         // create a parent block to hold the footnote definitions
         self.push_block(Block::ParentBlock(ParentBlock::new_footnotes_container(
@@ -169,10 +176,10 @@ mod tests {
         ));
         let mut graph = Asg::new();
         graph.document_id = "test".into();
-        graph.push_block(some_leaf);
+        let _ = graph.push_block(some_leaf);
         assert_eq!(graph.blocks.len(), 1);
         // just spot-check that we break them out; the actual logic is checked elsewhere
-        graph.standardize_footnotes();
+        let _ = graph.standardize_footnotes();
         assert_eq!(graph.blocks.len(), 2);
         // but also spot-check that we add the document_id, if any
         let Some(Block::LeafBlock(leaf)) = graph.blocks.first() else {

@@ -2,7 +2,6 @@ use core::panic;
 use std::{
     collections::{HashMap, VecDeque},
     fmt::Display,
-    iter,
 };
 
 use log::warn;
@@ -12,6 +11,7 @@ use super::{
     macros::target_and_attrs_from_token,
     metadata::ElementMetadata,
     nodes::{Location, NodeTypes},
+    substitutions::CHARREF_MAP,
 };
 use crate::scanner::tokens::{Token, TokenType};
 
@@ -177,7 +177,7 @@ impl Inline {
                 if span.node_form == InlineSpanForm::Unconstrained {
                     literal = literal
                         .chars()
-                        .flat_map(|c| iter::repeat(c).take(2))
+                        .flat_map(|c| std::iter::repeat_n(c, 2))
                         .collect::<String>();
                 }
                 literal
@@ -567,6 +567,19 @@ impl InlineRef {
             self.inlines.push(inline_literal)
         }
     }
+
+    pub fn pass_text_from_token(&mut self, token: Token) {
+        let inline_literal = Inline::InlineLiteral(InlineLiteral::new_text_from_token_pass(&token));
+        if let Some(last_inline) = self.inlines.last_mut() {
+            match last_inline {
+                Inline::InlineSpan(span) => span.add_inline(inline_literal),
+                Inline::InlineLiteral(prior_literal) => prior_literal.pass_text_from_token(&token),
+                _ => panic!("Can't add text to last token in this context"),
+            }
+        } else {
+            self.inlines.push(inline_literal)
+        }
+    }
 }
 
 #[derive(Serialize, PartialEq, Clone, Debug)]
@@ -604,9 +617,24 @@ impl InlineLiteral {
         InlineLiteral::new(InlineLiteralName::Charref, token.text(), token.locations())
     }
 
+    /// Passes the lexeme through, e.g., when we're in a source or literal block
+    pub fn new_text_from_token_pass(token: &Token) -> Self {
+        InlineLiteral::new(
+            InlineLiteralName::Text,
+            token.lexeme.clone(),
+            token.locations(),
+        )
+    }
+
     /// Add text and reconcile location information from a given (text) token
     pub fn add_text_from_token(&mut self, token: &Token) {
         self.value.push_str(&token.text());
+        self.location = Location::reconcile(self.location.clone(), token.locations());
+    }
+
+    /// Add text and reconcile location information from a given (text) token
+    pub fn pass_text_from_token(&mut self, token: &Token) {
+        self.value.push_str(&token.lexeme.clone());
         self.location = Location::reconcile(self.location.clone(), token.locations());
     }
 
@@ -638,20 +666,9 @@ impl InlineLiteral {
     pub fn value_or_refd_char(&self) -> String {
         // In HTML these just get passed through, but for certain outputs we want to do replacements. This
         // is obviously an incomplete table.
-        let charref_entities: HashMap<String, &str> = HashMap::from([
-            (String::from("&nbsp;"), " "),
-            (String::from("&mdash;"), "—"),
-            (String::from("&ndash;"), "—"),
-            (String::from("&dollar;"), "$"),
-            (String::from("&amp;"), "&"),
-            (String::from("&gt;"), ">"),
-            (String::from("&lt;"), "<"),
-            (String::from("&equals;"), "="),
-            (String::from("&plus;"), "+"),
-        ]);
-
         if matches!(self.name, InlineLiteralName::Charref) {
-            match charref_entities.get(&self.value) {
+            let charrefs = CHARREF_MAP.lock().unwrap();
+            match charrefs.get(&self.value) {
                 Some(entity) => entity.to_string(),
                 None => self.value.clone(),
             }
@@ -693,6 +710,7 @@ mod tests {
     use crate::scanner::tokens::{Token, TokenType};
 
     use super::*;
+    use rstest::rstest;
 
     #[test]
     fn xref_from_token() {
@@ -745,5 +763,24 @@ mod tests {
                 &"Pause".to_string()
             )
         }
+    }
+
+    #[rstest]
+    #[case::nbsp("&nbsp;", " ")]
+    #[case::mdash("&mdash;", "—")]
+    #[case::ndash("&ndash;", "—")]
+    #[case::dollar("&dollar;", "$")]
+    #[case::amp("&amp;", "&")]
+    #[case::gt("&gt;", ">")]
+    #[case::lt("&lt;", "<")]
+    #[case::equals("&equals;", "=")]
+    #[case::plus("&plus;", "+")]
+    fn test_value_or_refd_char(#[case] entity: &str, #[case] replacement: &str) {
+        let inline = InlineLiteral::new(
+            InlineLiteralName::Charref,
+            entity.into(),
+            vec![Location::default(), Location::default()],
+        );
+        assert_eq!(inline.value_or_refd_char(), replacement)
     }
 }

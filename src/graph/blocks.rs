@@ -1,5 +1,4 @@
-use core::panic;
-use log::error;
+use log::{error, warn};
 use std::{collections::HashMap, fmt::Display};
 
 use serde::Serialize;
@@ -12,6 +11,24 @@ use crate::graph::{
     nodes::{Location, NodeTypes},
 };
 use crate::scanner::tokens::{Token, TokenType};
+
+#[derive(thiserror::Error, Debug)]
+pub enum BlockError {
+    #[error("Attempted to push dangling ListItem to parent block")]
+    DanglingList,
+    #[error("Attempted to add something other than a TableCell to a Table")]
+    TableCell,
+    #[error("push_block not implemented for {0}")]
+    NotImplemented(String),
+    #[error("Incorrect function call: consolidate_table_info on non-table block")]
+    IncorrectCall,
+    #[error("Missing location information for block")]
+    Location,
+    #[error("Tried to create a block from an invalid Token.")]
+    InvalidToken,
+    #[error("Footnote error: {0}")]
+    Footnote(String),
+}
 
 /// Blocks Enum, containing all possible document blocks
 #[derive(Serialize, PartialEq, Clone, Debug)]
@@ -68,13 +85,13 @@ impl Block {
         }
     }
 
-    pub fn push_block(&mut self, block: Block) {
+    pub fn push_block(&mut self, block: Block) -> Result<(), BlockError> {
         match self {
             Block::Section(section) => {
                 if block.is_section() {
                     if let Some(possible_section) = section.blocks.last_mut() {
                         if possible_section.takes_block_of_type(&block) {
-                            possible_section.push_block(block);
+                            possible_section.push_block(block)?;
                         } else {
                             section.blocks.push(block);
                         }
@@ -92,26 +109,27 @@ impl Block {
             Block::ParentBlock(parent_block) => {
                 if matches!(block, Block::ListItem(_)) {
                     let Some(last) = parent_block.blocks.last_mut() else {
-                        panic!("Attempted to push dangling ListItem to parent block")
+                        return Err(BlockError::DanglingList);
                     };
                     if matches!(last, Block::List(_)) {
-                        last.push_block(block);
+                        last.push_block(block)?;
                         last.consolidate_locations();
                     } else {
-                        panic!("Attempted to push dangling ListItem to parent block")
+                        return Err(BlockError::DanglingList);
                     }
                 } else if matches!(parent_block.name, ParentBlockName::Table)
                     && !matches!(block, Block::TableCell(_))
                 {
                     // sanity-guard
-                    panic!("Attempted to add something other than a TableCell to a Table")
+                    return Err(BlockError::TableCell);
                 } else {
                     parent_block.blocks.push(block)
                 }
             }
-            _ => panic!("push_block not implemented for {}", self),
+            _ => return Err(BlockError::NotImplemented(format!("{}", self))),
         }
         self.consolidate_locations();
+        Ok(())
     }
 
     pub fn takes_inlines(&self) -> bool {
@@ -125,15 +143,16 @@ impl Block {
         )
     }
 
-    pub fn push_inline(&mut self, inline: Inline) {
+    pub fn push_inline(&mut self, inline: Inline) -> Result<(), BlockError> {
         match self {
             Block::Section(section) => section.inlines.push(inline),
             Block::LeafBlock(block) => block.inlines.push(inline),
             Block::ListItem(list_item) => list_item.add_inline(inline),
             Block::DListItem(list_item) => list_item.add_inline(inline),
             Block::TableCell(table_cell) => table_cell.inlines.push(inline),
-            _ => panic!("push_block not implemented for {}", self),
+            _ => return Err(BlockError::NotImplemented(format!("{}", self)))
         }
+        Ok(())
     }
 
     pub fn takes_block_of_type(&self, block: &Block) -> bool {
@@ -208,16 +227,16 @@ impl Block {
         }
     }
 
-    pub fn consolidate_table_info(&mut self) {
+    pub fn consolidate_table_info(&mut self) -> Result<(), BlockError> {
         let Block::ParentBlock(table) = self else {
-            panic!("Incorrect function call: consolidate_table_info on non-table block")
+            return Err(BlockError::IncorrectCall);
         };
         // check if there is an implicit header
         if table.blocks.len() >= 2 {
             // if the cells in the first row are on the same line, either serves as cols
             // designation
-            let first_cell_line = table.blocks[0].line();
-            if first_cell_line == table.blocks[1].line() {
+            let first_cell_line = table.blocks[0].line()?;
+            if first_cell_line == table.blocks[1].line()? {
                 // check for an implicit header
                 if first_cell_line == table.location[0].line + 1 {
                     if let Some(ref mut metadata) = table.metadata {
@@ -229,9 +248,13 @@ impl Block {
                     }
                 }
                 // count for implicit column designation
-                let cols = table.blocks.iter().fold(0usize, |acc, block| {
-                    acc + (block.line() == first_cell_line) as usize
-                });
+                let cols = table
+                    .blocks
+                    .iter()
+                    .fold(0usize, |acc, block| match block.line() {
+                        Ok(line) => acc + (line == first_cell_line) as usize,
+                        Err(_) => acc, // shouldn't ever happen
+                    });
                 if let Some(ref mut metadata) = table.metadata {
                     if !metadata.attributes.contains_key("cols") {
                         metadata
@@ -251,8 +274,9 @@ impl Block {
                 error!("Error creating table at Line: {}", first_cell_line);
                 std::process::exit(1)
             };
-            metadata.simplify_cols()
+            metadata.simplify_cols();
         }
+        Ok(())
     }
 
     pub fn has_blocks(&self) -> bool {
@@ -283,42 +307,87 @@ impl Block {
         }
     }
 
-    pub fn inlines(&mut self) -> Vec<&mut Inline> {
+    pub fn inlines(&self) -> Vec<Inline> {
+        let mut inlines: Vec<Inline> = vec![];
+        match self {
+            // parents
+            Block::Section(block) => {
+                inlines.extend(block.inlines.clone());
+                for child in block.blocks.iter() {
+                    inlines.extend(child.inlines())
+                }
+            }
+            Block::ParentBlock(block) => {
+                inlines.extend(block.title.clone());
+                for child in block.blocks.iter() {
+                    inlines.extend(child.inlines())
+                }
+            }
+            Block::List(block) => {
+                for child in block.items.iter() {
+                    inlines.extend(child.inlines())
+                }
+            }
+            Block::DList(block) => {
+                for child in block.items.iter() {
+                    inlines.extend(child.inlines())
+                }
+            }
+            Block::ListItem(block) => {
+                inlines.extend(block.principal.clone());
+                for child in block.blocks.iter() {
+                    inlines.extend(child.inlines())
+                }
+            }
+            Block::DListItem(block) => {
+                inlines.extend(block.principal.clone());
+                for child in block.blocks.iter() {
+                    inlines.extend(child.inlines())
+                }
+            }
+            Block::LeafBlock(block) => inlines.extend(block.inlines.clone()),
+            Block::TableCell(block) => inlines.extend(block.inlines.clone()),
+            _ => {} // remaining blocks don't have inlines
+        }
+
+        inlines
+    }
+    pub fn inlines_mut(&mut self) -> Vec<&mut Inline> {
         let mut inlines: Vec<&mut Inline> = vec![];
         match self {
             // parents
             Block::Section(block) => {
                 inlines.extend(block.inlines.iter_mut());
                 for child in block.blocks.iter_mut() {
-                    inlines.extend(child.inlines())
+                    inlines.extend(child.inlines_mut())
                 }
             }
             Block::ParentBlock(block) => {
                 inlines.extend(block.title.iter_mut());
                 for child in block.blocks.iter_mut() {
-                    inlines.extend(child.inlines())
+                    inlines.extend(child.inlines_mut())
                 }
             }
             Block::List(block) => {
                 for child in block.items.iter_mut() {
-                    inlines.extend(child.inlines())
+                    inlines.extend(child.inlines_mut())
                 }
             }
             Block::DList(block) => {
                 for child in block.items.iter_mut() {
-                    inlines.extend(child.inlines())
+                    inlines.extend(child.inlines_mut())
                 }
             }
             Block::ListItem(block) => {
                 inlines.extend(block.principal.iter_mut());
                 for child in block.blocks.iter_mut() {
-                    inlines.extend(child.inlines())
+                    inlines.extend(child.inlines_mut())
                 }
             }
             Block::DListItem(block) => {
                 inlines.extend(block.principal.iter_mut());
                 for child in block.blocks.iter_mut() {
-                    inlines.extend(child.inlines())
+                    inlines.extend(child.inlines_mut())
                 }
             }
             Block::LeafBlock(block) => inlines.extend(block.inlines.iter_mut()),
@@ -335,7 +404,7 @@ impl Block {
         &mut self,
         footnote_count: usize,
         document_id: &str,
-    ) -> Vec<Block> {
+    ) -> Result<Vec<Block>, BlockError> {
         // setup references
         let mut local_count = footnote_count;
         // setup list to return
@@ -346,7 +415,7 @@ impl Block {
             Block::Section(block) => {
                 for child in block.blocks.iter_mut() {
                     let child_footnoes =
-                        child.extract_footnote_definitions(extracted.len(), document_id);
+                        child.extract_footnote_definitions(extracted.len(), document_id)?;
                     local_count += child_footnoes.len();
                     extracted.extend(child_footnoes);
                 }
@@ -354,7 +423,7 @@ impl Block {
             Block::ParentBlock(block) => {
                 for child in block.blocks.iter_mut() {
                     let child_footnoes =
-                        child.extract_footnote_definitions(extracted.len(), document_id);
+                        child.extract_footnote_definitions(extracted.len(), document_id)?;
                     local_count += child_footnoes.len();
                     extracted.extend(child_footnoes);
                 }
@@ -362,7 +431,7 @@ impl Block {
             Block::List(block) => {
                 for child in block.items.iter_mut() {
                     let child_footnoes =
-                        child.extract_footnote_definitions(extracted.len(), document_id);
+                        child.extract_footnote_definitions(extracted.len(), document_id)?;
                     local_count += child_footnoes.len();
                     extracted.extend(child_footnoes);
                 }
@@ -370,16 +439,16 @@ impl Block {
             Block::DList(block) => {
                 for child in block.items.iter_mut() {
                     let child_footnoes =
-                        child.extract_footnote_definitions(extracted.len(), document_id);
+                        child.extract_footnote_definitions(extracted.len(), document_id)?;
                     extracted.extend(child_footnoes);
                 }
             }
             Block::ListItem(block) => {
-                let child_footnotes = block.extract_footnotes(extracted.len(), document_id);
+                let child_footnotes = block.extract_footnotes(extracted.len(), document_id)?;
                 extracted.extend(child_footnotes);
             }
             Block::DListItem(block) => {
-                let child_footnotes = block.extract_footnotes(extracted.len(), document_id);
+                let child_footnotes = block.extract_footnotes(extracted.len(), document_id)?;
                 extracted.extend(child_footnotes);
             }
             // nonparents
@@ -389,7 +458,7 @@ impl Block {
                         local_count += 1;
                         let inline_span = block.inlines.remove(idx);
                         let Inline::InlineSpan(mut footnote) = inline_span else {
-                            panic!("Bad is_footnote match")
+                            return Err(BlockError::Footnote("Bad is_footnote match".to_string()))
                         };
                         // deconstruct it
                         let (definition_id, replacement_span, footnote_contents) =
@@ -410,7 +479,7 @@ impl Block {
                           // reached
         }
 
-        extracted
+        Ok(extracted)
     }
 
     pub fn create_id(&mut self) {
@@ -643,12 +712,12 @@ impl Block {
         }
     }
 
-    pub fn line(&self) -> usize {
+    pub fn line(&self) -> Result<usize, BlockError> {
         let locs = self.locations();
-        let Some(first_location) = locs.first() else {
-            panic!("{:?} is missing location information", self)
-        };
-        first_location.line
+        match locs.first() {
+            Some(first_location) => Ok(first_location.line),
+            None => Err(BlockError::Location),
+        }
     }
 
     pub fn add_metadata(&mut self, metadata: ElementMetadata) {
@@ -658,7 +727,7 @@ impl Block {
         // guard against invalid inline use
         if metadata.inline_metadata {
             // TODO this is a warning, not a panic
-            panic!("Invalid inline class markup.")
+            warn!("Invalid inline class markup.")
         }
         match self {
             Block::LeafBlock(block) => block.metadata = Some(metadata),
@@ -836,11 +905,11 @@ impl Break {
 
 #[derive(Serialize, Clone, Debug)]
 pub struct BlockMacro {
-    name: BlockMacroName,
+    pub name: BlockMacroName,
     #[serde(rename = "type")]
     node_type: NodeTypes,
     form: String,
-    target: String,
+    pub target: String,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub caption: Vec<Inline>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -914,7 +983,7 @@ pub struct LeafBlock {
 #[serde(rename_all = "lowercase")]
 pub enum LeafBlockName {
     Listing,
-    Literal, // TK not handling now
+    Literal,
     Paragraph,
     Pass,
     Stem, // TK not handling now
@@ -974,28 +1043,26 @@ impl LeafBlock {
     }
 
     /// Creates a delimited block from based on the token type
-    pub fn new_from_token(token: Token) -> Self {
+    pub fn new_from_token(token: Token) -> Result<Self, BlockError> {
         match token.token_type() {
-            TokenType::PassthroughBlock => Self::new_delimited_block(token, LeafBlockName::Pass),
-            TokenType::LiteralBlock => Self::new_delimited_block(token, LeafBlockName::Literal),
-            TokenType::SourceBlock => Self::new_delimited_block(token, LeafBlockName::Listing),
-            TokenType::CommentBlock => Self::new_delimited_block(token, LeafBlockName::Listing),
-            TokenType::QuoteVerseBlock => Self::new_delimited_block(token, LeafBlockName::Verse),
-            _ => panic!(
-                "Can't create delimited leaf block from this type of token: {:?}",
-                token
-            ),
+            TokenType::PassthroughBlock => {
+                Ok(Self::new_delimited_block(token, LeafBlockName::Pass))
+            }
+            TokenType::LiteralBlock => Ok(Self::new_delimited_block(token, LeafBlockName::Literal)),
+            TokenType::SourceBlock => Ok(Self::new_delimited_block(token, LeafBlockName::Listing)),
+            TokenType::CommentBlock => Ok(Self::new_delimited_block(token, LeafBlockName::Listing)),
+            TokenType::QuoteVerseBlock => {
+                Ok(Self::new_delimited_block(token, LeafBlockName::Verse))
+            }
+            _ => Err(BlockError::InvalidToken),
         }
     }
 
-    pub fn opening_line(&self) -> usize {
-        let Some(first_location) = self.location.first() else {
-            panic!(
-                "{}",
-                format!("Missing location information for: {:?}", self)
-            )
-        };
-        first_location.line
+    pub fn opening_line(&self) -> Result<usize, BlockError> {
+        match self.location.first() {
+            Some(first_location) => Ok(first_location.line),
+            None => Err(BlockError::Location),
+        }
     }
 
     pub fn inlines(&self) -> Vec<Inline> {
@@ -1108,80 +1175,80 @@ impl ParentBlock {
         }
     }
 
-    pub fn new_from_token(token: Token) -> Self {
+    pub fn new_from_token(token: Token) -> Result<Self, BlockError> {
         match token.token_type() {
-            TokenType::SidebarBlock => ParentBlock::new(
+            TokenType::SidebarBlock => Ok(ParentBlock::new(
                 ParentBlockName::Sidebar,
                 None,
                 token.text(),
                 vec![],
                 token.locations(),
-            ),
-            TokenType::ExampleBlock => ParentBlock::new(
+            )),
+            TokenType::ExampleBlock => Ok(ParentBlock::new(
                 ParentBlockName::Example,
                 None,
                 token.text(),
                 vec![],
                 token.locations(),
-            ),
-            TokenType::QuoteVerseBlock => ParentBlock::new(
+            )),
+            TokenType::QuoteVerseBlock => Ok(ParentBlock::new(
                 ParentBlockName::Quote,
                 None,
                 token.text(),
                 vec![],
                 token.locations(),
-            ),
-            TokenType::OpenBlock => ParentBlock::new(
+            )),
+            TokenType::OpenBlock => Ok(ParentBlock::new(
                 ParentBlockName::Open,
                 None,
                 token.text(),
                 vec![],
                 token.locations(),
-            ),
-            TokenType::NotePara => ParentBlock::new(
+            )),
+            TokenType::NotePara => Ok(ParentBlock::new(
                 ParentBlockName::Admonition,
                 Some(ParentBlockVarient::Note),
                 token.text(),
                 vec![],
                 token.locations(),
-            ),
-            TokenType::TipPara => ParentBlock::new(
+            )),
+            TokenType::TipPara => Ok(ParentBlock::new(
                 ParentBlockName::Admonition,
                 Some(ParentBlockVarient::Tip),
                 token.text(),
                 vec![],
                 token.locations(),
-            ),
-            TokenType::ImportantPara => ParentBlock::new(
+            )),
+            TokenType::ImportantPara => Ok(ParentBlock::new(
                 ParentBlockName::Admonition,
                 Some(ParentBlockVarient::Important),
                 token.text(),
                 vec![],
                 token.locations(),
-            ),
-            TokenType::CautionPara => ParentBlock::new(
+            )),
+            TokenType::CautionPara => Ok(ParentBlock::new(
                 ParentBlockName::Admonition,
                 Some(ParentBlockVarient::Caution),
                 token.text(),
                 vec![],
                 token.locations(),
-            ),
-            TokenType::WarningPara => ParentBlock::new(
+            )),
+            TokenType::WarningPara => Ok(ParentBlock::new(
                 ParentBlockName::Admonition,
                 Some(ParentBlockVarient::Warning),
                 token.text(),
                 vec![],
                 token.locations(),
-            ),
-            TokenType::Table => ParentBlock::new(
+            )),
+            TokenType::Table => Ok(ParentBlock::new(
                 ParentBlockName::Table,
                 None,
                 token.text(),
                 vec![],
                 token.locations(),
-            ),
+            )),
 
-            _ => panic!("Tried to create a ParentBlock from an invalid Token."),
+            _ => Err(BlockError::InvalidToken),
         }
     }
 
@@ -1195,14 +1262,11 @@ impl ParentBlock {
         )
     }
 
-    pub fn opening_line(&self) -> usize {
-        let Some(first_location) = self.location.first() else {
-            panic!(
-                "{}",
-                format!("Missing location information for: {:?}", self)
-            )
-        };
-        first_location.line
+    pub fn opening_line(&self) -> Result<usize, BlockError> {
+        match self.location.first() {
+            Some(first_location) => Ok(first_location.line),
+            None => Err(BlockError::Location),
+        }
     }
 }
 
@@ -1263,7 +1327,7 @@ mod tests {
             vec![],
             vec![footnote],
         ));
-        let extracted = some_leaf.extract_footnote_definitions(0, "");
+        let extracted = some_leaf.extract_footnote_definitions(0, "").expect("Error extracting footnote definitions");
         let Block::LeafBlock(result) = some_leaf else {
             panic!("Destroyed the leaf block somehow")
         };

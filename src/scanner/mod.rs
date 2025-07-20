@@ -5,6 +5,14 @@ use core::str;
 use log::error;
 use tokens::{Token, TokenType};
 
+use self::tokens::TokenError;
+
+#[derive(thiserror::Error, Debug)]
+pub enum ScannerError {
+    #[error(transparent)]
+    Token(#[from] TokenError),
+}
+
 #[derive(Debug)]
 /// Scans an asciidoc `&str` into [`Token`]s to be consumed by the Parser.
 pub struct Scanner<'a> {
@@ -18,16 +26,17 @@ pub struct Scanner<'a> {
 }
 
 impl Iterator for Scanner<'_> {
-    type Item = Token;
+    type Item = Result<Token, ScannerError>;
 
     fn next(&mut self) -> Option<Self::Item> {
         if !self.is_at_end() {
             self.start = self.current;
+
             return Some(self.scan_token());
         }
         if self.scanning {
             self.scanning = false;
-            return Some(Token::final_token(self.line, self.file_stack.clone()));
+            return Some(Ok(Token::final_token(self.line, self.file_stack.clone())));
         }
         None
     }
@@ -58,7 +67,7 @@ impl<'a> Scanner<'a> {
         }
     }
 
-    fn scan_token(&mut self) -> Token {
+    fn scan_token(&mut self) -> Result<Token, ScannerError> {
         let c = self.source.as_bytes()[self.current] as char;
         self.current += 1; // this instead of the "advance" function in "Crafting Interpreters"
 
@@ -72,6 +81,11 @@ impl<'a> Scanner<'a> {
                 } else if ['\0', ' ', '\n'].contains(&self.peek_back()) && self.peek() == '`' {
                     self.current += 1;
                     self.add_token(TokenType::OpenSingleQuote, true, 0)
+                } else if ["s ", "s\n"].contains(&self.peeks_ahead(2))
+                // edge at end case
+                    || (self.peeks_ahead(2) == "\0" && self.peek() == 's')
+                {
+                    self.add_token(TokenType::CharRef, false, 0)
                 } else {
                     self.add_text_until_next_markup()
                 }
@@ -80,6 +94,9 @@ impl<'a> Scanner<'a> {
                 if self.starts_repeated_char_line(c, 3) {
                     self.current += 2;
                     self.add_token(TokenType::PageBreak, false, 0)
+                } else if ['-', '='].contains(&self.peek()) {
+                    self.current += 1;
+                    self.add_token(TokenType::CharRef, false, 0)
                 } else if self.peek() == '<' {
                     self.add_cross_reference()
                 } else if self.starts_new_line() && self.starts_code_callout_list_item() {
@@ -96,20 +113,31 @@ impl<'a> Scanner<'a> {
             '+' | '*' | '-' | '_' | '/' | '=' | '.' => {
                 if self.starts_new_line() && self.starts_repeated_char_line(c, 4) {
                     self.current += 3; // the remaining repeated chars
-                    self.add_token(TokenType::block_from_char(c), false, 0)
+                    self.add_token(TokenType::block_from_char(c)?, false, 0)
                 } else {
                     match c {
                         '=' => {
+                            if self.peek() == '>' {
+                                self.current += 1;
+                                self.add_token(TokenType::CharRef, false, 0)
+                            }
                             // possible heading
-                            if self.starts_new_line() {
+                            else if self.starts_new_line() {
                                 self.add_heading()
                             } else {
                                 self.add_text_until_next_markup()
                             }
                         }
                         '-' => {
-                            // check if it's an open block
-                            if self.starts_new_line() && self.starts_repeated_char_line(c, 2) {
+                            if self.peek() == '>' {
+                                // is it a '->'?
+                                self.current += 1;
+                                self.add_token(TokenType::CharRef, false, 0)
+                            } else if self.starts_text_symbol_replace_emdash() {
+                                self.current += 1;
+                                self.add_token(TokenType::CharRef, false, 0)
+                            } else if self.starts_new_line() && self.starts_repeated_char_line(c, 2)
+                            {
                                 self.current += 1;
                                 // since we consume the newline as a part of the block, add a line
                                 self.add_token(TokenType::OpenBlock, false, 0)
@@ -159,7 +187,10 @@ impl<'a> Scanner<'a> {
                         ),
                         // ordered list item or section title
                         '.' => {
-                            if self.starts_new_line() {
+                            if self.peeks_ahead(2) == ".." {
+                                self.current += 2;
+                                self.add_token(TokenType::CharRef, false, 0)
+                            } else if self.starts_new_line() {
                                 if self.peek() == ' ' {
                                     self.add_list_item(TokenType::OrderedListItem)
                                 } else {
@@ -227,6 +258,13 @@ impl<'a> Scanner<'a> {
                 } else if self.peek_back() != ' ' && [": ", ":\n"].contains(&self.peeks_ahead(2)) {
                     self.current += 2;
                     self.add_token(TokenType::DescriptionListMarker, false, 0)
+                } else {
+                    self.add_text_until_next_markup()
+                }
+            }
+            '(' => {
+                if self.starts_text_symbol_replace_parens() {
+                    self.handle_text_symbol_replacement_parens()
                 } else {
                     self.add_text_until_next_markup()
                 }
@@ -371,7 +409,7 @@ impl<'a> Scanner<'a> {
         token_type: TokenType,
         include_literal: bool,
         advance_line_after: usize,
-    ) -> Token {
+    ) -> Result<Token, ScannerError> {
         let text = &self.source[self.start..self.current];
         let mut literal = None;
         if include_literal {
@@ -407,10 +445,10 @@ impl<'a> Scanner<'a> {
             }
         }
         token.validate();
-        token
+        Ok(token)
     }
 
-    fn add_heading(&mut self) -> Token {
+    fn add_heading(&mut self) -> Result<Token, ScannerError> {
         while self.peek() == '=' {
             self.current += 1
         }
@@ -430,13 +468,13 @@ impl<'a> Scanner<'a> {
 
     /// adds the list item token, then includes the rest of the list item (until a new block or
     /// another list item marker) in an Text
-    fn add_list_item(&mut self, list_item_token: TokenType) -> Token {
+    fn add_list_item(&mut self, list_item_token: TokenType) -> Result<Token, ScannerError> {
         self.current += 1; // advance past the space, which we'll include in the token lexeme
         self.add_token(list_item_token, false, 0)
     }
 
     /// Adds the block image, consuming the target as well as any attributes
-    fn add_block_image(&mut self) -> Token {
+    fn add_block_image(&mut self) -> Result<Token, ScannerError> {
         while self.peek() != ']' {
             self.current += 1
         }
@@ -445,7 +483,7 @@ impl<'a> Scanner<'a> {
     }
 
     /// Adds the block image, consuming the target as well as any attributes
-    fn add_inline_image(&mut self) -> Token {
+    fn add_inline_image(&mut self) -> Result<Token, ScannerError> {
         while self.peek() != ']' {
             self.current += 1
         }
@@ -454,7 +492,7 @@ impl<'a> Scanner<'a> {
     }
 
     /// Adds the include image, consuming the target as well as any attributes
-    fn add_include(&mut self) -> Token {
+    fn add_include(&mut self) -> Result<Token, ScannerError> {
         while self.peek() != ']' {
             self.current += 1
         }
@@ -463,7 +501,7 @@ impl<'a> Scanner<'a> {
     }
 
     /// Adds contents into a TableCell token, regardless of other formatting (simpler to re-scan later)
-    fn add_table_cell(&mut self) -> Token {
+    fn add_table_cell(&mut self) -> Result<Token, ScannerError> {
         while !['\n', '\0', '|'].contains(&self.peek()) {
             self.current += 1
         }
@@ -476,7 +514,7 @@ impl<'a> Scanner<'a> {
     }
 
     /// Adds the link, consuming the target but not any attributes
-    fn add_link(&mut self) -> Token {
+    fn add_link(&mut self) -> Result<Token, ScannerError> {
         while self.peek() != '[' {
             self.current += 1
         }
@@ -484,7 +522,7 @@ impl<'a> Scanner<'a> {
         self.add_token(TokenType::LinkMacro, true, 0)
     }
 
-    fn add_inline_style(&mut self) -> Token {
+    fn add_inline_style(&mut self) -> Result<Token, ScannerError> {
         while self.peek() != ']' {
             self.current += 1
         }
@@ -493,7 +531,7 @@ impl<'a> Scanner<'a> {
     }
 
     // adds block anchors, e.g., "\n[[some_block_id]]\n"
-    fn add_cross_reference(&mut self) -> Token {
+    fn add_cross_reference(&mut self) -> Result<Token, ScannerError> {
         while self.peeks_ahead(2) != ">>" && !self.is_at_end() {
             self.current += 1
         }
@@ -502,7 +540,7 @@ impl<'a> Scanner<'a> {
     }
 
     // adds block anchors, e.g., "\n[[some_block_id]]\n"
-    fn add_block_anchor(&mut self) -> Token {
+    fn add_block_anchor(&mut self) -> Result<Token, ScannerError> {
         while self.peeks_ahead(3) != "]]\n" && !self.is_at_end() {
             self.current += 1
         }
@@ -510,13 +548,13 @@ impl<'a> Scanner<'a> {
         self.add_token(TokenType::BlockAnchor, true, 0)
     }
 
-    fn add_text_until_next_markup(&mut self) -> Token {
+    fn add_text_until_next_markup(&mut self) -> Result<Token, ScannerError> {
         // "inline" chars that could be markup; the newline condition prevents
         // capturing significant block markup chars
         // Chars: newline, bold, italic, code, super, subscript, footnote, pass, link, end inline macro, definition list marker, highlighted, inline admonition initial chars, inline images
         while ![
             '\n', '*', '_', '`', '^', '~', 'f', 'p', 'h', ']', '[', ':', '#', 'N', 'T', 'I', 'C',
-            'W', '&', '{', '+', 'i', '<', '\'', '\"',
+            'W', '&', '{', '+', 'i', '<', '\'', '\"', '-',
         ]
         .contains(&self.peek())
             && !self.is_at_end()
@@ -581,7 +619,7 @@ impl<'a> Scanner<'a> {
         c: char,
         constrained: TokenType,
         unconstrained: TokenType,
-    ) -> Token {
+    ) -> Result<Token, ScannerError> {
         // guard clause against dangling markup
         if self.peek() == ' ' && self.peek_back() == ' ' {
             self.add_text_until_next_markup()
@@ -600,6 +638,14 @@ impl<'a> Scanner<'a> {
         } else {
             self.add_text_until_next_markup()
         }
+    }
+
+    fn handle_text_symbol_replacement_parens(&mut self) -> Result<Token, ScannerError> {
+        while self.peek() != ')' {
+            self.current += 1
+        }
+        self.current += 1;
+        self.add_token(TokenType::CharRef, true, 0)
     }
 
     /// Checks for lines such as [quote], [verse, Mary Oliver], [source, python], etc.
@@ -640,6 +686,15 @@ impl<'a> Scanner<'a> {
         }
         self.current += 1;
         self.peek() == '\n' // callouts MUST be last chars in line
+    }
+
+    fn starts_text_symbol_replace_parens(&mut self) -> bool {
+        ["C)", "R)"].contains(&self.peeks_ahead(2)) || self.peeks_ahead(3) == "TM)"
+    }
+
+    fn starts_text_symbol_replace_emdash(&mut self) -> bool {
+        let after_char = self.peeks_ahead(2).chars().last().unwrap();
+        self.peek() == '-' && (after_char.is_alphanumeric() || [' ', '\0'].contains(&after_char))
     }
 
     fn is_at_end(&self) -> bool {
@@ -683,7 +738,12 @@ mod tests {
     // NOTE: ignoring the EOF here for simplicity's sake
     fn scan_and_assert_eq(markup: &str, expected_tokens: Vec<Token>) {
         let s = Scanner::new(markup);
-        let mut scanned_tokens = s.collect::<Vec<Token>>();
+        // let mut scanned_tokens = s.collect::<Vec<Result<Token, ScannerError>>>();
+        // let (mut scanned_tokens, errors): (Vec<_>, Vec<_>) = s.into_iter().partition(|r| r.is_ok());
+        let mut scanned_tokens: Vec<Token> = s
+            .into_iter()
+            .filter_map(|result| result.as_ref().ok().cloned())
+            .collect();
         let _ = scanned_tokens.pop();
         assert_eq!(scanned_tokens, expected_tokens);
     }
@@ -707,18 +767,18 @@ mod tests {
     }
 
     #[rstest]
-    #[case("++++\n".to_string(), TokenType::PassthroughBlock)]
-    #[case("****\n".to_string(), TokenType::SidebarBlock)]
-    #[case("----\n".to_string(), TokenType::SourceBlock)]
-    #[case("____\n".to_string(), TokenType::QuoteVerseBlock)]
-    #[case("____\n".to_string(), TokenType::QuoteVerseBlock)]
-    #[case("====\n".to_string(), TokenType::ExampleBlock)]
-    #[case("....\n".to_string(), TokenType::LiteralBlock)]
-    fn fenced_block_delimiter_start(#[case] markup: String, #[case] expected_token: TokenType) {
+    #[case("++++\n", TokenType::PassthroughBlock)]
+    #[case("****\n", TokenType::SidebarBlock)]
+    #[case("----\n", TokenType::SourceBlock)]
+    #[case("____\n", TokenType::QuoteVerseBlock)]
+    #[case("____\n", TokenType::QuoteVerseBlock)]
+    #[case("====\n", TokenType::ExampleBlock)]
+    #[case("....\n", TokenType::LiteralBlock)]
+    fn fenced_block_delimiter_start(#[case] markup: &str, #[case] expected_token: TokenType) {
         let expected_tokens = vec![
             Token::new_default(
                 expected_token,
-                markup.clone()[..4].to_string(),
+                markup.to_string()[..4].to_string(),
                 None,
                 1,
                 1,
@@ -726,24 +786,24 @@ mod tests {
             ),
             Token::new_default(TokenType::NewLineChar, "\n".to_string(), None, 1, 5, 5),
         ];
-        scan_and_assert_eq(&markup, expected_tokens);
+        scan_and_assert_eq(markup, expected_tokens);
     }
 
     #[rstest]
-    #[case("\n\n++++\n".to_string(), TokenType::PassthroughBlock)]
-    #[case("\n\n****\n".to_string(), TokenType::SidebarBlock)]
-    #[case("\n\n----\n".to_string(), TokenType::SourceBlock)]
-    #[case("\n\n____\n".to_string(), TokenType::QuoteVerseBlock)]
-    #[case("\n\n////\n".to_string(), TokenType::CommentBlock)]
-    #[case("\n\n====\n".to_string(), TokenType::ExampleBlock)]
-    #[case("\n\n....\n".to_string(), TokenType::LiteralBlock)]
-    fn fenced_block_delimiter_new_block(#[case] markup: String, #[case] expected_token: TokenType) {
+    #[case("\n\n++++\n", TokenType::PassthroughBlock)]
+    #[case("\n\n****\n", TokenType::SidebarBlock)]
+    #[case("\n\n----\n", TokenType::SourceBlock)]
+    #[case("\n\n____\n", TokenType::QuoteVerseBlock)]
+    #[case("\n\n////\n", TokenType::CommentBlock)]
+    #[case("\n\n====\n", TokenType::ExampleBlock)]
+    #[case("\n\n....\n", TokenType::LiteralBlock)]
+    fn fenced_block_delimiter_new_block(#[case] markup: &str, #[case] expected_token: TokenType) {
         let expected_tokens = vec![
             Token::new_default(TokenType::NewLineChar, "\n".to_string(), None, 1, 1, 1),
             Token::new_default(TokenType::NewLineChar, "\n".to_string(), None, 2, 1, 1),
             Token::new_default(
                 expected_token,
-                markup.clone()[2..6].to_string(),
+                markup.to_string()[2..6].to_string(),
                 None,
                 3,
                 1,
@@ -751,16 +811,16 @@ mod tests {
             ),
             Token::new_default(TokenType::NewLineChar, "\n".to_string(), None, 3, 5, 5),
         ];
-        scan_and_assert_eq(&markup, expected_tokens);
+        scan_and_assert_eq(markup, expected_tokens);
     }
 
     #[test]
     fn open_block_beginning() {
-        let markup = "--\n".to_string();
+        let markup = "--\n";
         let expected_tokens = vec![
             Token::new_default(
                 TokenType::OpenBlock,
-                markup.clone()[..2].to_string(),
+                markup.to_string()[..2].to_string(),
                 None,
                 1,
                 1,
@@ -768,19 +828,19 @@ mod tests {
             ),
             Token::new_default(TokenType::NewLineChar, "\n".to_string(), None, 1, 3, 3),
         ];
-        scan_and_assert_eq(&markup, expected_tokens);
+        scan_and_assert_eq(markup, expected_tokens);
     }
 
     #[test]
     fn open_block_new_block() {
-        let markup = "\n\n--\n".to_string();
+        let markup = "\n\n--\n";
         let expected_tokens = vec![
             Token::new_default(TokenType::NewLineChar, "\n".to_string(), None, 1, 1, 1),
             Token::new_default(TokenType::NewLineChar, "\n".to_string(), None, 2, 1, 1),
             Token::new_default(TokenType::OpenBlock, "--".to_string(), None, 3, 1, 2),
             Token::new_default(TokenType::NewLineChar, "\n".to_string(), None, 3, 3, 3),
         ];
-        scan_and_assert_eq(&markup, expected_tokens);
+        scan_and_assert_eq(markup, expected_tokens);
     }
 
     #[rstest]
@@ -847,14 +907,14 @@ mod tests {
     #[test]
     fn block_introduction() {
         // skip the "i"
-        let markup = ".Some ttle\n".to_string();
+        let markup = ".Some ttle\n";
         let title = "Some ttle".to_string();
         let expected_tokens = vec![
             Token::new_default(TokenType::BlockLabel, ".".to_string(), None, 1, 1, 1),
             Token::new_default(TokenType::Text, title.clone(), Some(title), 1, 2, 10),
             Token::new_default(TokenType::NewLineChar, "\n".to_string(), None, 1, 11, 11),
         ];
-        scan_and_assert_eq(&markup, expected_tokens);
+        scan_and_assert_eq(markup, expected_tokens);
     }
 
     #[rstest]
@@ -978,7 +1038,7 @@ mod tests {
                 markup.len(),
             ),
         ];
-        scan_and_assert_eq(&markup, expected_tokens);
+        scan_and_assert_eq(markup, expected_tokens);
     }
 
     #[test]
@@ -1253,7 +1313,7 @@ mod tests {
                 9,
             ),
         ];
-        scan_and_assert_eq(&markup, expected_tokens);
+        scan_and_assert_eq(markup, expected_tokens);
     }
 
     #[test]
@@ -1286,7 +1346,7 @@ mod tests {
                 9,
             ),
         ];
-        scan_and_assert_eq(&markup, expected_tokens);
+        scan_and_assert_eq(markup, expected_tokens);
     }
 
     #[test]
@@ -1319,7 +1379,7 @@ mod tests {
                 11,
             ),
         ];
-        scan_and_assert_eq(&markup, expected_tokens);
+        scan_and_assert_eq(markup, expected_tokens);
     }
 
     #[test]
@@ -1359,7 +1419,7 @@ mod tests {
                 28,
             ),
         ];
-        scan_and_assert_eq(&markup, expected_tokens);
+        scan_and_assert_eq(markup, expected_tokens);
     }
 
     #[test]
@@ -1391,7 +1451,7 @@ mod tests {
                 25,
             ),
         ];
-        scan_and_assert_eq(&markup, expected_tokens);
+        scan_and_assert_eq(markup, expected_tokens);
     }
 
     #[test]
@@ -1405,7 +1465,7 @@ mod tests {
             1,
             32,
         )];
-        scan_and_assert_eq(&markup, expected_tokens);
+        scan_and_assert_eq(markup, expected_tokens);
     }
 
     #[test]
@@ -1429,7 +1489,7 @@ mod tests {
                 28,
             ),
         ];
-        scan_and_assert_eq(&markup, expected_tokens);
+        scan_and_assert_eq(markup, expected_tokens);
     }
 
     #[test]
@@ -1493,7 +1553,7 @@ mod tests {
                 21,
             ),
         ];
-        scan_and_assert_eq(&markup, expected_tokens);
+        scan_and_assert_eq(markup, expected_tokens);
     }
 
     #[test]
@@ -1527,7 +1587,7 @@ mod tests {
             ),
             Token::new_default(TokenType::Mark, "#".to_string(), None, 1, 19, 19),
         ];
-        scan_and_assert_eq(&markup, expected_tokens);
+        scan_and_assert_eq(markup, expected_tokens);
     }
 
     #[test]
@@ -1554,7 +1614,7 @@ mod tests {
             ),
             Token::new_default(TokenType::Mark, "#".to_string(), None, 2, 14, 14),
         ];
-        scan_and_assert_eq(&markup, expected_tokens);
+        scan_and_assert_eq(markup, expected_tokens);
     }
     #[test]
     fn inline_style_new_block() {
@@ -1581,7 +1641,7 @@ mod tests {
             ),
             Token::new_default(TokenType::Mark, "#".to_string(), None, 3, 14, 14),
         ];
-        scan_and_assert_eq(&markup, expected_tokens);
+        scan_and_assert_eq(markup, expected_tokens);
     }
 
     #[test]
@@ -1613,7 +1673,39 @@ mod tests {
                 13,
             ),
         ];
-        scan_and_assert_eq(&markup, expected_tokens);
+        scan_and_assert_eq(markup, expected_tokens);
+    }
+
+    #[test]
+    fn inline_charref_spaces() {
+        let markup = "bar &mdash; bar";
+        let expected_tokens = vec![
+            Token::new_default(
+                TokenType::Text,
+                "bar ".to_string(),
+                Some("bar ".to_string()),
+                1,
+                1,
+                4,
+            ),
+            Token::new_default(
+                TokenType::CharRef,
+                "&mdash;".to_string(),
+                Some("&mdash;".to_string()),
+                1,
+                5,
+                11,
+            ),
+            Token::new_default(
+                TokenType::Text,
+                " bar".to_string(),
+                Some(" bar".to_string()),
+                1,
+                12,
+                15,
+            ),
+        ];
+        scan_and_assert_eq(markup, expected_tokens);
     }
 
     #[test]
@@ -1630,7 +1722,7 @@ mod tests {
             ),
             Token::new_default(TokenType::NewLineChar, "\n".to_string(), None, 1, 10, 10),
         ];
-        scan_and_assert_eq(&markup, expected_tokens);
+        scan_and_assert_eq(markup, expected_tokens);
     }
 
     #[test]
@@ -1662,7 +1754,7 @@ mod tests {
                 11,
             ),
         ];
-        scan_and_assert_eq(&markup, expected_tokens);
+        scan_and_assert_eq(markup, expected_tokens);
     }
 
     #[test]
@@ -1676,7 +1768,7 @@ mod tests {
             1,
             11,
         )];
-        scan_and_assert_eq(&markup, expected_tokens);
+        scan_and_assert_eq(markup, expected_tokens);
     }
 
     #[test]
@@ -1690,7 +1782,7 @@ mod tests {
             1,
             23,
         )];
-        scan_and_assert_eq(&markup, expected_tokens);
+        scan_and_assert_eq(markup, expected_tokens);
     }
 
     #[rstest]
@@ -1767,7 +1859,7 @@ mod tests {
             newline_token_at(4, 10),
             Token::new_default(TokenType::Table, "|===".to_string(), None, 5, 1, 4),
         ];
-        scan_and_assert_eq(&markup, expected_tokens);
+        scan_and_assert_eq(markup, expected_tokens);
     }
 
     #[test]
@@ -1804,7 +1896,7 @@ mod tests {
             newline_token_at(3, 20),
             Token::new_default(TokenType::Table, "|===".to_string(), None, 4, 1, 4),
         ];
-        scan_and_assert_eq(&markup, expected_tokens);
+        scan_and_assert_eq(markup, expected_tokens);
     }
 
     // this previously panicked at byte index 13 because it is not a char boundary; should now pass
@@ -1849,7 +1941,7 @@ mod tests {
                 file_stack: vec![],
             },
         ];
-        scan_and_assert_eq(&markup, expected_tokens);
+        scan_and_assert_eq(markup, expected_tokens);
     }
 
     #[test]
@@ -1874,8 +1966,9 @@ mod tests {
             ),
             Token::new_default(TokenType::NewLineChar, "\n".to_string(), None, 1, 11, 11),
         ];
-        scan_and_assert_eq(&markup, expected_tokens);
+        scan_and_assert_eq(markup, expected_tokens);
     }
+
     #[test]
     fn code_callout_list() {
         let markup = "<1> Bar";
@@ -1897,7 +1990,104 @@ mod tests {
                 7,
             ),
         ];
-        scan_and_assert_eq(&markup, expected_tokens);
+        scan_and_assert_eq(markup, expected_tokens);
+    }
+
+    #[test]
+    fn typographers_apostrophe() {
+        let markup = "Joe's ";
+        let expected_tokens = vec![
+            Token::new_default(
+                TokenType::Text,
+                "Joe".to_string(),
+                Some("Joe".to_string()),
+                1,
+                1,
+                3,
+            ),
+            Token::new_default(
+                TokenType::CharRef,
+                "'".to_string(),
+                Some("&#8217;".to_string()),
+                1,
+                4,
+                4,
+            ),
+            Token::new_default(
+                TokenType::Text,
+                "s ".to_string(),
+                Some("s ".to_string()),
+                1,
+                5,
+                6,
+            ),
+        ];
+        scan_and_assert_eq(markup, expected_tokens);
+    }
+
+    #[test]
+    fn typographers_apostrophe_newline() {
+        let markup = "Joe's\n";
+        let expected_tokens = vec![
+            Token::new_default(
+                TokenType::Text,
+                "Joe".to_string(),
+                Some("Joe".to_string()),
+                1,
+                1,
+                3,
+            ),
+            Token::new_default(
+                TokenType::CharRef,
+                "'".to_string(),
+                Some("&#8217;".to_string()),
+                1,
+                4,
+                4,
+            ),
+            Token::new_default(
+                TokenType::Text,
+                "s".to_string(),
+                Some("s".to_string()),
+                1,
+                5,
+                5,
+            ),
+            Token::new_default(TokenType::NewLineChar, "\n".to_string(), None, 1, 6, 6),
+        ];
+        scan_and_assert_eq(markup, expected_tokens);
+    }
+
+    #[test]
+    fn typographers_apostrophe_eof() {
+        let markup = "Joe's";
+        let expected_tokens = vec![
+            Token::new_default(
+                TokenType::Text,
+                "Joe".to_string(),
+                Some("Joe".to_string()),
+                1,
+                1,
+                3,
+            ),
+            Token::new_default(
+                TokenType::CharRef,
+                "'".to_string(),
+                Some("&#8217;".to_string()),
+                1,
+                4,
+                4,
+            ),
+            Token::new_default(
+                TokenType::Text,
+                "s".to_string(),
+                Some("s".to_string()),
+                1,
+                5,
+                5,
+            ),
+        ];
+        scan_and_assert_eq(markup, expected_tokens);
     }
 
     #[rstest]
@@ -1937,5 +2127,107 @@ mod tests {
             ),
         ];
         scan_and_assert_eq(&markup, expected_tokens);
+    }
+
+    #[rstest]
+    #[case("(C)", "&#169;")]
+    #[case("(R)", "&#174;")]
+    #[case("(TM)", "&#8482;")]
+    #[case("...", "&#8230;")]
+    #[case("->", "&#8594;")]
+    #[case("=>", "&#8658;")]
+    #[case("<-", "&#8592;")]
+    #[case("<=", "&#8656;")]
+    // note that ^ and ~ transformations are handled better by the parser
+    fn character_replacements_minus_emdash(#[case] markup: &str, #[case] replacement: &str) {
+        let expected_tokens = vec![Token::new_default(
+            TokenType::CharRef,
+            markup.to_string(),
+            Some(replacement.to_string()),
+            1,
+            1,
+            markup.len(),
+        )];
+        scan_and_assert_eq(markup, expected_tokens);
+    }
+    #[test]
+    // note that ^ and ~ transformations are handled better by the parser
+    fn character_replacements_emdash_alone() {
+        let markup = "--".to_string();
+        let expected_tokens = vec![Token::new_default(
+            TokenType::CharRef,
+            "--".to_string(),
+            Some("&#8212;".to_string()),
+            1,
+            1,
+            markup.len(),
+        )];
+        scan_and_assert_eq(&markup, expected_tokens);
+    }
+    #[test]
+    fn character_replacements_emdash_space() {
+        let markup = "-- ".to_string();
+        let expected_tokens = vec![
+            Token::new_default(
+                TokenType::CharRef,
+                "--".to_string(),
+                Some("&#8212;".to_string()),
+                1,
+                1,
+                2,
+            ),
+            Token::new_default(
+                TokenType::Text,
+                " ".to_string(),
+                Some(" ".to_string()),
+                1,
+                3,
+                3,
+            ),
+        ];
+        scan_and_assert_eq(&markup, expected_tokens);
+    }
+
+    #[rstest]
+    #[case("1", true)]
+    #[case("a", true)]
+    #[case("(", false)]
+    fn character_replacements_emdash_alpha_numeric(#[case] next_char: &str, #[case] pass: bool) {
+        let markup = format!("--{}", next_char);
+        let expected = Token::new_default(
+            TokenType::CharRef,
+            "--".to_string(),
+            Some("&#8212;".to_string()),
+            1,
+            1,
+            2,
+        );
+
+        let scanned: Vec<Token> = Scanner::new(&markup)
+            .filter_map(|result| result.as_ref().ok().cloned())
+            .collect();
+        if pass {
+            assert_eq!(scanned.first().unwrap(), &expected)
+        } else {
+            assert_ne!(scanned.first().unwrap(), &expected)
+        }
+    }
+
+    #[test]
+    fn character_replacements_emdash_inline() {
+        let markup = "This --".to_string();
+        let expected = Token::new_default(
+            TokenType::CharRef,
+            "--".to_string(),
+            Some("&#8212;".to_string()),
+            1,
+            6,
+            7,
+        );
+        let mut scanned: Vec<Token> = Scanner::new(&markup)
+            .filter_map(|result| result.as_ref().ok().cloned())
+            .collect();
+        scanned.pop(); // get rid of EOF token
+        assert_eq!(scanned.last().unwrap(), &expected)
     }
 }
