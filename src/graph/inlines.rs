@@ -556,24 +556,22 @@ impl InlineRef {
     }
 
     pub fn add_text_from_token(&mut self, token: Token) {
-        let inline_literal = Inline::InlineLiteral(InlineLiteral::new_text_from_token(&token));
-        if let Some(last_inline) = self.inlines.last_mut() {
-            match last_inline {
-                Inline::InlineSpan(span) => span.add_inline(inline_literal),
-                Inline::InlineLiteral(prior_literal) => prior_literal.add_text_from_token(&token),
-                _ => panic!("Can't add text to last token in this context"),
-            }
-        } else {
-            self.inlines.push(inline_literal)
-        }
+        self.text_from_token(token, false);
     }
 
     pub fn pass_text_from_token(&mut self, token: Token) {
+        self.text_from_token(token, true);
+    }
+
+    fn text_from_token(&mut self, token: Token, pass: bool) {
         let inline_literal = Inline::InlineLiteral(InlineLiteral::new_text_from_token_pass(&token));
         if let Some(last_inline) = self.inlines.last_mut() {
             match last_inline {
                 Inline::InlineSpan(span) => span.add_inline(inline_literal),
-                Inline::InlineLiteral(prior_literal) => prior_literal.pass_text_from_token(&token),
+                Inline::InlineLiteral(prior_literal) => match pass {
+                    true => prior_literal.pass_text_from_token(&token),
+                    false => prior_literal.add_text_from_token(&token),
+                },
                 _ => panic!("Can't add text to last token in this context"),
             }
         } else {
@@ -628,13 +626,20 @@ impl InlineLiteral {
 
     /// Add text and reconcile location information from a given (text) token
     pub fn add_text_from_token(&mut self, token: &Token) {
-        self.value.push_str(&token.text());
-        self.location = Location::reconcile(self.location.clone(), token.locations());
+        self.text_from_token(token, false);
     }
 
     /// Add text and reconcile location information from a given (text) token
     pub fn pass_text_from_token(&mut self, token: &Token) {
-        self.value.push_str(&token.lexeme.clone());
+        self.text_from_token(token, true);
+    }
+
+    /// Lazy DRY function for the above
+    fn text_from_token(&mut self, token: &Token, pass_through: bool) {
+        match pass_through {
+            true => self.value.push_str(&token.lexeme.clone()),
+            false => self.value.push_str(&token.text()),
+        }
         self.location = Location::reconcile(self.location.clone(), token.locations());
     }
 
