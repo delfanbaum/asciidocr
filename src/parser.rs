@@ -837,9 +837,7 @@ impl Parser {
 
     fn parse_block_image(&mut self, token: Token, asg: &mut Asg) -> Result<(), ParserError> {
         let (target, metadata) = target_and_attrs_from_token(&token);
-        if self.resolve_targets {
-            let _ = self.resolve_target(token.line, &target)?;
-        }
+        let _ = self.check_target(token.line, &target)?;
         let mut image_block = BlockMacro::new_image_block(target, metadata, token.locations());
         if let Some(metadata) = &self.metadata {
             // TODO see if there is a cleaner way to manage the borrowing here.
@@ -854,9 +852,13 @@ impl Parser {
     }
 
     fn parse_inline_image_macro(&mut self, token: Token) -> Result<(), ParserError> {
+        let (target, metadata) = target_and_attrs_from_token(&token);
+        let _ = self.check_target(token.line, &target);
         self.inline_stack
-            .push_back(Inline::InlineRef(InlineRef::new_inline_image_from_token(
-                token,
+            .push_back(Inline::InlineRef(InlineRef::new_inline_image(
+                target,
+                metadata,
+                token.locations(),
             )));
         self.close_parent_after_push = true;
         Ok(())
@@ -1431,6 +1433,17 @@ impl Parser {
             }
         }
         Ok(())
+    }
+
+    fn check_target(&self, token_line: usize, target: &str) -> Result<(), ParserError> {
+        if self.resolve_targets {
+            match self.resolve_target(token_line, target) {
+                Ok(_) => Ok(()),
+                Err(e) => Err(e),
+            }
+        } else {
+            Ok(())
+        }
     }
 
     fn resolve_target(&self, token_line: usize, target: &str) -> Result<PathBuf, ParserError> {

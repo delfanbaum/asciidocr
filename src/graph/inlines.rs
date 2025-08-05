@@ -8,7 +8,6 @@ use log::warn;
 use serde::Serialize;
 
 use super::{
-    macros::target_and_attrs_from_token,
     metadata::ElementMetadata,
     nodes::{Location, NodeTypes},
     substitutions::CHARREF_MAP,
@@ -534,8 +533,11 @@ impl InlineRef {
         InlineRef::new(InlineRefVariant::Link, target, token.locations())
     }
 
-    pub fn new_inline_image_from_token(token: Token) -> Self {
-        let (target, metadata) = target_and_attrs_from_token(&token);
+    pub fn new_inline_image(
+        target: String,
+        metadata: Option<ElementMetadata>,
+        location: Vec<Location>,
+    ) -> Self {
         if metadata.is_some() {
             InlineRef {
                 name: "ref".to_string(),
@@ -544,10 +546,10 @@ impl InlineRef {
                 target,
                 inlines: vec![],
                 metadata,
-                location: token.locations(),
+                location,
             }
         } else {
-            InlineRef::new(InlineRefVariant::Image, target, token.locations())
+            InlineRef::new(InlineRefVariant::Image, target, location)
         }
     }
 
@@ -712,6 +714,7 @@ impl LineBreak {
 #[cfg(test)]
 mod tests {
 
+    use crate::graph::macros::target_and_attrs_from_token;
     use crate::scanner::tokens::{Token, TokenType};
 
     use super::*;
@@ -744,7 +747,8 @@ mod tests {
             1,
             23,
         );
-        let img_ref = InlineRef::new_inline_image_from_token(token);
+        let (target, metadata) = target_and_attrs_from_token(&token);
+        let img_ref = InlineRef::new_inline_image(target, metadata, token.locations());
         assert_eq!(img_ref.target, "path/to/img.png".to_string())
     }
 
@@ -758,7 +762,8 @@ mod tests {
             1,
             23,
         );
-        let img_ref = InlineRef::new_inline_image_from_token(token);
+        let (target, metadata) = target_and_attrs_from_token(&token);
+        let img_ref = InlineRef::new_inline_image(target, metadata, token.locations());
         assert_eq!(img_ref.target, "path/to/img.png".to_string());
         assert!(img_ref.metadata.is_some());
         if let Some(metadata) = img_ref.metadata {
