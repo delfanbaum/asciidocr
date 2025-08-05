@@ -12,7 +12,7 @@ use crate::graph::{
 };
 use crate::scanner::tokens::{Token, TokenType};
 
-#[derive(thiserror::Error, Debug)]
+#[derive(thiserror::Error, PartialEq, Debug)]
 pub enum BlockError {
     #[error("Attempted to push dangling ListItem to parent block")]
     DanglingList,

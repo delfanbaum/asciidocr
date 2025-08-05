@@ -1,0 +1,186 @@
+{
+  "name": "document",
+  "type": "block",
+  "blocks": [
+    {
+      "name": "section",
+      "type": "block",
+      "title": [
+        {
+          "name": "text",
+          "type": "string",
+          "value": "Starts as one, should be two",
+          "location": [
+            {
+              "line": 1,
+              "col": 4,
+              "file": [
+                "headings-to-offset.adoc"
+              ]
+            },
+            {
+              "line": 1,
+              "col": 31,
+              "file": [
+                "headings-to-offset.adoc"
+              ]
+            }
+          ]
+        }
+      ],
+      "level": 2,
+      "blocks": [
+        {
+          "name": "section",
+          "type": "block",
+          "title": [
+            {
+              "name": "text",
+              "type": "string",
+              "value": "Starts as two, should be three",
+              "location": [
+                {
+                  "line": 3,
+                  "col": 5,
+                  "file": [
+                    "headings-to-offset.adoc"
+                  ]
+                },
+                {
+                  "line": 3,
+                  "col": 34,
+                  "file": [
+                    "headings-to-offset.adoc"
+                  ]
+                }
+              ]
+            }
+          ],
+          "level": 3,
+          "blocks": [
+            {
+              "name": "section",
+              "type": "block",
+              "title": [
+                {
+                  "name": "text",
+                  "type": "string",
+                  "value": "And so on",
+                  "location": [
+                    {
+                      "line": 5,
+                      "col": 6,
+                      "file": [
+                        "headings-to-offset.adoc"
+                      ]
+                    },
+                    {
+                      "line": 5,
+                      "col": 14,
+                      "file": [
+                        "headings-to-offset.adoc"
+                      ]
+                    }
+                  ]
+                }
+              ],
+              "level": 4,
+              "blocks": [],
+              "location": [
+                {
+                  "line": 5,
+                  "col": 1,
+                  "file": [
+                    "headings-to-offset.adoc"
+                  ]
+                },
+                {
+                  "line": 5,
+                  "col": 14,
+                  "file": [
+                    "headings-to-offset.adoc"
+                  ]
+                }
+              ]
+            }
+          ],
+          "location": [
+            {
+              "line": 3,
+              "col": 1,
+              "file": [
+                "headings-to-offset.adoc"
+              ]
+            },
+            {
+              "line": 5,
+              "col": 14,
+              "file": [
+                "headings-to-offset.adoc"
+              ]
+            }
+          ]
+        }
+      ],
+      "location": [
+        {
+          "line": 1,
+          "col": 1,
+          "file": [
+            "headings-to-offset.adoc"
+          ]
+        },
+        {
+          "line": 5,
+          "col": 14,
+          "file": [
+            "headings-to-offset.adoc"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "section",
+      "type": "block",
+      "title": [
+        {
+          "name": "text",
+          "type": "string",
+          "value": "This should be a level-one heading, outside the offset",
+          "location": [
+            {
+              "line": 7,
+              "col": 4
+            },
+            {
+              "line": 7,
+              "col": 57
+            }
+          ]
+        }
+      ],
+      "level": 1,
+      "blocks": [],
+      "location": [
+        {
+          "line": 7,
+          "col": 1
+        },
+        {
+          "line": 7,
+          "col": 57
+        }
+      ]
+    }
+  ],
+  "location": [
+    {
+      "line": 1,
+      "col": 1
+    },
+    {
+      "line": 7,
+      "col": 57
+    }
+  ]
+}

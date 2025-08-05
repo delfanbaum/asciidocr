@@ -85,11 +85,11 @@ more. It should, however, be good to go for your next great short story.
 features. Some things it does _not_ do (yet):
 
 * Checklists
-* Offsets
 * Tagged regions/tagged includes
 * Conditionals
 * Complex table markup
 * Complex nested lists
+* The "subs" attribute in blocks
 
 For a more complete list of the current limitations and caveats, see
 `LIMITATIONS.adoc`.
@@ -101,7 +101,7 @@ A non-exhaustive list:
 * Coverage of the majority, if not all, asciidoc language features
 * Passes the [language compatibility toolkit](https://gitlab.eclipse.org/eclipse/asciidoc-lang/asciidoc-tck) tests
 * Clean, simple HTML output as a default
-* Native "document" (`docx` or `odt`, probably `docx`) output in a "manuscript"
+* Native "document" (`docx`) output in a "manuscript"
   template, like what you might send to a publisher or literary journal
 * PyO3 hooks/project for use inside Python contexts (will be behind a feature
   flag)

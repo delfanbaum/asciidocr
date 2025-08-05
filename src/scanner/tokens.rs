@@ -1,6 +1,6 @@
 use crate::graph::nodes::Location;
 
-#[derive(thiserror::Error, Debug)]
+#[derive(thiserror::Error, PartialEq, Debug)]
 pub enum TokenError {
     #[error("Invalid character match to produce block TokenType")]
     CharacterMatch,
