@@ -15,6 +15,7 @@ pub enum DocumentStyles {
     Quote,
     Verse,
     ListParagraph,
+    ListParagraphContinue,
     OrderedListParagraph(usize),
     DefinitionTerm,
     Definition,
@@ -35,6 +36,7 @@ impl DocumentStyles {
             DocumentStyles::Quote => "Quote".into(),
             DocumentStyles::Verse => "Verse".into(),
             DocumentStyles::ListParagraph => "ListParagraph".into(),
+            DocumentStyles::ListParagraphContinue => "ListParagraphContinue".into(),
             DocumentStyles::OrderedListParagraph(id) => format!("NumberedListParagraph_{}", id),
             DocumentStyles::DefinitionTerm => "Definition Term".into(),
             DocumentStyles::Definition => "Definition".into(),
@@ -158,6 +160,12 @@ impl DocumentStyles {
                 .name("ListParagraph")
                 .based_on("No Spacing")
                 .indent(None, Some(SpecialIndentType::FirstLine(0)), None, None),
+            DocumentStyles::ListParagraphContinue => {
+                Style::new("ListParagraphContinue", StyleType::Paragraph)
+                    .name("ListParagraphContinue")
+                    .based_on("No Spacing")
+                    .indent(Some(720), Some(SpecialIndentType::FirstLine(0)), None, None)
+            }
             DocumentStyles::OrderedListParagraph(id) => {
                 let id = format!("NumberedListParagraph_{}", id);
                 Style::new(&id, StyleType::Paragraph)
