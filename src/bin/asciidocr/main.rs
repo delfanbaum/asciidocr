@@ -32,8 +32,13 @@ fn main() {
 }
 
 fn run(args: Cli) -> Result<()> {
-    let graph =
-        AdocParser::new(PathBuf::from(&args.file)).parse(Scanner::new(&read_input(&args)))?;
+    let graph = match args.do_not_resolve_targets {
+        true => AdocParser::new_no_target_resolution(PathBuf::from(&args.file))
+            .parse(Scanner::new(&read_input(&args)))?,
+        false => {
+            AdocParser::new(PathBuf::from(&args.file)).parse(Scanner::new(&read_input(&args)))?
+        }
+    };
     if args.count {
         println!("{} words in {}", graph.word_count(), args.file)
     }
@@ -50,6 +55,11 @@ fn run(args: Cli) -> Result<()> {
 
         #[cfg(feature = "docx")]
         Backends::Docx => {
+            if args.do_not_resolve_targets {
+                eprintln!("Error: the docx backend does not support parsing without target resolution.");
+                std::process::exit(1)
+            }
+
             if let Some(output_path) = read_output(args) {
                 render_docx(&graph, &output_path).expect("Error rendering docx");
                 Ok(())
