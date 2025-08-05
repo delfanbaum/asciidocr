@@ -6,7 +6,6 @@ use serde::Serialize;
 use crate::graph::{
     inlines::Inline,
     lists::{DList, DListItem, List, ListItem, ListVariant},
-    macros::target_and_attrs_from_token,
     metadata::ElementMetadata,
     nodes::{Location, NodeTypes},
 };
@@ -950,9 +949,12 @@ impl BlockMacro {
         }
     }
 
-    pub fn new_image_from_token(token: Token) -> Self {
-        let (target, metadata) = target_and_attrs_from_token(&token);
-        BlockMacro::new(BlockMacroName::Image, target, metadata, token.locations())
+    pub fn new_image_block(
+        target: String,
+        metadata: Option<ElementMetadata>,
+        locations: Vec<Location>,
+    ) -> Self {
+        BlockMacro::new(BlockMacroName::Image, target, metadata, locations)
     }
 
     pub fn add_metadata(mut self, incoming_metadata: &ElementMetadata) -> Self {

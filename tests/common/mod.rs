@@ -1,3 +1,4 @@
+use std::env;
 use std::{fs, path::PathBuf};
 
 use asciidocr::{backends::htmls::render_htmlbook, parser::Parser, scanner::Scanner};
@@ -10,7 +11,7 @@ use tempfile::NamedTempFile;
 /// the expected abstract syntax graph found in filename.json
 pub fn assert_parsed_doc_matches_expected_asg(adoc_fn: &str, asg_json_fn: &str) {
     let test_dir = PathBuf::from("tests/data/");
-    let parsed_asg = Parser::new(test_dir.join(adoc_fn))
+    let parsed_asg = Parser::new_no_target_resolution(test_dir.join(adoc_fn))
         .parse(Scanner::new(
             &fs::read_to_string(test_dir.join(adoc_fn)).expect("Unable to find adoc"),
         ))
@@ -27,8 +28,9 @@ pub fn assert_parsed_doc_matches_expected_asg(adoc_fn: &str, asg_json_fn: &str) 
 /// Given an asciidoc string and an expected abstract syntax graph json string, assert that the
 /// parser produces the correct json from the asciidoc
 pub fn assert_parsed_doc_matches_expected_asg_from_str(adoc_str: &str, asg_json_str: &str) {
+    let origin = env::current_dir().unwrap();
     let parsed_asg = json!(
-        Parser::default()
+        Parser::new_no_target_resolution(origin)
             .parse(Scanner::new(adoc_str))
             .expect("Unable to parse input file")
     );
@@ -41,7 +43,7 @@ pub fn assert_parsed_doc_matches_expected_asg_from_str(adoc_str: &str, asg_json_
 pub fn assert_rendered_htmlbook_matches_expected(adoc_fn: &str, html_fn: &str) {
     let test_dir = PathBuf::from("tests/data/");
     let mut rendered_html = render_htmlbook(
-        &Parser::new(test_dir.join(adoc_fn))
+        &Parser::new_no_target_resolution(test_dir.join(adoc_fn))
             .parse(Scanner::new(
                 &fs::read_to_string(test_dir.join(adoc_fn)).expect("Unable to find adoc"),
             ))
