@@ -28,7 +28,7 @@ use crate::{
     scanner::ScannerError,
 };
 
-#[derive(thiserror::Error, Debug)]
+#[derive(thiserror::Error, PartialEq, Debug)]
 pub enum ParserError {
     #[error(transparent)]
     Scanner(#[from] ScannerError),
@@ -40,16 +40,22 @@ pub enum ParserError {
     TopLevelHeading(usize),
     #[error("Parse error line {0}: Invalid open_parse_after_as_text_type occurance")]
     OpenParse(usize),
-    #[error("Parse error line: Attempted to close a non-existent delimited block")]
+    #[error("Parse error: Attempted to close a non-existent delimited block")]
     DelimitedBlock,
     #[error("Parse error line {0}: Unexpected block in Block::ParentBlock")]
     ParentBlock(usize),
-    #[error("Parse error line {0}: Unable to Uanble to canonicalize include path: {1:?}")]
-    IncludeError(usize, String),
+    #[error(
+        "Parse error line {0}: Invalid heading level; parser level offest at the time of error was: {1}"
+    )]
+    HeadingOffsetError(usize, i8),
+    #[error("Parse error line {0}: Unable to to canonicalize include path: {1:?}")]
+    IncludeErrorPath(usize, String),
     #[error("Parser error: Tried to add last block when block stack was empty.")]
     BlockStack,
     #[error("Parse error: invalid block continuation; no previous block")]
     BlockContinuation,
+    #[error("Parse error: {0}")]
+    InternalError(String),
 }
 
 /// Parses a stream of tokens into an [`Asg`] (Abstract Syntax Graph), returning the graph once all
@@ -81,6 +87,8 @@ pub struct Parser {
     /// appends text to block or inline regardless of markup, token, etc. (will need to change
     /// if/when we handle code callouts)
     open_parse_after_as_text_type: Option<TokenType>,
+    /// tracks the document heading level offset
+    level_offset: i8,
     /// designates whether we're to be adding inlines to the previous block until a newline
     in_block_line: bool,
     /// designates whether new literal text should be added to the last span
@@ -134,6 +142,7 @@ impl Parser {
             block_title: None,
             metadata: None,
             open_delimited_block_lines: vec![],
+            level_offset: 0,
             in_block_line: false,
             in_inline_span: false,
             in_block_continuation: false,
@@ -223,10 +232,10 @@ impl Parser {
         match token.token_type() {
             // document header, headings and section parsing
             TokenType::Heading1 => self.parse_title(token, asg),
-            TokenType::Heading2 => self.parse_section_headings(token, 1, asg),
-            TokenType::Heading3 => self.parse_section_headings(token, 2, asg),
-            TokenType::Heading4 => self.parse_section_headings(token, 3, asg),
-            TokenType::Heading5 => self.parse_section_headings(token, 4, asg),
+            TokenType::Heading2 => self.parse_section_headings(token, asg),
+            TokenType::Heading3 => self.parse_section_headings(token, asg),
+            TokenType::Heading4 => self.parse_section_headings(token, asg),
+            TokenType::Heading5 => self.parse_section_headings(token, asg),
 
             // document attributes
             TokenType::Attribute => self.parse_attribute(token),
@@ -377,14 +386,39 @@ impl Parser {
             warn!("Empty attributes list at line: {}", token.line);
             return Ok(());
         }
-        let key = attr_components.first().unwrap().to_string();
+        let key = attr_components.first().unwrap();
         // values should be trimmed
-        let mut value = attr_components.last().unwrap().trim().to_string();
-        if key == value {
-            value = String::from("")
+        let mut value = attr_components.last().unwrap().trim();
+        if key == &value {
+            value = ""
         }
-        self.document_attributes.insert(key, value);
-        Ok(())
+        match *key {
+            "leveloffset" => self.parse_level_offset(value),
+            _ => {
+                self.document_attributes
+                    .insert(key.to_string(), value.to_string());
+                Ok(())
+            }
+        }
+    }
+
+    fn parse_level_offset(&mut self, value: &str) -> Result<(), ParserError> {
+        if let Ok(value) = value.parse::<usize>() {
+            self.level_offset = value as i8;
+            Ok(())
+        } else {
+            match value.parse::<i8>() {
+                // absolute value
+                Ok(value) => {
+                    self.level_offset += value;
+                    Ok(())
+                }
+                // relative value, or error
+                Err(_) => Err(ParserError::InternalError(
+                    "Error parsing level offset".to_string(),
+                )),
+            }
+        }
     }
 
     fn parse_block_anchor_attributes(&mut self, token: Token) -> Result<(), ParserError> {
@@ -500,10 +534,19 @@ impl Parser {
 
     fn parse_include(&mut self, token: Token, asg: &mut Asg) -> Result<(), ParserError> {
         // ignore any attributes for the time being
-        let (target, _) = target_and_attrs_from_token(&token);
+        let (target, meta) = target_and_attrs_from_token(&token);
+        // check for level offsets in the include
+        if let Some(metadata) = meta {
+            if let Some(value) = metadata.attributes.get("leveloffset") {
+                match self.parse_level_offset(value) {
+                    Ok(_) => {}
+                    Err(e) => return Err(e),
+                }
+            }
+        }
+
         // calculate target, given that it's relative; if there is something on the stack, use
         // that, else use self.origin
-
         let mut resolved_target: PathBuf;
 
         if !self.file_stack.is_empty() {
@@ -516,12 +559,12 @@ impl Parser {
             }
             resolved_target = match resolved_target.join(target.clone()).canonicalize() {
                 Ok(p) => p,
-                Err(_) => return Err(ParserError::IncludeError(token.line, target)),
+                Err(_) => return Err(ParserError::IncludeErrorPath(token.line, target)),
             }
         } else {
             resolved_target = match self.origin_directory.join(target.clone()).canonicalize() {
                 Ok(p) => p,
-                Err(_) => return Err(ParserError::IncludeError(token.line, target)),
+                Err(_) => return Err(ParserError::IncludeErrorPath(token.line, target)),
             }
         }
         self.file_stack.push(target.clone());
@@ -672,7 +715,12 @@ impl Parser {
 
     //fn parse_block_label(&mut self, token: Token, asg: &mut Asg) {}
 
-    fn parse_title(&mut self, token: Token, _asg: &mut Asg) -> Result<(), ParserError> {
+    fn parse_title(&mut self, token: Token, asg: &mut Asg) -> Result<(), ParserError> {
+        // Check offsets
+        if self.level_offset != 0 {
+            return self.parse_section_headings(token, asg);
+        }
+
         if token.first_location() == Location::default() {
             self.in_block_line = true;
             let mut header = Header::new();
@@ -685,12 +733,9 @@ impl Parser {
         }
     }
 
-    fn parse_section_headings(
-        &mut self,
-        token: Token,
-        level: usize,
-        asg: &mut Asg,
-    ) -> Result<(), ParserError> {
+    fn parse_section_headings(&mut self, token: Token, asg: &mut Asg) -> Result<(), ParserError> {
+        let level = self.get_heading_level(&token)?;
+
         // if the last section is at the same level, we need to push that up, otherwise the
         // accordion effect gets screwy with section levels
         if let Some(Block::Section(_)) = self.block_stack.last() {
@@ -714,6 +759,39 @@ impl Parser {
         // let us know that we want to add to the section title for a little bit
         self.force_new_block = false;
         Ok(())
+    }
+
+    /// Returns a valid heading level for a given token
+    fn get_heading_level(&self, token: &Token) -> Result<usize, ParserError> {
+        let level: i8 = match token.token_type() {
+            TokenType::Heading1 => self.level_offset,
+            TokenType::Heading2 => 1 + self.level_offset,
+            TokenType::Heading3 => 2 + self.level_offset,
+            TokenType::Heading4 => 3 + self.level_offset,
+            TokenType::Heading5 => 4 + self.level_offset,
+            _ => {
+                return Err(ParserError::InternalError(
+                    "Inavlid token given to parse_section_headings".to_string(),
+                ));
+            }
+        };
+
+        match level.try_into() {
+            Ok(value) => {
+                if !(1..=4).contains(&value) {
+                    Err(ParserError::HeadingOffsetError(
+                        token.line,
+                        self.level_offset,
+                    ))
+                } else {
+                    Ok(value)
+                }
+            }
+            Err(_) => Err(ParserError::HeadingOffsetError(
+                token.line,
+                self.level_offset,
+            )),
+        }
     }
 
     fn parse_admonition_para_syntax(&mut self, token: Token) -> Result<(), ParserError> {

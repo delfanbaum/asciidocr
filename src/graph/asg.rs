@@ -6,7 +6,7 @@ use super::blocks::{Block, BlockError, ParentBlock};
 use super::inlines::Inline;
 use super::nodes::{Header, Location, NodeTypes};
 
-#[derive(thiserror::Error, Debug)]
+#[derive(thiserror::Error, PartialEq, Debug)]
 pub enum AsgError {
     #[error(transparent)]
     Block(#[from] BlockError),

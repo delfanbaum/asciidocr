@@ -7,7 +7,7 @@ use tokens::{Token, TokenType};
 
 use self::tokens::TokenError;
 
-#[derive(thiserror::Error, Debug)]
+#[derive(thiserror::Error, PartialEq, Debug)]
 pub enum ScannerError {
     #[error(transparent)]
     Token(#[from] TokenError),
