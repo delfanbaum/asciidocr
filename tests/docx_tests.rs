@@ -40,8 +40,6 @@ mod docx_tests {
             "example_image.png",
             &temp_image.path().display().to_string(),
         );
-        // note that list continuations don't work yet!
-        adoc_str = adoc_str.replace("+\n--\nSuch as this.\n--\n", "");
 
         let parsed_asg = Parser::new(test_dir.join(adoc_fn))
             .parse(Scanner::new(&adoc_str))

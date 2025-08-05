@@ -19,9 +19,15 @@ pub struct Cli {
     #[arg(value_enum, short = 'b', long = "backend", default_value = "htmlbook")]
     pub backend: Backends,
 
-    /// Print a document word count (excludes comments, markup characters, etc.)
+    /// Print a document word count (excludes comments, markup characters, etc.).
     #[arg(short, long = "count-words")]
     pub count: bool,
+
+    /// Run asciidocr without resolving resource targets; by default, asciidocr will fail to parse a
+    /// document if a given resource is not found. This option allows parsing to continue if the
+    /// backend supports missing targets.
+    #[arg(short = 'x', long = "allow-unresolved-targets")]
+    pub do_not_resolve_targets: bool,
 }
 
 pub fn read_input(args: &Cli) -> String {

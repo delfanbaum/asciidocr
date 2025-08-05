@@ -48,8 +48,8 @@ pub enum ParserError {
         "Parse error line {0}: Invalid heading level; parser level offest at the time of error was: {1}"
     )]
     HeadingOffsetError(usize, i8),
-    #[error("Parse error line {0}: Unable to to canonicalize include path: {1:?}")]
-    IncludeErrorPath(usize, String),
+    #[error("Parse error line {0}: Unable to resolve target: {1:?}")]
+    TargetResolution(usize, String),
     #[error("Parser error: Tried to add last block when block stack was empty.")]
     BlockStack,
     #[error("Parse error: invalid block continuation; no previous block")]
@@ -107,6 +107,8 @@ pub struct Parser {
     /// Used to see if we need to add a newline before new text; we don't add newlines to the text
     /// literals unless they're continuous (i.e., we never count newline paras as paras)
     dangling_newline: Option<Token>,
+    /// Testing helper
+    pub resolve_targets: bool,
 }
 
 impl Default for Parser {
@@ -151,7 +153,17 @@ impl Parser {
             force_new_block: false,
             close_parent_after_push: false,
             dangling_newline: None,
+            resolve_targets: true,
         }
+    }
+
+    /// Similar to Parser::new() except returns a parser that does not resolve non-include
+    /// directive targets (useful for testing, or in cases where you don't care if a given target
+    /// resource exists or not)
+    pub fn new_no_target_resolution(origin: PathBuf) -> Self {
+        let mut test_parser = Self::new(origin);
+        test_parser.resolve_targets = false;
+        test_parser
     }
 
     /// Parses the stream of tokens provided by the [`Scanner`].
@@ -547,26 +559,7 @@ impl Parser {
 
         // calculate target, given that it's relative; if there is something on the stack, use
         // that, else use self.origin
-        let mut resolved_target: PathBuf;
-
-        if !self.file_stack.is_empty() {
-            resolved_target = self.origin_directory.clone();
-            // may as well follow the rabbit hole
-            for file in self.file_stack.iter() {
-                if let Some(parent) = PathBuf::from_str(file).unwrap().parent() {
-                    resolved_target.push(parent)
-                }
-            }
-            resolved_target = match resolved_target.join(target.clone()).canonicalize() {
-                Ok(p) => p,
-                Err(_) => return Err(ParserError::IncludeErrorPath(token.line, target)),
-            }
-        } else {
-            resolved_target = match self.origin_directory.join(target.clone()).canonicalize() {
-                Ok(p) => p,
-                Err(_) => return Err(ParserError::IncludeErrorPath(token.line, target)),
-            }
-        }
+        let resolved_target = self.resolve_target(token.line, &target)?;
         self.file_stack.push(target.clone());
 
         let current_block_stack_len = self.block_stack.len();
@@ -843,7 +836,9 @@ impl Parser {
     }
 
     fn parse_block_image(&mut self, token: Token, asg: &mut Asg) -> Result<(), ParserError> {
-        let mut image_block = BlockMacro::new_image_from_token(token);
+        let (target, metadata) = target_and_attrs_from_token(&token);
+        let _ = self.check_target(token.line, &target)?;
+        let mut image_block = BlockMacro::new_image_block(target, metadata, token.locations());
         if let Some(metadata) = &self.metadata {
             // TODO see if there is a cleaner way to manage the borrowing here.
             image_block = image_block.add_metadata(metadata);
@@ -857,9 +852,13 @@ impl Parser {
     }
 
     fn parse_inline_image_macro(&mut self, token: Token) -> Result<(), ParserError> {
+        let (target, metadata) = target_and_attrs_from_token(&token);
+        let _ = self.check_target(token.line, &target);
         self.inline_stack
-            .push_back(Inline::InlineRef(InlineRef::new_inline_image_from_token(
-                token,
+            .push_back(Inline::InlineRef(InlineRef::new_inline_image(
+                target,
+                metadata,
+                token.locations(),
             )));
         self.close_parent_after_push = true;
         Ok(())
@@ -1434,6 +1433,38 @@ impl Parser {
             }
         }
         Ok(())
+    }
+
+    fn check_target(&self, token_line: usize, target: &str) -> Result<(), ParserError> {
+        if self.resolve_targets {
+            match self.resolve_target(token_line, target) {
+                Ok(_) => Ok(()),
+                Err(e) => Err(e),
+            }
+        } else {
+            Ok(())
+        }
+    }
+
+    fn resolve_target(&self, token_line: usize, target: &str) -> Result<PathBuf, ParserError> {
+        if !self.file_stack.is_empty() {
+            let mut resolved_target = self.origin_directory.clone();
+            // may as well follow the rabbit hole
+            for file in self.file_stack.iter() {
+                if let Some(parent) = PathBuf::from_str(file).unwrap().parent() {
+                    resolved_target.push(parent)
+                }
+            }
+            match resolved_target.join(target).canonicalize() {
+                Ok(p) => Ok(p),
+                Err(_) => Err(ParserError::TargetResolution(token_line, target.into())),
+            }
+        } else {
+            match self.origin_directory.join(target).canonicalize() {
+                Ok(p) => Ok(p),
+                Err(_) => Err(ParserError::TargetResolution(token_line, target.into())),
+            }
+        }
     }
 }
 
