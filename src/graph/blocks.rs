@@ -3,13 +3,16 @@ use std::{collections::HashMap, fmt::Display};
 
 use serde::Serialize;
 
-use crate::graph::{
-    inlines::Inline,
-    lists::{DList, DListItem, List, ListItem, ListVariant},
-    metadata::ElementMetadata,
-    nodes::{Location, NodeTypes},
-};
 use crate::scanner::tokens::{Token, TokenType};
+use crate::{
+    graph::{
+        inlines::Inline,
+        lists::{DList, DListItem, List, ListItem, ListVariant},
+        metadata::ElementMetadata,
+        nodes::{Location, NodeTypes},
+    },
+    parser::ParserError,
+};
 
 #[derive(thiserror::Error, PartialEq, Debug)]
 pub enum BlockError {
@@ -719,9 +722,9 @@ impl Block {
         }
     }
 
-    pub fn add_metadata(&mut self, metadata: ElementMetadata) {
+    pub fn add_metadata(&mut self, metadata: ElementMetadata) -> Result<(), ParserError> {
         if metadata.is_empty() {
-            return;
+            return Ok(());
         }
         // guard against invalid inline use
         if metadata.inline_metadata {
@@ -729,12 +732,23 @@ impl Block {
             warn!("Invalid inline class markup.")
         }
         match self {
-            Block::LeafBlock(block) => block.metadata = Some(metadata),
             Block::Section(block) => block.metadata = Some(metadata),
-            Block::ParentBlock(block) => block.metadata = Some(metadata),
+            Block::List(block) => block.metadata = Some(metadata),
+            Block::ListItem(block) => block.metadata = Some(metadata),
+            Block::DList(block) => block.metadata = Some(metadata),
+            Block::DListItem(block) => block.metadata = Some(metadata),
             Block::BlockMacro(block) => block.metadata = Some(metadata),
-            _ => todo!(),
+            Block::LeafBlock(block) => block.metadata = Some(metadata),
+            Block::ParentBlock(block) => block.metadata = Some(metadata),
+            Block::TableCell(block) => block.metadata = Some(metadata),
+            _ => {
+                return Err(ParserError::InternalError(format!(
+                    "Blocks of type {} do not accept metadata.",
+                    self
+                )));
+            }
         }
+        Ok(())
     }
 
     /// Returns all literal text in a block
