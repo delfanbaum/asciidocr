@@ -570,11 +570,11 @@ impl<'a> Scanner<'a> {
     }
 
     fn starts_repeated_char_line(&self, c: char, delimiter_len: usize) -> bool {
-        let mut expected_block = String::from(c).repeat(delimiter_len);
+        let mut expected_block = String::from(c).repeat(delimiter_len - 1);
         expected_block.push('\n');
 
         self.current + delimiter_len <= self.source.len()
-            && self.source[self.start..self.current + delimiter_len] == expected_block
+            && self.peeks_ahead(delimiter_len) == expected_block
     }
 
     /// Checks for document attribute lines, e.g., ":foo: bar" or ":foo:"
