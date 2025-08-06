@@ -1139,7 +1139,7 @@ impl Parser {
             self.in_block_continuation = false;
         } else {
             if self.metadata.is_some() {
-                block.add_metadata(self.metadata.as_ref().unwrap().clone());
+                block.add_metadata(self.metadata.as_ref().unwrap().clone())?;
                 self.metadata = None;
             }
             self.block_stack.push(block)
@@ -1394,7 +1394,7 @@ impl Parser {
             }
         }
         if self.metadata.is_some() {
-            block.add_metadata(self.metadata.as_ref().unwrap().clone());
+            block.add_metadata(self.metadata.as_ref().unwrap().clone())?;
             self.metadata = None;
         }
         asg.push_block(block)?;
@@ -1419,7 +1419,7 @@ impl Parser {
     fn add_last_block_to_graph(&mut self, asg: &mut Asg) -> Result<(), ParserError> {
         if let Some(mut block) = self.block_stack.pop() {
             if self.metadata.is_some() {
-                block.add_metadata(self.metadata.as_ref().unwrap().clone());
+                block.add_metadata(self.metadata.as_ref().unwrap().clone())?;
                 self.metadata = None;
             }
             if let Some(next_last_block) = self.block_stack.last_mut() {
