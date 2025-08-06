@@ -1,9 +1,8 @@
 use std::{fs::File, io::Read};
 
 use docx_rs::{
-    AlignmentType, BreakType, Docx, Header, IndentLevel, LineSpacing, Numbering, NumberingId,
-    PageMargin, PageNum, Paragraph, Pic, Run, RunFonts, RunProperty, Style, Table, TableCell,
-    TableRow, VertAlignType,
+    BreakType, Docx, Header, IndentLevel, LineSpacing, Numbering, NumberingId, PageMargin, PageNum,
+    Paragraph, Pic, Run, RunFonts, RunProperty, Style, Table, TableCell, TableRow, VertAlignType,
 };
 use once_cell::sync::Lazy;
 use regex::Regex;
@@ -28,7 +27,15 @@ pub fn asciidocr_default_docx() -> Docx {
         .add_style(DocumentStyles::normal())
         .add_style(DocumentStyles::no_spacing())
         .add_style(DocumentStyles::title())
-        .header(Header::new().add_page_num(PageNum::new().align(AlignmentType::Right)))
+        .header(
+            Header::new().add_paragraph(
+                Paragraph::new()
+                    .v_anchor("text")
+                    .h_anchor("margin")
+                    .x_align("right")
+                    .add_page_num(PageNum::new()),
+            ),
+        )
         .page_size(inches(8.5), inches(11.0))
         .page_margin(
             PageMargin::new()
