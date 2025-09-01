@@ -837,7 +837,7 @@ impl Parser {
 
     fn parse_block_image(&mut self, token: Token, asg: &mut Asg) -> Result<(), ParserError> {
         let (target, metadata) = target_and_attrs_from_token(&token);
-        let _ = self.check_target(token.line, &target)?;
+        self.check_target(token.line, &target)?;
         let mut image_block = BlockMacro::new_image_block(target, metadata, token.locations());
         if let Some(metadata) = &self.metadata {
             // TODO see if there is a cleaner way to manage the borrowing here.
