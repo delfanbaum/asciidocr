@@ -1,0 +1,419 @@
+{
+    "name": "document",
+    "type": "block",
+    "blocks": [
+        {
+            "name": "section",
+            "type": "block",
+            "title": [
+                {
+                    "name": "text",
+                    "type": "string",
+                    "value": "Single Range",
+                    "location": [
+                        {
+                            "line": 1,
+                            "col": 4
+                        },
+                        {
+                            "line": 1,
+                            "col": 15
+                        }
+                    ]
+                }
+            ],
+            "level": 1,
+            "blocks": [
+                {
+                    "name": "paragraph",
+                    "type": "block",
+                    "inlines": [
+                        {
+                            "name": "text",
+                            "type": "string",
+                            "value": "Line five\nLine six\nLine seven\nLine nine\nLine ten",
+                            "location": [
+                                {
+                                    "line": 5,
+                                    "col": 1,
+                                    "file": [
+                                        "included.txt"
+                                    ]
+                                },
+                                {
+                                    "line": 10,
+                                    "col": 8,
+                                    "file": [
+                                        "included.txt"
+                                    ]
+                                }
+                            ]
+                        }
+                    ],
+                    "location": [
+                        {
+                            "line": 5,
+                            "col": 1,
+                            "file": [
+                                "included.txt"
+                            ]
+                        },
+                        {
+                            "line": 10,
+                            "col": 8,
+                            "file": [
+                                "included.txt"
+                            ]
+                        }
+                    ]
+                }
+            ],
+            "location": [
+                {
+                    "line": 1,
+                    "col": 1
+                },
+                {
+                    "line": 10,
+                    "col": 8,
+                    "file": [
+                        "included.txt"
+                    ]
+                }
+            ]
+        },
+        {
+            "name": "section",
+            "type": "block",
+            "title": [
+                {
+                    "name": "text",
+                    "type": "string",
+                    "value": "Multiple Range Quoted",
+                    "location": [
+                        {
+                            "line": 5,
+                            "col": 4
+                        },
+                        {
+                            "line": 5,
+                            "col": 24
+                        }
+                    ]
+                }
+            ],
+            "level": 1,
+            "blocks": [
+                {
+                    "name": "paragraph",
+                    "type": "block",
+                    "inlines": [
+                        {
+                            "name": "text",
+                            "type": "string",
+                            "value": "Line one\nLine two\nLine three\nLine five\nLine six\nLine seven\n",
+                            "location": [
+                                {
+                                    "line": 1,
+                                    "col": 1,
+                                    "file": [
+                                        "included.txt"
+                                    ]
+                                },
+                                {
+                                    "line": 10,
+                                    "col": 8,
+                                    "file": [
+                                        "included.txt"
+                                    ]
+                                }
+                            ]
+                        }
+                    ],
+                    "location": [
+                        {
+                            "line": 1,
+                            "col": 1,
+                            "file": [
+                                "included.txt"
+                            ]
+                        },
+                        {
+                            "line": 10,
+                            "col": 8,
+                            "file": [
+                                "included.txt"
+                            ]
+                        }
+                    ]
+                }
+            ],
+            "location": [
+                {
+                    "line": 1,
+                    "col": 1,
+                    "file": [
+                        "included.txt"
+                    ]
+                },
+                {
+                    "line": 10,
+                    "col": 8,
+                    "file": [
+                        "included.txt"
+                    ]
+                }
+            ]
+        },
+        {
+            "name": "section",
+            "type": "block",
+            "title": [
+                {
+                    "name": "text",
+                    "type": "string",
+                    "value": "Multiple Range Semicolons",
+                    "location": [
+                        {
+                            "line": 9,
+                            "col": 4
+                        },
+                        {
+                            "line": 9,
+                            "col": 28
+                        }
+                    ]
+                }
+            ],
+            "level": 1,
+            "blocks": [
+                {
+                    "name": "paragraph",
+                    "type": "block",
+                    "inlines": [
+                        {
+                            "name": "text",
+                            "type": "string",
+                            "value": "Line one\nLine five\nLine six\nLine seven",
+                            "location": [
+                                {
+                                    "line": 1,
+                                    "col": 1,
+                                    "file": [
+                                        "included.txt"
+                                    ]
+                                },
+                                {
+                                    "line": 7,
+                                    "col": 10,
+                                    "file": [
+                                        "included.txt"
+                                    ]
+                                }
+                            ]
+                        }
+                    ],
+                    "location": [
+                        {
+                            "line": 1,
+                            "col": 1,
+                            "file": [
+                                "included.txt"
+                            ]
+                        },
+                        {
+                            "line": 7,
+                            "col": 10,
+                            "file": [
+                                "included.txt"
+                            ]
+                        }
+                    ]
+                }
+            ],
+            "location": [
+                {
+                    "line": 1,
+                    "col": 1,
+                    "file": [
+                        "included.txt"
+                    ]
+                },
+                {
+                    "line": 9,
+                    "col": 28
+                }
+            ]
+        },
+        {
+            "name": "section",
+            "type": "block",
+            "title": [
+                {
+                    "name": "text",
+                    "type": "string",
+                    "value": "Range To Last Line",
+                    "location": [
+                        {
+                            "line": 13,
+                            "col": 4
+                        },
+                        {
+                            "line": 13,
+                            "col": 21
+                        }
+                    ]
+                }
+            ],
+            "level": 1,
+            "blocks": [
+                {
+                    "name": "paragraph",
+                    "type": "block",
+                    "inlines": [
+                        {
+                            "name": "text",
+                            "type": "string",
+                            "value": "Line five\nLine six\nLine seven\nLine nine\nLine ten",
+                            "location": [
+                                {
+                                    "line": 5,
+                                    "col": 1,
+                                    "file": [
+                                        "included.txt"
+                                    ]
+                                },
+                                {
+                                    "line": 10,
+                                    "col": 8,
+                                    "file": [
+                                        "included.txt"
+                                    ]
+                                }
+                            ]
+                        }
+                    ],
+                    "location": [
+                        {
+                            "line": 5,
+                            "col": 1,
+                            "file": [
+                                "included.txt"
+                            ]
+                        },
+                        {
+                            "line": 10,
+                            "col": 8,
+                            "file": [
+                                "included.txt"
+                            ]
+                        }
+                    ]
+                }
+            ],
+            "location": [
+                {
+                    "line": 1,
+                    "col": 1,
+                    "file": [
+                        "included.txt"
+                    ]
+                },
+                {
+                    "line": 13,
+                    "col": 21
+                }
+            ]
+        },
+        {
+            "name": "section",
+            "type": "block",
+            "title": [
+                {
+                    "name": "text",
+                    "type": "string",
+                    "value": "Range without end",
+                    "location": [
+                        {
+                            "line": 17,
+                            "col": 4
+                        },
+                        {
+                            "line": 17,
+                            "col": 20
+                        }
+                    ]
+                }
+            ],
+            "level": 1,
+            "blocks": [
+                {
+                    "name": "paragraph",
+                    "type": "block",
+                    "inlines": [
+                        {
+                            "name": "text",
+                            "type": "string",
+                            "value": "Line five\nLine six\nLine seven\nLine nine\nLine ten",
+                            "location": [
+                                {
+                                    "line": 5,
+                                    "col": 1,
+                                    "file": [
+                                        "included.txt"
+                                    ]
+                                },
+                                {
+                                    "line": 10,
+                                    "col": 8,
+                                    "file": [
+                                        "included.txt"
+                                    ]
+                                }
+                            ]
+                        }
+                    ],
+                    "location": [
+                        {
+                            "line": 5,
+                            "col": 1,
+                            "file": [
+                                "included.txt"
+                            ]
+                        },
+                        {
+                            "line": 10,
+                            "col": 8,
+                            "file": [
+                                "included.txt"
+                            ]
+                        }
+                    ]
+                }
+            ],
+            "location": [
+                {
+                    "line": 1,
+                    "col": 1,
+                    "file": [
+                        "included.txt"
+                    ]
+                },
+                {
+                    "line": 17,
+                    "col": 20
+                }
+            ]
+        }
+    ],
+    "location": [
+        {
+            "line": 1,
+            "col": 1
+        },
+        {
+            "line": 17,
+            "col": 20
+        }
+    ]
+}

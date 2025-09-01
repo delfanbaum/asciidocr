@@ -1,3 +1,4 @@
+use std::ops::Range;
 use std::{collections::HashMap, fmt::Debug};
 
 use anyhow::{Result, anyhow};
@@ -268,6 +269,30 @@ fn key_values_from_named_attribute(attribute: &str) -> Result<(String, Vec<&str>
             ))
         }
         None => Err(anyhow!("Not a named attribute")),
+    }
+}
+
+pub fn extract_page_ranges(ranges_str: &str) -> Option<Vec<usize>> {
+    let mut ranges: Vec<usize> = vec![];
+
+    for range in ranges_str.split(";") {
+        let parts: Vec<&str> = range.split("..").collect();
+        if !parts.is_empty() {
+            let start = parts[0].parse::<usize>().ok()?;
+            if parts.len() == 2 {
+                let mut end = parts[1].parse::<usize>().ok()?;
+                end += 1; // because we want an inclusive range 
+                ranges.extend(start..end)
+            } else {
+                ranges.push(start)
+            }
+        }
+    }
+
+    if !ranges.is_empty() {
+        Some(ranges)
+    } else {
+        None
     }
 }
 

@@ -4,13 +4,13 @@ use std::{
     env,
     fmt::Debug,
     fs,
+    ops::Range,
     path::{Path, PathBuf},
     str::FromStr,
 };
 
 use log::{error, warn};
 
-use crate::{graph::asg::AsgError, scanner::Scanner};
 use crate::{
     graph::blocks::BlockError,
     scanner::tokens::{Token, TokenType},
@@ -26,6 +26,10 @@ use crate::{
         nodes::{Header, Location},
     },
     scanner::ScannerError,
+};
+use crate::{
+    graph::{asg::AsgError, metadata::extract_page_ranges},
+    scanner::Scanner,
 };
 
 #[derive(thiserror::Error, PartialEq, Debug)]
@@ -545,6 +549,9 @@ impl Parser {
     }
 
     fn parse_include(&mut self, token: Token, asg: &mut Asg) -> Result<(), ParserError> {
+        // placeholders
+        let mut read_lines: Vec<usize> = vec![];
+
         // ignore any attributes for the time being
         let (target, meta) = target_and_attrs_from_token(&token);
         // check for level offsets in the include
@@ -553,6 +560,11 @@ impl Parser {
                 match self.parse_level_offset(value) {
                     Ok(_) => {}
                     Err(e) => return Err(e),
+                }
+            }
+            if let Some(value) = metadata.attributes.get("lines") {
+                if let Some(ranges) = extract_page_ranges(value) {
+                    read_lines = ranges
                 }
             }
         }
@@ -574,6 +586,11 @@ impl Parser {
             {
                 match result {
                     Ok(token) => {
+                        if !read_lines.is_empty() {
+                            if !read_lines.contains(&token.line) {
+                                continue;
+                            }
+                        }
                         let token_type = token.token_type();
                         self.token_into(token, asg)?;
                         self.last_token_type = token_type;
