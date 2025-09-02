@@ -4,7 +4,6 @@ use std::{
     env,
     fmt::Debug,
     fs,
-    ops::Range,
     path::{Path, PathBuf},
     str::FromStr,
 };
@@ -550,9 +549,11 @@ impl Parser {
 
     fn parse_include(&mut self, token: Token, asg: &mut Asg) -> Result<(), ParserError> {
         // placeholders
-        let mut read_lines: Vec<usize> = vec![];
+        let mut included_lines: Vec<i32> = vec![];
+        let mut include_to_end: bool = false;
+        let _included_tags: Vec<&str> = vec![];
+        let mut asciidoc_include: bool = false;
 
-        // ignore any attributes for the time being
         let (target, meta) = target_and_attrs_from_token(&token);
         // check for level offsets in the include
         if let Some(metadata) = meta {
@@ -563,8 +564,13 @@ impl Parser {
                 }
             }
             if let Some(value) = metadata.attributes.get("lines") {
-                if let Some(ranges) = extract_page_ranges(value) {
-                    read_lines = ranges
+                dbg!(&metadata.attributes);
+                included_lines = extract_page_ranges(value);
+                if let Some(line) = included_lines.last() {
+                    if *line == -1 {
+                        include_to_end = true;
+                        included_lines.pop();
+                    }
                 }
             }
         }
@@ -576,34 +582,33 @@ impl Parser {
 
         let current_block_stack_len = self.block_stack.len();
 
-        // Match filetype, if adoc scan into tokens, adding the location, then parse...
+        // Are we including another asciidoc file that should be scanned and parsed?
         if matches!(
             target.split('.').next_back().unwrap_or(""),
             "adoc" | "asciidoc" | "txt"
         ) {
-            for result in
-                Scanner::new_with_stack(&open_file(resolved_target), self.file_stack.clone())
-            {
-                match result {
-                    Ok(token) => {
-                        if !read_lines.is_empty() {
-                            if !read_lines.contains(&token.line) {
-                                continue;
-                            }
+            asciidoc_include = true;
+        }
+
+        // now parse the file
+        for result in Scanner::new_with_stack(&open_file(resolved_target), self.file_stack.clone())
+        {
+            match result {
+                Ok(token) => {
+                    if !included_lines.is_empty() {
+                        if !included_lines.contains(&(token.line as i32)) {
+                            continue;
+                        } else if include_to_end
+                            && &(token.line as i32) >= included_lines.last().unwrap()
+                        {
+                            included_lines.clear()
                         }
+                    }
+                    if asciidoc_include {
                         let token_type = token.token_type();
                         self.token_into(token, asg)?;
                         self.last_token_type = token_type;
-                    }
-                    Err(e) => return Err(ParserError::Scanner(e)),
-                }
-            }
-        } else {
-            for result in
-                Scanner::new_with_stack(&open_file(resolved_target), self.file_stack.clone())
-            {
-                match result {
-                    Ok(token) => {
+                    } else {
                         // allow EOFs to pass through; otherwise just parse as text
                         if matches!(token.token_type(), TokenType::Eof) {
                             self.last_token_type = TokenType::Eof;
@@ -612,8 +617,8 @@ impl Parser {
                         }
                         self.parse_text(token)?;
                     }
-                    Err(e) => return Err(ParserError::Scanner(e)),
                 }
+                Err(e) => return Err(ParserError::Scanner(e)),
             }
         }
 

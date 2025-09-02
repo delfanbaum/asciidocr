@@ -1,4 +1,3 @@
-use std::ops::Range;
 use std::{collections::HashMap, fmt::Debug};
 
 use anyhow::{Result, anyhow};
@@ -19,6 +18,7 @@ pub enum AttributeType {
     Quote,
     Verse,
     Source,
+    Lines,
 }
 
 impl AttributeType {
@@ -183,6 +183,7 @@ impl ElementMetadata {
 
     pub fn process_attributes(&mut self, mut attributes: Vec<&str>) {
         for (idx, attribute) in attributes.iter_mut().enumerate() {
+            dbg!(&attribute);
             match key_values_from_named_attribute(attribute) {
                 Ok((key, values)) => {
                     if key == *"role" {
@@ -229,6 +230,10 @@ impl ElementMetadata {
                     todo!(); // or panic?
                 }
             }
+            Some(AttributeType::Lines) => {
+                // need to figure out how to
+                todo!()
+            }
             _ => {
                 if attribute.starts_with('"') {
                     *attribute = &attribute[1..attribute.len() - 1]
@@ -272,28 +277,31 @@ fn key_values_from_named_attribute(attribute: &str) -> Result<(String, Vec<&str>
     }
 }
 
-pub fn extract_page_ranges(ranges_str: &str) -> Option<Vec<usize>> {
-    let mut ranges: Vec<usize> = vec![];
+/// Extracts included page ranges from the "lines=" attribute of an include directive
+pub fn extract_page_ranges(ranges_str: &str) -> Vec<i32> {
+    dbg!(&ranges_str);
+    let mut ranges: Vec<i32> = vec![];
 
-    for range in ranges_str.split(";") {
+    let mut _ranges = ranges_str.split(";").peekable();
+    while let Some(range) = _ranges.next() {
         let parts: Vec<&str> = range.split("..").collect();
         if !parts.is_empty() {
-            let start = parts[0].parse::<usize>().ok()?;
+            let start = parts[0].parse::<i32>().unwrap_or(0);
             if parts.len() == 2 {
-                let mut end = parts[1].parse::<usize>().ok()?;
-                end += 1; // because we want an inclusive range 
-                ranges.extend(start..end)
+                // if there is an end value
+                if let Some(mut end) = parts[1].parse::<i32>().ok() {
+                    end += 1; // because we want an inclusive range 
+                    ranges.extend(start..end)
+                } else if _ranges.peek().is_none() {
+                    ranges.push(start);
+                    ranges.push(-1);
+                }
             } else {
-                ranges.push(start)
+                ranges.push(start);
             }
         }
     }
-
-    if !ranges.is_empty() {
-        Some(ranges)
-    } else {
-        None
-    }
+    ranges
 }
 
 #[cfg(test)]
