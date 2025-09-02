@@ -714,7 +714,7 @@ impl LineBreak {
 #[cfg(test)]
 mod tests {
 
-    use crate::graph::macros::target_and_attrs_from_token;
+    use crate::utils::target_and_attrs_from_token;
     use crate::scanner::tokens::{Token, TokenType};
 
     use super::*;
