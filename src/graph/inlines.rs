@@ -714,8 +714,8 @@ impl LineBreak {
 #[cfg(test)]
 mod tests {
 
-    use crate::utils::target_and_attrs_from_token;
     use crate::scanner::tokens::{Token, TokenType};
+    use crate::utils::target_and_attrs_from_token;
 
     use super::*;
     use rstest::rstest;

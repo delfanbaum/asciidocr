@@ -155,6 +155,15 @@ impl Token {
         ) || self.is_inline()
     }
 
+    /// If the token is a TokenType::StartTag or TokenType::EndTag, return the tag value,
+    /// otherwise return None
+    pub fn tag(&self) -> Option<String> {
+        if matches!(self.token_type(), TokenType::StartTag | TokenType::EndTag) {
+            return Some((&self.lexeme[5..self.lexeme.len() - 2]).to_string());
+        }
+        None
+    }
+
     /// Performs some sanity-check validations; currently checking for characters that aren't
     /// allowed in, for example, IDs, as well as performs the character substitutions for
     /// Charref entities, following asciidoctor
@@ -293,8 +302,8 @@ pub enum TokenType {
 
     // file and tag references
     Include,
-    //StartTag, // tag::[]
-    //EndTag,
+    StartTag, // tag::[]
+    EndTag,
     // math blocks TK
 
     // Attributes, anchors and references
@@ -343,5 +352,40 @@ mod tests {
         let mut token = Token::new(token_type, " ".to_string(), None, 1, 1, 1, vec![]);
         token.validate();
         assert_eq!(token.token_type(), TokenType::Text)
+    }
+
+    #[rstest]
+    #[case("foo")]
+    #[case("longer_than_foo")]
+    #[case("a")]
+    fn start_tag_extraction(#[case] tag: &str) {
+        let lexeme = format!("tag::{}[]", tag);
+        let token = Token::new(
+            TokenType::StartTag,
+            lexeme.clone(),
+            Some(lexeme),
+            1,
+            1,
+            1,
+            vec![],
+        );
+        assert_eq!(token.tag(), Some(tag.to_string()))
+    }
+    #[rstest]
+    #[case("foo")]
+    #[case("longer_than_foo")]
+    #[case("a")]
+    fn end_tag_extraction(#[case] tag: &str) {
+        let lexeme = format!("end::{}[]", tag);
+        let token = Token::new(
+            TokenType::StartTag,
+            lexeme.clone(),
+            Some(lexeme),
+            1,
+            1,
+            1,
+            vec![],
+        );
+        assert_eq!(token.tag(), Some(tag.to_string()))
     }
 }

@@ -1,1 +1,7 @@
+== Single Tag
+
 include::included.txt[tag=foo]
+
+== Two tags
+
+include::included.txt[tags=foo;bar]

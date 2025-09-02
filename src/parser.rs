@@ -233,8 +233,10 @@ impl Parser {
                     }
                 }
                 TokenType::SourceBlock => {
-                    // allow callouts in the source block
-                    if ![token_type, TokenType::CodeCallout].contains(&token.token_type()) {
+                    // allow callouts and includes
+                    if ![token_type, TokenType::CodeCallout, TokenType::Include]
+                        .contains(&token.token_type())
+                    {
                         self.pass_text_through(token)?;
                         return Ok(());
                     }
@@ -298,6 +300,8 @@ impl Parser {
             TokenType::AttributeReference => self.parse_attribute_reference(token),
             TokenType::CrossReference => self.parse_cross_reference(token),
             TokenType::Include => self.parse_include(token, asg),
+            // we just check for the existence of these; we don't actually process them
+            TokenType::StartTag | TokenType::EndTag => {Ok(())}
 
             // inline macros
             TokenType::FootnoteMacro => self.parse_footnote_macro(token),
@@ -550,8 +554,9 @@ impl Parser {
         // placeholders
         let mut included_lines: Vec<i32> = vec![];
         let mut include_to_end: bool = false;
-        let _included_tags: Vec<&str> = vec![];
+        let mut included_tags: Vec<String> = vec![];
         let mut asciidoc_include: bool = false;
+        let mut current_tag: Option<String> = None;
 
         let (target, meta) = target_and_attrs_from_token(&token);
         // check for level offsets in the include
@@ -571,6 +576,12 @@ impl Parser {
                     }
                 }
             }
+            if let Some(value) = metadata.attributes.get("tag") {
+                included_tags.push(value.clone());
+            } // it can either be tag or tags, which is annoying!
+            if let Some(value) = metadata.attributes.get("tags") {
+                included_tags.extend(value.split(";").map(|tag| tag.to_string()));
+            }
         }
 
         // calculate target, given that it's relative; if there is something on the stack, use
@@ -583,7 +594,7 @@ impl Parser {
         // Are we including another asciidoc file that should be scanned and parsed?
         if matches!(
             target.split('.').next_back().unwrap_or(""),
-            "adoc" | "asciidoc" | "txt"
+            "adoc" | "asciidoc" | "txt"   // note that per the spec we parse txt as asciidoc
         ) {
             asciidoc_include = true;
         }
@@ -593,6 +604,7 @@ impl Parser {
         {
             match result {
                 Ok(token) => {
+                    // lines
                     if !included_lines.is_empty() {
                         if !included_lines.contains(&(token.line as i32)) {
                             continue;
@@ -600,6 +612,28 @@ impl Parser {
                             && &(token.line as i32) >= included_lines.last().unwrap()
                         {
                             included_lines.clear()
+                        }
+                    }
+                    // tags
+                    if !included_tags.is_empty() {
+                        if token.token_type() == TokenType::StartTag {
+                            if let Some(tag) = token.tag() {
+                                if included_tags.contains(&tag) {
+                                    current_tag = Some(tag);
+                                    continue;
+                                }
+                            }
+                        }
+                        if token.token_type() == TokenType::EndTag {
+                            if let Some(tag) = token.tag() {
+                                if current_tag == Some(tag) {
+                                    current_tag = None;
+                                    continue;
+                                }
+                            }
+                        }
+                        if current_tag.is_none() {
+                            continue;
                         }
                     }
                     if asciidoc_include {

@@ -88,7 +88,7 @@ more. It should, however, be good to go for your next great short story.
 features. Some things it does _not_ do (yet):
 
 * Checklists
-* Tagged regions/tagged includes
+* Tag filtering* (including by tags is now supported) 
 * Conditionals
 * Complex table markup
 * Complex nested lists

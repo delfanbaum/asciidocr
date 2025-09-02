@@ -150,11 +150,8 @@
       ],
       "location": [
         {
-          "line": 1,
-          "col": 1,
-          "file": [
-            "included.txt"
-          ]
+          "line": 5,
+          "col": 1
         },
         {
           "line": 7,
@@ -233,15 +230,15 @@
       ],
       "location": [
         {
-          "line": 1,
-          "col": 1,
+          "line": 9,
+          "col": 1
+        },
+        {
+          "line": 7,
+          "col": 10,
           "file": [
             "included.txt"
           ]
-        },
-        {
-          "line": 9,
-          "col": 28
         }
       ]
     },
@@ -274,7 +271,7 @@
             {
               "name": "text",
               "type": "string",
-              "value": "Line five\nLine six\nLine seven\nLine nine\nLine ten",
+              "value": "Line five\nLine six\nLine seven\nLine nine\nLine ten\nLine eleven",
               "location": [
                 {
                   "line": 5,
@@ -284,8 +281,8 @@
                   ]
                 },
                 {
-                  "line": 10,
-                  "col": 8,
+                  "line": 12,
+                  "col": 11,
                   "file": [
                     "included.txt"
                   ]
@@ -302,8 +299,8 @@
               ]
             },
             {
-              "line": 10,
-              "col": 8,
+              "line": 12,
+              "col": 11,
               "file": [
                 "included.txt"
               ]
@@ -313,15 +310,15 @@
       ],
       "location": [
         {
-          "line": 5,
-          "col": 1,
+          "line": 13,
+          "col": 1
+        },
+        {
+          "line": 12,
+          "col": 11,
           "file": [
             "included.txt"
           ]
-        },
-        {
-          "line": 13,
-          "col": 21
         }
       ]
     },
@@ -354,7 +351,7 @@
             {
               "name": "text",
               "type": "string",
-              "value": "Line five\nLine six\nLine seven\nLine nine\nLine ten",
+              "value": "Line five\nLine six\nLine seven\nLine nine\nLine ten\nLine eleven",
               "location": [
                 {
                   "line": 5,
@@ -364,8 +361,8 @@
                   ]
                 },
                 {
-                  "line": 10,
-                  "col": 8,
+                  "line": 12,
+                  "col": 11,
                   "file": [
                     "included.txt"
                   ]
@@ -382,8 +379,8 @@
               ]
             },
             {
-              "line": 10,
-              "col": 8,
+              "line": 12,
+              "col": 11,
               "file": [
                 "included.txt"
               ]
@@ -393,15 +390,15 @@
       ],
       "location": [
         {
-          "line": 5,
-          "col": 1,
+          "line": 17,
+          "col": 1
+        },
+        {
+          "line": 12,
+          "col": 11,
           "file": [
             "included.txt"
           ]
-        },
-        {
-          "line": 17,
-          "col": 20
         }
       ]
     }
@@ -412,8 +409,11 @@
       "col": 1
     },
     {
-      "line": 17,
-      "col": 20
+      "line": 12,
+      "col": 11,
+      "file": [
+        "included.txt"
+      ]
     }
   ]
 }

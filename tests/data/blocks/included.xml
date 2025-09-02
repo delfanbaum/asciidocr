@@ -1,0 +1,7 @@
+<doc>
+    <this>
+        <!-- tag::snip[] -->
+        <the-element-we-want />
+        <!-- end::snip[] -->
+    </this>
+</doc>

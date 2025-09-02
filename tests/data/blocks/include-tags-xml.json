@@ -1,0 +1,145 @@
+{
+  "name": "document",
+  "type": "block",
+  "attributes": {},
+  "header": {
+    "title": [
+      {
+        "name": "text",
+        "type": "string",
+        "value": "Include XML should not include end of comment",
+        "location": [
+          {
+            "line": 1,
+            "col": 3
+          },
+          {
+            "line": 1,
+            "col": 47
+          }
+        ]
+      }
+    ],
+    "location": [
+      {
+        "line": 1,
+        "col": 1
+      },
+      {
+        "line": 1,
+        "col": 47
+      }
+    ]
+  },
+  "blocks": [
+    {
+      "name": "paragraph",
+      "type": "block",
+      "inlines": [
+        {
+          "name": "text",
+          "type": "string",
+          "value": "For example:",
+          "location": [
+            {
+              "line": 3,
+              "col": 1
+            },
+            {
+              "line": 3,
+              "col": 12
+            }
+          ]
+        }
+      ],
+      "location": [
+        {
+          "line": 3,
+          "col": 1
+        },
+        {
+          "line": 3,
+          "col": 12
+        }
+      ]
+    },
+    {
+      "name": "listing",
+      "type": "block",
+      "form": "delimited",
+      "delimiter": "----",
+      "inlines": [
+        {
+          "name": "text",
+          "type": "string",
+          "value": "\n        <the-element-we-want />\n",
+          "location": [
+            {
+              "line": 6,
+              "col": 5
+            },
+            {
+              "line": 4,
+              "col": 32,
+              "file": [
+                "included.xml"
+              ]
+            }
+          ]
+        },
+        {
+          "name": "text",
+          "type": "string",
+          "value": "\n",
+          "location": [
+            {
+              "line": 7,
+              "col": 32
+            },
+            {
+              "line": 7,
+              "col": 32
+            }
+          ]
+        }
+      ],
+      "metadata": {
+        "attributes": {
+          "language": "xml"
+        },
+        "options": [],
+        "roles": [],
+        "location": [
+          {
+            "line": 5,
+            "col": 1
+          },
+          {
+            "line": 5,
+            "col": 13
+          }
+        ]
+      },
+      "location": [
+        {
+          "line": 6,
+          "col": 1
+        },
+        {
+          "line": 8,
+          "col": 4
+        }
+      ]
+    }
+  ],
+  "location": [
+    {
+      "line": 1,
+      "col": 1
+    },
+    {
+      "line": 8,
+      "col": 4
+    }
+  ]
+}
