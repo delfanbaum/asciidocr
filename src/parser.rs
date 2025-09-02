@@ -10,6 +10,7 @@ use std::{
 
 use log::{error, warn};
 
+use crate::{graph::asg::AsgError, scanner::Scanner};
 use crate::{
     graph::blocks::BlockError,
     scanner::tokens::{Token, TokenType},
@@ -20,15 +21,11 @@ use crate::{
         blocks::{Block, BlockMacro, Break, LeafBlock, ParentBlock, Section, TableCell},
         inlines::{Inline, InlineLiteral, InlineLiteralName, InlineRef, InlineSpan, LineBreak},
         lists::{DList, DListItem, List, ListItem, ListVariant},
-        macros::target_and_attrs_from_token,
         metadata::{AttributeType, ElementMetadata},
         nodes::{Header, Location},
     },
     scanner::ScannerError,
-};
-use crate::{
-    graph::{asg::AsgError, metadata::extract_page_ranges},
-    scanner::Scanner,
+    utils::{extract_page_ranges, target_and_attrs_from_token},
 };
 
 #[derive(thiserror::Error, PartialEq, Debug)]
@@ -59,6 +56,8 @@ pub enum ParserError {
     BlockContinuation,
     #[error("Parse error: {0}")]
     InternalError(String),
+    #[error("Attribute error: {0}")]
+    AttributeError(String),
 }
 
 /// Parses a stream of tokens into an [`Asg`] (Abstract Syntax Graph), returning the graph once all
@@ -564,7 +563,6 @@ impl Parser {
                 }
             }
             if let Some(value) = metadata.attributes.get("lines") {
-                dbg!(&metadata.attributes);
                 included_lines = extract_page_ranges(value);
                 if let Some(line) = included_lines.last() {
                     if *line == -1 {

@@ -111,7 +111,7 @@
             {
               "name": "text",
               "type": "string",
-              "value": "Line one\nLine two\nLine three\nLine five\nLine six\nLine seven\n",
+              "value": "Line one\nLine two\nLine three\nLine five\nLine six\nLine seven",
               "location": [
                 {
                   "line": 1,
@@ -122,7 +122,7 @@
                 },
                 {
                   "line": 7,
-                  "col": 8,
+                  "col": 10,
                   "file": [
                     "included.txt"
                   ]
@@ -139,8 +139,8 @@
               ]
             },
             {
-              "line": 10,
-              "col": 8,
+              "line": 7,
+              "col": 10,
               "file": [
                 "included.txt"
               ]
@@ -157,8 +157,8 @@
           ]
         },
         {
-          "line": 10,
-          "col": 8,
+          "line": 7,
+          "col": 10,
           "file": [
             "included.txt"
           ]
@@ -215,7 +215,7 @@
           ],
           "location": [
             {
-              "line": 5,
+              "line": 1,
               "col": 1,
               "file": [
                 "included.txt"
@@ -233,7 +233,7 @@
       ],
       "location": [
         {
-          "line": 5,
+          "line": 1,
           "col": 1,
           "file": [
             "included.txt"
@@ -277,7 +277,7 @@
               "value": "Line five\nLine six\nLine seven\nLine nine\nLine ten",
               "location": [
                 {
-                  "line": 1,
+                  "line": 5,
                   "col": 1,
                   "file": [
                     "included.txt"
@@ -295,7 +295,7 @@
           ],
           "location": [
             {
-              "line": 1,
+              "line": 5,
               "col": 1,
               "file": [
                 "included.txt"
@@ -313,7 +313,7 @@
       ],
       "location": [
         {
-          "line": 1,
+          "line": 5,
           "col": 1,
           "file": [
             "included.txt"
