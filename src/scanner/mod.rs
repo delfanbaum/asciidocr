@@ -11,6 +11,8 @@ use self::tokens::TokenError;
 pub enum ScannerError {
     #[error(transparent)]
     Token(#[from] TokenError),
+    #[error("Invalid include tag pattern: {0}")]
+    TagError(String),
 }
 
 #[derive(Debug)]
@@ -21,7 +23,8 @@ pub struct Scanner<'a> {
     startcol: usize,
     current: usize,
     line: usize,
-    scanning: bool, // flag to let us know when we're done with a file
+    scanning: bool,          // flag to let us know when we're done with a file
+    expecting_tag_end: bool, // flag to avoid returning `<--` in lines like `<--end:foo[]-->`
     file_stack: Vec<String>,
 }
 
@@ -51,6 +54,7 @@ impl<'a> Scanner<'a> {
             current: 0,  // the character we're looking at *now*
             line: 1,
             scanning: true,
+            expecting_tag_end: false,
             file_stack: vec![],
         }
     }
@@ -63,6 +67,7 @@ impl<'a> Scanner<'a> {
             current: 0,  // the character we're looking at *now*
             line: 1,
             scanning: true,
+            expecting_tag_end: false,
             file_stack,
         }
     }
@@ -71,9 +76,13 @@ impl<'a> Scanner<'a> {
         let c = self.source.as_bytes()[self.current] as char;
         self.current += 1; // this instead of the "advance" function in "Crafting Interpreters"
 
+        // handle the tagging end edge case
+        if !matches!(c, '\n') && self.expecting_tag_end && self.peek_line().contains("end::") {
+            return self.add_tag();
+        }
+
         match c {
             '\n' => self.add_token(TokenType::NewLineChar, false, 1),
-
             '\'' => {
                 if self.starts_repeated_char_line(c, 3) {
                     self.current += 2;
@@ -159,10 +168,15 @@ impl<'a> Scanner<'a> {
                         }
                         '/' => {
                             if self.starts_new_line() && self.peek() == '/' {
-                                while self.peek() != '\n' && !self.is_at_end() {
-                                    self.current += 1;
+                                if ["/ tag::", "/ end::"].contains(&self.peeks_ahead(7)) {
+                                    self.current += 2;
+                                    self.add_token(TokenType::Comment, true, 0)
+                                } else {
+                                    while self.peek() != '\n' && !self.is_at_end() {
+                                        self.current += 1;
+                                    }
+                                    self.add_token(TokenType::Comment, true, 0)
                                 }
-                                self.add_token(TokenType::Comment, true, 0)
                             } else {
                                 self.add_text_until_next_markup()
                             }
@@ -304,6 +318,20 @@ impl<'a> Scanner<'a> {
                     && self.peeks_ahead(6) != "mage: "
                 {
                     self.add_inline_image()
+                } else {
+                    self.add_text_until_next_markup()
+                }
+            }
+            't' => {
+                if self.peeks_ahead(4) == "ag::" {
+                    self.add_tag()
+                } else {
+                    self.add_text_until_next_markup()
+                }
+            }
+            'e' => {
+                if self.peeks_ahead(4) == "nd::" {
+                    self.add_tag()
                 } else {
                     self.add_text_until_next_markup()
                 }
@@ -554,7 +582,7 @@ impl<'a> Scanner<'a> {
         // Chars: newline, bold, italic, code, super, subscript, footnote, pass, link, end inline macro, definition list marker, highlighted, inline admonition initial chars, inline images
         while ![
             '\n', '*', '_', '`', '^', '~', 'f', 'p', 'h', ']', '[', ':', '#', 'N', 'T', 'I', 'C',
-            'W', '&', '{', '+', 'i', '<', '\'', '\"', '-',
+            'W', '&', '{', '+', 'i', '<', '\'', '\"', '-', 't', 'e',
         ]
         .contains(&self.peek())
             && !self.is_at_end()
@@ -562,6 +590,42 @@ impl<'a> Scanner<'a> {
             self.current += 1;
         }
         self.add_token(TokenType::Text, true, 0)
+    }
+
+    fn add_tag(&mut self) -> Result<Token, ScannerError> {
+        let tag_type: TokenType;
+        if self.expecting_tag_end {
+            while self.peek() != 'e' {
+                self.current += 1;
+            }
+            self.start = self.current;
+            self.startcol = self.start;
+        }
+        while ![']'].contains(&self.peek()) && !self.is_at_end() {
+            self.current += 1;
+        }
+        self.current += 1; // consume the ']' char
+
+        if (&self.source[self.start..self.current]).contains("tag") {
+            tag_type = TokenType::StartTag;
+            self.expecting_tag_end = true;
+        } else if (&self.source[self.start..self.current]).contains("end") {
+            tag_type = TokenType::EndTag;
+            self.expecting_tag_end = false;
+        } else {
+            return Err(ScannerError::TagError(
+                self.source[self.start..self.current].to_string(),
+            ));
+        }
+        let result = self.add_token(tag_type, true, 1);
+        // move to the end of the line
+        while self.peek() != '\n' && !self.is_at_end() {
+            self.current += 1
+        }
+        if self.peek() == '\n' {
+            self.current += 1
+        }
+        result
     }
 
     fn starts_new_line(&self) -> bool {
@@ -724,6 +788,14 @@ impl<'a> Scanner<'a> {
         }
         &self.source[self.current..self.current + count]
     }
+
+    fn peek_line(&self) -> &str {
+        let mut count = 1;
+        while !['\n', '\0'].contains(&self.peeks_ahead(count).chars().last().unwrap()) {
+            count += 1
+        }
+        return self.peeks_ahead(count - 1);
+    }
 }
 
 #[cfg(test)]
@@ -735,11 +807,8 @@ mod tests {
 
     use super::*;
 
-    // NOTE: ignoring the EOF here for simplicity's sake
     fn scan_and_assert_eq(markup: &str, expected_tokens: Vec<Token>) {
         let s = Scanner::new(markup);
-        // let mut scanned_tokens = s.collect::<Vec<Result<Token, ScannerError>>>();
-        // let (mut scanned_tokens, errors): (Vec<_>, Vec<_>) = s.into_iter().partition(|r| r.is_ok());
         let mut scanned_tokens: Vec<Token> = s
             .into_iter()
             .filter_map(|result| result.as_ref().ok().cloned())
@@ -907,12 +976,12 @@ mod tests {
     #[test]
     fn block_introduction() {
         // skip the "i"
-        let markup = ".Some ttle\n";
-        let title = "Some ttle".to_string();
+        let markup = ".Baz\n";
+        let title = "Baz".to_string();
         let expected_tokens = vec![
             Token::new_default(TokenType::BlockLabel, ".".to_string(), None, 1, 1, 1),
-            Token::new_default(TokenType::Text, title.clone(), Some(title), 1, 2, 10),
-            Token::new_default(TokenType::NewLineChar, "\n".to_string(), None, 1, 11, 11),
+            Token::new_default(TokenType::Text, title.clone(), Some(title), 1, 2, 4),
+            Token::new_default(TokenType::NewLineChar, "\n".to_string(), None, 1, 5, 5),
         ];
         scan_and_assert_eq(markup, expected_tokens);
     }
@@ -1111,12 +1180,12 @@ mod tests {
     #[case('~', TokenType::Subscript)]
     #[case('#', TokenType::Mark)]
     fn inline_formatting(#[case] markup_char: char, #[case] expected_token: TokenType) {
-        let markup = format!("Some {}bar{} bar.", markup_char, markup_char);
+        let markup = format!("Somx {}bar{} bar.", markup_char, markup_char);
         let expected_tokens = vec![
             Token::new_default(
                 TokenType::Text,
-                "Some ".to_string(),
-                Some("Some ".to_string()),
+                "Somx ".to_string(),
+                Some("Somx ".to_string()),
                 1,
                 1,
                 5,
@@ -1150,12 +1219,12 @@ mod tests {
     #[case::mark(String::from("##"), TokenType::UnconstrainedMark)]
     #[case::mark(String::from("++"), TokenType::UnconstrainedLiteral)]
     fn inline_formatting_doubles(#[case] markup_str: String, #[case] expected_token: TokenType) {
-        let markup = format!("Some{}bar{}bar.", markup_str, markup_str);
+        let markup = format!("Somx{}bar{}bar.", markup_str, markup_str);
         let expected_tokens = vec![
             Token::new_default(
                 TokenType::Text,
-                "Some".to_string(),
-                Some("Some".to_string()),
+                "Somx".to_string(),
+                Some("Somx".to_string()),
                 1,
                 1,
                 4,
@@ -1216,12 +1285,12 @@ mod tests {
     #[case("footnote:[", TokenType::FootnoteMacro)]
     #[case("pass:[", TokenType::PassthroughInlineMacro)]
     fn inline_macros(#[case] markup_check: &str, #[case] expected_token: TokenType) {
-        let markup = format!("Some {}bar]", &markup_check);
+        let markup = format!("Somx {}bar]", &markup_check);
         let expected_tokens = vec![
             Token::new_default(
                 TokenType::Text,
-                "Some ".to_string(),
-                Some("Some ".to_string()),
+                "Somx ".to_string(),
+                Some("Somx ".to_string()),
                 1,
                 1,
                 5,
@@ -1286,12 +1355,12 @@ mod tests {
     #[test]
     fn description_list_mark_space() {
         // make it "DS" instead of "Description" to avoid the "i" delimiting the text
-        let markup = "Term:: DS";
+        let markup = "Txrm:: DS";
         let expected_tokens = vec![
             Token::new_default(
                 TokenType::Text,
-                "Term".to_string(),
-                Some("Term".to_string()),
+                "Txrm".to_string(),
+                Some("Txrm".to_string()),
                 1,
                 1,
                 4,
@@ -1319,12 +1388,12 @@ mod tests {
     #[test]
     fn description_list_mark_newline() {
         // make it "DS" instead of "Description" to avoid the "i" delimiting the text
-        let markup = "Term::\nDS";
+        let markup = "Txrm::\nDS";
         let expected_tokens = vec![
             Token::new_default(
                 TokenType::Text,
-                "Term".to_string(),
-                Some("Term".to_string()),
+                "Txrm".to_string(),
+                Some("Txrm".to_string()),
                 1,
                 1,
                 4,
@@ -1351,13 +1420,13 @@ mod tests {
 
     #[test]
     fn description_list_mark_not_if_space_before() {
-        let markup = "Term :: bar";
+        let markup = "Txrm :: bar";
 
         let expected_tokens = vec![
             Token::new_default(
                 TokenType::Text,
-                "Term ".to_string(),
-                Some("Term ".to_string()),
+                "Txrm ".to_string(),
+                Some("Txrm ".to_string()),
                 1,
                 1,
                 5,
@@ -1384,12 +1453,12 @@ mod tests {
 
     #[test]
     fn link_with_text() {
-        let markup = "Some http://example.com[bar]";
+        let markup = "Somx http://example.com[bar]";
         let expected_tokens = vec![
             Token::new_default(
                 TokenType::Text,
-                "Some ".to_string(),
-                Some("Some ".to_string()),
+                "Somx ".to_string(),
+                Some("Somx ".to_string()),
                 1,
                 1,
                 5,
@@ -1424,12 +1493,12 @@ mod tests {
 
     #[test]
     fn link_no_text() {
-        let markup = "Some http://example.com[]";
+        let markup = "Somx http://example.com[]";
         let expected_tokens = vec![
             Token::new_default(
                 TokenType::Text,
-                "Some ".to_string(),
-                Some("Some ".to_string()),
+                "Somx ".to_string(),
+                Some("Somx ".to_string()),
                 1,
                 1,
                 5,
@@ -1470,12 +1539,12 @@ mod tests {
 
     #[test]
     fn inline_image() {
-        let markup = "Some image:path/to/img.png[]";
+        let markup = "Somx image:path/to/img.png[]";
         let expected_tokens = vec![
             Token::new_default(
                 TokenType::Text,
-                "Some ".to_string(),
-                Some("Some ".to_string()),
+                "Somx ".to_string(),
+                Some("Somx ".to_string()),
                 1,
                 1,
                 5,
@@ -1494,22 +1563,30 @@ mod tests {
 
     #[test]
     fn no_inline_image_if_double_colon() {
-        let markup = "Some image::bar.png[]";
+        let markup = "Somx image::bar.png[]";
         let expected_tokens = vec![
             Token::new_default(
                 TokenType::Text,
-                "Some ".to_string(),
-                Some("Some ".to_string()),
+                "Somx ".to_string(),
+                Some("Somx ".to_string()),
                 1,
                 1,
                 5,
             ),
             Token::new_default(
                 TokenType::Text,
-                "image".to_string(),
-                Some("image".to_string()),
+                "imag".to_string(),
+                Some("imag".to_string()),
                 1,
                 6,
+                9,
+            ),
+            Token::new_default(
+                TokenType::Text,
+                "e".to_string(),
+                Some("e".to_string()),
+                1,
+                10,
                 10,
             ),
             Token::new_default(
@@ -1558,12 +1635,12 @@ mod tests {
 
     #[test]
     fn inline_style_in_line() {
-        let markup = "Some [.style]#text#";
+        let markup = "Somx [.style]#foo#";
         let expected_tokens = vec![
             Token::new_default(
                 TokenType::Text,
-                "Some ".to_string(),
-                Some("Some ".to_string()),
+                "Somx ".to_string(),
+                Some("Somx ".to_string()),
                 1,
                 1,
                 5,
@@ -1579,20 +1656,20 @@ mod tests {
             Token::new_default(TokenType::Mark, "#".to_string(), None, 1, 14, 14),
             Token::new_default(
                 TokenType::Text,
-                "text".to_string(),
-                Some("text".to_string()),
+                "foo".to_string(),
+                Some("foo".to_string()),
                 1,
                 15,
-                18,
+                17,
             ),
-            Token::new_default(TokenType::Mark, "#".to_string(), None, 1, 19, 19),
+            Token::new_default(TokenType::Mark, "#".to_string(), None, 1, 18, 18),
         ];
         scan_and_assert_eq(markup, expected_tokens);
     }
 
     #[test]
     fn inline_style_new_line() {
-        let markup = "\n[.style]#text#";
+        let markup = "\n[.style]#foox#";
         let expected_tokens = vec![
             Token::new_default(TokenType::NewLineChar, "\n".to_string(), None, 1, 1, 1),
             Token::new_default(
@@ -1606,8 +1683,8 @@ mod tests {
             Token::new_default(TokenType::Mark, "#".to_string(), None, 2, 9, 9),
             Token::new_default(
                 TokenType::Text,
-                "text".to_string(),
-                Some("text".to_string()),
+                "foox".to_string(),
+                Some("foox".to_string()),
                 2,
                 10,
                 13,
@@ -1618,7 +1695,7 @@ mod tests {
     }
     #[test]
     fn inline_style_new_block() {
-        let markup = "\n\n[.style]#text#";
+        let markup = "\n\n[.style]#foo#";
         let expected_tokens = vec![
             Token::new_default(TokenType::NewLineChar, "\n".to_string(), None, 1, 1, 1),
             Token::new_default(TokenType::NewLineChar, "\n".to_string(), None, 2, 1, 1),
@@ -1633,13 +1710,13 @@ mod tests {
             Token::new_default(TokenType::Mark, "#".to_string(), None, 3, 9, 9),
             Token::new_default(
                 TokenType::Text,
-                "text".to_string(),
-                Some("text".to_string()),
+                "foo".to_string(),
+                Some("foo".to_string()),
                 3,
                 10,
-                13,
+                12,
             ),
-            Token::new_default(TokenType::Mark, "#".to_string(), None, 3, 14, 14),
+            Token::new_default(TokenType::Mark, "#".to_string(), None, 3, 13, 13),
         ];
         scan_and_assert_eq(markup, expected_tokens);
     }
@@ -1902,12 +1979,12 @@ mod tests {
     // this previously panicked at byte index 13 because it is not a char boundary; should now pass
     #[test]
     fn scan_odd_boundaried_text() {
-        let markup = "regular shit…\n";
+        let markup = "rxgular shis…\n";
         let expected_tokens = vec![
             Token {
                 token_type: TokenType::Text,
-                lexeme: "regular s".into(),
-                literal: Some("regular s".into()),
+                lexeme: "rxgular s".into(),
+                literal: Some("rxgular s".into()),
                 line: 1,
                 startcol: 1,
                 endcol: 9,
@@ -1924,8 +2001,8 @@ mod tests {
             },
             Token {
                 token_type: TokenType::Text,
-                lexeme: "it…".into(),
-                literal: Some("it…".into()),
+                lexeme: "is…".into(),
+                literal: Some("is…".into()),
                 line: 1,
                 startcol: 11,
                 endcol: 15,
@@ -1995,12 +2072,12 @@ mod tests {
 
     #[test]
     fn typographers_apostrophe() {
-        let markup = "Joe's ";
+        let markup = "Sam's ";
         let expected_tokens = vec![
             Token::new_default(
                 TokenType::Text,
-                "Joe".to_string(),
-                Some("Joe".to_string()),
+                "Sam".to_string(),
+                Some("Sam".to_string()),
                 1,
                 1,
                 3,
@@ -2027,12 +2104,12 @@ mod tests {
 
     #[test]
     fn typographers_apostrophe_newline() {
-        let markup = "Joe's\n";
+        let markup = "Sam's\n";
         let expected_tokens = vec![
             Token::new_default(
                 TokenType::Text,
-                "Joe".to_string(),
-                Some("Joe".to_string()),
+                "Sam".to_string(),
+                Some("Sam".to_string()),
                 1,
                 1,
                 3,
@@ -2060,12 +2137,12 @@ mod tests {
 
     #[test]
     fn typographers_apostrophe_eof() {
-        let markup = "Joe's";
+        let markup = "Sam's";
         let expected_tokens = vec![
             Token::new_default(
                 TokenType::Text,
-                "Joe".to_string(),
-                Some("Joe".to_string()),
+                "Sam".to_string(),
+                Some("Sam".to_string()),
                 1,
                 1,
                 3,
@@ -2229,5 +2306,70 @@ mod tests {
             .collect();
         scanned.pop(); // get rid of EOF token
         assert_eq!(scanned.last().unwrap(), &expected)
+    }
+
+    #[rstest]
+    #[case("tag", TokenType::StartTag)]
+    #[case("end", TokenType::EndTag)]
+    fn simple_tag(#[case] marker: &str, #[case] tag: TokenType) {
+        let markup = format!("{}::foo[]", marker);
+        let expected = Token::new_default(tag, markup.clone(), Some(markup.clone()), 1, 1, 10);
+        let mut scanned: Vec<Token> = Scanner::new(&markup)
+            .filter_map(|result| result.as_ref().ok().cloned())
+            .collect();
+        scanned.pop(); // get rid of EOF token
+        assert_eq!(scanned.last().unwrap(), &expected)
+    }
+
+    #[rstest]
+    #[case("<!-- ", " -->")] // xml style comments
+    #[case("// ", "")] // c-style comments
+    #[case("# ", "")] // python-style comments
+    fn contextual_tag_start(#[case] context_start: &str, #[case] context_end: &str) {
+        let tag = String::from("tag::foo[]");
+        let markup = format!("{}{}{}", context_start, tag, context_end);
+        let tag_col_start = context_start.len() + 1;
+        let tag_col_end = tag_col_start + tag.len() - 1;
+        let expected = Token::new_default(
+            TokenType::StartTag,
+            tag.clone(),
+            Some(tag.clone()),
+            1,
+            tag_col_start,
+            tag_col_end,
+        );
+        let scanned: Vec<Token> = Scanner::new(&markup)
+            .filter_map(|result| result.as_ref().ok().cloned())
+            .collect();
+        assert!(scanned.contains(&expected))
+    }
+
+    #[rstest]
+    #[case("<!-- ", " -->")] // xml style comments
+    #[case("// ", "")] // c-style comments
+    #[case("# ", "")] // python-style comments
+    fn contextual_tag_end(#[case] context_start: &str, #[case] context_end: &str) {
+        let tag = String::from("end::foo[]");
+        let markup = format!("\n{}{}{}", context_start, tag, context_end);
+        let tag_col_start = context_start.len() + 1;
+        let tag_col_end = tag_col_start + tag.len() - 1;
+        let expected = vec![
+            Token::new_default(TokenType::NewLineChar, "\n".to_string(), None, 1, 1, 1),
+            Token::new_default(
+                TokenType::EndTag,
+                tag.clone(),
+                Some(tag.clone()),
+                2,
+                tag_col_start,
+                tag_col_end,
+            ),
+        ];
+        let mut scanner = Scanner::new(&markup);
+        scanner.expecting_tag_end = true;
+        let mut scanned: Vec<Token> = scanner
+            .filter_map(|result| result.as_ref().ok().cloned())
+            .collect();
+        scanned.pop(); // remove EOF
+        assert_eq!(scanned, expected)
     }
 }

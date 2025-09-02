@@ -1,0 +1,8 @@
+= Include XML should not include end of comment
+
+For example:
+
+[source, xml]
+----
+include::included.xml[tag=snip]
+----

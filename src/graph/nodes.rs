@@ -95,10 +95,14 @@ impl Default for Location {
 
 impl Ord for Location {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        if self.line == other.line {
-            self.col.cmp(&other.col)
+        if self.file.len() == other.file.len() {
+            if self.line == other.line {
+                self.col.cmp(&other.col)
+            } else {
+                self.line.cmp(&other.line)
+            }
         } else {
-            self.line.cmp(&other.line)
+            self.file.len().cmp(&other.file.len())
         }
     }
 }
@@ -159,6 +163,25 @@ mod tests {
         let other = vec![Location::new(1, 1, vec![]), Location::new(4, 5, vec![])];
         assert_eq!(
             vec![Location::new(1, 1, vec![]), Location::new(4, 5, vec![])],
+            Location::reconcile(start, other)
+        )
+    }
+
+    #[test]
+    /// Ensure that any included files are ordered after non-included files even if their lines
+    /// and cols are the same
+    fn reconcile_locations_files() {
+        let included = "foo.txt".to_string();
+        let start = vec![Location::new(1, 1, vec![]), Location::new(2, 4, vec![])];
+        let other = vec![
+            Location::new(1, 1, vec![included.clone()]),
+            Location::new(4, 5, vec![included.clone()]),
+        ];
+        assert_eq!(
+            vec![
+                Location::new(1, 1, vec![]),
+                Location::new(4, 5, vec![included])
+            ],
             Location::reconcile(start, other)
         )
     }

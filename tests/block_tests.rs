@@ -252,6 +252,22 @@ fn test_include_lines() {
 }
 
 #[test]
+fn test_include_tags() {
+    let fn_pattern = "blocks/include-tags";
+    let adoc_fn = format!("{}.adoc", fn_pattern);
+    let asg_json_fn = format!("{}.json", fn_pattern);
+    assert_parsed_doc_matches_expected_asg(&adoc_fn, &asg_json_fn)
+}
+
+#[test]
+fn test_include_tags_xml() {
+    let fn_pattern = "blocks/include-tags-xml";
+    let adoc_fn = format!("{}.adoc", fn_pattern);
+    let asg_json_fn = format!("{}.json", fn_pattern);
+    assert_parsed_doc_matches_expected_asg(&adoc_fn, &asg_json_fn)
+}
+
+#[test]
 fn test_include_respects_internal_breaks() {
     let fn_pattern = "blocks/include-respects-internal-breaks";
     let adoc_fn = format!("{}.adoc", fn_pattern);

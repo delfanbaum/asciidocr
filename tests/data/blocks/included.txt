@@ -8,3 +8,6 @@ Line seven
 // end::foo[]
 Line nine
 Line ten
+// tag::bar[]
+Line eleven
+// end::bar[]
