@@ -22,6 +22,7 @@ regex = "1.11.1"
 serde = {version = "1.0.210", features=["derive"]}
 serde_json = "1.0.128"
 simple_logger = {version = "5.0.0", features=["colors"]}
+syntect = {version = "5.2.0", optional=true}
 tera = {version = "1.20.0", features=["builtins"]}
 thiserror = "2.0.12"
 
@@ -29,8 +30,9 @@ thiserror = "2.0.12"
 assert-json-diff = "2.0.2"
 image = "0.25.6"
 logtest = "2.0.0"
-rstest = "0.25.0"
+rstest = "0.26.1"
 tempfile = "3.14.0"
 
 [features]
 docx = ["dep:docx-rs"]
+highlighting = ["dep:syntect"]

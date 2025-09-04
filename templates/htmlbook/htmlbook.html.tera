@@ -6,16 +6,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{%- if header %}
+    {%- if header %}
+    <title>
         {%- for inline in header.title %}
         {{- inline_macros::process_inline(inline=inline) -}}
         {% endfor -%}
-        {% endif -%}</title>
+    </title>
+
+    {% endif -%}
+
 </head>
 
-<body>{% for block in blocks %}
+<body>
+    {% for block in blocks %}
     {{ block_macros::process_block(block=block,skip_tag=false) -}}
-{% endfor %}
+    {% endfor %}
 </body>
 
 </html>

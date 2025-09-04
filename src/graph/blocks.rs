@@ -14,6 +14,9 @@ use crate::{
     parser::ParserError,
 };
 
+#[cfg(feature = "highlighting")]
+use syntect::parsing::SyntaxSet;
+
 #[derive(thiserror::Error, PartialEq, Debug)]
 pub enum BlockError {
     #[error("Attempted to push dangling ListItem to parent block")]
@@ -30,6 +33,9 @@ pub enum BlockError {
     InvalidToken,
     #[error("Footnote error: {0}")]
     Footnote(String),
+    #[cfg(feature = "highlighting")]
+    #[error("Highlighting error: {0}")]
+    HighlightingError(String),
 }
 
 /// Blocks Enum, containing all possible document blocks
@@ -1100,6 +1106,45 @@ impl LeafBlock {
             )),
             location: vec![],
         }
+    }
+
+    #[cfg(feature = "highlighting")]
+    /// Highlights the block if it can find a suitable highlighter, nothing that this effectively
+    /// "squishes" all the Inlines into one so that they can be processed.
+    pub fn highlight(&mut self) -> Result<(), BlockError> {
+        if let Some(metadata) = &self.metadata {
+            if let Some(language) = metadata.attributes.get("language") {
+                use syntect::util::LinesWithEndings;
+
+                let syntax_set = SyntaxSet::load_defaults_newlines();
+                if let Some(syntax) = syntax_set.find_syntax_by_extension(language) {
+                    use syntect::html::{ClassStyle, ClassedHTMLGenerator};
+                    let mut block_text = String::new();
+
+                    for inline in self.inlines.iter() {
+                        block_text.push_str(&inline.extract_values_to_string())
+                    }
+
+                    let mut html_generator = ClassedHTMLGenerator::new_with_class_style(
+                        syntax,
+                        &syntax_set,
+                        ClassStyle::Spaced,
+                    );
+                    for line in LinesWithEndings::from(&block_text) {
+                        match html_generator.parse_html_for_line_which_includes_newline(line) {
+                            Ok(_) => {}
+                            Err(_) => {
+                                return Err(BlockError::HighlightingError(
+                                    "THIS SHOULD HAPPEN AT SERIALIZATION".to_string(),
+                                ));
+                            }
+                        }
+                    }
+                    let _ = html_generator.finalize();
+                }
+            }
+        }
+        Ok(())
     }
 }
 
