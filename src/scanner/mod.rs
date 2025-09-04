@@ -78,15 +78,12 @@ impl<'a> Scanner<'a> {
         let c = self.source.as_bytes()[self.current] as char;
         self.current += 1; // this instead of the "advance" function in "Crafting Interpreters"
 
-        // handle the tagging end edge case
-        if !matches!(c, '\n') && self.expecting_tag_end && self.peek_line().contains("end::") {
-            return self.add_tag();
-        }
-
         match c {
             '\n' => self.add_token(TokenType::NewLineChar, false, 1),
             '\'' => {
-                if self.starts_repeated_char_line(c, 3) {
+                if self.starts_end_tag_line() {
+                    self.add_tag()
+                } else if self.starts_repeated_char_line(c, 3) {
                     self.current += 2;
                     self.add_token(TokenType::ThematicBreak, false, 0)
                 } else if ['\0', ' ', '\n'].contains(&self.peek_back()) && self.peek() == '`' {
@@ -102,7 +99,9 @@ impl<'a> Scanner<'a> {
                 }
             }
             '<' => {
-                if self.starts_repeated_char_line(c, 3) {
+                if self.starts_end_tag_line() {
+                    self.add_tag()
+                } else if self.starts_repeated_char_line(c, 3) {
                     self.current += 2;
                     self.add_token(TokenType::PageBreak, false, 0)
                 } else if ['-', '='].contains(&self.peek()) {
@@ -122,7 +121,9 @@ impl<'a> Scanner<'a> {
             }
             // potential block delimiter chars get treated similarly
             '+' | '*' | '-' | '_' | '/' | '=' | '.' => {
-                if self.starts_new_line() && self.starts_repeated_char_line(c, 4) {
+                if self.starts_end_tag_line() {
+                    self.add_tag()
+                } else if self.starts_new_line() && self.starts_repeated_char_line(c, 4) {
                     self.current += 3; // the remaining repeated chars
                     self.add_token(TokenType::block_from_char(c)?, false, 0)
                 } else {
@@ -169,7 +170,9 @@ impl<'a> Scanner<'a> {
                             }
                         }
                         '/' => {
-                            if self.starts_new_line() && self.peek() == '/' {
+                            if self.starts_end_tag_line() {
+                                self.add_tag()
+                            } else if self.starts_new_line() && self.peek() == '/' {
                                 if ["/ tag::", "/ end::"].contains(&self.peeks_ahead(7)) {
                                     self.current += 2;
                                     self.add_token(TokenType::Comment, true, 0)
@@ -263,7 +266,13 @@ impl<'a> Scanner<'a> {
             }
             '^' => self.add_token(TokenType::Superscript, false, 0),
             '~' => self.add_token(TokenType::Subscript, false, 0),
-            '#' => self.handle_inline_formatting(c, TokenType::Mark, TokenType::UnconstrainedMark),
+            '#' => {
+                if self.starts_end_tag_line() {
+                    self.add_tag()
+                } else {
+                    self.handle_inline_formatting(c, TokenType::Mark, TokenType::UnconstrainedMark)
+                }
+            }
             ':' => {
                 if self.starts_new_line() && self.starts_attr() {
                     while self.peek() != '\n' {
@@ -426,6 +435,13 @@ impl<'a> Scanner<'a> {
                 if ['\0', ' ', '\n'].contains(&self.peek_back()) && self.peek() == '`' {
                     self.current += 1;
                     self.add_token(TokenType::OpenDoubleQuote, true, 0)
+                } else {
+                    self.add_text_until_next_markup()
+                }
+            }
+            ' ' | '%' => {
+                if self.starts_end_tag_line() {
+                    self.add_tag()
                 } else {
                     self.add_text_until_next_markup()
                 }
@@ -650,6 +666,10 @@ impl<'a> Scanner<'a> {
         let check = self.source.as_bytes()[self.current] as char == ':';
         self.current = current_placeholder;
         check
+    }
+
+    fn starts_end_tag_line(&mut self) -> bool {
+        self.expecting_tag_end && self.peek_line().contains("end::")
     }
 
     /// Checks for document attribute references, e.g., {my-thing}
