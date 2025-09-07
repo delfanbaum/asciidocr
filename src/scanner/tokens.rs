@@ -159,7 +159,7 @@ impl Token {
     /// otherwise return None
     pub fn tag(&self) -> Option<String> {
         if matches!(self.token_type(), TokenType::StartTag | TokenType::EndTag) {
-            return Some((&self.lexeme[5..self.lexeme.len() - 2]).to_string());
+            return Some((self.lexeme[5..self.lexeme.len() - 2]).to_string());
         }
         None
     }

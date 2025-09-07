@@ -77,8 +77,9 @@ pub fn extract_page_ranges(ranges_str: &str) -> Vec<i32> {
             let start = parts[0].parse::<i32>().unwrap_or(0);
             if parts.len() == 2 {
                 // if there is an end value
-                if let Some(mut end) = parts[1].parse::<i32>().ok() {
-                    if end == -1 {  // if we're reading to the end, read to the end
+                if let Ok(mut end) = parts[1].parse::<i32>() {
+                    if end == -1 {
+                        // if we're reading to the end, read to the end
                         ranges.push(start);
                         ranges.push(-1);
                     } else {
@@ -101,7 +102,7 @@ pub fn extract_attributes(attribute_list: &str) -> Vec<String> {
     let mut attributes: Vec<String> = vec![];
     let mut non_quoted_key_values = attribute_list.to_owned();
     // TK "1,2,4" should be a single attribute, not "1,", 2, 4"
-    for quoted_attr in RE_NAMED_QUOTED.captures_iter(&attribute_list) {
+    for quoted_attr in RE_NAMED_QUOTED.captures_iter(attribute_list) {
         let (total, [_]) = quoted_attr.extract();
         attributes.push(total.to_owned());
         non_quoted_key_values = non_quoted_key_values.replace(total, "");

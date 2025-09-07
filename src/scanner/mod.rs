@@ -623,10 +623,10 @@ impl<'a> Scanner<'a> {
         }
         self.current += 1; // consume the ']' char
 
-        if (&self.source[self.start..self.current]).contains("tag") {
+        if (self.source[self.start..self.current]).contains("tag") {
             tag_type = TokenType::StartTag;
             self.expecting_tag_end = true;
-        } else if (&self.source[self.start..self.current]).contains("end") {
+        } else if (self.source[self.start..self.current]).contains("end") {
             tag_type = TokenType::EndTag;
             self.expecting_tag_end = false;
         } else {
@@ -815,7 +815,7 @@ impl<'a> Scanner<'a> {
         while !['\n', '\0'].contains(&self.peeks_ahead(count).chars().last().unwrap()) {
             count += 1
         }
-        return self.peeks_ahead(count - 1);
+        self.peeks_ahead(count - 1)
     }
 }
 
