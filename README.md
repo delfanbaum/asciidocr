@@ -97,6 +97,17 @@ features. Some things it does _not_ do (yet):
 For a more complete list of the current limitations and caveats, see
 `LIMITATIONS.adoc`.
 
+## Recent Additions
+
+That said, new language features are being added in addition to other
+capabilities with each release -- if there's something you want but don't
+have, please open an issue. The most up-to-date information will be found on
+each release's page, but some language features recently introduced include:
+
+* Handling for tagged regions (`tag::foo[]`, `include::bar.txt[tag=foo]`, etc.)
+* Filtering included files by line (`include:foo.txt[lines=4..20]`, etc.),
+  including "end of file" filtering (`[lines=5..-1`)
+
 ## Project Goals 
 
 A non-exhaustive list:
