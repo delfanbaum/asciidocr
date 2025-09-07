@@ -11,6 +11,8 @@ use self::tokens::TokenError;
 pub enum ScannerError {
     #[error(transparent)]
     Token(#[from] TokenError),
+    #[error("General error: `{0}`")]
+    String(String),
 }
 
 #[derive(Debug)]
@@ -460,8 +462,7 @@ impl<'a> Scanner<'a> {
             4 => self.add_token(TokenType::Heading4, false, 0),
             5 => self.add_token(TokenType::Heading5, false, 0),
             _ => {
-                error!("Invalid headling level: line {}", self.line);
-                std::process::exit(1)
+                return Err(ScannerError::String(format!("Invalid headling level: line {}", self.line)))
             }
         }
     }
