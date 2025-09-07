@@ -1,0 +1,13 @@
+Line one
+Line two
+Line three
+// tag::foo[]
+Line five
+Line six
+Line seven
+// end::foo[]
+Line nine
+Line ten
+// tag::bar[]
+Line eleven
+// end::bar[]

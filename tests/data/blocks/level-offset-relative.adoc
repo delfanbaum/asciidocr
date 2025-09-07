@@ -1,0 +1,7 @@
+:leveloffset: +1
+
+include::headings-to-offset.adoc[]
+
+:leveloffset: -1
+
+== This should be a level-one heading, outside the offset

@@ -35,4 +35,5 @@
 pub mod backends;
 pub mod graph;
 pub mod parser;
+pub mod utils;
 pub mod scanner;

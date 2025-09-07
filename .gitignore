@@ -24,4 +24,5 @@ Cargo.lock
 
 /target
 notes/
+local-tests/
 *.docx

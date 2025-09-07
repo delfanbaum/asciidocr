@@ -1,0 +1,19 @@
+== Single Range
+
+include::included.txt[lines=5..10]
+
+== Multiple Range Quoted
+
+include::included.txt[lines="1..3,5..7"]
+
+== Multiple Range Semicolons
+
+include::included.txt[lines=1;5..7]
+
+== Range To Last Line
+
+include::included.txt[lines=5..-1]
+
+== Range without end
+
+include::included.txt[lines=5..]

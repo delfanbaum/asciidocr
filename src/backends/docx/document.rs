@@ -1,9 +1,8 @@
 use std::{fs::File, io::Read};
 
 use docx_rs::{
-    AlignmentType, BreakType, Docx, Header, IndentLevel, LineSpacing, Numbering, NumberingId,
-    PageMargin, PageNum, Paragraph, Pic, Run, RunFonts, RunProperty, Style, Table, TableCell,
-    TableRow, VertAlignType,
+    BreakType, Docx, Header, IndentLevel, LineSpacing, Numbering, NumberingId, PageMargin, PageNum,
+    Paragraph, Pic, Run, RunFonts, RunProperty, Style, Table, TableCell, TableRow, VertAlignType,
 };
 use once_cell::sync::Lazy;
 use regex::Regex;
@@ -28,7 +27,15 @@ pub fn asciidocr_default_docx() -> Docx {
         .add_style(DocumentStyles::normal())
         .add_style(DocumentStyles::no_spacing())
         .add_style(DocumentStyles::title())
-        .header(Header::new().add_page_num(PageNum::new().align(AlignmentType::Right)))
+        .header(
+            Header::new().add_paragraph(
+                Paragraph::new()
+                    .v_anchor("text")
+                    .h_anchor("margin")
+                    .x_align("right")
+                    .add_page_num(PageNum::new()),
+            ),
+        )
         .page_size(inches(8.5), inches(11.0))
         .page_margin(
             PageMargin::new()
@@ -193,10 +200,24 @@ impl DocxWriter {
         docx = self.add_paragraph(docx, para)?;
         // add any children -- TODO style them as list continues
         if !item.blocks.is_empty() {
+            docx = self.set_style(docx, DocumentStyles::ListParagraphContinue)?;
             for block in item.blocks.iter() {
-                docx = self.add_block_to_doc(docx, block)?
+                docx = self.add_block_to_list_item(docx, block)?
             }
+            self.reset_style();
         }
+        Ok(docx)
+    }
+
+    /// For now, simply add any child inlines as such to a list continuation paragraph
+    fn add_block_to_list_item(
+        &mut self,
+        mut docx: Docx,
+        block: &Block,
+    ) -> Result<Docx, DocxRenderError> {
+        let mut para = Paragraph::new().style(&self.current_style.style_id());
+        para = self.add_inlines_to_para(para, block.inlines());
+        docx = self.add_paragraph(docx, para)?;
         Ok(docx)
     }
 

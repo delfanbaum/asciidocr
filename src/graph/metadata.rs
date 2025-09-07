@@ -1,16 +1,16 @@
 use std::{collections::HashMap, fmt::Debug};
 
-use anyhow::{Result, anyhow};
 use once_cell::sync::Lazy;
 use regex::Regex;
 use serde::Serialize;
 
 use crate::graph::nodes::Location;
 use crate::scanner::tokens::{Token, TokenType};
+use crate::utils::{extract_attributes, key_values_from_named_attribute};
 
 // just make this quoted, and then pull everything else out
-static RE_NAMED_QUOTED: Lazy<Regex> = Lazy::new(|| Regex::new(r#"(\w*=".*?")"#).unwrap());
-static RE_NAMED: Lazy<Regex> = Lazy::new(|| Regex::new(r#"(.*?)[=|,](.*)"#).unwrap());
+pub static RE_NAMED_QUOTED: Lazy<Regex> = Lazy::new(|| Regex::new(r#"(\w*=".*?")"#).unwrap());
+pub static RE_NAMED: Lazy<Regex> = Lazy::new(|| Regex::new(r#"(.*?)[=|,](.*)"#).unwrap());
 
 #[derive(PartialEq, Clone, Debug)]
 pub enum AttributeType {
@@ -18,6 +18,7 @@ pub enum AttributeType {
     Quote,
     Verse,
     Source,
+    Lines,
 }
 
 impl AttributeType {
@@ -138,17 +139,7 @@ impl ElementMetadata {
             new_block_metadata.attributes.insert("id".to_string(), id);
         } else {
             let attribute_list = token.lexeme[1..token.lexeme.len() - 1].to_string();
-            let mut non_quoted_key_values = attribute_list.clone();
-            let mut attributes: Vec<&str> = vec![];
-            // TK "1,2,4" should be a single attribute, not "1,", 2, 4"
-            for quoted_attr in RE_NAMED_QUOTED.captures_iter(&attribute_list) {
-                let (total, [_]) = quoted_attr.extract();
-                attributes.push(total);
-                non_quoted_key_values = non_quoted_key_values.replace(total, "");
-            }
-            attributes.extend(non_quoted_key_values.split(',').collect::<Vec<&str>>());
-
-            new_block_metadata.process_attributes(attributes);
+            new_block_metadata.process_attributes(extract_attributes(&attribute_list));
         }
         new_block_metadata
     }
@@ -161,8 +152,7 @@ impl ElementMetadata {
             }
         } else {
             let attribute_list = token.lexeme[1..token.lexeme.len() - 1].to_string();
-            let attributes: Vec<&str> = attribute_list.split(',').collect();
-            self.process_attributes(attributes);
+            self.process_attributes(extract_attributes(&attribute_list));
         }
     }
 
@@ -180,7 +170,7 @@ impl ElementMetadata {
         self.roles.extend(incoming.options.clone());
     }
 
-    pub fn process_attributes(&mut self, mut attributes: Vec<&str>) {
+    pub fn process_attributes(&mut self, mut attributes: Vec<String>) {
         for (idx, attribute) in attributes.iter_mut().enumerate() {
             match key_values_from_named_attribute(attribute) {
                 Ok((key, values)) => {
@@ -209,7 +199,7 @@ impl ElementMetadata {
         }
     }
 
-    fn process_attribute(&mut self, idx: usize, attribute: &mut &str) {
+    fn process_attribute(&mut self, idx: usize, attribute: &mut String) {
         match self.declared_type {
             Some(AttributeType::Source) => {
                 if idx == 1 {
@@ -228,9 +218,13 @@ impl ElementMetadata {
                     todo!(); // or panic?
                 }
             }
+            Some(AttributeType::Lines) => {
+                // need to figure out how to
+                todo!()
+            }
             _ => {
                 if attribute.starts_with('"') {
-                    *attribute = &attribute[1..attribute.len() - 1]
+                    *attribute = attribute[1..attribute.len() - 1].to_string()
                 }
                 self.attributes
                     .insert(format!("positional_{}", idx + 1), attribute.to_string());
@@ -251,23 +245,6 @@ impl ElementMetadata {
                     .insert("cols".to_string(), cols_value[..1].to_string());
             }
         }
-    }
-}
-
-fn key_values_from_named_attribute(attribute: &str) -> Result<(String, Vec<&str>)> {
-    match RE_NAMED.captures(attribute) {
-        Some(captures) => {
-            let (_, [named, mut values_str]) = captures.extract();
-            // remove quotes values
-            if values_str.starts_with('"') {
-                values_str = &values_str[1..values_str.len() - 1]
-            }
-            Ok((
-                named.to_string(),
-                values_str.split(' ').collect::<Vec<&str>>(),
-            ))
-        }
-        None => Err(anyhow!("Not a named attribute")),
     }
 }
 

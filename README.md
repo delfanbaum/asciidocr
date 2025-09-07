@@ -65,6 +65,9 @@ Options:
   -c, --count-words
           Print a document word count (excludes comments, markup characters, etc.)
 
+  -x, --allow-unresolved-targets
+          Run asciidocr without resolving resource targets; by default, asciidocr will fail to parse a document if a given resource is not found. This option allows parsing to continue if the backend supports missing targets
+
   -h, --help
           Print help (see a summary with '-h')
 
@@ -85,14 +88,25 @@ more. It should, however, be good to go for your next great short story.
 features. Some things it does _not_ do (yet):
 
 * Checklists
-* Offsets
-* Tagged regions/tagged includes
+* Tag filtering* (including by tags is now supported) 
 * Conditionals
 * Complex table markup
 * Complex nested lists
+* The "subs" attribute in blocks
 
 For a more complete list of the current limitations and caveats, see
 `LIMITATIONS.adoc`.
+
+## Recent Additions
+
+That said, new language features are being added in addition to other
+capabilities with each release -- if there's something you want but don't
+have, please open an issue. The most up-to-date information will be found on
+each release's page, but some language features recently introduced include:
+
+* Handling for tagged regions (`tag::foo[]`, `include::bar.txt[tag=foo]`, etc.)
+* Filtering included files by line (`include:foo.txt[lines=4..20]`, etc.),
+  including "end of file" filtering (`[lines=5..-1`)
 
 ## Project Goals 
 
@@ -101,7 +115,7 @@ A non-exhaustive list:
 * Coverage of the majority, if not all, asciidoc language features
 * Passes the [language compatibility toolkit](https://gitlab.eclipse.org/eclipse/asciidoc-lang/asciidoc-tck) tests
 * Clean, simple HTML output as a default
-* Native "document" (`docx` or `odt`, probably `docx`) output in a "manuscript"
+* Native "document" (`docx`) output in a "manuscript"
   template, like what you might send to a publisher or literary journal
 * PyO3 hooks/project for use inside Python contexts (will be behind a feature
   flag)

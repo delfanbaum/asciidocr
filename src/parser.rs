@@ -21,14 +21,14 @@ use crate::{
         blocks::{Block, BlockMacro, Break, LeafBlock, ParentBlock, Section, TableCell},
         inlines::{Inline, InlineLiteral, InlineLiteralName, InlineRef, InlineSpan, LineBreak},
         lists::{DList, DListItem, List, ListItem, ListVariant},
-        macros::target_and_attrs_from_token,
         metadata::{AttributeType, ElementMetadata},
         nodes::{Header, Location},
     },
     scanner::ScannerError,
+    utils::{extract_page_ranges, target_and_attrs_from_token},
 };
 
-#[derive(thiserror::Error, Debug)]
+#[derive(thiserror::Error, PartialEq, Debug)]
 pub enum ParserError {
     #[error(transparent)]
     Scanner(#[from] ScannerError),
@@ -40,16 +40,24 @@ pub enum ParserError {
     TopLevelHeading(usize),
     #[error("Parse error line {0}: Invalid open_parse_after_as_text_type occurance")]
     OpenParse(usize),
-    #[error("Parse error line: Attempted to close a non-existent delimited block")]
+    #[error("Parse error: Attempted to close a non-existent delimited block")]
     DelimitedBlock,
     #[error("Parse error line {0}: Unexpected block in Block::ParentBlock")]
     ParentBlock(usize),
-    #[error("Parse error line {0}: Unable to Uanble to canonicalize include path: {1:?}")]
-    IncludeError(usize, String),
+    #[error(
+        "Parse error line {0}: Invalid heading level; parser level offest at the time of error was: {1}"
+    )]
+    HeadingOffsetError(usize, i8),
+    #[error("Parse error line {0}: Unable to resolve target: {1:?}")]
+    TargetResolution(usize, String),
     #[error("Parser error: Tried to add last block when block stack was empty.")]
     BlockStack,
     #[error("Parse error: invalid block continuation; no previous block")]
     BlockContinuation,
+    #[error("Parse error: {0}")]
+    InternalError(String),
+    #[error("Attribute error: {0}")]
+    AttributeError(String),
 }
 
 /// Parses a stream of tokens into an [`Asg`] (Abstract Syntax Graph), returning the graph once all
@@ -81,6 +89,8 @@ pub struct Parser {
     /// appends text to block or inline regardless of markup, token, etc. (will need to change
     /// if/when we handle code callouts)
     open_parse_after_as_text_type: Option<TokenType>,
+    /// tracks the document heading level offset
+    level_offset: i8,
     /// designates whether we're to be adding inlines to the previous block until a newline
     in_block_line: bool,
     /// designates whether new literal text should be added to the last span
@@ -99,6 +109,8 @@ pub struct Parser {
     /// Used to see if we need to add a newline before new text; we don't add newlines to the text
     /// literals unless they're continuous (i.e., we never count newline paras as paras)
     dangling_newline: Option<Token>,
+    /// Testing helper
+    pub resolve_targets: bool,
 }
 
 impl Default for Parser {
@@ -134,6 +146,7 @@ impl Parser {
             block_title: None,
             metadata: None,
             open_delimited_block_lines: vec![],
+            level_offset: 0,
             in_block_line: false,
             in_inline_span: false,
             in_block_continuation: false,
@@ -142,7 +155,17 @@ impl Parser {
             force_new_block: false,
             close_parent_after_push: false,
             dangling_newline: None,
+            resolve_targets: true,
         }
+    }
+
+    /// Similar to Parser::new() except returns a parser that does not resolve non-include
+    /// directive targets (useful for testing, or in cases where you don't care if a given target
+    /// resource exists or not)
+    pub fn new_no_target_resolution(origin: PathBuf) -> Self {
+        let mut test_parser = Self::new(origin);
+        test_parser.resolve_targets = false;
+        test_parser
     }
 
     /// Parses the stream of tokens provided by the [`Scanner`].
@@ -210,8 +233,10 @@ impl Parser {
                     }
                 }
                 TokenType::SourceBlock => {
-                    // allow callouts in the source block
-                    if ![token_type, TokenType::CodeCallout].contains(&token.token_type()) {
+                    // allow callouts and includes
+                    if ![token_type, TokenType::CodeCallout, TokenType::Include]
+                        .contains(&token.token_type())
+                    {
                         self.pass_text_through(token)?;
                         return Ok(());
                     }
@@ -223,10 +248,10 @@ impl Parser {
         match token.token_type() {
             // document header, headings and section parsing
             TokenType::Heading1 => self.parse_title(token, asg),
-            TokenType::Heading2 => self.parse_section_headings(token, 1, asg),
-            TokenType::Heading3 => self.parse_section_headings(token, 2, asg),
-            TokenType::Heading4 => self.parse_section_headings(token, 3, asg),
-            TokenType::Heading5 => self.parse_section_headings(token, 4, asg),
+            TokenType::Heading2 => self.parse_section_headings(token, asg),
+            TokenType::Heading3 => self.parse_section_headings(token, asg),
+            TokenType::Heading4 => self.parse_section_headings(token, asg),
+            TokenType::Heading5 => self.parse_section_headings(token, asg),
 
             // document attributes
             TokenType::Attribute => self.parse_attribute(token),
@@ -275,6 +300,8 @@ impl Parser {
             TokenType::AttributeReference => self.parse_attribute_reference(token),
             TokenType::CrossReference => self.parse_cross_reference(token),
             TokenType::Include => self.parse_include(token, asg),
+            // we just check for the existence of these; we don't actually process them
+            TokenType::StartTag | TokenType::EndTag => {Ok(())}
 
             // inline macros
             TokenType::FootnoteMacro => self.parse_footnote_macro(token),
@@ -377,14 +404,39 @@ impl Parser {
             warn!("Empty attributes list at line: {}", token.line);
             return Ok(());
         }
-        let key = attr_components.first().unwrap().to_string();
+        let key = attr_components.first().unwrap();
         // values should be trimmed
-        let mut value = attr_components.last().unwrap().trim().to_string();
-        if key == value {
-            value = String::from("")
+        let mut value = attr_components.last().unwrap().trim();
+        if key == &value {
+            value = ""
         }
-        self.document_attributes.insert(key, value);
-        Ok(())
+        match *key {
+            "leveloffset" => self.parse_level_offset(value),
+            _ => {
+                self.document_attributes
+                    .insert(key.to_string(), value.to_string());
+                Ok(())
+            }
+        }
+    }
+
+    fn parse_level_offset(&mut self, value: &str) -> Result<(), ParserError> {
+        if let Ok(value) = value.parse::<usize>() {
+            self.level_offset = value as i8;
+            Ok(())
+        } else {
+            match value.parse::<i8>() {
+                // absolute value
+                Ok(value) => {
+                    self.level_offset += value;
+                    Ok(())
+                }
+                // relative value, or error
+                Err(_) => Err(ParserError::InternalError(
+                    "Error parsing level offset".to_string(),
+                )),
+            }
+        }
     }
 
     fn parse_block_anchor_attributes(&mut self, token: Token) -> Result<(), ParserError> {
@@ -499,58 +551,96 @@ impl Parser {
     }
 
     fn parse_include(&mut self, token: Token, asg: &mut Asg) -> Result<(), ParserError> {
-        // ignore any attributes for the time being
-        let (target, _) = target_and_attrs_from_token(&token);
-        // calculate target, given that it's relative; if there is something on the stack, use
-        // that, else use self.origin
+        // placeholders
+        let mut included_lines: Vec<i32> = vec![];
+        let mut include_to_end: bool = false;
+        let mut included_tags: Vec<String> = vec![];
+        let mut asciidoc_include: bool = false;
+        let mut current_tag: Option<String> = None;
 
-        let mut resolved_target: PathBuf;
-
-        if !self.file_stack.is_empty() {
-            resolved_target = self.origin_directory.clone();
-            // may as well follow the rabbit hole
-            for file in self.file_stack.iter() {
-                if let Some(parent) = PathBuf::from_str(file).unwrap().parent() {
-                    resolved_target.push(parent)
+        let (target, meta) = target_and_attrs_from_token(&token);
+        // check for level offsets in the include
+        if let Some(metadata) = meta {
+            if let Some(value) = metadata.attributes.get("leveloffset") {
+                match self.parse_level_offset(value) {
+                    Ok(_) => {}
+                    Err(e) => return Err(e),
                 }
             }
-            resolved_target = match resolved_target.join(target.clone()).canonicalize() {
-                Ok(p) => p,
-                Err(_) => return Err(ParserError::IncludeError(token.line, target)),
+            if let Some(value) = metadata.attributes.get("lines") {
+                included_lines = extract_page_ranges(value);
+                if let Some(line) = included_lines.last() {
+                    if *line == -1 {
+                        include_to_end = true;
+                        included_lines.pop();
+                    }
+                }
             }
-        } else {
-            resolved_target = match self.origin_directory.join(target.clone()).canonicalize() {
-                Ok(p) => p,
-                Err(_) => return Err(ParserError::IncludeError(token.line, target)),
+            if let Some(value) = metadata.attributes.get("tag") {
+                included_tags.push(value.clone());
+            } // it can either be tag or tags, which is annoying!
+            if let Some(value) = metadata.attributes.get("tags") {
+                included_tags.extend(value.split(";").map(|tag| tag.to_string()));
             }
         }
+
+        // calculate target, given that it's relative; if there is something on the stack, use
+        // that, else use self.origin
+        let resolved_target = self.resolve_target(token.line, &target)?;
         self.file_stack.push(target.clone());
 
         let current_block_stack_len = self.block_stack.len();
 
-        // Match filetype, if adoc scan into tokens, adding the location, then parse...
+        // Are we including another asciidoc file that should be scanned and parsed?
         if matches!(
             target.split('.').next_back().unwrap_or(""),
-            "adoc" | "asciidoc" | "txt"
+            "adoc" | "asciidoc" | "txt"   // note that per the spec we parse txt as asciidoc
         ) {
-            for result in
-                Scanner::new_with_stack(&open_file(resolved_target), self.file_stack.clone())
-            {
-                match result {
-                    Ok(token) => {
+            asciidoc_include = true;
+        }
+
+        // now parse the file
+        for result in Scanner::new_with_stack(&open_file(resolved_target), self.file_stack.clone())
+        {
+            match result {
+                Ok(token) => {
+                    // lines
+                    if !included_lines.is_empty() {
+                        if !included_lines.contains(&(token.line as i32)) {
+                            continue;
+                        } else if include_to_end
+                            && &(token.line as i32) >= included_lines.last().unwrap()
+                        {
+                            included_lines.clear()
+                        }
+                    }
+                    // tags
+                    if !included_tags.is_empty() {
+                        if token.token_type() == TokenType::StartTag {
+                            if let Some(tag) = token.tag() {
+                                if included_tags.contains(&tag) {
+                                    current_tag = Some(tag);
+                                    continue;
+                                }
+                            }
+                        }
+                        if token.token_type() == TokenType::EndTag {
+                            if let Some(tag) = token.tag() {
+                                if current_tag == Some(tag) {
+                                    current_tag = None;
+                                    continue;
+                                }
+                            }
+                        }
+                        if current_tag.is_none() {
+                            continue;
+                        }
+                    }
+                    if asciidoc_include {
                         let token_type = token.token_type();
                         self.token_into(token, asg)?;
                         self.last_token_type = token_type;
-                    }
-                    Err(e) => return Err(ParserError::Scanner(e)),
-                }
-            }
-        } else {
-            for result in
-                Scanner::new_with_stack(&open_file(resolved_target), self.file_stack.clone())
-            {
-                match result {
-                    Ok(token) => {
+                    } else {
                         // allow EOFs to pass through; otherwise just parse as text
                         if matches!(token.token_type(), TokenType::Eof) {
                             self.last_token_type = TokenType::Eof;
@@ -559,8 +649,8 @@ impl Parser {
                         }
                         self.parse_text(token)?;
                     }
-                    Err(e) => return Err(ParserError::Scanner(e)),
                 }
+                Err(e) => return Err(ParserError::Scanner(e)),
             }
         }
 
@@ -672,7 +762,12 @@ impl Parser {
 
     //fn parse_block_label(&mut self, token: Token, asg: &mut Asg) {}
 
-    fn parse_title(&mut self, token: Token, _asg: &mut Asg) -> Result<(), ParserError> {
+    fn parse_title(&mut self, token: Token, asg: &mut Asg) -> Result<(), ParserError> {
+        // Check offsets
+        if self.level_offset != 0 {
+            return self.parse_section_headings(token, asg);
+        }
+
         if token.first_location() == Location::default() {
             self.in_block_line = true;
             let mut header = Header::new();
@@ -685,12 +780,9 @@ impl Parser {
         }
     }
 
-    fn parse_section_headings(
-        &mut self,
-        token: Token,
-        level: usize,
-        asg: &mut Asg,
-    ) -> Result<(), ParserError> {
+    fn parse_section_headings(&mut self, token: Token, asg: &mut Asg) -> Result<(), ParserError> {
+        let level = self.get_heading_level(&token)?;
+
         // if the last section is at the same level, we need to push that up, otherwise the
         // accordion effect gets screwy with section levels
         if let Some(Block::Section(_)) = self.block_stack.last() {
@@ -714,6 +806,39 @@ impl Parser {
         // let us know that we want to add to the section title for a little bit
         self.force_new_block = false;
         Ok(())
+    }
+
+    /// Returns a valid heading level for a given token
+    fn get_heading_level(&self, token: &Token) -> Result<usize, ParserError> {
+        let level: i8 = match token.token_type() {
+            TokenType::Heading1 => self.level_offset,
+            TokenType::Heading2 => 1 + self.level_offset,
+            TokenType::Heading3 => 2 + self.level_offset,
+            TokenType::Heading4 => 3 + self.level_offset,
+            TokenType::Heading5 => 4 + self.level_offset,
+            _ => {
+                return Err(ParserError::InternalError(
+                    "Inavlid token given to parse_section_headings".to_string(),
+                ));
+            }
+        };
+
+        match level.try_into() {
+            Ok(value) => {
+                if !(1..=4).contains(&value) {
+                    Err(ParserError::HeadingOffsetError(
+                        token.line,
+                        self.level_offset,
+                    ))
+                } else {
+                    Ok(value)
+                }
+            }
+            Err(_) => Err(ParserError::HeadingOffsetError(
+                token.line,
+                self.level_offset,
+            )),
+        }
     }
 
     fn parse_admonition_para_syntax(&mut self, token: Token) -> Result<(), ParserError> {
@@ -765,7 +890,9 @@ impl Parser {
     }
 
     fn parse_block_image(&mut self, token: Token, asg: &mut Asg) -> Result<(), ParserError> {
-        let mut image_block = BlockMacro::new_image_from_token(token);
+        let (target, metadata) = target_and_attrs_from_token(&token);
+        self.check_target(token.line, &target)?;
+        let mut image_block = BlockMacro::new_image_block(target, metadata, token.locations());
         if let Some(metadata) = &self.metadata {
             // TODO see if there is a cleaner way to manage the borrowing here.
             image_block = image_block.add_metadata(metadata);
@@ -779,9 +906,13 @@ impl Parser {
     }
 
     fn parse_inline_image_macro(&mut self, token: Token) -> Result<(), ParserError> {
+        let (target, metadata) = target_and_attrs_from_token(&token);
+        let _ = self.check_target(token.line, &target);
         self.inline_stack
-            .push_back(Inline::InlineRef(InlineRef::new_inline_image_from_token(
-                token,
+            .push_back(Inline::InlineRef(InlineRef::new_inline_image(
+                target,
+                metadata,
+                token.locations(),
             )));
         self.close_parent_after_push = true;
         Ok(())
@@ -1062,7 +1193,7 @@ impl Parser {
             self.in_block_continuation = false;
         } else {
             if self.metadata.is_some() {
-                block.add_metadata(self.metadata.as_ref().unwrap().clone());
+                block.add_metadata(self.metadata.as_ref().unwrap().clone())?;
                 self.metadata = None;
             }
             self.block_stack.push(block)
@@ -1317,7 +1448,7 @@ impl Parser {
             }
         }
         if self.metadata.is_some() {
-            block.add_metadata(self.metadata.as_ref().unwrap().clone());
+            block.add_metadata(self.metadata.as_ref().unwrap().clone())?;
             self.metadata = None;
         }
         asg.push_block(block)?;
@@ -1342,7 +1473,7 @@ impl Parser {
     fn add_last_block_to_graph(&mut self, asg: &mut Asg) -> Result<(), ParserError> {
         if let Some(mut block) = self.block_stack.pop() {
             if self.metadata.is_some() {
-                block.add_metadata(self.metadata.as_ref().unwrap().clone());
+                block.add_metadata(self.metadata.as_ref().unwrap().clone())?;
                 self.metadata = None;
             }
             if let Some(next_last_block) = self.block_stack.last_mut() {
@@ -1356,6 +1487,38 @@ impl Parser {
             }
         }
         Ok(())
+    }
+
+    fn check_target(&self, token_line: usize, target: &str) -> Result<(), ParserError> {
+        if self.resolve_targets {
+            match self.resolve_target(token_line, target) {
+                Ok(_) => Ok(()),
+                Err(e) => Err(e),
+            }
+        } else {
+            Ok(())
+        }
+    }
+
+    fn resolve_target(&self, token_line: usize, target: &str) -> Result<PathBuf, ParserError> {
+        if !self.file_stack.is_empty() {
+            let mut resolved_target = self.origin_directory.clone();
+            // may as well follow the rabbit hole
+            for file in self.file_stack.iter() {
+                if let Some(parent) = PathBuf::from_str(file).unwrap().parent() {
+                    resolved_target.push(parent)
+                }
+            }
+            match resolved_target.join(target).canonicalize() {
+                Ok(p) => Ok(p),
+                Err(_) => Err(ParserError::TargetResolution(token_line, target.into())),
+            }
+        } else {
+            match self.origin_directory.join(target).canonicalize() {
+                Ok(p) => Ok(p),
+                Err(_) => Err(ParserError::TargetResolution(token_line, target.into())),
+            }
+        }
     }
 }
 
