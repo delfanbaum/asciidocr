@@ -1,7 +1,8 @@
-use anyhow::Result;
 use tera::{Context, Tera};
 
 use crate::graph::asg::Asg;
+
+use super::ConversionError;
 
 static HTMLBOOK_TEMPLATE: &str = include_str!("../../templates/htmlbook/htmlbook.html.tera");
 static BLOCKS_TEMPLATE: &str = include_str!("../../templates/htmlbook/block.html.tera");
@@ -11,14 +12,14 @@ static INLINES_TEMPLATE: &str = include_str!("../../templates/htmlbook/inline.ht
 
 /// Renders HTMLBook, which is HTML5 compliant, and includes no styles and no extraneous `<div>`
 /// enclosure. Useful when you just want a "plain" HTML representation.
-pub fn render_htmlbook(graph: &Asg) -> Result<String> {
+pub fn render_htmlbook(graph: &Asg) -> Result<String, ConversionError> {
     render_from_templates(graph, gather_htmlbook_templates())
 }
 
 fn render_from_templates(
     graph: &Asg,
     templates: Vec<(&'static str, &'static str)>,
-) -> Result<String> {
+) -> Result<String, ConversionError> {
     // from their docs
     let mut tera = Tera::default();
     tera.add_raw_templates(templates).expect("failure");

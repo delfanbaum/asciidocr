@@ -41,4 +41,6 @@ pub enum ConversionError {
     #[cfg(feature = "docx")]
     #[error(transparent)]
     DocxRender(#[from] DocxRenderError),
+    #[error(transparent)]
+    TeraError(#[from] tera::Error),
 }
