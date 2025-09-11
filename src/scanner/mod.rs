@@ -2,20 +2,9 @@
 
 pub mod tokens;
 use core::str;
-use log::error;
 use tokens::{Token, TokenType};
 
-use self::tokens::TokenError;
-
-#[derive(thiserror::Error, PartialEq, Debug)]
-pub enum ScannerError {
-    #[error(transparent)]
-    Token(#[from] TokenError),
-    #[error("Invalid headling level at line {0}")]
-    HeadingLevelError(usize),
-    #[error("Invalid include tag pattern: {0}")]
-    TagError(String),
-}
+use crate::errors::ScannerError;
 
 #[derive(Debug)]
 /// Scans an asciidoc `&str` into [`Token`]s to be consumed by the Parser.

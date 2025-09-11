@@ -10,10 +10,10 @@ use std::{
 
 use log::{error, warn};
 
-use crate::{graph::asg::AsgError, scanner::Scanner};
+use crate::scanner::tokens::{Token, TokenType};
 use crate::{
-    graph::blocks::BlockError,
-    scanner::tokens::{Token, TokenType},
+    errors::{ParserError, ScannerError},
+    scanner::Scanner,
 };
 use crate::{
     graph::{
@@ -24,41 +24,8 @@ use crate::{
         metadata::{AttributeType, ElementMetadata},
         nodes::{Header, Location},
     },
-    scanner::ScannerError,
     utils::{extract_page_ranges, target_and_attrs_from_token},
 };
-
-#[derive(thiserror::Error, PartialEq, Debug)]
-pub enum ParserError {
-    #[error(transparent)]
-    Scanner(#[from] ScannerError),
-    #[error(transparent)]
-    Block(#[from] BlockError),
-    #[error(transparent)]
-    Asg(#[from] AsgError),
-    #[error("Parse error line {0}: Level 0 headings are only allowed at the top of a document")]
-    TopLevelHeading(usize),
-    #[error("Parse error line {0}: Invalid open_parse_after_as_text_type occurance")]
-    OpenParse(usize),
-    #[error("Parse error: Attempted to close a non-existent delimited block")]
-    DelimitedBlock,
-    #[error("Parse error line {0}: Unexpected block in Block::ParentBlock")]
-    ParentBlock(usize),
-    #[error(
-        "Parse error line {0}: Invalid heading level; parser level offest at the time of error was: {1}"
-    )]
-    HeadingOffsetError(usize, i8),
-    #[error("Parse error line {0}: Unable to resolve target: {1:?}")]
-    TargetResolution(usize, String),
-    #[error("Parser error: Tried to add last block when block stack was empty.")]
-    BlockStack,
-    #[error("Parse error: invalid block continuation; no previous block")]
-    BlockContinuation,
-    #[error("Parse error: {0}")]
-    InternalError(String),
-    #[error("Attribute error: {0}")]
-    AttributeError(String),
-}
 
 /// Parses a stream of tokens into an [`Asg`] (Abstract Syntax Graph), returning the graph once all
 /// tokens have been parsed.
@@ -594,7 +561,7 @@ impl Parser {
         // Are we including another asciidoc file that should be scanned and parsed?
         if matches!(
             target.split('.').next_back().unwrap_or(""),
-            "adoc" | "asciidoc" | "txt"   // note that per the spec we parse txt as asciidoc
+            "adoc" | "asciidoc" | "txt" // note that per the spec we parse txt as asciidoc
         ) {
             asciidoc_include = true;
         }

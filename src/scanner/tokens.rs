@@ -1,10 +1,5 @@
+use crate::errors::TokenError;
 use crate::graph::nodes::Location;
-
-#[derive(thiserror::Error, PartialEq, Debug)]
-pub enum TokenError {
-    #[error("Invalid character match to produce block TokenType")]
-    CharacterMatch,
-}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 /// Produced by the Scanner; contains the text, location information about itself, and what

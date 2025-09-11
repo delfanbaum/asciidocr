@@ -2,7 +2,8 @@ pub mod common;
 
 use std::env::current_dir;
 
-use asciidocr::parser::{Parser, ParserError};
+use asciidocr::errors::ParserError;
+use asciidocr::parser::Parser;
 use asciidocr::scanner::Scanner;
 use common::assert_parsed_doc_matches_expected_asg;
 
