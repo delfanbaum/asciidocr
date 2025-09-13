@@ -1,0 +1,16 @@
+name: Assign Issues
+on:
+  issues:
+    types: [opened, unassigned]
+jobs:
+  auto-assign:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - name: "Auto-assign issue"
+        uses: pozil/auto-assign-issue@v1
+        with:
+          assignees: delfanbaum
+          numOfAssignee: 1
+          allowSelfAssign: true
