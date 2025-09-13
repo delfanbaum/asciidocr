@@ -1,3 +1,9 @@
+#[cfg(feature = "docx")]
+use docx_rs::DocxError;
+
+#[cfg(feature = "docx")]
+use crate::backends::docx::document::DocxRenderError;
+
 #[derive(thiserror::Error, Debug)]
 pub enum AsciidocrError {
     #[error(transparent)]
@@ -6,6 +12,8 @@ pub enum AsciidocrError {
     Parser(#[from] ParserError),
     #[error(transparent)]
     Asg(#[from] AsgError),
+    #[error(transparent)]
+    Conversion(#[from] ConversionError),
     #[error(transparent)]
     IOError(#[from] std::io::Error),
 }
@@ -50,6 +58,18 @@ pub enum ParserError {
     InternalError(String),
     #[error("Attribute error: {0}")]
     AttributeError(String),
+}
+
+#[derive(thiserror::Error, Debug)]
+pub enum ConversionError {
+    #[cfg(feature = "docx")]
+    #[error(transparent)]
+    Docx(#[from] DocxError),
+    #[cfg(feature = "docx")]
+    #[error(transparent)]
+    DocxRender(#[from] DocxRenderError),
+    #[error(transparent)]
+    TeraError(#[from] tera::Error),
 }
 
 #[derive(thiserror::Error, PartialEq, Debug)]

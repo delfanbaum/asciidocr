@@ -12,11 +12,6 @@ pub mod htmls;
 
 use clap::ValueEnum;
 
-#[cfg(feature = "docx")]
-use self::docx::document::DocxRenderError;
-#[cfg(feature = "docx")]
-use docx_rs::DocxError;
-
 #[derive(Debug, ValueEnum, Clone)]
 /// Enum containing all available backends for `asciidocr`. Note that some backends may be behind
 /// feature flags.
@@ -31,16 +26,4 @@ pub enum Backends {
     #[cfg(feature = "docx")]
     /// !Experimental! Produces a "manuscript-styled" DOCX document.
     Docx,
-}
-
-#[derive(thiserror::Error, Debug)]
-pub enum ConversionError {
-    #[cfg(feature = "docx")]
-    #[error(transparent)]
-    Docx(#[from] DocxError),
-    #[cfg(feature = "docx")]
-    #[error(transparent)]
-    DocxRender(#[from] DocxRenderError),
-    #[error(transparent)]
-    TeraError(#[from] tera::Error),
 }

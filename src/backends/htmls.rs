@@ -1,8 +1,7 @@
 use tera::{Context, Tera};
 
+use crate::errors::ConversionError;
 use crate::graph::asg::Asg;
-
-use super::ConversionError;
 
 static HTMLBOOK_TEMPLATE: &str = include_str!("../../templates/htmlbook/htmlbook.html.tera");
 static BLOCKS_TEMPLATE: &str = include_str!("../../templates/htmlbook/block.html.tera");
