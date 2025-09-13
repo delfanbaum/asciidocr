@@ -1,16 +1,15 @@
 use std::collections::HashMap;
+use std::env::current_dir;
 
 use serde::Serialize;
 
-use super::blocks::{Block, BlockError, ParentBlock};
+use crate::errors::{AsciidocrError, AsgError};
+use crate::parser::Parser;
+use crate::scanner::Scanner;
+
+use super::blocks::{Block, ParentBlock};
 use super::inlines::Inline;
 use super::nodes::{Header, Location, NodeTypes};
-
-#[derive(thiserror::Error, PartialEq, Debug)]
-pub enum AsgError {
-    #[error(transparent)]
-    Block(#[from] BlockError),
-}
 
 /// Abstract Syntax Graph used to represent an asciidoc document
 /// roughly meaning to follow the "official" schema:
@@ -57,6 +56,12 @@ impl Asg {
             blocks: vec![],
             location: vec![Location::default()],
         }
+    }
+
+    /// Creates an `Asg` from an `&str`, using the current directory as the base for any target
+    /// resolution
+    pub fn from_str(s: &str) -> Result<Self, AsciidocrError> {
+        Ok(Parser::new(current_dir()?).parse(Scanner::new(s))?)
     }
 
     /// Standardizes the graph into the "official" ASG format. Since we keep an intermediate

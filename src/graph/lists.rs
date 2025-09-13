@@ -1,3 +1,4 @@
+use crate::errors::BlockError;
 use crate::graph::{
     blocks::{Block, LeafBlock},
     inlines::Inline,
@@ -6,7 +7,7 @@ use crate::graph::{
 use crate::scanner::tokens::Token;
 use serde::Serialize;
 
-use super::{blocks::BlockError, metadata::ElementMetadata};
+use super::metadata::ElementMetadata;
 
 #[derive(Serialize, Clone, Debug)]
 pub struct List {

@@ -3,8 +3,8 @@ use once_cell::sync::Lazy;
 use regex::Regex;
 use std::collections::HashMap;
 
+use crate::errors::ParserError;
 use crate::graph::metadata::{ElementMetadata, RE_NAMED, RE_NAMED_QUOTED};
-use crate::parser::ParserError;
 use crate::scanner::tokens::{Token, TokenType};
 
 pub static RE_LINE_RANGES: Lazy<Regex> = Lazy::new(|| Regex::new(r#"([^,;]*)"#).unwrap());

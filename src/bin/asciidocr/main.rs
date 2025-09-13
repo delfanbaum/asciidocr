@@ -56,7 +56,9 @@ fn run(args: Cli) -> Result<()> {
         #[cfg(feature = "docx")]
         Backends::Docx => {
             if args.do_not_resolve_targets {
-                eprintln!("Error: the docx backend does not support parsing without target resolution.");
+                eprintln!(
+                    "Error: the docx backend does not support parsing without target resolution."
+                );
                 std::process::exit(1)
             }
 

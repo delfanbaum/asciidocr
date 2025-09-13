@@ -3,34 +3,14 @@ use std::{collections::HashMap, fmt::Display};
 
 use serde::Serialize;
 
-use crate::scanner::tokens::{Token, TokenType};
-use crate::{
-    graph::{
-        inlines::Inline,
-        lists::{DList, DListItem, List, ListItem, ListVariant},
-        metadata::ElementMetadata,
-        nodes::{Location, NodeTypes},
-    },
-    parser::ParserError,
+use crate::errors::{BlockError, ParserError};
+use crate::graph::{
+    inlines::Inline,
+    lists::{DList, DListItem, List, ListItem, ListVariant},
+    metadata::ElementMetadata,
+    nodes::{Location, NodeTypes},
 };
-
-#[derive(thiserror::Error, PartialEq, Debug)]
-pub enum BlockError {
-    #[error("Attempted to push dangling ListItem to parent block")]
-    DanglingList,
-    #[error("Attempted to add something other than a TableCell to a Table")]
-    TableCell,
-    #[error("push_block not implemented for {0}")]
-    NotImplemented(String),
-    #[error("Incorrect function call: consolidate_table_info on non-table block")]
-    IncorrectCall,
-    #[error("Missing location information for block")]
-    Location,
-    #[error("Tried to create a block from an invalid Token.")]
-    InvalidToken,
-    #[error("Footnote error: {0}")]
-    Footnote(String),
-}
+use crate::scanner::tokens::{Token, TokenType};
 
 /// Blocks Enum, containing all possible document blocks
 #[derive(Serialize, PartialEq, Clone, Debug)]

@@ -8,11 +8,10 @@ use std::{fs::File, path::Path};
 
 use docx_rs::Paragraph;
 
+use crate::errors::ConversionError;
 use crate::graph::asg::Asg;
 
 use self::document::DocxRenderError;
-
-use super::ConversionError;
 
 /// !Experimental! Renders a Docx file. Some [`Asg`] blocks are still unsupported.
 pub fn render_docx(graph: &Asg, output_path: &Path) -> Result<(), ConversionError> {

@@ -33,7 +33,8 @@
 //! [`HTMLBook`]: https://oreillymedia.github.io/HTMLBook/
 
 pub mod backends;
+pub mod errors;
 pub mod graph;
 pub mod parser;
-pub mod utils;
 pub mod scanner;
+pub mod utils;
