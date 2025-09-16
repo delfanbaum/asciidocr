@@ -1,0 +1,134 @@
+{#-
+
+Tera doesn't seem to support calling back and forth macros in recursion, so
+unfortunately our block (and inline, for that matter) processing all has to be
+done on a kind of `match`-like check, though as it also doesn't support a
+`match` (to be fair: I don't know of many templating languages that do), we get
+a long if-else chain. Perhaps there is a smarter way to do this, but for now,
+this should work.
+
+-#}
+{%- import "inline.html.tera" as inline_macros -%}
+{%- import "leafblocks.html.tera" as leaf_block_macros -%}
+{%- import "tables.html.tera" as table_macros -%}
+{%- macro process_block(block, skip_tag) -%}
+{%- set local_skip_tag = false -%}
+{#- Handle breaks separately; makes the logic easier -#}
+{%- if block.name in ["paragraph", "listing", "verse", "pass", "literal"] %}
+{{ leaf_block_macros::process_leaf_block(block=block) }}
+{%- elif block.name == "table" -%}
+{{ table_macros::process_table(block=block) }}
+{%- else -%}
+{%- if block.name == "break"-%}
+{% if block.variant == "page" %}
+<div style="page-break-after: always;"></div>
+{% elif block.variant == "thematic" %}
+<hr />
+{%- endif -%}
+{%- else -%}
+{%- if block.name == "section" -%}
+<section data-type="sect{{block.level}}"
+{%- if block.metadata.roles %} class="{{ block.metadata.roles | join(sep=" ")}}" {%- endif -%}
+{%- if block.metadata.attributes.id %} id="{{ block.metadata.attributes.id }}" {%- endif -%}>
+{%- elif block.name == "dlist" -%}
+{%- set tag = "dl" -%}
+{%- elif block.name == "list" -%}
+{%- if block.variant == "ordered" -%}
+{%- set tag = "ol" -%}
+{%- elif block.variant == "unordered" -%}
+{%- set tag = "ul" -%}
+{%- endif -%}
+{%- elif block.name == "open" -%}
+{%- set tag = "div" -%}
+{%- elif block.name == "listItem" -%}
+{%- set tag = "li" -%}
+{%- elif block.name == "dlistItem" -%}
+{#- just handle the terms here-#}
+{%- if block.terms %}
+<dt>{%- for inline in block.terms -%}
+{{- inline_macros::process_inline(inline=inline) -}}
+{%- endfor -%}</dt>
+{% endif -%}
+{%- set tag = "dd" -%}
+{% elif block.name == "admonition" -%}
+{%- set tag = "div" -%}
+{%- set data_type = block.variant -%}
+{%- set local_skip_tag = true -%}
+{% elif block.name == "example" -%}
+{%- set tag = "div" -%}
+{% elif block.name == "quote" -%}
+{%- set tag = "blockquote" -%}
+{% elif block.name == "image" -%}
+{%- set tag = "figure" -%}
+{%- if block.metadata.attributes.positional_1 -%}
+{%- set alt_text = block.metadata.attributes.positional_1 -%}
+{%- endif -%}
+{%- if block.metadata.attributes.id -%}
+{%- set id = block.metadata.attributes.id -%}
+{%- endif -%}
+{% elif block.name == "sidebar" -%}
+{%- set tag = "aside" -%}
+{%- set data_type = "sidebar" -%}
+{% else %}
+{%- set tag = "UNHANDLED" -%}
+{%- endif %}
+{%- if tag and not skip_tag -%}<{{tag}}
+{%- if block.metadata.roles and not block.name=="section" %} class="{{ block.metadata.roles | join(sep=" ")}}" {%- endif -%}
+{%- if code_language %} data-code-language="{{ code_language }}" {%- endif -%}
+{%- if id %} id="{{ id }}" {%- endif -%}
+{%- if data_type %} data-type="{{ data_type }}"{%- endif -%}>{%- endif -%}
+{%- if block.title -%}
+{%- if block.name in ["example", "sidebar"]-%}
+{%- set title_heading_level = 5 -%}
+{%- else -%}
+{%- set title_heading_level = 1 -%}
+{%- endif %}
+<h{{title_heading_level}}>{%- for inline in block.title -%}{{- inline_macros::process_inline(inline=inline) -}}
+{%- endfor -%}</h{{title_heading_level}}>
+{% endif -%}
+{%- if block.name == "image" %}
+<img src="{{block.target}}"{%- if alt_text %} alt="{{alt_text}}"{%- endif -%} />
+{%- if block.caption %}
+<figcaption>{%- for inline in block.caption -%}
+{{- inline_macros::process_inline(inline=inline) -}}
+{%- endfor -%}</figcaption>
+{%- endif %}
+{% endif -%}
+{%- if block.name == "list" or block.name == "dlist" -%}
+{% for item in block.items -%}
+{{ self::process_block(block=item, skip_tag=local_skip_tag) }}
+{%- endfor -%}
+{% elif block.principal -%}
+<p>{%- for inline in block.principal -%}
+{{- inline_macros::process_inline(inline=inline) -}}
+{%- endfor -%}</p>
+{%- else -%}
+{% if block.inlines %}
+{%- for inline in block.inlines -%}
+{{- inline_macros::process_inline(inline=inline) -}}
+{%- endfor -%}
+{%- endif -%}
+{%- endif -%}
+{%- if block.blocks and block.name != "section" %}
+{%- for child_block in block.blocks %}
+{{- self::process_block(block=child_block, skip_tag=local_skip_tag )-}}
+{%- endfor -%}
+{% endif -%}
+{%- if block.metadata.attributes.attribution -%}
+<p data-type="attribution">{{block.metadata.attributes.attribution}}
+{%- if block.metadata.attributes.citation -%}, {{block.metadata.attributes.citation}}
+{%- endif -%}
+</p>
+{%- endif -%}
+{%- if tag and not skip_tag -%}</{{tag}}>{%- endif -%}
+{% if block.name == "section" %}
+{% if block.blocks -%}
+{% for child_block in block.blocks %}
+{{- self::process_block(block=child_block, skip_tag=local_skip_tag) -}}
+{%- endfor -%}
+{%- endif -%}
+</section>
+{%- endif -%}
+{%- endif -%}
+{%- endif -%}
+{%- endmacro process_block -%}

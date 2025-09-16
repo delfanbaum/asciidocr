@@ -1,0 +1,59 @@
+{%- macro process_inline(inline) -%}
+{%- if inline.name == "linebreak" -%}
+    <br />
+{%- else -%}
+    {%- if inline.name == "span" -%}
+        {%- if inline.variant == "emphasis" -%}
+            {%- set inline_tag = "em" -%}
+        {%- elif inline.variant == "mark" -%}
+            {%- set inline_tag = "span" -%}
+        {%- elif inline.variant == "superscript" -%}
+            {%- set inline_tag = "sup" -%}
+        {%- elif inline.variant == "subscript" -%}
+            {%- set inline_tag = "sub" -%}
+        {%- elif inline.variant == "footnote" -%}
+            {%- set inline_tag = "span" -%}
+            {%- set data_type = "footnote" -%}
+        {%- else -%}
+            {%- set inline_tag = inline.variant -%}
+        {%- endif -%}
+
+    {%- elif inline.name == "ref" -%}
+        {%- set inline_tag = "a" -%}
+        {%- if inline.variant == "link" -%}
+            {%- set ref = inline.target -%}
+            {%- set target_attr = "href" -%}
+        {%- elif inline.variant == "xref" -%}
+            {%- set ref = "#" ~ inline.target -%}
+            {%- set target_attr = "href" -%}
+        {%- elif inline.variant == "image" -%}
+            {%- set inline_tag = "img" -%}
+            {%- set ref = inline.target -%}
+            {%- set self_close = True -%}
+            {%- set target_attr = "src" -%}
+        {%- endif -%}
+        {%- set target = target_attr ~ '="' ~ ref ~ '"' -%}
+    {%- endif -%}
+{%- if inline_tag -%}<{{inline_tag}}
+    {%- if inline.metadata.roles %} class="{{inline.metadata.roles | join(sep=" ")}}"
+    {%- endif -%}
+    {%- if data_type %} data-type="{{data_type}}"
+    {%- endif -%}
+    {%- if target %} {{target}}
+    {%- endif -%}{%-if self_close%} /{%-endif-%}>
+{%- endif -%}
+    {%- if not self_close -%}
+        {#- Handle recursion -#}
+            {%- if inline.inlines -%}
+                {%- for child in inline.inlines -%}
+                    {{- self::process_inline(inline=child) -}}
+                {%- endfor -%}
+            {%- elif inline.variant and inline.variant == "xref" -%}
+                {{ref}} {#- putting the ref in as text for now-#}
+            {%- elif inline.value -%}
+                {{- inline.value -}}
+            {%- endif -%}
+    {%- if inline_tag -%}</{{inline_tag}}>{%- endif -%}
+    {%- endif -%}
+{%- endif -%}
+{%- endmacro process_inline -%}

@@ -1,13 +1,13 @@
 [package]
 name = "asciidocr"
-version = "0.1.14"
+version = "0.2.0"
 readme = "README.md"
 license = "MIT"
 edition = "2024"
 description = "A pure-Rust CLI and library for processing and converting asciidoc files"
 documentation = "https://docs.rs/asciidocr"
 repository = "https://github.com/delfanbaum/asciidocr"
-keywords = ["asciidoc", "lightweight-markup", "htmlbook"]
+keywords = ["asciidoc", "lightweight-markup", "htmlbook", "asciidocr"]
 categories = ["command-line-utilities", "parser-implementations", "text-processing"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html

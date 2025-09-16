@@ -48,6 +48,9 @@ fn run(args: Cli) -> Result<()> {
             render_string(render_htmlbook(&graph)?, read_output(args));
             Ok(())
         }
+
+        Backends::Asciidoctor => todo!(),
+
         Backends::Json => {
             render_string(serde_json::to_string_pretty(&graph)?, read_output(args));
             Ok(())

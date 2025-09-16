@@ -61,6 +61,7 @@ pub fn read_output(args: Cli) -> Option<PathBuf> {
                 out_destination.push(args.file.clone());
                 match args.backend {
                     Backends::Htmlbook => out_destination.set_extension("html"),
+                    Backends::Asciidoctor => out_destination.set_extension("html"),
                     Backends::Json => out_destination.set_extension("json"),
                     #[cfg(feature = "docx")]
                     Backends::Docx => out_destination.set_extension("docx"),
