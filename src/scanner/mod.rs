@@ -2,6 +2,7 @@
 
 pub mod tokens;
 use core::str;
+use log::{debug, warn};
 use tokens::{Token, TokenType};
 
 use crate::errors::ScannerError;
@@ -480,6 +481,7 @@ impl<'a> Scanner<'a> {
             }
         }
         token.validate();
+        debug!("Token {:?} from {}..{}", token, self.start, self.current);
         Ok(token)
     }
 
@@ -494,7 +496,10 @@ impl<'a> Scanner<'a> {
             3 => self.add_token(TokenType::Heading3, false, 0),
             4 => self.add_token(TokenType::Heading4, false, 0),
             5 => self.add_token(TokenType::Heading5, false, 0),
-            _ => Err(ScannerError::HeadingLevelError(self.line)),
+            _ => {
+                warn!("Heading level error at line {}", self.line);
+                Err(ScannerError::HeadingLevelError(self.line))
+            }
         }
     }
 
@@ -641,6 +646,7 @@ impl<'a> Scanner<'a> {
             self.expecting_tag_end = false;
         } else {
             return Err(ScannerError::TagError(
+                self.line,
                 self.source[self.start..self.current].to_string(),
             ));
         }

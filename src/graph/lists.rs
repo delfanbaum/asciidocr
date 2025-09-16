@@ -123,13 +123,13 @@ impl ListItem {
                 };
                 // deconstruct it
                 let (definition_id, replacement_span, footnote_contents) =
-                    footnote.deconstruct_footnote(local_count, document_id);
+                    footnote.deconstruct_footnote(local_count, document_id)?;
                 // add the relevant stuff to the return
                 extracted.push(Block::LeafBlock(
                     LeafBlock::new_footnote_def_from_id_and_inlines(
                         definition_id,
                         footnote_contents,
-                    ),
+                    )?,
                 ));
                 // put the reference back where the span was
                 self.principal.insert(idx, replacement_span);
@@ -255,13 +255,13 @@ impl DListItem {
                 };
                 // deconstruct it
                 let (definition_id, replacement_span, footnote_contents) =
-                    footnote.deconstruct_footnote(local_count, document_id);
+                    footnote.deconstruct_footnote(local_count, document_id)?;
                 // add the relevant stuff to the return
                 extracted.push(Block::LeafBlock(
                     LeafBlock::new_footnote_def_from_id_and_inlines(
                         definition_id,
                         footnote_contents,
-                    ),
+                    )?,
                 ));
                 // put the reference back where the span was
                 self.principal.insert(idx, replacement_span);

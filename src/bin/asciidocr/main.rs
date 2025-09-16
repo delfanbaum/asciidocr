@@ -22,9 +22,12 @@ use cli::{Cli, read_input, read_output};
 fn main() {
     let args = Cli::parse();
 
-    let verbosity = match args.verbose {
-        true => log::LevelFilter::Info,
-        false => log::LevelFilter::Warn,
+    let verbosity = if args.verbose {
+        log::LevelFilter::Info
+    } else if args.debug {
+        log::LevelFilter::Debug
+    } else {
+        log::LevelFilter::Warn
     };
 
     SimpleLogger::new()

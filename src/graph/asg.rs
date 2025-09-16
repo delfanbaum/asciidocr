@@ -164,21 +164,24 @@ mod tests {
 
     #[test]
     fn consolidate_footnotes() {
+        let dummy_locations = vec![
+Location::new(1, 1, vec![])];
+        
         let mut footnote = Inline::InlineSpan(InlineSpan::new(
             InlineSpanVariant::Footnote,
             InlineSpanForm::Constrained,
-            vec![],
+            dummy_locations.clone()
         ));
         footnote.push_inline(Inline::InlineLiteral(InlineLiteral::new(
             InlineLiteralName::Text,
             "Foonote text".to_string(),
-            vec![],
+            dummy_locations.clone()
         )));
         let some_leaf = Block::LeafBlock(LeafBlock::new(
             LeafBlockName::Paragraph,
             LeafBlockForm::Paragraph,
             None,
-            vec![],
+            dummy_locations.clone(),
             vec![footnote],
         ));
         let mut graph = Asg::new();
