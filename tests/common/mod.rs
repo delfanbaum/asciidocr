@@ -1,7 +1,11 @@
 use std::env;
 use std::{fs, path::PathBuf};
 
-use asciidocr::{backends::htmls::render_htmlbook, parser::Parser, scanner::Scanner};
+use asciidocr::{
+    backends::htmls::{render_asciidoctor_html, render_htmlbook},
+    parser::Parser,
+    scanner::Scanner,
+};
 use assert_json_diff::assert_json_eq;
 use image::RgbImage;
 use serde_json::{Value, json};
@@ -43,6 +47,23 @@ pub fn assert_parsed_doc_matches_expected_asg_from_str(adoc_str: &str, asg_json_
 pub fn assert_rendered_htmlbook_matches_expected(adoc_fn: &str, html_fn: &str) {
     let test_dir = PathBuf::from("tests/data/");
     let mut rendered_html = render_htmlbook(
+        &Parser::new_no_target_resolution(test_dir.join(adoc_fn))
+            .parse(Scanner::new(
+                &fs::read_to_string(test_dir.join(adoc_fn)).expect("Unable to find adoc"),
+            ))
+            .expect("Unable to parse input file"),
+    )
+    .expect("Unable to render HTML from document");
+    rendered_html.retain(|c| !c.is_whitespace());
+    let mut expected_html =
+        fs::read_to_string(test_dir.join(html_fn)).expect("Unable to read expectd html file");
+    expected_html.retain(|c| !c.is_whitespace());
+    assert_eq!(rendered_html, expected_html);
+}
+
+pub fn assert_rendered_asciidoctor_html_matches_expected(adoc_fn: &str, html_fn: &str) {
+    let test_dir = PathBuf::from("tests/data/");
+    let mut rendered_html = render_asciidoctor_html(
         &Parser::new_no_target_resolution(test_dir.join(adoc_fn))
             .parse(Scanner::new(
                 &fs::read_to_string(test_dir.join(adoc_fn)).expect("Unable to find adoc"),

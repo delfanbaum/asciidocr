@@ -1,0 +1,41 @@
+{#- Leaf blocks, which never have child blocks, include:
+    Listing,
+    Literal, // TK not handling now
+    Paragraph,
+    Pass,
+    Stem, // TK not handling now
+    Verse,
+    Comment, // Gets thrown away, but convenient
+-#}
+{%- import "inline.html.tera" as inline_macros -%}
+{%- macro process_leaf_block(block) -%}
+{% if block.name == "paragraph" -%}
+{%- set tag = "p" -%}
+{% elif block.name == "listing" -%}
+{%- set tag = "pre" -%}
+{%- if block.metadata.attributes.language -%}
+{%- set code_language = block.metadata.attributes.language -%}
+{%- endif -%}
+{% elif block.name == "verse" -%}
+{%- set tag = "pre" -%}
+{%- set data_type = "verse" -%}
+{% elif block.name == "literal" -%}
+{%- set tag = "pre" -%}
+{% elif block.name == "pass" -%}
+{%- endif -%}
+{%- if tag -%}
+<div class="{{block.name}}">
+<{{tag}}
+{%- if block.metadata.roles %} class="{{ block.metadata.roles | join(sep=" ")}}" {%- endif -%}
+{%- if code_language %} data-code-language="{{ code_language }}" {%- endif -%}
+{%- if id %} id="{{ id }}" {%- endif -%}
+{%- if data_type %} data-type="{{ data_type }}"{%- endif -%}>{%- endif -%}
+{% if block.inlines %}
+{%- for inline in block.inlines -%}
+{{- inline_macros::process_inline(inline=inline) -}}
+{%- endfor -%}
+{%- endif -%}
+{%- if tag -%}</{{tag}}>
+</div>
+{%- endif -%}
+{%- endmacro process_leaf_block -%}
