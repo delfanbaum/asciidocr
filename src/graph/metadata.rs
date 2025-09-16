@@ -1,5 +1,7 @@
+use std::fmt::Display;
 use std::{collections::HashMap, fmt::Debug};
 
+use log::info;
 use once_cell::sync::Lazy;
 use regex::Regex;
 use serde::Serialize;
@@ -19,6 +21,18 @@ pub enum AttributeType {
     Verse,
     Source,
     Lines,
+}
+
+impl Display for AttributeType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            AttributeType::Role => write!(f, "Role"),
+            AttributeType::Quote => write!(f, "Quote"),
+            AttributeType::Verse => write!(f, "Verse"),
+            AttributeType::Source => write!(f, "Source"),
+            AttributeType::Lines => write!(f, "Lines"),
+        }
+    }
 }
 
 impl AttributeType {
@@ -215,7 +229,18 @@ impl ElementMetadata {
                     self.attributes
                         .insert(String::from("citation"), String::from(attribute.trim()));
                 } else {
-                    todo!(); // or panic?
+                    if let Some(t) = &self.declared_type {
+                        let info = format!(
+                            "Additional information found in {} attribute: {}\n      This will be ignored in the output",
+                            t,
+                            attribute.trim()
+                        );
+                        info!("{}", info);
+                    }
+                    self.attributes.insert(
+                        format!("additional_quote_info_{}", idx),
+                        attribute.trim().to_string(),
+                    );
                 }
             }
             Some(AttributeType::Lines) => {

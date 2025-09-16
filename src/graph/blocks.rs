@@ -616,7 +616,7 @@ impl Block {
             Block::LeafBlock(block) => {
                 block.location = Location::reconcile(block.location.clone(), locations)
             }
-            _ => todo!(),
+            _ => warn!("Unresolved locations at {}", self)
         }
     }
 

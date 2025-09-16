@@ -8,7 +8,7 @@ use std::{
     str::FromStr,
 };
 
-use log::{error, warn};
+use log::{error, info, warn};
 
 use crate::scanner::tokens::{Token, TokenType};
 use crate::{
@@ -528,6 +528,7 @@ impl Parser {
         let mut current_tag: Option<String> = None;
 
         let (target, meta) = target_and_attrs_from_token(&token);
+        info!("Parsing included file: {}", &target);
         // check for level offsets in the include
         if let Some(metadata) = meta {
             if let Some(value) = metadata.attributes.get("leveloffset") {
@@ -1100,7 +1101,7 @@ impl Parser {
                 self.add_inlines_to_block_stack()?;
                 // remove the open delimiter line from the count and confirm we're nested properly
                 let Some(line) = self.open_delimited_block_lines.pop() else {
-                    return Err(ParserError::DelimitedBlock);
+                    return Err(ParserError::DelimitedBlock(matched.opening_line()?));
                 };
                 if line != matched.opening_line()? {
                     warn!("Error nesting delimited blocks, see line {}", line)

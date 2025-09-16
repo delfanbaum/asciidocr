@@ -157,7 +157,13 @@ impl Inline {
     pub fn extract_child_inlines(&mut self) -> VecDeque<Inline> {
         match &self {
             Inline::InlineSpan(span) => span.inlines.clone().into(),
-            _ => todo!(),
+            Inline::InlineRef(ref_) => ref_.inlines.clone().into(),
+            Inline::InlineBreak(_) | Inline::InlineLiteral(_) => {
+                // This really shouldn't ever be called
+                let mut v = VecDeque::new();
+                v.push_front(self.clone());
+                v
+            }
         }
     }
 
@@ -171,7 +177,7 @@ impl Inline {
                     InlineSpanVariant::Code => "`".to_string(),
                     InlineSpanVariant::Superscript => "^".to_string(),
                     InlineSpanVariant::Subscript => "~".to_string(),
-                    InlineSpanVariant::Footnote => todo!(), // not applicable
+                    InlineSpanVariant::Footnote => "".to_string(),
                 };
                 if span.node_form == InlineSpanForm::Unconstrained {
                     literal = literal
@@ -181,7 +187,7 @@ impl Inline {
                 }
                 literal
             }
-            _ => todo!(),
+            _ => unreachable!(),
         }
     }
 
@@ -213,17 +219,17 @@ impl Inline {
             Inline::InlineRef(inline) => inline.inlines.is_empty(),
             Inline::InlineSpan(inline) => inline.inlines.is_empty(),
             Inline::InlineLiteral(inline) => inline.value.is_empty(),
-            Inline::InlineBreak(_) => todo!(), // shouldn't ever be called
+            Inline::InlineBreak(_) => unreachable!(),
         }
     }
 
     pub fn consolidate_locations_from_token(&mut self, token: Token) {
         match self {
-            Inline::InlineLiteral(_) => todo!(),
+            Inline::InlineLiteral(_) => unreachable!(),
             Inline::InlineSpan(inline) => {
                 inline.location = Location::reconcile(inline.location.clone(), token.locations())
             }
-            Inline::InlineBreak(_) => todo!(),
+            Inline::InlineBreak(_) => unreachable!(),
             Inline::InlineRef(inline) => {
                 inline.location = Location::reconcile(inline.location.clone(), token.locations())
             }

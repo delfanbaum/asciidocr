@@ -42,8 +42,8 @@ pub enum ParserError {
     TopLevelHeading(usize),
     #[error("Parse error line {0}: Invalid open_parse_after_as_text_type occurance")]
     OpenParse(usize),
-    #[error("Parse error: Attempted to close a non-existent delimited block")]
-    DelimitedBlock,
+    #[error("Parse error: Attempted to close a non-existent delimited block, line {0}")]
+    DelimitedBlock(usize),
     #[error("Parse error line {0}: Unexpected block in Block::ParentBlock")]
     ParentBlock(usize),
     #[error(
