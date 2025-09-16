@@ -8,7 +8,7 @@ use std::{
     str::FromStr,
 };
 
-use log::{error, warn};
+use log::{error, info, warn};
 
 use crate::scanner::tokens::{Token, TokenType};
 use crate::{
@@ -76,7 +76,10 @@ pub struct Parser {
     /// Used to see if we need to add a newline before new text; we don't add newlines to the text
     /// literals unless they're continuous (i.e., we never count newline paras as paras)
     dangling_newline: Option<Token>,
-    /// Testing helper
+    /// Track lines for better error handling
+    line: usize,
+    /// Flag for whether or not the parser will require any targets (images, included files, etc.)
+    /// to exist to successfully parse the document
     pub resolve_targets: bool,
 }
 
@@ -122,6 +125,7 @@ impl Parser {
             force_new_block: false,
             close_parent_after_push: false,
             dangling_newline: None,
+            line: 1,
             resolve_targets: true,
         }
     }
@@ -145,6 +149,7 @@ impl Parser {
             match result {
                 Ok(token) => {
                     let token_type = token.token_type();
+                    self.line = token.line;
                     self.token_into(token, &mut asg)?;
 
                     self.last_token_type = token_type;
@@ -402,6 +407,7 @@ impl Parser {
                 }
                 // relative value, or error
                 Err(_) => Err(ParserError::InternalError(
+                    self.line,
                     "Error parsing level offset".to_string(),
                 )),
             }
@@ -528,6 +534,7 @@ impl Parser {
         let mut current_tag: Option<String> = None;
 
         let (target, meta) = target_and_attrs_from_token(&token);
+        info!("Parsing included file: {}", &target);
         // check for level offsets in the include
         if let Some(metadata) = meta {
             if let Some(value) = metadata.attributes.get("leveloffset") {
@@ -700,7 +707,7 @@ impl Parser {
                         self.add_last_to_block_stack_or_graph(asg)?;
                     }
                 }
-                list.metadata = Some(ElementMetadata::new_with_role("colist".to_string()));
+                list.metadata = Some(ElementMetadata::new_with_role("colist".to_string(), self.line));
             }
             self.push_block_to_stack(Block::List(list))?;
         }
@@ -787,7 +794,7 @@ impl Parser {
             TokenType::Heading5 => 4 + self.level_offset,
             _ => {
                 return Err(ParserError::InternalError(
-                    "Inavlid token given to parse_section_headings".to_string(),
+                    self.line, "Inavlid token given to parse_section_headings".to_string(),
                 ));
             }
         };
@@ -1133,7 +1140,7 @@ impl Parser {
                 self.add_inlines_to_block_stack()?;
                 // remove the open delimiter line from the count and confirm we're nested properly
                 let Some(line) = self.open_delimited_block_lines.pop() else {
-                    return Err(ParserError::DelimitedBlock);
+                    return Err(ParserError::DelimitedBlock(matched.opening_line()?));
                 };
                 if line != matched.opening_line()? {
                     warn!("Error nesting delimited blocks, see line {}", line)
@@ -1199,7 +1206,7 @@ impl Parser {
         // close itself, emptying the open_delimited_block_lines)
         if self.in_block_continuation && self.open_delimited_block_lines.is_empty() {
             let Some(last_block) = self.block_stack.last_mut() else {
-                return Err(ParserError::BlockContinuation);
+                return Err(ParserError::BlockContinuation(self.line));
             };
             last_block.push_block(block)?;
             self.in_block_continuation = false;
@@ -1392,7 +1399,7 @@ impl Parser {
         }
         if self.in_block_continuation && self.open_delimited_block_lines.is_empty() {
             let Some(last_block) = self.block_stack.last_mut() else {
-                return Err(ParserError::BlockContinuation);
+                return Err(ParserError::BlockContinuation(self.line));
             };
             last_block.push_block(para_block)?;
             return Ok(());
@@ -1480,7 +1487,7 @@ impl Parser {
             asg.push_block(last_block)?;
             Ok(())
         } else {
-            Err(ParserError::BlockStack)
+            Err(ParserError::BlockStack(self.line))
         }
     }
 

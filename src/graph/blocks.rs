@@ -3,7 +3,7 @@ use std::{collections::HashMap, fmt::Display};
 
 use serde::Serialize;
 
-use crate::errors::{BlockError, ParserError};
+use crate::errors::BlockError;
 use crate::graph::{
     inlines::Inline,
     lists::{DList, DListItem, List, ListItem, ListVariant},
@@ -444,13 +444,13 @@ impl Block {
                         };
                         // deconstruct it
                         let (definition_id, replacement_span, footnote_contents) =
-                            footnote.deconstruct_footnote(local_count, document_id);
+                            footnote.deconstruct_footnote(local_count, document_id)?;
                         // add the relevant stuff to the return
                         extracted.push(Block::LeafBlock(
                             LeafBlock::new_footnote_def_from_id_and_inlines(
                                 definition_id,
                                 footnote_contents,
-                            ),
+                            )?,
                         ));
                         // put the reference back where the span was
                         block.inlines.insert(idx, replacement_span);
@@ -616,7 +616,7 @@ impl Block {
             Block::LeafBlock(block) => {
                 block.location = Location::reconcile(block.location.clone(), locations)
             }
-            _ => todo!(),
+            _ => warn!("Unresolved locations at {}", self),
         }
     }
 
@@ -702,7 +702,7 @@ impl Block {
         }
     }
 
-    pub fn add_metadata(&mut self, metadata: ElementMetadata) -> Result<(), ParserError> {
+    pub fn add_metadata(&mut self, metadata: ElementMetadata) -> Result<(), BlockError> {
         if metadata.is_empty() {
             return Ok(());
         }
@@ -722,10 +722,7 @@ impl Block {
             Block::ParentBlock(block) => block.metadata = Some(metadata),
             Block::TableCell(block) => block.metadata = Some(metadata),
             _ => {
-                return Err(ParserError::InternalError(format!(
-                    "Blocks of type {} do not accept metadata.",
-                    self
-                )));
+                return Err(BlockError::InvalidMetadata(format!("{}", self)));
             }
         }
         Ok(())
@@ -1067,8 +1064,22 @@ impl LeafBlock {
     pub fn new_footnote_def_from_id_and_inlines(
         definition_id: String,
         inlines: Vec<Inline>,
-    ) -> Self {
-        Self {
+    ) -> Result<LeafBlock, BlockError> {
+        let line = if let Some(inline) = inlines.first() {
+            if let Some(loc) = inline.locations().first() {
+                loc.line
+            } else {
+                return Err(BlockError::Footnote(
+                    "Unable to resolve footnote locations".to_string(),
+                ));
+            }
+        } else {
+            return Err(BlockError::Footnote(
+                "Unable to resolve footnote locations".to_string(),
+            ));
+        };
+
+        Ok(Self {
             name: LeafBlockName::Paragraph,
             node_type: NodeTypes::Block,
             form: LeafBlockForm::Paragraph,
@@ -1077,9 +1088,10 @@ impl LeafBlock {
             metadata: Some(ElementMetadata::new_with_id_and_roles(
                 definition_id,
                 vec!["footnote".to_string()],
+                line,
             )),
             location: vec![],
-        }
+        })
     }
 }
 
@@ -1306,21 +1318,22 @@ mod tests {
 
     #[test]
     fn extract_footnote_definitions() {
+        let dummy_locations = vec![Location::new(1, 1, vec![])];
         let mut footnote = Inline::InlineSpan(InlineSpan::new(
             InlineSpanVariant::Footnote,
             InlineSpanForm::Constrained,
-            vec![],
+            dummy_locations.clone(),
         ));
         footnote.push_inline(Inline::InlineLiteral(InlineLiteral::new(
             InlineLiteralName::Text,
             "Foonote text".to_string(),
-            vec![],
+            dummy_locations.clone(),
         )));
         let mut some_leaf = Block::LeafBlock(LeafBlock::new(
             LeafBlockName::Paragraph,
             LeafBlockForm::Paragraph,
             None,
-            vec![],
+            dummy_locations.clone(),
             vec![footnote],
         ));
         let extracted = some_leaf

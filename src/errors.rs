@@ -22,12 +22,12 @@ pub enum AsciidocrError {
 pub enum ScannerError {
     #[error(transparent)]
     Token(#[from] TokenError),
-    #[error("Invalid headling level at line {0}")]
+    #[error("Line {0}: Invalid headling level")]
     HeadingLevelError(usize),
-    #[error("Invalid include tag pattern: {0}")]
-    TagError(String),
-    #[error("Unknown scanner error")]
-    UnknownError,
+    #[error("Line {0}: Invalid include tag pattern: {1}")]
+    TagError(usize, String),
+    #[error("Line {0}: Unknown scanner error")]
+    UnknownError(usize),
 }
 
 #[derive(thiserror::Error, PartialEq, Debug)]
@@ -38,28 +38,28 @@ pub enum ParserError {
     Block(#[from] BlockError),
     #[error(transparent)]
     Asg(#[from] AsgError),
-    #[error("Parse error line {0}: Level 0 headings are only allowed at the top of a document")]
+    #[error("Line {0}: Level 0 headings are only allowed at the top of a document")]
     TopLevelHeading(usize),
-    #[error("Parse error line {0}: Invalid open_parse_after_as_text_type occurance")]
+    #[error("Line {0}: Invalid open_parse_after_as_text_type occurance")]
     OpenParse(usize),
-    #[error("Parse error: Attempted to close a non-existent delimited block")]
-    DelimitedBlock,
-    #[error("Parse error line {0}: Unexpected block in Block::ParentBlock")]
+    #[error("Line {0}: Attempted to close a non-existent delimited block")]
+    DelimitedBlock(usize),
+    #[error("Line {0}: Unexpected block in Block::ParentBlock")]
     ParentBlock(usize),
     #[error(
-        "Parse error line {0}: Invalid heading level; parser level offest at the time of error was: {1}"
+        "Line {0}: Invalid heading level; parser level offest at the time of error was: {1}"
     )]
     HeadingOffsetError(usize, i8),
-    #[error("Parse error line {0}: Unable to resolve target: {1:?}")]
+    #[error("Line {0}: Unable to resolve target: {1:?}")]
     TargetResolution(usize, String),
-    #[error("Parser error: Tried to add last block when block stack was empty.")]
-    BlockStack,
-    #[error("Parse error: invalid block continuation; no previous block")]
-    BlockContinuation,
-    #[error("Parse error: {0}")]
-    InternalError(String),
-    #[error("Attribute error: {0}")]
-    AttributeError(String),
+    #[error("Line {0}: Tried to add last block when block stack was empty.")]
+    BlockStack(usize),
+    #[error("Line {0}: invalid block continuation; no previous block")]
+    BlockContinuation(usize),
+    #[error("Line {0}: error: {1}")]
+    InternalError(usize, String),
+    #[error("Line: {0} Attribute error: {0}")]
+    AttributeError(usize, String),
 }
 
 #[derive(thiserror::Error, Debug)]
@@ -92,11 +92,23 @@ pub enum BlockError {
     IncorrectCall,
     #[error("Missing location information for block")]
     Location,
-    #[error("Tried to create a block from an invalid Token.")]
+    #[error("Tried to create a block from an invalid Token")]
     InvalidToken,
     #[error("Footnote error: {0}")]
     Footnote(String),
+    #[error("Blocks of type {0} do not accept metadata")]
+    InvalidMetadata(String),
+    #[error(transparent)]
+InlineError(#[from] InlineError)
+
 }
+
+#[derive(thiserror::Error, PartialEq, Debug)]
+pub enum InlineError {
+    #[error("Error creating footnote reference to {0}")]
+    FootnoteRef(String)
+}
+
 
 #[derive(thiserror::Error, PartialEq, Debug)]
 pub enum TokenError {
