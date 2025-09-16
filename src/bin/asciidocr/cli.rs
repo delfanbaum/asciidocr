@@ -23,6 +23,11 @@ pub struct Cli {
     #[arg(short, long = "count-words")]
     pub count: bool,
 
+    /// If this flag is given alongside an HTML backend, an "embeddable" document is output, i.e.,
+    /// one that includes only the <body> element contents (excluding any headers, footers, etc.)
+    #[arg(short, long = "embedded")]
+    pub embedded: bool,
+
     /// Run asciidocr without resolving resource targets; by default, asciidocr will fail to parse a
     /// document if a given resource is not found. This option allows parsing to continue if the
     /// backend supports missing targets.

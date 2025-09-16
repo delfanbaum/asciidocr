@@ -6,7 +6,10 @@ use simple_logger::SimpleLogger;
 use std::{fs, path::PathBuf};
 
 use asciidocr::{
-    backends::{Backends, htmls::render_htmlbook},
+    backends::{
+        Backends,
+        htmls::{render_asciidoctor_html, render_htmlbook, render_htmlbook_embedded},
+    },
     parser::Parser as AdocParser,
     scanner::Scanner,
 };
@@ -45,11 +48,20 @@ fn run(args: Cli) -> Result<()> {
 
     match args.backend {
         Backends::Htmlbook => {
-            render_string(render_htmlbook(&graph)?, read_output(args));
+            match args.embedded {
+                true => render_string(render_htmlbook_embedded(&graph)?, read_output(args)),
+                false => render_string(render_htmlbook(&graph)?, read_output(args)),
+            }
             Ok(())
         }
 
-        Backends::Asciidoctor => todo!(),
+        Backends::Asciidoctor => {
+            match args.embedded {
+                true => todo!(),
+                false => render_string(render_asciidoctor_html(&graph)?, read_output(args)),
+            }
+            Ok(())
+        }
 
         Backends::Json => {
             render_string(serde_json::to_string_pretty(&graph)?, read_output(args));
