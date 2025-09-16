@@ -20,13 +20,19 @@ use asciidocr::backends::docx::render_docx;
 use cli::{Cli, read_input, read_output};
 
 fn main() {
+    let args = Cli::parse();
+
+    let verbosity = match args.verbose {
+        true => log::LevelFilter::Info,
+        false => log::LevelFilter::Warn,
+    };
+
     SimpleLogger::new()
-        .with_level(log::LevelFilter::Warn)
+        .with_level(verbosity)
         .with_colors(true)
         .without_timestamps()
         .init()
         .unwrap();
-    let args = Cli::parse();
 
     if let Err(e) = run(args) {
         eprintln!("Error converting document: {}", e);
@@ -35,13 +41,12 @@ fn main() {
 }
 
 fn run(args: Cli) -> Result<()> {
-    let graph = match args.do_not_resolve_targets {
-        true => AdocParser::new_no_target_resolution(PathBuf::from(&args.file))
-            .parse(Scanner::new(&read_input(&args)))?,
-        false => {
-            AdocParser::new(PathBuf::from(&args.file)).parse(Scanner::new(&read_input(&args)))?
-        }
-    };
+    let mut parser = AdocParser::new(PathBuf::from(&args.file));
+    if args.do_not_resolve_targets {
+        parser.resolve_targets = false;
+    }
+
+    let graph = parser.parse(Scanner::new(&read_input(&args)))?;
     if args.count {
         println!("{} words in {}", graph.word_count(), args.file)
     }

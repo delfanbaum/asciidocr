@@ -28,6 +28,10 @@ pub struct Cli {
     #[arg(short, long = "embedded")]
     pub embedded: bool,
 
+    /// Show verbose processing output
+    #[arg(short, long)]
+    pub verbose: bool,
+
     /// Run asciidocr without resolving resource targets; by default, asciidocr will fail to parse a
     /// document if a given resource is not found. This option allows parsing to continue if the
     /// backend supports missing targets.
