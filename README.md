@@ -149,11 +149,11 @@ Then you can run `asciidocr` like you would on an actual computer. Marvelous!
 
 A non-exhaustive list:
 
-* Coverage of the majority, if not all, asciidoc language features
+* Coverage of the majority, if not all, asciidoc language features (✓)
 * Passes the [language compatibility toolkit](https://gitlab.eclipse.org/eclipse/asciidoc-lang/asciidoc-tck) tests
-* Clean, simple HTML output as a default
-* Native "document" (`docx`) output in a "manuscript"
-  template, like what you might send to a publisher or literary journal
+* Clean, simple HTML output as a default (✓)
+* Native "document" (`docx`) output in a "manuscript" 
+  template, like what you might send to a publisher or literary journal (✓ with `docx` feature)
 * PyO3 hooks/project for use inside Python contexts (will be behind a feature
   flag)
 
