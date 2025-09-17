@@ -12,7 +12,10 @@ use super::{
     nodes::{Location, NodeTypes},
     substitutions::CHARREF_MAP,
 };
-use crate::scanner::tokens::{Token, TokenType};
+use crate::{
+    errors::InlineError,
+    scanner::tokens::{Token, TokenType},
+};
 
 /// Inlines enum containing literals, spans, and references (the latter not implemented)
 #[derive(Serialize, Clone, Debug)]
@@ -366,7 +369,7 @@ impl InlineSpan {
                 token.locations(),
             ),
             TokenType::CodeCallout => {
-                let metadata = ElementMetadata::new_with_role("conum".into());
+                let metadata = ElementMetadata::new_with_role("conum".into(), token.line);
                 let mut code_span = Self::new(
                     InlineSpanVariant::Strong,
                     InlineSpanForm::Constrained,
@@ -401,15 +404,21 @@ impl InlineSpan {
         self.inlines.push(inline);
     }
 
-    fn new_footnote_ref(footnote_ref: InlineRef) -> Self {
+    fn new_footnote_ref(footnote_ref: InlineRef) -> Result<Self, InlineError> {
         let mut footnote = InlineSpan::new(
             InlineSpanVariant::Superscript,
             InlineSpanForm::Constrained,
             footnote_ref.location.clone(),
         );
-        footnote.inlines.push(Inline::InlineRef(footnote_ref));
-        footnote.metadata = Some(ElementMetadata::new_with_role("footnote".to_string()));
         footnote
+            .inlines
+            .push(Inline::InlineRef(footnote_ref.clone()));
+        if let Some(line) = footnote_ref.line() {
+            footnote.metadata = Some(ElementMetadata::new_with_role("footnote".to_string(), line));
+            Ok(footnote)
+        } else {
+            Err(InlineError::FootnoteRef(format!("{:?}", footnote_ref)))
+        }
     }
 
     /// Deconstructs a footnote span into the relevant footnote definition ID (to be applied to
@@ -420,7 +429,7 @@ impl InlineSpan {
         &mut self,
         count: usize,
         document_id: &str,
-    ) -> (String, Inline, Vec<Inline>) {
+    ) -> Result<(String, Inline, Vec<Inline>), InlineError> {
         // setup
         let footnote_def_pattern = format!("{}_footnotedef_{}", document_id, count);
         let footnote_ref_pattern = format!("{}_footnoteref_{}", document_id, count);
@@ -440,23 +449,23 @@ impl InlineSpan {
             Some(footnote_ref_pattern.clone()),
             numbering.clone(),
             self.location.clone(),
-        );
+        )?;
         // Footnote def targets the reference
         let footnote_def = InlineRef::new_footnote_ref(
             footnote_ref_pattern,
             None,
             numbering,
             self.location.clone(),
-        );
+        )?;
         // put the footnote def (with targets back to the reference) into the inline vec
         self.inlines.insert(0, Inline::InlineRef(footnote_def));
         // handle adding a ". " after the footnote numbering in the template
 
-        (
+        Ok((
             footnote_def_pattern,
-            Inline::InlineSpan(InlineSpan::new_footnote_ref(footnote_ref)),
+            Inline::InlineSpan(InlineSpan::new_footnote_ref(footnote_ref)?),
             self.inlines.clone(),
-        )
+        ))
     }
 }
 
@@ -505,19 +514,33 @@ impl InlineRef {
         }
     }
 
+    fn line(&self) -> Option<usize> {
+        if let Some(loc) = self.location.first() {
+            Some(loc.line)
+        } else {
+            None
+        }
+    }
+
     pub fn new_footnote_ref(
         target: String,
         id: Option<String>,
         numbering: Inline,
         location: Vec<Location>,
-    ) -> Self {
+    ) -> Result<Self, InlineError> {
         let mut metadata: Option<ElementMetadata> = None;
 
+        let line = if let Some(loc) = location.first() {
+            loc.line
+        } else {
+            return Err(InlineError::FootnoteRef(target));
+        };
+
         if let Some(ref_id) = id {
-            metadata = Some(ElementMetadata::new_inline_with_id(ref_id));
+            metadata = Some(ElementMetadata::new_inline_with_id(ref_id, line));
         }
 
-        InlineRef {
+        Ok(InlineRef {
             name: "ref".to_string(),
             node_type: NodeTypes::Inline,
             variant: InlineRefVariant::Xref,
@@ -525,7 +548,7 @@ impl InlineRef {
             inlines: vec![numbering],
             metadata,
             location,
-        }
+        })
     }
 
     pub fn new_xref_from_token(token: Token) -> Self {

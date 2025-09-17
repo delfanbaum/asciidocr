@@ -11,6 +11,7 @@ pub static RE_LINE_RANGES: Lazy<Regex> = Lazy::new(|| Regex::new(r#"([^,;]*)"#).
 
 pub fn key_values_from_named_attribute(
     attribute: &str,
+    line: usize,
 ) -> Result<(String, Vec<&str>), ParserError> {
     match RE_NAMED.captures(attribute) {
         Some(captures) => {
@@ -24,10 +25,10 @@ pub fn key_values_from_named_attribute(
                 values_str.split(' ').collect::<Vec<&str>>(),
             ))
         }
-        None => Err(ParserError::AttributeError(format!(
-            "{} does not contain a named attribute",
-            attribute
-        ))),
+        None => Err(ParserError::AttributeError(
+            line,
+            format!("{} does not contain a named attribute", attribute),
+        )),
     }
 }
 
@@ -58,6 +59,7 @@ pub fn target_and_attrs_from_token(token: &Token) -> (String, Option<ElementMeta
             inline_metadata: true,
             declared_type: None,
             location: vec![],
+            line: token.line
         };
         token_metadata.process_attributes(extract_attributes(&attributes));
         metadata = Some(token_metadata);

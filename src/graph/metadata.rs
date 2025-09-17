@@ -58,6 +58,8 @@ pub struct ElementMetadata {
     #[serde(skip)]
     pub declared_type: Option<AttributeType>,
     pub location: Vec<Location>,
+    #[serde(skip)]
+    pub line: usize,
 }
 
 impl ElementMetadata {
@@ -67,7 +69,7 @@ impl ElementMetadata {
         self.attributes.is_empty() && self.options.is_empty() && self.roles.is_empty()
     }
 
-    pub fn new_with_role(role_name: String) -> Self {
+    pub fn new_with_role(role_name: String, line: usize) -> Self {
         ElementMetadata {
             attributes: HashMap::new(),
             options: vec![],
@@ -75,10 +77,11 @@ impl ElementMetadata {
             inline_metadata: false,
             declared_type: None,
             location: vec![],
+            line,
         }
     }
 
-    pub fn new_with_id(id: String) -> Self {
+    pub fn new_with_id(id: String, line: usize) -> Self {
         let mut attrs: HashMap<String, String> = HashMap::with_capacity(1);
         attrs.insert("id".to_string(), id);
         ElementMetadata {
@@ -88,10 +91,11 @@ impl ElementMetadata {
             inline_metadata: false,
             declared_type: None,
             location: vec![],
+            line,
         }
     }
 
-    pub fn new_with_id_and_roles(id: String, roles: Vec<String>) -> Self {
+    pub fn new_with_id_and_roles(id: String, roles: Vec<String>, line: usize) -> Self {
         let mut attrs: HashMap<String, String> = HashMap::with_capacity(1);
         attrs.insert("id".to_string(), id);
         ElementMetadata {
@@ -101,12 +105,13 @@ impl ElementMetadata {
             inline_metadata: false,
             declared_type: None,
             location: vec![],
+            line,
         }
     }
 
     /// Metadata from ID
-    pub fn new_inline_with_id(id: String) -> Self {
-        let mut inline_meta = Self::new_with_id(id);
+    pub fn new_inline_with_id(id: String, line: usize) -> Self {
+        let mut inline_meta = Self::new_with_id(id, line);
         inline_meta.inline_metadata = true;
         inline_meta
     }
@@ -125,6 +130,7 @@ impl ElementMetadata {
             inline_metadata: true,
             declared_type: None,
             location: token.locations().clone(),
+            line: token.line,
         };
 
         let class_list = token.lexeme[1..token.lexeme.len() - 1].to_string();
@@ -147,6 +153,7 @@ impl ElementMetadata {
             inline_metadata: false,
             declared_type: None,
             location: token.locations().clone(),
+            line: token.line,
         };
         if matches!(token.token_type(), TokenType::BlockAnchor) {
             let id = token.lexeme[2..token.lexeme.len() - 2].to_string(); // skip the "[[" and "]]"
@@ -186,7 +193,7 @@ impl ElementMetadata {
 
     pub fn process_attributes(&mut self, mut attributes: Vec<String>) {
         for (idx, attribute) in attributes.iter_mut().enumerate() {
-            match key_values_from_named_attribute(attribute) {
+            match key_values_from_named_attribute(attribute, self.line) {
                 Ok((key, values)) => {
                     if key == *"role" {
                         for role in values {
@@ -281,7 +288,7 @@ mod tests {
     fn values_from_named_attribute_role() {
         assert_eq!(
             ("role".to_string(), vec!["foo", "bar"]),
-            key_values_from_named_attribute("role=\"foo bar\"").unwrap()
+            key_values_from_named_attribute("role=\"foo bar\"", 1).unwrap()
         )
     }
 
@@ -289,7 +296,7 @@ mod tests {
     fn values_from_named_attribute_any() {
         assert_eq!(
             ("foo".to_string(), vec!["bar"]),
-            key_values_from_named_attribute("foo=\"bar\"").unwrap()
+            key_values_from_named_attribute("foo=\"bar\"", 1).unwrap()
         )
     }
 }
