@@ -26,6 +26,8 @@ pub enum ScannerError {
     HeadingLevelError(usize),
     #[error("Invalid include tag pattern: {0}")]
     TagError(String),
+    #[error("Unknown scanner error")]
+    UnknownError,
 }
 
 #[derive(thiserror::Error, PartialEq, Debug)]
