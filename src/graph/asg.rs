@@ -44,6 +44,13 @@ impl Default for Asg {
     }
 }
 
+impl std::str::FromStr for Asg {
+    type Err = AsciidocrError;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(Parser::new(current_dir()?).parse(Scanner::new(s))?)
+    }
+}
+
 impl Asg {
     pub fn new() -> Self {
         Asg {
@@ -56,12 +63,6 @@ impl Asg {
             blocks: vec![],
             location: vec![Location::default()],
         }
-    }
-
-    /// Creates an `Asg` from an `&str`, using the current directory as the base for any target
-    /// resolution
-    pub fn from_str(s: &str) -> Result<Self, AsciidocrError> {
-        Ok(Parser::new(current_dir()?).parse(Scanner::new(s))?)
     }
 
     /// Standardizes the graph into the "official" ASG format. Since we keep an intermediate

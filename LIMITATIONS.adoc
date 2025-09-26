@@ -31,7 +31,7 @@ attribute short hand] -- I'm both not a fan (just use `role=` and `[[id]]`, etc.
 * Paragraph alignment and indented blocks 
 * Substitutions (quote substitutions now working!)
 * Checklists
-* Autolinks (for now, just use the `url[text]` or `url[]` syntax)
+* Autolinks for emails (http:: urls now work!)
 * `mailto:`
 * `Footnote:id` syntax (this may not happen)
 * Icons

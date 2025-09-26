@@ -273,6 +273,7 @@ impl Parser {
             // inline macros
             TokenType::FootnoteMacro => self.parse_footnote_macro(token),
             TokenType::LinkMacro => self.parse_link_macro(token),
+            TokenType::Hyperlink => self.parse_hyperlink(token),
             TokenType::InlineImageMacro => self.parse_inline_image_macro(token),
             TokenType::PassthroughInlineMacro => self.parse_passthrough_inline_macro(token),
             TokenType::InlineMacroClose => self.parse_inline_macro_close(token),
@@ -360,6 +361,7 @@ impl Parser {
                 }
                 Ok(())
             }
+            TokenType::Email => todo!()
         }
     }
 
@@ -852,7 +854,17 @@ impl Parser {
 
     fn parse_link_macro(&mut self, token: Token) -> Result<(), ParserError> {
         self.inline_stack
-            .push_back(Inline::InlineRef(InlineRef::new_link_from_token(token)));
+            .push_back(Inline::InlineRef(InlineRef::new_link_from_macro_token(
+                token,
+            )));
+        Ok(())
+    }
+
+    fn parse_hyperlink(&mut self, token: Token) -> Result<(), ParserError> {
+        self.inline_stack
+            .push_back(Inline::InlineRef(InlineRef::new_link_from_token(
+                token,
+            )));
         Ok(())
     }
 

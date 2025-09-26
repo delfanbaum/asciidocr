@@ -527,9 +527,14 @@ impl InlineRef {
         InlineRef::new(InlineRefVariant::Xref, target, token.locations())
     }
 
-    pub fn new_link_from_token(token: Token) -> Self {
+    pub fn new_link_from_macro_token(token: Token) -> Self {
         let mut target = token.text();
         target.pop(); // remove trailing '['
+        InlineRef::new(InlineRefVariant::Link, target, token.locations())
+    }
+
+    pub fn new_link_from_token(token: Token) -> Self {
+        let target = token.text();
         InlineRef::new(InlineRefVariant::Link, target, token.locations())
     }
 

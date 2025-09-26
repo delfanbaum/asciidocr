@@ -48,8 +48,10 @@
                 {%- for child in inline.inlines -%}
                     {{- self::process_inline(inline=child) -}}
                 {%- endfor -%}
-            {%- elif inline.variant and inline.variant == "xref" -%}
+    {%- elif inline.variant -%}
+        {%- if inline.variant == "xref" or inline.variant == "link" -%}
                 {{ref}} {#- putting the ref in as text for now-#}
+            {%- endif -%}
             {%- elif inline.value -%}
                 {{- inline.value -}}
             {%- endif -%}

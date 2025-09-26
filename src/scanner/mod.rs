@@ -547,11 +547,34 @@ impl<'a> Scanner<'a> {
 
     /// Adds the link, consuming the target but not any attributes
     fn add_link(&mut self) -> Result<Token, ScannerError> {
-        while self.peek() != '[' {
+        let hyperlink_allowed_punctuation = ['.', '#', ':', '/', '?', '=', '&'];
+        while !['\0', ' '].contains(&self.peek()) && !self.peek().is_ascii_punctuation() {
             self.current += 1
         }
-        self.current += 1; // consume the '[' char
-        self.add_token(TokenType::LinkMacro, true, 0)
+        // it's an attribute-styled link
+        if self.peek() == '[' {
+            self.current += 1; // consume the '[' char
+            self.add_token(TokenType::LinkMacro, true, 0)
+        } else if ['\0', ' '].contains(&self.peek()) {
+            self.add_token(TokenType::Hyperlink, true, 0)
+        } else if hyperlink_allowed_punctuation.contains(&self.peek()) {
+            // if it's at the end of a sentence
+            if let Some(second_char) = self.peeks_ahead(2).chars().last() {
+                if ['\0', ' '].contains(&second_char) {
+                    self.add_token(TokenType::Hyperlink, true, 0)
+                } else {
+                    // otherwise it contains an allowed url punctuation character
+                    self.current += 1; // consume the allowed character
+                    self.add_link()
+                }
+            } else {
+                // otherwise it contains an allowed url punctuation character
+                self.current += 1; // consume the allowed character
+                self.add_link()
+            }
+        } else {
+            self.add_token(TokenType::Hyperlink, true, 0)
+        }
     }
 
     fn add_inline_style(&mut self) -> Result<Token, ScannerError> {
@@ -1529,6 +1552,106 @@ mod tests {
             ),
         ];
         scan_and_assert_eq(markup, expected_tokens);
+    }
+
+    #[test]
+    fn link_no_attribute_fencing() {
+        let markup = "Somx http://example.com";
+        let expected_tokens = vec![
+            Token::new_default(
+                TokenType::Text,
+                "Somx ".to_string(),
+                Some("Somx ".to_string()),
+                1,
+                1,
+                5,
+            ),
+            Token::new_default(
+                TokenType::Hyperlink,
+                "http://example.com".to_string(),
+                Some("http://example.com".to_string()),
+                1,
+                6,
+                23,
+            ),
+        ];
+        scan_and_assert_eq(markup, expected_tokens);
+    }
+
+    #[test]
+    fn link_no_attribute_fencing_more_text() {
+        let markup = "Somx http://example.com Somx";
+        let expected_tokens = vec![
+            Token::new_default(
+                TokenType::Text,
+                "Somx ".to_string(),
+                Some("Somx ".to_string()),
+                1,
+                1,
+                5,
+            ),
+            Token::new_default(
+                TokenType::Hyperlink,
+                "http://example.com".to_string(),
+                Some("http://example.com".to_string()),
+                1,
+                6,
+                23,
+            ),
+            Token::new_default(
+                TokenType::Text,
+                " Somx".to_string(),
+                Some(" Somx".to_string()),
+                1,
+                24,
+                28,
+            ),
+        ];
+        scan_and_assert_eq(markup, expected_tokens);
+    }
+
+    #[rstest]
+    #[case(". ")]
+    #[case(".")]
+    #[case(", ")]
+    #[case(",")]
+    #[case(": ")]
+    #[case("? ")]
+    #[case(". ")]
+    #[case("/ ")]
+    #[case(":")]
+    #[case("?")]
+    #[case(".")]
+    #[case("/")]
+    fn link_no_attribute_fencing_sentence(#[case] end_: &str) {
+        let markup = format!("Somx http://example.com{}", end_);
+        let expected_tokens = vec![
+            Token::new_default(
+                TokenType::Text,
+                "Somx ".to_string(),
+                Some("Somx ".to_string()),
+                1,
+                1,
+                5,
+            ),
+            Token::new_default(
+                TokenType::Hyperlink,
+                "http://example.com".to_string(),
+                Some("http://example.com".to_string()),
+                1,
+                6,
+                23,
+            ),
+            Token::new_default(
+                TokenType::Text,
+                end_.to_string(),
+                Some(end_.to_string()),
+                1,
+                24,
+                23 + end_.len(),
+            ),
+        ];
+        scan_and_assert_eq(&markup, expected_tokens);
     }
 
     #[test]

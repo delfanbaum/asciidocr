@@ -212,3 +212,12 @@ fn description_list_ordering() {
     let html_fn = format!("{}.html", fn_pattern);
     assert_rendered_htmlbook_matches_expected(&adoc_fn, &html_fn)
 }
+
+#[test]
+// it's just easier to reason about this in HTML than in JSON, so testing this here
+fn links() {
+    let fn_pattern = String::from("htmlbook/links");
+    let adoc_fn = format!("{}.adoc", fn_pattern);
+    let html_fn = format!("{}.html", fn_pattern);
+    assert_rendered_htmlbook_matches_expected(&adoc_fn, &html_fn)
+}
