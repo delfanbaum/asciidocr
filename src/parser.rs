@@ -862,9 +862,7 @@ impl Parser {
 
     fn parse_hyperlink(&mut self, token: Token) -> Result<(), ParserError> {
         self.inline_stack
-            .push_back(Inline::InlineRef(InlineRef::new_link_from_token(
-                token,
-            )));
+            .push_back(Inline::InlineRef(InlineRef::new_link_from_token(token)));
         Ok(())
     }
 
@@ -1030,7 +1028,7 @@ impl Parser {
     }
 
     fn parse_charref(&mut self, token: Token) -> Result<(), ParserError> {
-        let inline_lit = Inline::InlineLiteral(InlineLiteral::new_charref_from_token(&token));
+        let inline_literal = Inline::InlineLiteral(InlineLiteral::new_charref_from_token(&token));
         if let Some(newline_token) = self.dangling_newline.clone() {
             if self.preserve_newline_text {
                 // add the newline as such
@@ -1040,14 +1038,37 @@ impl Parser {
                 // clear the newline
                 self.dangling_newline = None;
                 // add the new text separately
-                self.inline_stack.push_back(inline_lit);
+                self.inline_stack.push_back(inline_literal);
                 return Ok(());
             } else {
                 self.add_text_to_last_inline(newline_token);
                 self.dangling_newline = None;
             }
         }
-        self.inline_stack.push_back(inline_lit);
+        if let Some(last_inline) = self.inline_stack.back_mut() {
+            match last_inline {
+                Inline::InlineSpan(span) => {
+                    if self.in_inline_span {
+                        span.add_inline(inline_literal);
+                    } else {
+                        self.inline_stack.push_back(inline_literal)
+                    }
+                }
+                Inline::InlineRef(inline_ref) => {
+                    if !self.close_parent_after_push {
+                        inline_ref.inlines.push(inline_literal);
+                    } else {
+                        self.inline_stack.push_back(inline_literal)
+                    }
+                }
+                _ => {
+                    // can't add to the back, so just add the literal
+                    self.inline_stack.push_back(inline_literal)
+                }
+            }
+        } else {
+            self.inline_stack.push_back(inline_literal)
+        }
         Ok(())
     }
 
