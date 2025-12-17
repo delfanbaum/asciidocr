@@ -566,6 +566,10 @@ impl<'a> Scanner<'a> {
             // if it's at the end of a sentence
             if let Some(second_char) = self.peeks_ahead(2).chars().last() {
                 if ['\0', ' '].contains(&second_char) {
+                    // if it's not a possible sentence ender, we want that in the link
+                    if !['.', ':', '?'].contains(&self.peek()) {
+                        self.current += 1;
+                    }
                     self.add_token(TokenType::Hyperlink, true, 0)
                 } else {
                     // otherwise it contains an allowed url punctuation character
@@ -1610,9 +1614,14 @@ mod tests {
         scan_and_assert_eq(markup, expected_tokens);
     }
 
-    #[test]
-    fn link_no_attribute_fencing() {
-        let markup = "Somx http://example.com";
+    #[rstest]
+    #[case("http://example.com")]
+    #[case("http://example.com/")]
+    #[case("http://example.com/?next=foo")]
+    #[case("http://example.com:80/")]
+    #[case("http://example.com/foo.html#bar")]
+    fn link_no_attribute_fencing(#[case] link: &str) {
+        let markup = &format!("Somx {link}");
         let expected_tokens = vec![
             Token::new_default(
                 TokenType::Text,
@@ -1624,11 +1633,11 @@ mod tests {
             ),
             Token::new_default(
                 TokenType::Hyperlink,
-                "http://example.com".to_string(),
-                Some("http://example.com".to_string()),
+                link.to_string(),
+                Some(link.to_string()),
                 1,
                 6,
-                23,
+                5 + link.len(),
             ),
         ];
         scan_and_assert_eq(markup, expected_tokens);
@@ -1674,11 +1683,9 @@ mod tests {
     #[case(": ")]
     #[case("? ")]
     #[case(". ")]
-    #[case("/ ")]
     #[case(":")]
     #[case("?")]
     #[case(".")]
-    #[case("/")]
     fn link_no_attribute_fencing_sentence(#[case] end_: &str) {
         let markup = format!("Somx http://example.com{}", end_);
         let expected_tokens = vec![
