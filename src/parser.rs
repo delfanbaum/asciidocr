@@ -144,6 +144,7 @@ impl Parser {
         for result in tokens {
             match result {
                 Ok(token) => {
+                    let _ = dbg!(&token);
                     let token_type = token.token_type();
                     self.token_into(token, &mut asg)?;
 
@@ -832,6 +833,16 @@ impl Parser {
                 last_inline.close();
                 self.in_inline_span = false;
                 return Ok(());
+            } else if let Inline::InlineSpan(last_span) = last_inline {
+                if let Some(last_internal_inline) = last_span.inlines.last_mut() {
+                    if inline == *last_internal_inline {
+                        last_internal_inline.reconcile_locations(inline.locations());
+                        last_internal_inline.close();
+                    }
+                } else {
+                    last_span.add_inline(inline);
+                }
+                return Ok(());
             }
         }
         // handle newline tokens prior to constrained spans
@@ -1272,6 +1283,7 @@ impl Parser {
     }
 
     fn handle_dangling_spans(&mut self) {
+        dbg!(&self.inline_stack);
         // look for the last span in the stack
         if let Some(open_span_idx) = self
             .inline_stack

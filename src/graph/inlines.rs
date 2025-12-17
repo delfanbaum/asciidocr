@@ -12,7 +12,9 @@ use super::{
     nodes::{Location, NodeTypes},
     substitutions::CHARREF_MAP,
 };
-use crate::scanner::tokens::{Token, TokenType};
+use crate::{
+    scanner::tokens::{Token, TokenType},
+};
 
 /// Inlines enum containing literals, spans, and references (the latter not implemented)
 #[derive(Serialize, Clone, Debug)]
@@ -385,14 +387,18 @@ impl InlineSpan {
     pub fn add_inline(&mut self, inline: Inline) {
         // update the locations
         self.location = Location::reconcile(self.location.clone(), inline.locations());
-        // combine literals if necessary
-        if matches!(inline, Inline::InlineLiteral(_)) {
-            if let Some(Inline::InlineLiteral(prior_literal)) = self.inlines.last_mut() {
-                prior_literal.add_text_from_inline_literal(inline);
-                return;
+        if let Some(Inline::InlineSpan(last_span)) = self.inlines.last_mut() {
+            last_span.add_inline(inline);
+        } else {
+            // combine literals if necessary
+            if matches!(inline, Inline::InlineLiteral(_)) {
+                if let Some(Inline::InlineLiteral(prior_literal)) = self.inlines.last_mut() {
+                    prior_literal.add_text_from_inline_literal(inline);
+                    return;
+                }
             }
+            self.inlines.push(inline);
         }
-        self.inlines.push(inline);
     }
 
     fn new_footnote_ref(footnote_ref: InlineRef) -> Self {
