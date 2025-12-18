@@ -731,9 +731,7 @@ impl<'a> Scanner<'a> {
             // we've got an unconstrained (i.e., "**foo**bar") version
             self.current += 1;
             self.add_token(unconstrained, false, 0)
-
         }
-
         // we're at the end of a span, or are butted up against another inline marker
         else if end_of_inline_markers.contains(&self.peek()) ||
         // or we're at the beginning, or butted up against another inline marker

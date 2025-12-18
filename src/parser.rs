@@ -834,8 +834,6 @@ impl Parser {
                 return Ok(());
             } else if let Inline::InlineSpan(last_span) = last_inline {
                 if let Some(last_internal_inline) = last_span.inlines.last_mut() {
-                    // okay so what needs to happen is that spans deconstruct themselves,
-                    // I think
                     if inline == *last_internal_inline {
                         last_internal_inline.reconcile_locations(inline.locations());
                         last_internal_inline.close();
@@ -1326,22 +1324,6 @@ impl Parser {
                         temp_stack.push(inline);
                     }
                 }
-                // let mut inline_stack_iter = self.inline_stack.iter_mut().peekable();
-                // // this doesn't work like it should! it's skipping the middle, because of the
-                // // way it's looping
-                // while inline_stack_iter.peek().is_some() {
-                //     if let Some(current) = inline_stack_iter.next() {
-                //         dbg!(&current);
-                //         if let Inline::InlineLiteral(current_literal) = current {
-                //             if let Some(Inline::InlineLiteral(next_literal)) =
-                //                 inline_stack_iter.next()
-                //             {
-                //                 current_literal.combine_literals(next_literal.clone());
-                //             }
-                //         }
-                //         temp_stack.push_back(current.clone());
-                //     }
-                // }
                 self.inline_stack = temp_stack.into();
             } else {
                 // ... or if there are no children, add the token to the back of the last one; this

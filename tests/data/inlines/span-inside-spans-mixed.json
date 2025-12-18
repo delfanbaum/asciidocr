@@ -45,21 +45,21 @@
                 }
               ]
             },
+            {
+              "name": "text",
+              "type": "string",
+              "value": " shouldn't be a problem!",
+              "location": [
                 {
-                  "name": "text",
-                  "type": "string",
-                  "value": " shouldn't be a problem!",
-                  "location": [
-                    {
-                      "line": 1,
-                      "col": 8
-                    },
-                    {
-                      "line": 1,
-                      "col": 32
-                    }
-                  ]
+                  "line": 1,
+                  "col": 8
+                },
+                {
+                  "line": 1,
+                  "col": 31
                 }
+              ]
+            }
           ],
           "location": [
             {

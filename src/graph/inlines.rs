@@ -386,7 +386,11 @@ impl InlineSpan {
         // update the locations
         self.location = Location::reconcile(self.location.clone(), inline.locations());
         if let Some(Inline::InlineSpan(last_span)) = self.inlines.last_mut() {
-            last_span.add_inline(inline);
+            if last_span.open {
+                last_span.add_inline(inline);
+            } else {
+                self.inlines.push(inline);
+            }
         } else {
             // combine literals if necessary
             if matches!(inline, Inline::InlineLiteral(_)) {
