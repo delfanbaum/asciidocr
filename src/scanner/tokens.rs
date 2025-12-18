@@ -280,7 +280,7 @@ pub enum TokenType {
 
     // garden-variety text
     Hyperlink, // http://whatever.txt
-    Email, // cats@dogs.foo
+    Email,     // cats@dogs.foo
     Text,
 
     // character reference, such as "&mdash;"

@@ -715,21 +715,29 @@ impl<'a> Scanner<'a> {
         constrained: TokenType,
         unconstrained: TokenType,
     ) -> Result<Token, ScannerError> {
+        let inline_markup_chars = ['*', '_', '`', '+', '^', '~', '#'];
+        let mut end_of_inline_markers = vec![
+            ' ', '\0', '.', ',', ';', ':', '\n', ')', '"', '!', '?', '\'', ']', '…', '“', '”', '‘',
+            '’',
+        ];
+        let mut beginning_of_inline_markers = vec![' ', '\n', '\0', ']', '(', '"', '['];
+        end_of_inline_markers.extend_from_slice(&inline_markup_chars);
+        beginning_of_inline_markers.extend_from_slice(&inline_markup_chars);
         // guard clause against dangling markup
         if self.peek() == ' ' && self.peek_back() == ' ' {
             self.add_text_until_next_markup()
-        } else if [
-            ' ', '\0', '.', ',', ';', ':', '\n', ')', '"', '!', '?', '\'', ']', '…', '“', '”', '‘',
-            '’',
-        ]
-        .contains(&self.peek())
-            || [' ', '\n', '\0', ']', '(', '"', '['].contains(&self.peek_back()) && self.peek() != c
-        {
-            self.add_token(constrained, false, 0)
         } else if self.peek() == c {
-            // we've got an unconstrained version
+            // the next character is the same
+            // we've got an unconstrained (i.e., "**foo**bar") version
             self.current += 1;
             self.add_token(unconstrained, false, 0)
+        }
+        // we're at the end of a span, or are butted up against another inline marker
+        else if end_of_inline_markers.contains(&self.peek()) ||
+        // or we're at the beginning, or butted up against another inline marker
+        beginning_of_inline_markers.contains(&self.peek_back()) && self.peek() != c
+        {
+            self.add_token(constrained, false, 0)
         } else {
             self.add_text_until_next_markup()
         }
@@ -1277,6 +1285,48 @@ mod tests {
                 1,
                 12,
                 15,
+            ),
+        ];
+        scan_and_assert_eq(&markup, expected_tokens);
+    }
+
+    #[rstest]
+    #[case('*', TokenType::Strong)]
+    #[case('`', TokenType::Monospace)]
+    #[case('+', TokenType::Literal)]
+    #[case('^', TokenType::Superscript)]
+    #[case('~', TokenType::Subscript)]
+    #[case('#', TokenType::Mark)]
+    fn inline_formatting_by_other(#[case] markup_char: char, #[case] expected_token: TokenType) {
+        let markup = format!("Somx {}_bar_{} bar.", markup_char, markup_char);
+        let expected_tokens = vec![
+            Token::new_default(
+                TokenType::Text,
+                "Somx ".to_string(),
+                Some("Somx ".to_string()),
+                1,
+                1,
+                5,
+            ),
+            Token::new_default(expected_token, markup_char.to_string(), None, 1, 6, 6),
+            Token::new_default(TokenType::Emphasis, "_".to_string(), None, 1, 7, 7),
+            Token::new_default(
+                TokenType::Text,
+                "bar".to_string(),
+                Some("bar".to_string()),
+                1,
+                8,
+                10,
+            ),
+            Token::new_default(TokenType::Emphasis, "_".to_string(), None, 1, 11, 11),
+            Token::new_default(expected_token, markup_char.to_string(), None, 1, 12, 12),
+            Token::new_default(
+                TokenType::Text,
+                " bar.".to_string(),
+                Some(" bar.".to_string()),
+                1,
+                13,
+                markup.len(),
             ),
         ];
         scan_and_assert_eq(&markup, expected_tokens);

@@ -156,7 +156,7 @@ impl Inline {
 
     pub fn extract_child_inlines(&mut self) -> VecDeque<Inline> {
         match &self {
-            Inline::InlineSpan(span) => span.inlines.clone().into(),
+            Inline::InlineSpan(span) => span.extract_span_inlines(),
             _ => todo!(),
         }
     }
@@ -385,14 +385,22 @@ impl InlineSpan {
     pub fn add_inline(&mut self, inline: Inline) {
         // update the locations
         self.location = Location::reconcile(self.location.clone(), inline.locations());
-        // combine literals if necessary
-        if matches!(inline, Inline::InlineLiteral(_)) {
-            if let Some(Inline::InlineLiteral(prior_literal)) = self.inlines.last_mut() {
-                prior_literal.add_text_from_inline_literal(inline);
-                return;
+        if let Some(Inline::InlineSpan(last_span)) = self.inlines.last_mut() {
+            if last_span.open {
+                last_span.add_inline(inline);
+            } else {
+                self.inlines.push(inline);
             }
+        } else {
+            // combine literals if necessary
+            if matches!(inline, Inline::InlineLiteral(_)) {
+                if let Some(Inline::InlineLiteral(prior_literal)) = self.inlines.last_mut() {
+                    prior_literal.add_text_from_inline_literal(inline);
+                    return;
+                }
+            }
+            self.inlines.push(inline);
         }
-        self.inlines.push(inline);
     }
 
     fn new_footnote_ref(footnote_ref: InlineRef) -> Self {
@@ -404,6 +412,34 @@ impl InlineSpan {
         footnote.inlines.push(Inline::InlineRef(footnote_ref));
         footnote.metadata = Some(ElementMetadata::new_with_role("footnote".to_string()));
         footnote
+    }
+
+    // extracts the inlines inside the span, closing any open (dangling) spans that may be
+    // inside of it
+    fn extract_span_inlines(&self) -> VecDeque<Inline> {
+        let mut children = VecDeque::new();
+        for inline in self.inlines.iter() {
+            // handle any open spans
+            if inline.is_open() {
+                let mut working_inline = inline.clone();
+                let open_span_literal = working_inline.produce_literal_from_self();
+                let mut inline_children = working_inline.extract_child_inlines();
+                if let Some(inline) = inline_children.front_mut() {
+                    match inline {
+                        Inline::InlineLiteral(literal) => {
+                            literal.prepend_to_value(open_span_literal, literal.location.clone());
+                        }
+                        _ => todo!(),
+                    }
+                } else {
+                    todo!()
+                }
+                children.extend(inline_children);
+            } else {
+                children.push_back(inline.clone());
+            }
+        }
+        children
     }
 
     /// Deconstructs a footnote span into the relevant footnote definition ID (to be applied to
