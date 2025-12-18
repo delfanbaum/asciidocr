@@ -45,6 +45,15 @@ fn test_spans_inside_spans() {
     assert_parsed_doc_matches_expected_asg_from_str(&adoc_str, &asg_json_str)
 }
 
+#[test]
+fn test_spans_inside_spans_mixed() {
+    let adoc_str = fs::read_to_string("tests/data/inlines/span-inside-spans-mixed.adoc")
+        .expect("Unable to read asciidoc test template");
+    let asg_json_str = fs::read_to_string("tests/data/inlines/span-inside-spans-mixed.json")
+        .expect("Unable to read asg json test template");
+    assert_parsed_doc_matches_expected_asg_from_str(&adoc_str, &asg_json_str)
+}
+
 #[rstest]
 #[case::emphasis("_")]
 #[case::strong("*")]
