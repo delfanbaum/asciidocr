@@ -12,9 +12,7 @@ use super::{
     nodes::{Location, NodeTypes},
     substitutions::CHARREF_MAP,
 };
-use crate::{
-    scanner::tokens::{Token, TokenType},
-};
+use crate::scanner::tokens::{Token, TokenType};
 
 /// Inlines enum containing literals, spans, and references (the latter not implemented)
 #[derive(Serialize, Clone, Debug)]
@@ -158,7 +156,7 @@ impl Inline {
 
     pub fn extract_child_inlines(&mut self) -> VecDeque<Inline> {
         match &self {
-            Inline::InlineSpan(span) => span.inlines.clone().into(),
+            Inline::InlineSpan(span) => span.extract_span_inlines(),
             _ => todo!(),
         }
     }
@@ -410,6 +408,34 @@ impl InlineSpan {
         footnote.inlines.push(Inline::InlineRef(footnote_ref));
         footnote.metadata = Some(ElementMetadata::new_with_role("footnote".to_string()));
         footnote
+    }
+
+    // extracts the inlines inside the span, closing any open (dangling) spans that may be
+    // inside of it
+    fn extract_span_inlines(&self) -> VecDeque<Inline> {
+        let mut children = VecDeque::new();
+        for inline in self.inlines.iter() {
+            // handle any open spans
+            if inline.is_open() {
+                let mut working_inline = inline.clone();
+                let open_span_literal = working_inline.produce_literal_from_self();
+                let mut inline_children = working_inline.extract_child_inlines();
+                if let Some(inline) = inline_children.front_mut() {
+                    match inline {
+                        Inline::InlineLiteral(literal) => {
+                            literal.prepend_to_value(open_span_literal, literal.location.clone());
+                        }
+                        _ => todo!(),
+                    }
+                } else {
+                    todo!()
+                }
+                children.extend(inline_children);
+            } else {
+                children.push_back(inline.clone());
+            }
+        }
+        children
     }
 
     /// Deconstructs a footnote span into the relevant footnote definition ID (to be applied to

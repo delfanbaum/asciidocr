@@ -144,7 +144,6 @@ impl Parser {
         for result in tokens {
             match result {
                 Ok(token) => {
-                    let _ = dbg!(&token);
                     let token_type = token.token_type();
                     self.token_into(token, &mut asg)?;
 
@@ -835,9 +834,13 @@ impl Parser {
                 return Ok(());
             } else if let Inline::InlineSpan(last_span) = last_inline {
                 if let Some(last_internal_inline) = last_span.inlines.last_mut() {
+                    // okay so what needs to happen is that spans deconstruct themselves,
+                    // I think
                     if inline == *last_internal_inline {
                         last_internal_inline.reconcile_locations(inline.locations());
                         last_internal_inline.close();
+                    } else {
+                        last_span.add_inline(inline);
                     }
                 } else {
                     last_span.add_inline(inline);
@@ -1283,7 +1286,6 @@ impl Parser {
     }
 
     fn handle_dangling_spans(&mut self) {
-        dbg!(&self.inline_stack);
         // look for the last span in the stack
         if let Some(open_span_idx) = self
             .inline_stack
@@ -1303,26 +1305,44 @@ impl Parser {
                     _ => todo!(),
                 }
                 // put any appended inlines into the stack at the relevant position
-                for child_inline in children {
-                    self.inline_stack.insert(open_span_idx, child_inline)
+                while children.len() > 0 {
+                    if let Some(child) = children.pop_back() {
+                        self.inline_stack.insert(open_span_idx, child);
+                    }
                 }
 
                 // consolidate any resultant or remaining adjacent literals (this should be extracted to a function)
-                let mut temp_stack: VecDeque<Inline> = VecDeque::new();
-                let mut inline_stack_iter = self.inline_stack.iter_mut().peekable();
-                while inline_stack_iter.peek().is_some() {
-                    if let Some(current) = inline_stack_iter.next() {
-                        if let Inline::InlineLiteral(current_literal) = current {
-                            if let Some(Inline::InlineLiteral(next_literal)) =
-                                inline_stack_iter.next()
-                            {
-                                current_literal.combine_literals(next_literal.clone());
-                            }
+                let mut temp_stack: Vec<Inline> = vec![];
+                while let Some(mut inline) = self.inline_stack.pop_front() {
+                    if temp_stack.len() == 0 {
+                        temp_stack.push(inline);
+                    } else if inline.is_literal() {
+                        if let Some(Inline::InlineLiteral(last_in_stack)) = temp_stack.last_mut() {
+                            last_in_stack.combine_literals(inline.extract_literal());
+                        } else {
+                            temp_stack.push(inline);
                         }
-                        temp_stack.push_back(current.clone());
+                    } else {
+                        temp_stack.push(inline);
                     }
                 }
-                self.inline_stack = temp_stack;
+                // let mut inline_stack_iter = self.inline_stack.iter_mut().peekable();
+                // // this doesn't work like it should! it's skipping the middle, because of the
+                // // way it's looping
+                // while inline_stack_iter.peek().is_some() {
+                //     if let Some(current) = inline_stack_iter.next() {
+                //         dbg!(&current);
+                //         if let Inline::InlineLiteral(current_literal) = current {
+                //             if let Some(Inline::InlineLiteral(next_literal)) =
+                //                 inline_stack_iter.next()
+                //             {
+                //                 current_literal.combine_literals(next_literal.clone());
+                //             }
+                //         }
+                //         temp_stack.push_back(current.clone());
+                //     }
+                // }
+                self.inline_stack = temp_stack.into();
             } else {
                 // ... or if there are no children, add the token to the back of the last one; this
                 // is a little hacky, but it is cleaner compared to the rest of the code just to
