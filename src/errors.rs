@@ -46,9 +46,7 @@ pub enum ParserError {
     DelimitedBlock(usize),
     #[error("Line {0}: Unexpected block in Block::ParentBlock")]
     ParentBlock(usize),
-    #[error(
-        "Line {0}: Invalid heading level; parser level offest at the time of error was: {1}"
-    )]
+    #[error("Line {0}: Invalid heading level; parser level offest at the time of error was: {1}")]
     HeadingOffsetError(usize, i8),
     #[error("Line {0}: Unable to resolve target: {1:?}")]
     TargetResolution(usize, String),
@@ -99,16 +97,14 @@ pub enum BlockError {
     #[error("Blocks of type {0} do not accept metadata")]
     InvalidMetadata(String),
     #[error(transparent)]
-InlineError(#[from] InlineError)
-
+    InlineError(#[from] InlineError),
 }
 
 #[derive(thiserror::Error, PartialEq, Debug)]
 pub enum InlineError {
     #[error("Error creating footnote reference to {0}")]
-    FootnoteRef(String)
+    FootnoteRef(String),
 }
-
 
 #[derive(thiserror::Error, PartialEq, Debug)]
 pub enum TokenError {

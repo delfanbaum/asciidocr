@@ -59,7 +59,7 @@ pub fn target_and_attrs_from_token(token: &Token) -> (String, Option<ElementMeta
             inline_metadata: true,
             declared_type: None,
             location: vec![],
-            line: token.line
+            line: token.line,
         };
         token_metadata.process_attributes(extract_attributes(&attributes));
         metadata = Some(token_metadata);

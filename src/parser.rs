@@ -707,7 +707,10 @@ impl Parser {
                         self.add_last_to_block_stack_or_graph(asg)?;
                     }
                 }
-                list.metadata = Some(ElementMetadata::new_with_role("colist".to_string(), self.line));
+                list.metadata = Some(ElementMetadata::new_with_role(
+                    "colist".to_string(),
+                    self.line,
+                ));
             }
             self.push_block_to_stack(Block::List(list))?;
         }
@@ -794,7 +797,8 @@ impl Parser {
             TokenType::Heading5 => 4 + self.level_offset,
             _ => {
                 return Err(ParserError::InternalError(
-                    self.line, "Inavlid token given to parse_section_headings".to_string(),
+                    self.line,
+                    "Inavlid token given to parse_section_headings".to_string(),
                 ));
             }
         };
