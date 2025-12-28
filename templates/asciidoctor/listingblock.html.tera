@@ -1,0 +1,25 @@
+{#- Leaf blocks, which never have child blocks, include:
+    Listing,
+    Literal, // TK not handling now
+    Paragraph,
+    Pass,
+    Stem, // TK not handling now
+    Verse,
+    Comment, // Gets thrown away, but convenient
+-#}
+{%- import "inline.html.tera" as inline_macros -%}
+{%- macro process_listing(block) -%}
+{%- if block.metadata.attributes.language -%}
+{%- set code_language = block.metadata.attributes.language -%}
+{%- endif -%}
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code {%- if code_language %} class="language-{{ code_language }}" data-lang="{{code_language}}" {%- endif -%}>{%- if block.inlines -%}
+    {%- for inline in block.inlines -%}
+    {{- inline_macros::process_inline(inline=inline) -}}
+    {%- endfor -%}
+    {%- endif -%}
+    </code></pre>
+</div>
+</div>
+{%- endmacro process_listing -%}

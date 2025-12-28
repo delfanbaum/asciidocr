@@ -8,7 +8,13 @@
     Comment, // Gets thrown away, but convenient
 -#}
 {%- import "inline.html.tera" as inline_macros -%}
+{%- import "listingblock.html.tera" as listing_macros -%}
 {%- macro process_leaf_block(block) -%}
+
+{% if block.name == "listing" -%}
+{{ listing_macros::process_listing(block=block) }}
+{% else %}
+
 {% if block.name == "paragraph" -%}
 {%- set tag = "p" -%}
 {% elif block.name == "listing" -%}
@@ -37,5 +43,6 @@
 {%- endif -%}
 {%- if tag -%}</{{tag}}>
 </div>
+{%- endif -%}
 {%- endif -%}
 {%- endmacro process_leaf_block -%}

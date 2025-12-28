@@ -1,4 +1,4 @@
-use chrono::{Local };
+use chrono::Local;
 use tera::{Context, Tera};
 
 use crate::errors::ConversionError;
@@ -18,6 +18,8 @@ static ASC_DR_HTML_TEMPLATE: &str =
 static ASC_DR_BLOCKS_TEMPLATE: &str = include_str!("../../templates/asciidoctor/block.html.tera");
 static ASC_DR_LEAF_BLOCKS_TEMPLATE: &str =
     include_str!("../../templates/asciidoctor/leafblocks.html.tera");
+static ASC_DR_LISTING_BLOCKS_TEMPLATE: &str =
+    include_str!("../../templates/asciidoctor/listingblock.html.tera");
 static ASC_DR_TABLES_TEMPLATE: &str = include_str!("../../templates/asciidoctor/tables.html.tera");
 static ASC_DR_INLINES_TEMPLATE: &str = include_str!("../../templates/asciidoctor/inline.html.tera");
 
@@ -58,9 +60,7 @@ fn render_from_templates(
     context.insert("current_time", &now);
 
     // do the rendering
-    Ok(tera
-        .render(base_template, &context)
-        .expect("failure"))
+    Ok(tera.render(base_template, &context).expect("failure"))
 }
 
 fn gather_htmlbook_templates(
@@ -90,6 +90,7 @@ fn gather_asciidoctor_templates() -> (&'static str, Vec<(&'static str, &'static 
             ("asciidoctor.html.tera", ASC_DR_HTML_TEMPLATE),
             ("block.html.tera", ASC_DR_BLOCKS_TEMPLATE),
             ("leafblocks.html.tera", ASC_DR_LEAF_BLOCKS_TEMPLATE),
+            ("listingblock.html.tera", ASC_DR_LISTING_BLOCKS_TEMPLATE),
             ("tables.html.tera", ASC_DR_TABLES_TEMPLATE),
             ("inline.html.tera", ASC_DR_INLINES_TEMPLATE),
         ],
