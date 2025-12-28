@@ -7,6 +7,7 @@ use asciidocr::{
     scanner::Scanner,
 };
 use assert_json_diff::assert_json_eq;
+use chrono::Local;
 use image::RgbImage;
 use serde_json::{Value, json};
 use tempfile::NamedTempFile;
@@ -63,6 +64,8 @@ pub fn assert_rendered_htmlbook_matches_expected(adoc_fn: &str, html_fn: &str) {
 
 pub fn assert_rendered_asciidoctor_html_matches_expected(adoc_fn: &str, html_fn: &str) {
     let test_dir = PathBuf::from("tests/data/");
+    let now_datetime = Local::now();
+    let now = format!("{}", now_datetime.format("%Y-%m-%d %H:%M:%S %z"));
     let mut rendered_html = render_asciidoctor_html(
         &Parser::new_no_target_resolution(test_dir.join(adoc_fn))
             .parse(Scanner::new(
@@ -74,6 +77,7 @@ pub fn assert_rendered_asciidoctor_html_matches_expected(adoc_fn: &str, html_fn:
     rendered_html.retain(|c| !c.is_whitespace());
     let mut expected_html =
         fs::read_to_string(test_dir.join(html_fn)).expect("Unable to read expectd html file");
+    expected_html = expected_html.replace("NOW", &now);
     expected_html.retain(|c| !c.is_whitespace());
     assert_eq!(rendered_html, expected_html);
 }

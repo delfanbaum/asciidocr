@@ -14,6 +14,7 @@ categories = ["command-line-utilities", "parser-implementations", "text-processi
 
 [dependencies]
 anyhow = "1.0.89"
+chrono = {version="0.4.42", features=["serde"]}
 clap = {version = "4.5.20", features=["derive"]}
 docx-rs = {version="0.4.18", optional=true}
 log = "0.4.22"

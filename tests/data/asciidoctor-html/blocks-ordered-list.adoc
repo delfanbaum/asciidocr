@@ -1,0 +1,9 @@
+= Document Title
+
+=== A B-Head
+
+Some further text, followed by an ordered list:
+
+. One
+. Two
+. Three

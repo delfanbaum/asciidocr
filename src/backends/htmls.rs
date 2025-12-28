@@ -1,3 +1,4 @@
+use chrono::{Local };
 use tera::{Context, Tera};
 
 use crate::errors::ConversionError;
@@ -47,11 +48,18 @@ fn render_from_templates(
     base_template: &'static str,
     templates: Vec<(&'static str, &'static str)>,
 ) -> Result<String, ConversionError> {
-    // from their docs
+    // set up tera
     let mut tera = Tera::default();
     tera.add_raw_templates(templates).expect("failure");
+
+    // set up context
+    let mut context = Context::from_serialize(graph)?;
+    let now = Local::now();
+    context.insert("current_time", &now);
+
+    // do the rendering
     Ok(tera
-        .render(base_template, &Context::from_serialize(graph)?)
+        .render(base_template, &context)
         .expect("failure"))
 }
 

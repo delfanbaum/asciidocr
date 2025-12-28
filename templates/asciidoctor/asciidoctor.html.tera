@@ -22,5 +22,10 @@
 <div id="content">{% for block in blocks %}
 {{ block_macros::process_block(block=block,skip_tag=false) -}}
 {% endfor %}</div>
+<div id="footer">
+<div id="footer-text">
+Last updated {{current_time | date(format="%Y-%m-%d %H:%M:%S %z")}}
+</div>
+</div>
 </body>
 </html>

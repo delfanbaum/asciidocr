@@ -1,0 +1,4 @@
+.Open Block Title
+****
+A paragraph inside an open block.
+****
