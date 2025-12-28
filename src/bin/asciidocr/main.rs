@@ -71,6 +71,7 @@ fn run(args: Cli) -> Result<()> {
             Ok(())
         }
 
+        #[cfg(feature = "json")]
         Backends::Json => {
             render_string(serde_json::to_string_pretty(&graph)?, read_output(args));
             Ok(())

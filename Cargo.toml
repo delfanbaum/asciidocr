@@ -35,3 +35,4 @@ tempfile = "3.14.0"
 
 [features]
 docx = ["dep:docx-rs"]
+json = []

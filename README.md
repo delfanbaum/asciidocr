@@ -7,10 +7,11 @@ _Now with a fairly high-functioning `docx` backend_! (See feature flag.)
 
 ## Installation
 
-Right now the crate provides an `asciidocr` executable with a default HTML
-build as well as a `json` backend that can be used to check against
-the still-in-progress asciidoc official spec/technology compatibility toolkit.
-An experimental `docx` build is provided behind a feature flag.
+The crate provides an `asciidocr` executable with a default HTML
+build. Behind the `json` feature, it also provides a `json` backend that can be
+used to check against the still-in-progress asciidoc official spec/technology
+compatibility toolkit. An experimental `docx` build is also provided behind a
+feature flag.
 
 To install from `crates.io`:
 
@@ -36,7 +37,7 @@ $ cargo install --path . --features "docx"
 
 ## Usage (Command-Line)
 
-Here's the usage with the `docx` feature enabled:
+Here's the usage with the all features enabled:
 
 ```console
 $ asciidocr --help
