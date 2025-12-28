@@ -12,7 +12,13 @@
     {% endfor -%}
     {% endif -%}</title>
 </head>
-<body>
+<body class="article">
+<div id="header">{%- if header %}
+<h1>{%- for inline in header.title %}
+{{- inline_macros::process_inline(inline=inline) -}}
+{% endfor -%}
+{% endif -%}</h1>
+</div>
 <div id="content">{% for block in blocks %}
 {{ block_macros::process_block(block=block,skip_tag=false) -}}
 {% endfor %}</div>
