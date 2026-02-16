@@ -27,7 +27,7 @@ this should work.
 {%- endif -%}
 {%- else -%}
 {%- if block.name == "section" -%}
-<section data-type="sect{{block.level}}"
+<div class="sect{{block.level}}"
 {%- if block.metadata.roles %} class="{{ block.metadata.roles | join(sep=" ")}}" {%- endif -%}
 {%- if block.metadata.attributes.id %} id="{{ block.metadata.attributes.id }}" {%- endif -%}>
 {%- elif block.name == "dlist" -%}
@@ -35,8 +35,10 @@ this should work.
 {%- elif block.name == "list" -%}
 {%- if block.variant == "ordered" -%}
 {%- set tag = "ol" -%}
+{%- set div_tag = "olist arabic" -%}
 {%- elif block.variant == "unordered" -%}
 {%- set tag = "ul" -%}
+{%- set div_tag = "ulist" -%}
 {%- endif -%}
 {%- elif block.name == "open" -%}
 {%- set tag = "div" -%}
@@ -71,6 +73,9 @@ this should work.
 {%- set data_type = "sidebar" -%}
 {% else %}
 {%- set tag = "UNHANDLED" -%}
+{%- endif %}
+{%- if div_class %}
+<div class="{{ div_class}}">
 {%- endif %}
 {%- if tag and not skip_tag -%}<{{tag}}
 {%- if block.metadata.roles and not block.name=="section" %} class="{{ block.metadata.roles | join(sep=" ")}}" {%- endif -%}
@@ -121,13 +126,16 @@ this should work.
 </p>
 {%- endif -%}
 {%- if tag and not skip_tag -%}</{{tag}}>{%- endif -%}
+{%- if div_class %}
+</div>
+{%- endif %}
 {% if block.name == "section" %}
 {% if block.blocks -%}
 {% for child_block in block.blocks %}
 {{- self::process_block(block=child_block, skip_tag=local_skip_tag) -}}
 {%- endfor -%}
 {%- endif -%}
-</section>
+</div>
 {%- endif -%}
 {%- endif -%}
 {%- endif -%}
