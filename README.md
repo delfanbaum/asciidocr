@@ -140,7 +140,7 @@ to your `~/Documents/.profile` (remembering that the "root" of a-Shell is
 `~/Documents`, because iOS):
 
 ```
-alias asciidocr='wasm ~/Documents/wasm-bin/asciidocr.wasm`
+alias asciidocr='wasm ~/Documents/wasm-bin/asciidocr.wasm'
 ```
 
 Then you can run `asciidocr` like you would on an actual computer. Marvelous!
