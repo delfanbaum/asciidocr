@@ -108,6 +108,43 @@ each release's page, but some language features recently introduced include:
 * Filtering included files by line (`include:foo.txt[lines=4..20]`, etc.),
   including "end of file" filtering (`[lines=5..-1`)
 
+
+## Wasm Build for a-Shell (Asciidoc on iOS)
+
+This may just be a personal problem, but as an iOS user, I would like to be
+able to convert asciidoc files. Specifically, I would like to be able to convert
+my asciidoc files into `docx` files to send to for folks when I'm on the go.
+
+[Wasm to the rescue](https://bianshen00009.gitbook.io/a-guide-to-a-shell/lets-do-more-for-it/webassembly-for-a-shell)!
+
+Although I'm still testing this, `asciidocr` seems to work just fine in
+[a-Shell](https://holzschu.github.io/a-Shell_iOS/), specifically a-Shell mini,
+with `all-features` enabled (`docx` rendering seems fine!).
+
+To have this yourself, clone the repo, and do the following:
+
+```bash
+# add the target
+rustup target add wasm32-wasip1
+
+# build asciidocr as a .wasm bin with all features in release mode
+cargo build --all-features --target wasm32-wasip1 -r
+```
+
+Then, one way or another, get it over to your iOS device (I used iCloud Drive,
+you can also Airdrop, email it to yourself as the bin is very small, etc.), then
+put it somewhere easy to find. I added it to a `~/Documents/wasm-bin` directory.
+
+You can run it from there, or for convenience, add something like the following
+to your `~/Documents/.profile` (remembering that the "root" of a-Shell is
+`~/Documents`, because iOS):
+
+```
+alias asciidocr='wasm ~/Documents/wasm-bin/asciidocr.wasm`
+```
+
+Then you can run `asciidocr` like you would on an actual computer. Marvelous!
+
 ## Project Goals 
 
 A non-exhaustive list:
