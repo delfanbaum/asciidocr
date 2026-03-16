@@ -1,0 +1,141 @@
+{#-
+
+NOTE: This file includes all block macros; maybe some day they will be split
+back up again, but I can't get recursive calls (i.e., a list calling
+render_block) to work across files right now. Maybe someday I'll fix that. This
+does simplify the template loading code, however.
+
+-#}
+{%- from "inline.html" import render_inline -%}
+
+{%- macro render_block(block, skip_tag=false) -%}
+
+{%- if block.name == "section"-%}
+    {{ render_section(block) }}
+
+{#- leaf blocks -#}
+{%- elif block.name in ["paragraph", "listing", "verse", "pass", "literal"] %}
+    {{ render_leafblock(block) }}
+
+{#- tables -#}
+{%- elif block.name == "table" -%}
+    {{ render_table(block) }}
+
+{#- breaks -#}
+{%- elif block.name == "break" -%}
+    {% if block.variant == "page" %}
+    <div style="page-break-after: always;"></div>
+    {% elif block.variant == "thematic" %}
+    <hr />
+    {%- endif -%}
+{%-endif-%}
+
+{%- endmacro -%}
+
+{% macro render_title_for_block(block) %}
+        {%- if block.name in ["example", "sidebar"]-%}
+            {%- set title_heading_level = 5 -%}
+        {%- else -%}
+            {%- set title_heading_level = 1 -%}
+        {%- endif %}
+    <h{{title_heading_level}}>{%- for inline in block.title -%}{{- render_inline(inline) -}}
+    {%- endfor -%}</h{{title_heading_level}}>
+{%- endmacro -%}
+
+
+
+
+{%- macro render_section(block) -%}
+<section data-type="sect{{block.level}}"
+        {%- if block.metadata -%}
+        {%- if block.metadata.roles %} class="{{ block.metadata.roles | join(sep=" ")}}" {%- endif -%}
+        {%- if block.metadata.attributes.id %} id="{{ block.metadata.attributes.id }}" {%- endif -%}
+        {%- endif -%}>
+    {% if block.title %}
+        {{ render_title_for_block(block) }}
+    {% endif -%}
+    {% for block in block.blocks %}
+        {{ render_block(block) }}
+    {%- endfor -%}
+</section>
+{%- endmacro -%}
+
+{%- macro render_leafblock(block) -%}
+{#- Leaf blocks, which never have child blocks, include:
+    Listing,
+    Literal, // TK not handling now
+    Paragraph,
+    Pass,
+    Stem, // TK not handling now
+    Verse,
+    Comment, // Gets thrown away, but convenient
+-#}
+    {% if block.name == "paragraph" -%}
+    {%- set tag = "p" -%}
+    {% elif block.name == "listing" -%}
+    {%- set tag = "pre" -%}
+        {%- if block.metadata.attributes.language -%}
+        {%- set code_language = block.metadata.attributes.language -%}
+        {%- endif -%}
+    {% elif block.name == "verse" -%}
+        {%- set tag = "pre" -%}
+        {%- set data_type = "verse" -%}
+    {% elif block.name == "literal" -%}
+        {%- set tag = "pre" -%}
+    {% elif block.name == "pass" -%}
+    {%- endif -%}
+{%- if tag -%}<{{tag}}
+{%- if block.metadata and block.metadata.roles %} class="{{ block.metadata.roles | join(sep=" ")}}" {%- endif -%}
+{%- if code_language %} data-code-language="{{ code_language }}" {%- endif -%}
+{%- if id %} id="{{ id }}" {%- endif -%}
+{%- if data_type %} data-type="{{ data_type }}"{%- endif -%}>{%- endif -%}
+    {% if block.inlines %}
+    {%- for inline in block.inlines -%}
+    {{- render_inline(inline) -}}
+    {%- endfor -%}
+    {%- endif -%}
+{%- if tag -%}</{{tag}}>{%- endif -%}
+{%- endmacro -%}
+
+
+{%- macro render_table(block) -%}
+{#- Collect Cells into rows; should be save to assume that all tables have a cols attr -#}
+{% set cols = block.metadata.attributes.cols | int %}
+{%- set body_start = 0 -%}
+{%- if "header" in block.metadata.options -%}
+{%- set header = true -%}
+{%- set body_start = cols -%}
+{%- endif -%}
+    <table>{% if header %}
+    <thead>
+        {% for idx in range(0, body_start) -%}
+            {%- set cell = block.blocks[idx] -%}
+                {{ process_table_cell(cell, tag="th") }}
+    {% endfor %}</thead>
+    <tbody>
+        <tr>
+        {%- else -%}
+        <tr>
+        {%- endif %}
+        {% set num_cells = block.blocks | length -%}
+        {% for idx in range(body_start, num_cells) -%}
+            {%- set cell = block.blocks[idx] -%}
+                {{ process_table_cell(cell=cell, tag="td") -}}
+        {% if idx > 0 and (idx + 1) % cols == 0 and idx+1 != num_cells %}
+        </tr>
+        <tr>{%- endif %}
+        {% endfor %}</tr>
+    {%- if header %}
+    </tbody>{%- endif %}
+    </table>
+{%- endmacro -%}
+
+{%- macro process_table_cell(cell, tag) -%}
+    <{{tag}}>
+    {%- if cell.inlines -%}
+    {%- for inline in cell.inlines -%}
+    {{- render_inline(inline) -}}
+    {%- endfor -%}
+    {%- endif -%}
+    </{{tag}}>
+{%- endmacro -%}

@@ -398,7 +398,7 @@ impl Block {
                 for child in block.blocks.iter_mut() {
                     let child_footnoes =
                         child.extract_footnote_definitions(extracted.len(), document_id)?;
-                    local_count += child_footnoes.len();
+                    // local_count += child_footnoes.len();
                     extracted.extend(child_footnoes);
                 }
             }
@@ -406,7 +406,7 @@ impl Block {
                 for child in block.blocks.iter_mut() {
                     let child_footnoes =
                         child.extract_footnote_definitions(extracted.len(), document_id)?;
-                    local_count += child_footnoes.len();
+                    // local_count += child_footnoes.len();
                     extracted.extend(child_footnoes);
                 }
             }
@@ -414,7 +414,7 @@ impl Block {
                 for child in block.items.iter_mut() {
                     let child_footnoes =
                         child.extract_footnote_definitions(extracted.len(), document_id)?;
-                    local_count += child_footnoes.len();
+                    // local_count += child_footnoes.len();
                     extracted.extend(child_footnoes);
                 }
             }

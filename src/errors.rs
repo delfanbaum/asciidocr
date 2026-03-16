@@ -69,7 +69,7 @@ pub enum ConversionError {
     #[error(transparent)]
     DocxRender(#[from] DocxRenderError),
     #[error(transparent)]
-    TeraError(#[from] tera::Error),
+    MiniJinja(#[from] minijinja::Error),
 }
 
 #[derive(thiserror::Error, PartialEq, Debug)]
