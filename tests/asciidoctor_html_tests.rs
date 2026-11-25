@@ -63,3 +63,25 @@ fn test_minimum_document_renders() {
     let html = render_asciidoctor_embedded_from_str(&adoc);
     assert!(!html.trim().is_empty());
 }
+
+/// Asciidoctor itself outputs quote attributions as written; we escape them, since they can hold
+/// any characters (so this is not part of the fixture compared against Asciidoctor)
+#[test]
+fn test_attribution_is_escaped() {
+    let html = render_asciidoctor_embedded_from_str(
+        "[quote, Smith & Sons, A <Book>]\n____\nA quote.\n____\n\n[verse, Jo & Co]\n____\nA poem.\n____\n",
+    );
+    assert!(html.contains("&#8212; Smith &amp; Sons<br>"), "{html}");
+    assert!(html.contains("<cite>A &lt;Book&gt;</cite>"), "{html}");
+    assert!(html.contains("&#8212; Jo &amp; Co"), "{html}");
+}
+
+/// Passthroughs are output as written, and the text around them is still escaped
+#[test]
+fn test_inline_passthrough_is_not_escaped() {
+    let html = render_asciidoctor_embedded_from_str("a < b pass:[<b>raw</b>] & c\n");
+    assert!(
+        html.contains("<p>a &lt; b <b>raw</b> &amp; c</p>"),
+        "{html}"
+    );
+}

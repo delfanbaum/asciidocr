@@ -76,8 +76,8 @@ loading code simple.
 {%- macro render_section(block) -%}
 <section data-type="sect{{block.level}}"
         {%- if block.metadata -%}
-        {%- if block.metadata.roles %} class="{{ block.metadata.roles | join(" ")}}" {%- endif -%}
-        {%- if block.metadata.attributes.id %} id="{{ block.metadata.attributes.id }}" {%- endif -%}
+        {%- if block.metadata.roles %} class="{{ block.metadata.roles | join(" ") | escape_attr }}" {%- endif -%}
+        {%- if block.metadata.attributes.id %} id="{{ block.metadata.attributes.id | escape_attr }}" {%- endif -%}
         {%- endif -%}>
     {% if block.title %}
         {{ render_title_for_block(block) }}
@@ -99,7 +99,7 @@ loading code simple.
     {{- warn_unrendered_list_title(block) -}}
     {%- set tag = "ul" if block.variant == "unordered" else "ol" -%}
     <{{tag}}
-    {%- if block.metadata and block.metadata.roles %} class="{{ block.metadata.roles | join(" ") }}"{%- endif -%}>
+    {%- if block.metadata and block.metadata.roles %} class="{{ block.metadata.roles | join(" ") | escape_attr }}"{%- endif -%}>
     {%- for item in block.items -%}
         {{ render_block(item) }}
     {%- endfor -%}
@@ -163,8 +163,8 @@ loading code simple.
         {%- set tag = "div" -%}
     {%- endif -%}
     <{{tag}}
-    {%- if block.metadata and block.metadata.roles %} class="{{ block.metadata.roles | join(" ") }}"{%- endif -%}
-    {%- if attrs.id %} id="{{ attrs.id }}"{%- endif -%}
+    {%- if block.metadata and block.metadata.roles %} class="{{ block.metadata.roles | join(" ") | escape_attr }}"{%- endif -%}
+    {%- if attrs.id %} id="{{ attrs.id | escape_attr }}"{%- endif -%}
     {%- if data_type %} data-type="{{ data_type }}"{%- endif -%}>
     {%- if block.title -%}
         {{ render_title_for_block(block) }}
@@ -184,8 +184,8 @@ loading code simple.
         {%- endif -%}
     {%- endfor -%}
     {%- if block.name == "quote" and attrs.attribution -%}
-        <p data-type="attribution">{{ attrs.attribution }}
-        {%- if attrs.citation -%}, {{ attrs.citation }}{%- endif -%}</p>
+        <p data-type="attribution">{{ attrs.attribution | escape_text }}
+        {%- if attrs.citation -%}, {{ attrs.citation | escape_text }}{%- endif -%}</p>
     {%- endif -%}
     </{{tag}}>
 {%- endmacro -%}
@@ -193,12 +193,12 @@ loading code simple.
 {%- macro render_image(block) -%}
     {%- set attrs = block.metadata.attributes if block.metadata and block.metadata.attributes else {} -%}
     <figure
-    {%- if attrs.id %} id="{{ attrs.id }}"{%- endif -%}>
+    {%- if attrs.id %} id="{{ attrs.id | escape_attr }}"{%- endif -%}>
     {%- if block.title -%}
         {{ render_title_for_block(block) }}
     {%- endif -%}
-    <img src="{{ block.target }}"
-    {%- if attrs.positional_1 %} alt="{{ attrs.positional_1 }}"{%- endif -%}/>
+    <img src="{{ block.target | escape_attr }}"
+    {%- if attrs.positional_1 %} alt="{{ attrs.positional_1 | escape_attr }}"{%- endif -%}/>
     {%- if block.caption -%}
         <figcaption>{%- for inline in block.caption -%}
             {{- render_inline(inline) -}}
@@ -245,12 +245,13 @@ loading code simple.
 <div data-type="example">{{ render_title_for_block(block, 5) }}
 {%- endif -%}
 {%- if tag -%}<{{tag}}
-{%- if block.metadata and block.metadata.roles %} class="{{ block.metadata.roles | join(" ")}}" {%- endif -%}
+{%- if block.metadata and block.metadata.roles %} class="{{ block.metadata.roles | join(" ") | escape_attr }}" {%- endif -%}
 {%- if data_type %} data-type="{{ data_type }}"{%- endif -%}
-{%- if code_language %} data-code-language="{{ code_language }}" {%- endif -%}>{%- endif -%}
+{%- if code_language %} data-code-language="{{ code_language | escape_attr }}" {%- endif -%}>{%- endif -%}
     {% if block.inlines %}
     {%- for inline in block.inlines -%}
-    {{- render_inline(inline) -}}
+    {#- passthrough content is output exactly as written -#}
+    {%- if block.name == "pass" -%}{{- inline.value -}}{%- else -%}{{- render_inline(inline) -}}{%- endif -%}
     {%- endfor -%}
     {%- endif -%}
 {%- if tag -%}</{{tag}}>{%- endif -%}

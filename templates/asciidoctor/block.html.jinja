@@ -19,7 +19,8 @@ HTMLBook's.
 {%- elif block.name == "verse" -%}
     {{ render_verse(block) }}
 {%- elif block.name == "pass" -%}
-    {{ verbatim_text(block) }}
+    {#- passthrough content is output exactly as written (Asciidoctor drops only the delimiter newlines) -#}
+    {%- for inline in block.inlines %}{{ inline.value | trim("\n") }}{%- endfor -%}
 {%- elif block.name == "break" -%}
     {{ render_break(block) }}
 {%- elif block.name == "admonition" -%}
@@ -42,8 +43,8 @@ HTMLBook's.
 {#- Asciidoctor puts a block's id and roles on its outermost element: `id` first, then the
     block's own classes followed by any roles. (A section's id goes on its heading instead.) -#}
 {%- macro wrapper_attrs(block, css_class, with_id=true) -%}
-{%- if with_id and block.metadata and block.metadata.attributes and block.metadata.attributes.id %} id="{{ block.metadata.attributes.id }}"{%- endif %} class="{{ css_class }}
-{%- if block.metadata and block.metadata.roles %} {{ block.metadata.roles | join(" ") }}{%- endif -%}"
+{%- if with_id and block.metadata and block.metadata.attributes and block.metadata.attributes.id %} id="{{ block.metadata.attributes.id | escape_attr }}"{%- endif %} class="{{ css_class }}
+{%- if block.metadata and block.metadata.roles %} {{ block.metadata.roles | join(" ") | escape_attr }}{%- endif -%}"
 {%- endmacro -%}
 
 {%- macro render_title(block) -%}
@@ -63,7 +64,7 @@ HTMLBook's.
 {%- set title_html = render_inlines(block.title) %}
 <div{{ wrapper_attrs(block, "sect" ~ block.level, false) }}>
 {%- set explicit_id = block.metadata.attributes.id if block.metadata and block.metadata.attributes else none %}
-<h{{ block.level + 1 }} id="{{ explicit_id or section_id(title_html) }}">{{ title_html }}</h{{ block.level + 1 }}>
+<h{{ block.level + 1 }} id="{{ (explicit_id or section_id(title_html)) | escape_attr }}">{{ title_html }}</h{{ block.level + 1 }}>
 {%- if block.level == 1 %}
 <div class="sectionbody">
 {%- endif -%}
@@ -113,7 +114,7 @@ HTMLBook's.
 {{- render_title(block) }}
 <div class="content">
 {%- if language %}
-<pre class="highlight"><code class="language-{{ language }}" data-lang="{{ language }}">{{ verbatim_text(block) }}</code></pre>
+<pre class="highlight"><code class="language-{{ language | escape_attr }}" data-lang="{{ language | escape_attr }}">{{ verbatim_text(block) }}</code></pre>
 {%- else %}
 <pre>{{ verbatim_text(block) }}</pre>
 {%- endif %}
@@ -205,11 +206,11 @@ HTMLBook's.
 {%- if attrs.attribution or attrs.citation %}
 <div class="attribution">
 {%- if attrs.attribution %}
-&#8212; {{ attrs.attribution }}
+&#8212; {{ attrs.attribution | escape_text }}
 {%- endif -%}
 {%- if attrs.attribution and attrs.citation %}<br>{%- endif -%}
 {%- if attrs.citation %}
-<cite>{{ attrs.citation }}</cite>
+<cite>{{ attrs.citation | escape_text }}</cite>
 {%- endif %}
 </div>
 {%- endif -%}
@@ -288,7 +289,7 @@ HTMLBook's.
 {%- macro render_image(block) %}
 <div{{ wrapper_attrs(block, "imageblock") }}>
 <div class="content">
-<img src="{{ block.target }}" alt="{{ alt_text(block.target, block.metadata) }}">
+<img src="{{ block.target | escape_attr }}" alt="{{ alt_text(block.target, block.metadata) }}">
 </div>
 {%- if block.caption %}
 <div class="title">Figure {{ next_number("figure") }}. {{ render_inlines(block.caption) }}</div>

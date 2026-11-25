@@ -402,8 +402,9 @@ impl InlineSpan {
             }
         } else {
             // combine literals if necessary
-            if matches!(inline, Inline::InlineLiteral(_))
+            if let Inline::InlineLiteral(new_literal) = &inline
                 && let Some(Inline::InlineLiteral(prior_literal)) = self.inlines.last_mut()
+                && prior_literal.can_merge_with(new_literal)
             {
                 prior_literal.add_text_from_inline_literal(inline);
                 return;
@@ -692,6 +693,16 @@ impl InlineLiteral {
         )
     }
 
+    /// Text that was passed through an inline passthrough macro (e.g., `pass:[<b>text</b>]`), which
+    /// backends output as is.
+    pub fn new_raw_from_token(token: &Token) -> Self {
+        InlineLiteral::new(
+            InlineLiteralName::Raw,
+            token.lexeme.clone(),
+            token.locations(),
+        )
+    }
+
     /// Add text and reconcile location information from a given (text) token
     pub fn add_text_from_token(&mut self, token: &Token) {
         self.text_from_token(token, false);
@@ -709,6 +720,13 @@ impl InlineLiteral {
             false => self.value.push_str(&token.text()),
         }
         self.location = Location::reconcile(self.location.clone(), token.locations());
+    }
+
+    /// Whether the other literal's text can simply be appended to this one. Passthrough text only
+    /// merges with other passthrough text, because backends output it as is while escaping
+    /// everything else.
+    pub fn can_merge_with(&self, other: &InlineLiteral) -> bool {
+        matches!(self.name, InlineLiteralName::Raw) == matches!(other.name, InlineLiteralName::Raw)
     }
 
     /// Add test from inline literals; should only really be used in reconciling multi-line spans

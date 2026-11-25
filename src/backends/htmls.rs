@@ -75,6 +75,28 @@ pub fn render_asciidoctor_html_embedded(graph: &Asg) -> Result<String, Conversio
     render_from_templates(graph, templates, ASCIIDOCTOR_EMBED_TEMPLATE.0)
 }
 
+/// Escapes the characters that would otherwise be read as markup when placed in HTML text.
+/// Quotation marks are left alone, as in Asciidoctor's output. Like Asciidoctor, an ampersand that
+/// already starts a character reference (`&amp;`, `&#8217;`, `&#x2014;`) is kept as it is: the
+/// parser makes character references of replacements and of references the author wrote, but
+/// inside spans they can be merged into the surrounding text.
+fn escape_text(text: &str) -> String {
+    static CHARREF: Lazy<Regex> = Lazy::new(|| {
+        Regex::new(r"&((?:[a-zA-Z][a-zA-Z]+\d{0,2}|#\d\d\d{0,4}|#[xX][\da-fA-F][\da-fA-F][\da-fA-F]{0,3});)?")
+            .unwrap()
+    });
+    let text = CHARREF.replace_all(text, |caps: &regex::Captures| match caps.get(1) {
+        Some(reference) => format!("&{}", reference.as_str()),
+        None => "&amp;".to_string(),
+    });
+    text.replace('<', "&lt;").replace('>', "&gt;")
+}
+
+/// Escapes text for use inside a double-quoted HTML attribute value.
+fn escape_attr(text: &str) -> String {
+    escape_text(text).replace('"', "&quot;")
+}
+
 /// Builds section ids the way Asciidoctor does when none is given: `_` followed by the lowercased
 /// title text, with markup and punctuation removed and spaces, periods and hyphens turned into
 /// single underscores (e.g., "An A-Head" becomes `_an_a_head`).
@@ -145,6 +167,11 @@ fn render_from_templates(
         notes.len()
     });
     env.add_function("footnotes", move || footnotes.lock().unwrap().clone());
+    // The parser leaves special characters in text as they were written (and makes character
+    // references of replacements, which must not be escaped again), so templates escape text and
+    // attribute values themselves
+    env.add_filter("escape_text", |text: String| escape_text(&text));
+    env.add_filter("escape_attr", |text: String| escape_attr(&text));
     env.add_function("image_alt", |target: String| asciidoctor_image_alt(&target));
     for (name, template) in templates {
         env.add_template(name, template)
@@ -198,6 +225,26 @@ mod tests {
     #[case::replaced_punctuation("One&#8201;&#8212;&#8201;two", "_onetwo")]
     fn test_asciidoctor_section_id(#[case] title: &str, #[case] expected: &str) {
         assert_eq!(asciidoctor_section_id(title), expected);
+    }
+
+    #[rstest]
+    #[case::all_three("a < b & c > d", "a &lt; b &amp; c &gt; d")]
+    #[case::quotes_untouched("say \"hi\"", "say \"hi\"")]
+    #[case::character_references_kept(
+        "a &amp; b &#8217; c &#x2014; d &lt;",
+        "a &amp; b &#8217; c &#x2014; d &lt;"
+    )]
+    #[case::not_a_reference("AT&T; and &x;", "AT&amp;T; and &amp;x;")]
+    fn test_escape_text(#[case] text: &str, #[case] expected: &str) {
+        assert_eq!(escape_text(text), expected);
+    }
+
+    #[test]
+    fn test_escape_attr_escapes_quotes_too() {
+        assert_eq!(
+            escape_attr("a \"b\" & <c>"),
+            "a &quot;b&quot; &amp; &lt;c&gt;"
+        );
     }
 
     #[rstest]

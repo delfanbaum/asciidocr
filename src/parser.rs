@@ -1092,7 +1092,13 @@ impl Parser {
                 self.dangling_newline = None;
             }
         }
-        self.pass_text_to_last_inline(token);
+        // text inside an inline passthrough macro is kept apart from regular text, as it must not
+        // be escaped when output
+        let raw = matches!(
+            self.open_parse_after_as_text_type,
+            Some(TokenType::PassthroughInlineMacro)
+        );
+        self.pass_text_to_last_inline(token, raw);
         Ok(())
     }
 
@@ -1287,7 +1293,11 @@ impl Parser {
                     }
                 }
                 Inline::InlineLiteral(prior_literal) => {
-                    if matches!(prior_literal.name, InlineLiteralName::Charref) {
+                    if matches!(
+                        prior_literal.name,
+                        InlineLiteralName::Charref | InlineLiteralName::Raw
+                    ) {
+                        // character references and passthroughs stay on their own
                         self.inline_stack.push_back(inline_literal)
                     } else {
                         prior_literal.add_text_from_token(&token)
@@ -1310,8 +1320,12 @@ impl Parser {
         }
     }
 
-    fn pass_text_to_last_inline(&mut self, token: Token) {
-        let inline_literal = Inline::InlineLiteral(InlineLiteral::new_text_from_token_pass(&token));
+    fn pass_text_to_last_inline(&mut self, token: Token, raw: bool) {
+        let inline_literal = Inline::InlineLiteral(if raw {
+            InlineLiteral::new_raw_from_token(&token)
+        } else {
+            InlineLiteral::new_text_from_token_pass(&token)
+        });
         if let Some(last_inline) = self.inline_stack.back_mut() {
             match last_inline {
                 Inline::InlineSpan(span) => {
@@ -1322,10 +1336,16 @@ impl Parser {
                     }
                 }
                 Inline::InlineLiteral(prior_literal) => {
-                    if matches!(prior_literal.name, InlineLiteralName::Charref) {
-                        self.inline_stack.push_back(inline_literal)
-                    } else {
+                    let same_kind = match prior_literal.name {
+                        InlineLiteralName::Raw => raw,
+                        InlineLiteralName::Text => !raw,
+                        InlineLiteralName::Charref => false,
+                    };
+                    if same_kind {
                         prior_literal.pass_text_from_token(&token)
+                    } else {
+                        // passthrough text must not be mixed into regular text, or vice versa
+                        self.inline_stack.push_back(inline_literal)
                     }
                 }
                 Inline::InlineRef(inline_ref) => {

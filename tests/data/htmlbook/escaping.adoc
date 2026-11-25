@@ -24,3 +24,8 @@ Already encoded: &amp; and &lt;tag&gt; stay as they are.
 image::ab.png[Alt "q" & <x>]
 
 An inline image:c&d.png[Tiny <i>] here.
+
+[quote, Smith & Sons, A <Book>]
+____
+A quote.
+____
