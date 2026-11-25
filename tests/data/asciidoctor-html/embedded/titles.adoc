@@ -1,0 +1,68 @@
+.A listing
+----
+code
+----
+
+.A literal
+....
+text
+....
+
+.A verse
+[verse]
+____
+roses
+____
+
+.An example
+====
+Example text.
+====
+
+.A sidebar
+****
+Sidebar text.
+****
+
+.An open block
+--
+Open text.
+--
+
+.A quote
+[quote, Someone]
+____
+Quoted.
+____
+
+.A table
+|===
+|a |b
+
+|1 |2
+|===
+
+.Unordered title
+* one
+* two
+
+.Ordered title
+. one
+. two
+
+.Description title
+term:: definition
+
+.Admonition title
+NOTE: Careful.
+
+.Second table
+|===
+|a
+|===
+
+.Block admonition title
+[WARNING]
+====
+Watch out.
+====

@@ -72,6 +72,7 @@ HTMLBook's.
 {%- macro render_list(block) %}
 {%- set ordered = block.variant == "ordered" -%}
 <div class="{{ 'olist arabic' if ordered else 'ulist' }}">
+{{- render_title(block) }}
 {%- if ordered %}
 <ol class="arabic">
 {%- else %}
@@ -153,6 +154,13 @@ HTMLBook's.
 <div class="title">{{ block.variant | capitalize }}</div>
 </td>
 <td class="content">
+{#- the title of a delimited admonition sits on the example block that wraps its content -#}
+{%- set wrapped = block.blocks | selectattr("name", "equalto", "example") | list -%}
+{%- if block.title %}
+<div class="title">{{ render_inlines(block.title) }}</div>
+{%- elif wrapped and wrapped[0].title %}
+<div class="title">{{ render_inlines(wrapped[0].title) }}</div>
+{%- endif -%}
 {%- for child in block.blocks -%}
     {%- if child.name == "paragraph" %}
 {{ render_inlines(child.inlines) }}
@@ -172,7 +180,9 @@ HTMLBook's.
 
 {%- macro render_example(block) %}
 <div class="exampleblock">
-{{- render_title(block) }}
+{%- if block.title %}
+<div class="title">Example {{ next_number("example") }}. {{ render_inlines(block.title) }}</div>
+{%- endif %}
 <div class="content">
 {%- for child in block.blocks %}
 {{ render_block(child) }}
@@ -230,7 +240,7 @@ HTMLBook's.
 {%- set has_header = block.metadata and "header" in block.metadata.options %}
 <table class="tableblock frame-all grid-all stretch">
 {%- if block.title %}
-<caption class="title">{{ render_inlines(block.title) }}</caption>
+<caption class="title">Table {{ next_number("table") }}. {{ render_inlines(block.title) }}</caption>
 {%- endif %}
 <colgroup>
 {%- for _ in range(columns) %}

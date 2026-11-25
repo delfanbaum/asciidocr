@@ -29,6 +29,7 @@ fn test_full_documents(#[case] fn_pattern: &str) {
 #[case::table("asciidoctor-html/embedded/table")]
 #[case::xrefs("asciidoctor-html/embedded/xrefs")]
 #[case::images("asciidoctor-html/embedded/images")]
+#[case::titles("asciidoctor-html/embedded/titles")]
 fn test_embedded(#[case] fn_pattern: &str) {
     let adoc_fn = format!("{}.adoc", fn_pattern);
     let html_fn = format!("{}.html", fn_pattern);
