@@ -32,6 +32,35 @@ pub fn assert_parsed_doc_matches_expected_asg(adoc_fn: &str, asg_json_fn: &str) 
     assert_json_eq!(asg_as_json, expected_asg);
 }
 
+/// Parses the Asciidoc source and returns all of the text in the resulting graph (every literal
+/// `value`, in document order), for tests that only care that nothing was lost or crashed
+pub fn parsed_text(adoc: &str) -> String {
+    fn collect(value: &Value, text: &mut String) {
+        match value {
+            Value::Object(map) => {
+                if let Some(Value::String(v)) = map.get("value") {
+                    text.push_str(v);
+                }
+                for (key, child) in map {
+                    if key != "value" && key != "location" {
+                        collect(child, text);
+                    }
+                }
+            }
+            Value::Array(items) => items.iter().for_each(|child| collect(child, text)),
+            _ => {}
+        }
+    }
+    let asg = json!(
+        Parser::new_no_target_resolution(env::current_dir().unwrap())
+            .parse(Scanner::new(adoc))
+            .expect("Unable to parse input")
+    );
+    let mut text = String::new();
+    collect(&asg, &mut text);
+    text
+}
+
 /// Given an asciidoc string and an expected abstract syntax graph json string, assert that the
 /// parser produces the correct json from the asciidoc
 pub fn assert_parsed_doc_matches_expected_asg_from_str(adoc_str: &str, asg_json_str: &str) {

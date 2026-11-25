@@ -3,6 +3,7 @@ use std::fs;
 
 use common::{
     assert_parsed_doc_matches_expected_asg, assert_parsed_doc_matches_expected_asg_from_str,
+    parsed_text,
 };
 use rstest::rstest;
 
@@ -239,4 +240,25 @@ fn test_inline_markup_edge_cases() {
     let adoc_fn = format!("{}.adoc", fn_pattern);
     let asg_json_fn = format!("{}.json", fn_pattern);
     assert_parsed_doc_matches_expected_asg(&adoc_fn, &asg_json_fn)
+}
+
+/// Markup that is never closed (or never finished) is just text; it must not stop the parser
+#[rstest]
+#[case::lone_markers("*_\n", "*_")]
+#[case::unclosed_span_before_span("A *_x_ and unclosed\n", "A *x and unclosed")]
+#[case::unclosed_span_inside_span("A *b _c\n", "A *b _c")]
+#[case::unclosed_xref("see <<oops\n", "see <<oops")]
+#[case::unclosed_xref_at_end_of_file("see <<oops", "see <<oops")]
+#[case::xref_with_one_bracket("see <<x>\n", "see <<x>")]
+#[case::unclosed_anchor("[[abc\npara\n", "[[abc\npara")]
+fn test_unfinished_markup_is_text(#[case] adoc: &str, #[case] expected: &str) {
+    assert_eq!(parsed_text(adoc), expected);
+}
+
+/// Callouts keep working when the `icons` attribute is set
+#[test]
+fn test_code_callouts_with_icons_attribute() {
+    let text = parsed_text(":icons: true\n\n[source,c]\n----\nint x; // <1>\n----\n<1> A note\n");
+    assert!(text.contains("int x;"), "{text}");
+    assert!(text.contains("A note"), "{text}");
 }
