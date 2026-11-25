@@ -4,7 +4,7 @@ use minijinja::{AutoEscape, Environment, context};
 use once_cell::sync::Lazy;
 use regex::Regex;
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     sync::{Arc, Mutex},
 };
 
@@ -135,19 +135,29 @@ fn render_from_templates(
         String::new()
     });
     // Asciidoctor-style templates generate ids for sections that lack one; ids must be unique, so
-    // repeats get a numeric suffix (e.g., `_title_2`)
-    let seen_ids: Mutex<HashMap<String, usize>> = Mutex::new(HashMap::new());
-    env.add_function("section_id", move |title_html: String| {
-        let id = asciidoctor_section_id(&title_html);
-        let mut seen = seen_ids.lock().unwrap();
-        let count = seen.entry(id.clone()).or_insert(0);
-        *count += 1;
-        if *count == 1 {
+    // a generated id that is already taken (by an earlier generated or explicit id) gets the
+    // first free numeric suffix (e.g., `_title_2`). Explicit ids are passed in so they are
+    // registered, and are returned unchanged.
+    let used_ids: Mutex<HashSet<String>> = Mutex::new(HashSet::new());
+    env.add_function(
+        "section_id",
+        move |title_html: String, explicit_id: Option<String>| {
+            let mut used = used_ids.lock().unwrap();
+            if let Some(id) = explicit_id {
+                used.insert(id.clone());
+                return id;
+            }
+            let base = asciidoctor_section_id(&title_html);
+            let mut id = base.clone();
+            let mut suffix = 2;
+            while used.contains(&id) {
+                id = format!("{base}_{suffix}");
+                suffix += 1;
+            }
+            used.insert(id.clone());
             id
-        } else {
-            format!("{id}_{count}")
-        }
-    });
+        },
+    );
     // Asciidoctor numbers captioned blocks by kind ("Figure 1.", "Figure 2.", ...); the templates
     // ask for the next number as they go
     let counters: Mutex<HashMap<String, usize>> = Mutex::new(HashMap::new());
