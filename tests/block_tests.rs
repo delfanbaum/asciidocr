@@ -189,9 +189,10 @@ fn test_literal() {
     assert_parsed_doc_matches_expected_asg(&adoc_fn, &asg_json_fn)
 }
 
-#[test]
-fn test_verse() {
-    let fn_pattern = "blocks/verse";
+#[rstest]
+#[case::lines("blocks/verse")]
+#[case::stanzas("blocks/verse-stanzas")]
+fn test_verse(#[case] fn_pattern: &str) {
     let adoc_fn = format!("{}.adoc", fn_pattern);
     let asg_json_fn = format!("{}.json", fn_pattern);
     assert_parsed_doc_matches_expected_asg(&adoc_fn, &asg_json_fn)

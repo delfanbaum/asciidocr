@@ -1,0 +1,49 @@
+{
+    "name": "document",
+    "type": "block",
+    "blocks": [
+        {
+            "name": "verse",
+            "type": "block",
+            "form": "delimited",
+            "delimiter": "____",
+            "inlines": [
+                {
+                    "name": "text",
+                    "type": "string",
+                    "value": "Roses are red,\nViolets are blue.\n\nSugar is sweet,\nAnd so are you.",
+                    "location": [
+                        {
+                            "line": 3,
+                            "col": 1
+                        },
+                        {
+                            "line": 7,
+                            "col": 15
+                        }
+                    ]
+                }
+            ],
+            "location": [
+                {
+                    "line": 2,
+                    "col": 1
+                },
+                {
+                    "line": 8,
+                    "col": 4
+                }
+            ]
+        }
+    ],
+    "location": [
+        {
+            "line": 1,
+            "col": 1
+        },
+        {
+            "line": 8,
+            "col": 4
+        }
+    ]
+}
