@@ -1688,6 +1688,21 @@ mod tests {
         );
     }
 
+    /// The same, with Windows (CRLF) line endings: the `\r` is not part of the link
+    #[rstest]
+    #[case::plain("http://example.com", "http://example.com")]
+    #[case::sentence_end("http://example.com.", "http://example.com")]
+    #[case::allowed_punctuation("http://example.com/?a=b", "http://example.com/?a=b")]
+    fn link_no_attribute_fencing_end_of_crlf_line(#[case] line: &str, #[case] link: &str) {
+        let markup = format!("Somx {line}\r\nnext\r\n");
+        let tokens: Vec<Token> = Scanner::new(&markup).filter_map(Result::ok).collect();
+        let hyperlink = tokens
+            .iter()
+            .find(|t| t.token_type() == TokenType::Hyperlink)
+            .expect("no hyperlink token");
+        assert_eq!(hyperlink.lexeme, link);
+    }
+
     #[test]
     fn link_no_attribute_fencing_more_text() {
         let markup = "Somx http://example.com Somx";
