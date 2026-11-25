@@ -4,6 +4,7 @@ use docx_rs::{
     BreakType, Docx, Header, IndentLevel, LineSpacing, Numbering, NumberingId, PageMargin, PageNum,
     Paragraph, Pic, Run, RunFonts, Style, Table, TableCell, TableRow, VertAlignType,
 };
+use log::warn;
 use once_cell::sync::Lazy;
 use regex::Regex;
 
@@ -406,6 +407,13 @@ impl DocxWriter {
                 vec![styled_run(&text, variants)]
             }
             Inline::InlineSpan(span) => {
+                // warn here, once per footnote, rather than for each run of text inside it
+                if matches!(span.variant, InlineSpanVariant::Footnote) {
+                    let line = inline.locations().first().map_or(0, |l| l.line);
+                    warn!(
+                        "Line {line}: Footnotes are not well supported in DOCX; footnote text will be included in-line and highlighted for the time being."
+                    );
+                }
                 let mut nested = variants.to_vec();
                 nested.push(&span.variant);
                 span.inlines
@@ -445,12 +453,7 @@ fn styled_run(text: &str, variants: &[&InlineSpanVariant]) -> Run {
                 run.run_property = run.run_property.vert_align(VertAlignType::SuperScript);
                 run
             }
-            InlineSpanVariant::Footnote => {
-                eprintln!(
-                    "Footnotes are not well supported; footnote text will be included in-line and higlighted for the time being."
-                );
-                run.highlight("blue")
-            }
+            InlineSpanVariant::Footnote => run.highlight("blue"),
         };
     }
     run
