@@ -19,16 +19,6 @@
 {%- endif -%}
 {%- endmacro -%}
 
-{%- macro render_inlines(inlines) -%}
-{%- for inline in inlines -%}
-    {%- if inline.name == "text" and loop.nextitem and loop.nextitem.name == "linebreak" -%}
-        {{- inline.value | trim(" ") | escape_text -}}
-    {%- else -%}
-        {{- render_inline(inline) -}}
-    {%- endif -%}
-{%- endfor -%}
-{%- endmacro -%}
-
 {%- macro render_inline(inline) -%}
 {%- if inline.name == "linebreak" -%}
     <br>
