@@ -90,3 +90,27 @@ fn test_inline_passthrough_is_not_escaped() {
         "{html}"
     );
 }
+
+/// Text after a bare URL follows the link rather than becoming its text, and keeps its own
+/// escaping (or lack of it, for passthroughs); a link macro still takes the text in its brackets
+#[rstest]
+#[case::text_after(
+    "See http://example.com then.\n",
+    "<p>See <a href=\"http://example.com\" class=\"bare\">http://example.com</a> then.</p>"
+)]
+#[case::next_line(
+    "A http://example.com/bar/\nnext line.\n",
+    "<p>A <a href=\"http://example.com/bar/\" class=\"bare\">http://example.com/bar/</a>\nnext line.</p>"
+)]
+#[case::passthrough_after(
+    "Raw http://example.com pass:[<b>y</b>]\n",
+    "<a href=\"http://example.com\" class=\"bare\">http://example.com</a> <b>y</b></p>"
+)]
+#[case::link_macro(
+    "Macro http://example.com[*text*] after.\n",
+    "<p>Macro <a href=\"http://example.com\"><strong>text</strong></a> after.</p>"
+)]
+fn test_text_after_bare_url(#[case] adoc: &str, #[case] expected: &str) {
+    let html = render_asciidoctor_embedded_from_str(adoc);
+    assert!(html.contains(expected), "{html}");
+}
