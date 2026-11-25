@@ -90,11 +90,20 @@ fn test_unknown_backend_fails() {
 fn test_debug_flag_shows_debug_output(#[case] args: &[&str], #[case] shows_debug: bool) {
     let output = run_asciidocr(args, DOCUMENT);
     assert!(output.status.success());
-    // the logger currently writes to stdout, so look at both streams
-    let logged = format!(
-        "{}{}",
-        String::from_utf8_lossy(&output.stdout),
-        String::from_utf8_lossy(&output.stderr)
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert_eq!(stderr.contains("DEBUG"), shows_debug, "{stderr}");
+}
+
+/// Log messages go to stderr, so they never end up in a document written to stdout
+#[test]
+fn test_logging_stays_out_of_stdout() {
+    let output = run_asciidocr(&["-d", "-o", "-", "-"], "image::missing.png[]\n");
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        !stdout.contains("DEBUG") && !stdout.contains("WARN"),
+        "{stdout}"
     );
-    assert_eq!(logged.contains("DEBUG"), shows_debug, "{logged}");
+    assert!(stderr.contains("WARN"), "{stderr}");
 }
