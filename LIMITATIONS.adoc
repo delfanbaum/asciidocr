@@ -15,6 +15,10 @@ non-features.
 * Nested lists (`** nested`) are not recognized
 * List continuations (`+`) inside lists are unreliable; a continuation that
   attaches a nested list, for example, will garble the list
+* A list item with a continuation garbles the list if another item follows it:
+  `* one`, `+`, `more`, `* two` merges "more" into the first item's text
+  ("onemore"), leaves the second item empty, and moves "two" out of the list
+  into a paragraph before it. A continuation on the last item of a list works
 * A footnote in a list item moves the item's text out of the item's principal
   text if an earlier footnote exists in the document
 * `+pass:[]+` inline passthroughs work, but `+++text+++` does not (it is
