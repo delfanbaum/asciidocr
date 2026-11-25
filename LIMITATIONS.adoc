@@ -21,9 +21,9 @@ admonitions, examples, sidebars and images are rendered. Titles on passthrough
 blocks are parsed but not rendered.
 
 Titles on lists:: A block title above a list (`.Title` then `* item`) is
-parsed and kept in the ASG, but is intentionally not rendered by the HTMLBook
-backend (or the DOCX backend) yet; the HTMLBook backend logs a warning
-instead. Asciidoctor-style output, which does render them, is planned.
+parsed and kept in the ASG, and is rendered by the Asciidoctor-style HTML
+backend. It is intentionally not rendered by the HTMLBook backend (or the DOCX
+backend) yet; the HTMLBook backend logs a warning instead.
 
 Titles on paragraphs:: Not supported, and not planned. The paragraph is kept,
 and the title is dropped with a warning.

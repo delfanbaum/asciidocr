@@ -122,9 +122,11 @@ HTMLBook's.
 {%- endmacro -%}
 
 {%- macro render_verse(block) %}
+{%- set attrs = block.metadata.attributes if block.metadata and block.metadata.attributes else {} %}
 <div{{ wrapper_attrs(block, "verseblock") }}>
 {{- render_title(block) }}
 <pre class="content">{{ verbatim_text(block) }}</pre>
+{{ render_attribution(attrs) }}
 </div>
 {%- endmacro -%}
 
@@ -198,15 +200,8 @@ HTMLBook's.
 </div>
 {%- endmacro -%}
 
-{%- macro render_quote(block) %}
-{%- set attrs = block.metadata.attributes if block.metadata and block.metadata.attributes else {} %}
-<div{{ wrapper_attrs(block, "quoteblock") }}>
-{{- render_title(block) }}
-<blockquote>
-{%- for child in block.blocks %}
-{{ render_block(child) }}
-{%- endfor %}
-</blockquote>
+{#- The "— Author" line (with the source in a <cite>) under quotes and verses -#}
+{%- macro render_attribution(attrs) -%}
 {%- if attrs.attribution or attrs.citation %}
 <div class="attribution">
 {%- if attrs.attribution %}
@@ -217,7 +212,19 @@ HTMLBook's.
 <cite>{{ attrs.citation }}</cite>
 {%- endif %}
 </div>
-{%- endif %}
+{%- endif -%}
+{%- endmacro -%}
+
+{%- macro render_quote(block) %}
+{%- set attrs = block.metadata.attributes if block.metadata and block.metadata.attributes else {} %}
+<div{{ wrapper_attrs(block, "quoteblock") }}>
+{{- render_title(block) }}
+<blockquote>
+{%- for child in block.blocks %}
+{{ render_block(child) }}
+{%- endfor %}
+</blockquote>
+{{ render_attribution(attrs) }}
 </div>
 {%- endmacro -%}
 
@@ -302,4 +309,24 @@ HTMLBook's.
 {%- endfor %}
 </div>
 {%- endif -%}
+{%- endmacro -%}
+
+{#- The document's top-level blocks. When a document with a title has content ahead of its first
+    section, Asciidoctor wraps that content in a "preamble". -#}
+{%- macro render_document_blocks(graph) -%}
+{%- set has_sections = graph.blocks | selectattr("name", "equalto", "section") | list | length > 0 -%}
+{%- set preamble = graph.header and has_sections and graph.blocks and graph.blocks[0].name != "section" -%}
+{%- set state = namespace(open=preamble) -%}
+{%- if preamble %}
+<div id="preamble">
+<div class="sectionbody">
+{%- endif -%}
+{%- for block in graph.blocks -%}
+    {%- if state.open and block.name == "section" %}
+</div>
+</div>
+        {%- set state.open = false -%}
+    {%- endif %}
+{{ render_block(block) }}
+{%- endfor -%}
 {%- endmacro -%}

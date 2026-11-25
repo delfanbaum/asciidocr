@@ -32,6 +32,9 @@ fn test_full_documents(#[case] fn_pattern: &str) {
 #[case::titles("asciidoctor-html/embedded/titles")]
 #[case::ids_and_roles("asciidoctor-html/embedded/ids-and-roles")]
 #[case::footnotes("asciidoctor-html/embedded/footnotes")]
+#[case::verse_attribution("asciidoctor-html/embedded/verse-attribution")]
+#[case::preamble("asciidoctor-html/embedded/preamble")]
+#[case::no_preamble("asciidoctor-html/embedded/no-preamble")]
 fn test_embedded(#[case] fn_pattern: &str) {
     let adoc_fn = format!("{}.adoc", fn_pattern);
     let html_fn = format!("{}.html", fn_pattern);
@@ -50,4 +53,12 @@ fn test_embedded(#[case] fn_pattern: &str) {
 fn test_preformatted_whitespace_is_exact(#[case] adoc: &str, #[case] expected: &str) {
     let html = render_asciidoctor_embedded_from_str(adoc);
     assert!(html.contains(expected), "{html}");
+}
+
+/// A document with a little of everything renders without template errors, in both modes
+#[test]
+fn test_minimum_document_renders() {
+    let adoc = std::fs::read_to_string("tests/data/documents/minimum.adoc").unwrap();
+    let html = render_asciidoctor_embedded_from_str(&adoc);
+    assert!(!html.trim().is_empty());
 }

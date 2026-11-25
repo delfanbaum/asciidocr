@@ -1,5 +1,5 @@
 {%- from "inline.html" import render_inlines -%}
-{%- from "block.html" import render_block, render_footnotes -%}
+{%- from "block.html" import render_document_blocks, render_footnotes -%}
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -21,9 +21,7 @@ Untitled
 {%- endif %}
 </div>
 <div id="content">
-{%- for block in graph.blocks %}
-{{ render_block(block) }}
-{%- endfor %}
+{{- render_document_blocks(graph) }}
 </div>
 {{- render_footnotes() }}
 <div id="footer">

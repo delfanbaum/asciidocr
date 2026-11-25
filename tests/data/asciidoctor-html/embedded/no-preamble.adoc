@@ -1,0 +1,3 @@
+= Document Title
+
+Only a paragraph, no sections.

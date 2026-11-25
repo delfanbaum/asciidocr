@@ -84,7 +84,8 @@ cargo clippy --all-features
   same kebab-case base name:
   - `blocks/`, `inlines/`, `documents/`: `name.adoc` + `name.json` (expected ASG)
   - `htmlbook/`: `name.adoc` + `name.html`
-  - `asciidoctor-html/`: `name.adoc` + `name.html`
+  - `asciidoctor-html/`: `name.adoc` + `name.html` (a full document), and
+    `asciidoctor-html/embedded/`: the same, but the `.html` is embedded output
 - Use `rstest` for parameterized cases, and name each case after its fixture:
 
   ```rust
@@ -114,14 +115,21 @@ cargo clippy --all-features
 - Version bumps are separate commits ("Bump version").
 - Feature and bug branches merge into `main` via PR.
 - Don't commit anything from `notes/` or `local-tests/` (both are gitignored, as are `*.docx`),
-  or scratch files such as `scratch.tera`.
+  or scratch files such as `scratch.html`.
 
 ## Current state (update as this changes)
 
-- The project is migrating from Tera to minijinja (`templates/*.jinja`). The HTMLBook templates
-  are fully ported and `htmlbook_tests` pass. The asciidoctor backend's templates are still
-  `.tera`. Its tests are parked in `tests/asciidoctor_html_tests.rs.hold`, and the matching
-  helper in `tests/common/mod.rs` is commented out.
+- The migration from Tera to minijinja is finished: both HTML backends (HTMLBook and
+  Asciidoctor-style) render with minijinja templates under `templates/<backend>/*.jinja`, each
+  with its own block and inline templates.
+- The Asciidoctor-style templates copy Asciidoctor's markup, and Asciidoctor itself (2.0.17) is the
+  oracle: fixtures in `tests/data/asciidoctor-html/embedded/` are `asciidoctor -s -o - name.adoc`
+  output (embedded mode, i.e., document contents only), and the five full-document fixtures in
+  `tests/data/asciidoctor-html/` cover the shell (header, content, footer). Numbering
+  ("Figure 1."), section ids, footnotes and image alt text need per-render state or helpers, so
+  they are template functions registered in `src/backends/htmls.rs` (`next_number`, `section_id`,
+  `register_footnote`/`footnotes`, `image_alt`). Those tests ignore whitespace, so whitespace
+  that matters (inside `<pre>`) has its own exact-match test.
 - minijinja environments in `src/backends/htmls.rs` have autoescape turned off, because the parser
   already entity-encodes text. Don't add `| safe` or re-escape in templates.
 - HTMLBook block macros live in one file (`templates/htmlbook/block.html.jinja`) so they can

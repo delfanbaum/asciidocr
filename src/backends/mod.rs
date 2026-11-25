@@ -2,6 +2,7 @@
 //! Abstract Syntax Graph. Currently the backends include:
 //!
 //! - HTMLBook (fairly good support; can be used as a relatively "unadorned" HTML generator)
+//! - Asciidoctor-style HTML (the markup and classes Asciidoctor produces, without its stylesheet)
 //! - Docx (experimental and still very much in-progress; but good enough for "simple" documents without tables, images, etc.)
 //!
 

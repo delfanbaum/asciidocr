@@ -26,6 +26,8 @@
 //! Current backends (parse targets) includes:
 //!
 //! - [`HTMLBook`]: fairly good support; can be used as a relatively "unadorned" HTML generator
+//! - Asciidoctor-style HTML: the same classes and structure Asciidoctor produces, so Asciidoctor's
+//!   stylesheets apply (the stylesheets themselves are not included)
 //! - Docx (behind `docx` feature):  experimental and still very much in-progress; but good enough
 //!   for "simple" documents without tables, images, etc.
 //!
