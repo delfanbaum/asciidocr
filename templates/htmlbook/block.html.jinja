@@ -248,12 +248,15 @@ loading code simple.
 {%- if block.metadata and block.metadata.roles %} class="{{ block.metadata.roles | join(" ") | escape_attr }}" {%- endif -%}
 {%- if data_type %} data-type="{{ data_type }}"{%- endif -%}
 {%- if code_language %} data-code-language="{{ code_language | escape_attr }}" {%- endif -%}>{%- endif -%}
-    {% if block.inlines %}
+    {#- The ASG keeps the newlines next to a delimited block's delimiters, and whitespace matters
+        inside <pre>, so those are dropped there -#}
+    {%- set content -%}
     {%- for inline in block.inlines -%}
     {#- passthrough content is output exactly as written -#}
     {%- if block.name == "pass" -%}{{- inline.value -}}{%- else -%}{{- render_inline(inline) -}}{%- endif -%}
     {%- endfor -%}
-    {%- endif -%}
+    {%- endset -%}
+    {%- if tag == "pre" -%}{{- content | trim("\n") -}}{%- else -%}{{- content -}}{%- endif -%}
 {%- if tag -%}</{{tag}}>{%- endif -%}
 {%- if titled and block.title -%}</div>{%- endif -%}
 {%- endmacro -%}
