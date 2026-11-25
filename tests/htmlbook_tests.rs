@@ -287,3 +287,11 @@ fn list_title_is_not_rendered_and_does_not_linger() {
     let html_fn = format!("{}.html", fn_pattern);
     assert_rendered_htmlbook_matches_expected(&adoc_fn, &html_fn)
 }
+
+#[test]
+fn inline_admonition_takes_title() {
+    let fn_pattern = String::from("htmlbook/admonition-inline-title");
+    let adoc_fn = format!("{}.adoc", fn_pattern);
+    let html_fn = format!("{}.html", fn_pattern);
+    assert_rendered_htmlbook_matches_expected(&adoc_fn, &html_fn)
+}

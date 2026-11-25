@@ -848,8 +848,12 @@ impl Parser {
     }
 
     fn parse_admonition_para_syntax(&mut self, token: Token) -> Result<(), ParserError> {
-        self.block_stack
-            .push(Block::ParentBlock(ParentBlock::new_from_token(token)?));
+        let mut admonition = ParentBlock::new_from_token(token)?;
+        // a block title above an inline-style admonition (`NOTE: text`) belongs to the admonition
+        if let Some(title) = self.block_title.take() {
+            admonition.title = title;
+        }
+        self.block_stack.push(Block::ParentBlock(admonition));
         self.close_parent_after_push = true;
         Ok(())
     }
