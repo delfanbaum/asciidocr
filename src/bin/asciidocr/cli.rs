@@ -23,8 +23,9 @@ pub struct Cli {
     #[arg(short, long = "count-words")]
     pub count: bool,
 
-    /// If this flag is given alongside an HTML backend, an "embeddable" document is output, i.e.,
-    /// one that includes only the <body> element contents (excluding any headers, footers, etc.)
+    /// If this flag is given alongside an HTML backend (htmlbook or asciidoctor), an "embeddable"
+    /// document is output, i.e., one that includes only the <body> element contents (excluding any
+    /// headers, footers, etc.)
     #[arg(short, long = "embedded")]
     pub embedded: bool,
 

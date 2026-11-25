@@ -8,7 +8,10 @@ use std::{fs, path::PathBuf};
 use asciidocr::{
     backends::{
         Backends,
-        htmls::{render_htmlbook, render_htmlbook_embedded},
+        htmls::{
+            render_asciidoctor_html, render_asciidoctor_html_embedded, render_htmlbook,
+            render_htmlbook_embedded,
+        },
     },
     parser::Parser as AdocParser,
     scanner::Scanner,
@@ -64,7 +67,11 @@ fn run(args: Cli) -> Result<()> {
         }
 
         Backends::Asciidoctor => {
-            todo!()
+            match args.embedded {
+                true => render_string(render_asciidoctor_html_embedded(&graph)?, read_output(args)),
+                false => render_string(render_asciidoctor_html(&graph)?, read_output(args)),
+            }
+            Ok(())
         }
 
         #[cfg(feature = "json")]

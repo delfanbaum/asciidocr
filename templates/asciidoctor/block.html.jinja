@@ -1,0 +1,11 @@
+{#-
+
+NOTE: Like the HTMLBook templates, all block macros live in this one file so that they can call
+each other recursively. The markup follows Asciidoctor's (so that its stylesheets apply), not
+HTMLBook's.
+
+-#}
+{%- from "inline.html" import render_inline -%}
+
+{%- macro render_block(block) -%}
+{%- endmacro -%}

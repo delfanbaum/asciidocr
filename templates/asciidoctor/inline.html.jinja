@@ -1,0 +1,5 @@
+{%- macro render_inline(inline) -%}
+{%- if inline.value -%}
+    {{- inline.value -}}
+{%- endif -%}
+{%- endmacro -%}
