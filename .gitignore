@@ -26,3 +26,4 @@ Cargo.lock
 notes/
 local-tests/
 *.docx
+**/*.local.md
