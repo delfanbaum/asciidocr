@@ -308,6 +308,22 @@ fn special_characters_are_escaped() {
     assert_rendered_htmlbook_embedded_matches_expected(&adoc_fn, &html_fn)
 }
 
+/// An unclosed span turns back into text, but that must not merge passthrough content with the
+/// text around it: the text is still escaped and the passthrough is still output as written
+#[rstest]
+#[case::text_after_passthrough(
+    "pass:[<b>x</b>] <script> and _unclosed text\n",
+    "<p><b>x</b> &lt;script&gt; and _unclosed text</p>"
+)]
+#[case::passthrough_after_text(
+    "b pass:[<b>x</b>] <i> and _unclosed\n",
+    "<p>b <b>x</b> &lt;i&gt; and _unclosed</p>"
+)]
+fn test_unclosed_span_keeps_passthrough_separate(#[case] adoc: &str, #[case] expected: &str) {
+    let html = render_htmlbook_embedded_from_str(adoc);
+    assert!(html.contains(expected), "{html}");
+}
+
 /// The other tests ignore whitespace, but it is significant inside `<pre>`: the newlines next to
 /// the delimiters are dropped, while indentation and blank lines are kept
 #[rstest]
