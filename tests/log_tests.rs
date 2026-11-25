@@ -1,6 +1,7 @@
 pub mod common;
 use std::sync::{Mutex, MutexGuard, OnceLock};
 
+use asciidocr::{parser::Parser, scanner::Scanner};
 use common::{assert_parsed_doc_matches_expected_asg, assert_rendered_htmlbook_matches_expected};
 use logtest::Logger;
 
@@ -62,5 +63,34 @@ fn test_title_on_list_warns() {
         warnings.iter().any(|w| w.contains("Line 2")
             && w.contains("Titles on lists are not rendered by the HTMLBook backend yet")),
         "expected a list title warning, got: {warnings:?}"
+    );
+}
+
+#[test]
+fn test_missing_block_image_target_warns_and_renders() {
+    let mut logger = logger();
+    let adoc = ".Figure Title\nimage::does-not-exist.png[Alt]\n\nAfter.\n";
+    // unlike the shared helpers, this parser resolves targets
+    let asg = Parser::new(std::env::current_dir().unwrap())
+        .parse(Scanner::new(adoc))
+        .expect("a missing image target should not abort parsing");
+    let json = serde_json::to_string(&asg).unwrap();
+    assert!(
+        json.contains("does-not-exist.png"),
+        "image block missing: {json}"
+    );
+    assert!(
+        json.contains("After."),
+        "following paragraph missing: {json}"
+    );
+    let mut warnings = vec![];
+    while let Some(record) = logger.pop() {
+        warnings.push(record.args().to_owned());
+    }
+    assert!(
+        warnings
+            .iter()
+            .any(|w| w.contains("Line 2") && w.contains("Unable to resolve target")),
+        "expected a missing target warning, got: {warnings:?}"
     );
 }

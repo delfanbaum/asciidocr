@@ -921,7 +921,11 @@ impl Parser {
 
     fn parse_block_image(&mut self, token: Token, asg: &mut Asg) -> Result<(), ParserError> {
         let (target, metadata) = target_and_attrs_from_token(&token);
-        self.check_target(token.line, &target)?;
+        // like Asciidoctor, a missing image is a problem to report, not a reason to stop: the
+        // block is still rendered with the target as written
+        if let Err(e) = self.check_target(token.line, &target) {
+            warn!("{e}");
+        }
         let mut image_block = BlockMacro::new_image_block(target, metadata, token.locations());
         if let Some(metadata) = &self.metadata {
             // TODO see if there is a cleaner way to manage the borrowing here.
