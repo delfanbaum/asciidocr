@@ -72,7 +72,11 @@ impl Block {
             Block::Section(section) => {
                 if block.is_section() {
                     if let Some(possible_section) = section.blocks.last_mut() {
-                        if possible_section.takes_block_of_type(&block) {
+                        // only a (higher-level) section can contain this section; other blocks
+                        // that take children (sidebars, tables, etc.) are complete by now
+                        if possible_section.is_section()
+                            && possible_section.takes_block_of_type(&block)
+                        {
                             possible_section.push_block(block)?;
                         } else {
                             section.blocks.push(block);

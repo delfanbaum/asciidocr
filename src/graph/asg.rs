@@ -87,7 +87,9 @@ impl Asg {
         self.document_id_hash.extend(block.id_hashes());
         if block.is_section() {
             if let Some(possible_section) = self.blocks.last_mut() {
-                if possible_section.takes_block_of_type(&block) {
+                // only a (higher-level) section can contain this section; other blocks that take
+                // children (sidebars, examples, tables, etc.) are complete once they get here
+                if possible_section.is_section() && possible_section.takes_block_of_type(&block) {
                     possible_section.push_block(block)?;
                 } else {
                     self.blocks.push(block);
