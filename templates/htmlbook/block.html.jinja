@@ -274,10 +274,12 @@ loading code simple.
     {%- endif -%}
     {% if header %}
     <thead>
+        <tr>
         {% for idx in range(0, body_start) -%}
             {%- set cell = block.blocks[idx] -%}
                 {{ process_table_cell(cell, tag="th") }}
-    {% endfor %}</thead>
+    {% endfor %}</tr>
+    </thead>
     <tbody>
         <tr>
         {%- else -%}
