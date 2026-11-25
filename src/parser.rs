@@ -878,14 +878,20 @@ impl Parser {
                 self.in_inline_span = false;
                 return Ok(());
             } else if let Inline::InlineSpan(last_span) = last_inline {
-                if let Some(last_internal_inline) = last_span.inlines.last_mut() {
-                    if last_internal_inline.is_open() && inline == *last_internal_inline {
-                        last_internal_inline.reconcile_locations(inline.locations());
-                        last_internal_inline.close();
-                    } else {
-                        last_span.add_inline(inline);
-                    }
+                if let Some(last_internal_inline) = last_span.inlines.last_mut()
+                    && last_internal_inline.is_open()
+                    && inline == *last_internal_inline
+                {
+                    last_internal_inline.reconcile_locations(inline.locations());
+                    last_internal_inline.close();
                 } else {
+                    // Like Asciidoctor, a newline ahead of a nested span is text in the
+                    // enclosing span, so flush it before the nested span starts
+                    if let Some(newline_token) = self.dangling_newline.take() {
+                        last_span.add_inline(Inline::InlineLiteral(
+                            InlineLiteral::new_text_from_token(&newline_token),
+                        ));
+                    }
                     last_span.add_inline(inline);
                 }
                 return Ok(());
