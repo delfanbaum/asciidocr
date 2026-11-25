@@ -327,7 +327,10 @@ impl Block {
                     inlines.extend(child.inlines())
                 }
             }
-            Block::LeafBlock(block) => inlines.extend(block.inlines.clone()),
+            Block::LeafBlock(block) => {
+                inlines.extend(block.title.clone());
+                inlines.extend(block.inlines.clone())
+            }
             Block::TableCell(block) => inlines.extend(block.inlines.clone()),
             _ => {} // remaining blocks don't have inlines
         }
@@ -372,7 +375,10 @@ impl Block {
                     inlines.extend(child.inlines_mut())
                 }
             }
-            Block::LeafBlock(block) => inlines.extend(block.inlines.iter_mut()),
+            Block::LeafBlock(block) => {
+                inlines.extend(block.title.iter_mut());
+                inlines.extend(block.inlines.iter_mut())
+            }
             Block::TableCell(block) => inlines.extend(block.inlines.iter_mut()),
             _ => {} // remaining blocks don't have inlines
         }
@@ -966,6 +972,8 @@ pub struct LeafBlock {
     form: LeafBlockForm,
     #[serde(skip_serializing_if = "Option::is_none")]
     delimiter: Option<String>, // if it's a delimited block, then we provide the delimiter
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub title: Vec<Inline>,
     inlines: Vec<Inline>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub metadata: Option<ElementMetadata>,
@@ -1017,6 +1025,7 @@ impl LeafBlock {
             node_type: NodeTypes::Block,
             form,
             delimiter,
+            title: vec![],
             inlines,
             metadata: None,
             location,
@@ -1029,6 +1038,7 @@ impl LeafBlock {
             node_type: NodeTypes::Block,
             form: LeafBlockForm::Delimited,
             delimiter: Some(token.text()),
+            title: vec![],
             inlines: vec![],
             metadata: None,
             location: token.locations(),
@@ -1084,6 +1094,7 @@ impl LeafBlock {
             node_type: NodeTypes::Block,
             form: LeafBlockForm::Paragraph,
             delimiter: None,
+            title: vec![],
             inlines,
             metadata: Some(ElementMetadata::new_with_id_and_roles(
                 definition_id,

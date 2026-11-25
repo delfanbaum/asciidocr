@@ -1110,7 +1110,12 @@ impl Parser {
             }
         } else {
             self.open_parse_after_as_text_type = Some(token.token_type());
-            let block = LeafBlock::new_from_token(token)?;
+            let mut block = LeafBlock::new_from_token(token)?;
+            // a pending block title belongs to this block (and must not linger, or it will
+            // swallow the inlines that follow)
+            if let Some(title) = self.block_title.take() {
+                block.title = title;
+            }
             self.push_block_to_stack(Block::LeafBlock(block))?;
             // note that we're to just add
             self.force_new_block = false;

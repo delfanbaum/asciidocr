@@ -1,0 +1,16 @@
+.Listing Title
+[source,python]
+----
+print("hi")
+----
+
+.Literal Title
+....
+literal text
+....
+
+.Verse Title
+[verse]
+____
+Roses are red
+____
