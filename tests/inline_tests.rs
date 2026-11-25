@@ -264,3 +264,25 @@ fn test_code_callouts_with_icons_attribute() {
     assert!(text.contains("A note"), "{text}");
     assert!(!text.contains("//"), "{text}");
 }
+
+/// An include directive that never closes is just text; in particular, it must not make the scanner
+/// run forever (the parse happens on its own thread so that a hang fails the test, not the run)
+#[rstest]
+#[case::tag_at_end_of_file("include::x.xml[tag=a", "include::x.xml[tag=a")]
+#[case::lines_at_end_of_file("include::x.xml[lines=1", "include::x.xml[lines=1")]
+#[case::no_attribute_value("include::included.xml[tag=", "include::included.xml[tag=")]
+#[case::unclosed_on_its_line(
+    "include::x.xml[tag=a\nnext line\n",
+    "include::x.xml[tag=a\nnext line"
+)]
+fn test_unclosed_include_is_text(#[case] adoc: &str, #[case] expected: &str) {
+    let (sender, receiver) = std::sync::mpsc::channel();
+    let source = adoc.to_string();
+    std::thread::spawn(move || {
+        let _ = sender.send(parsed_text(&source));
+    });
+    let text = receiver
+        .recv_timeout(std::time::Duration::from_secs(5))
+        .expect("Parsing did not finish: the scanner is stuck");
+    assert_eq!(text, expected);
+}
