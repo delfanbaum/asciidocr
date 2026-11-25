@@ -1,4 +1,5 @@
-{%- from "block.html" import render_block -%}
+{%- from "block.html" import render_block, render_footnotes -%}
 {%- for block in graph.blocks %}
 {{ render_block(block) }}
 {%- endfor -%}
+{{- render_footnotes() }}

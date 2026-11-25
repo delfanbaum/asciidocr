@@ -32,6 +32,9 @@
 {%- macro render_inline(inline) -%}
 {%- if inline.name == "linebreak" -%}
     <br>
+{%- elif inline.name == "span" and inline.variant == "footnote" -%}
+    {%- set number = register_footnote(render_inlines(inline.inlines)) -%}
+    <sup class="footnote">[<a id="_footnoteref_{{ number }}" class="footnote" href="#_footnotedef_{{ number }}" title="View footnote.">{{ number }}</a>]</sup>
 {%- elif inline.name == "span" -%}
     {%- set tags = {"strong": "strong", "emphasis": "em", "code": "code", "mark": "mark", "superscript": "sup", "subscript": "sub"} -%}
     {%- set tag = tags[inline.variant] -%}

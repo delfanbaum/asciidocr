@@ -288,3 +288,18 @@ HTMLBook's.
 {%- endif %}
 </div>
 {%- endmacro -%}
+
+{#- The footnotes collected while rendering, listed after the content -#}
+{%- macro render_footnotes() -%}
+{%- set notes = footnotes() -%}
+{%- if notes %}
+<div id="footnotes">
+<hr>
+{%- for note in notes %}
+<div class="footnote" id="_footnotedef_{{ loop.index }}">
+<a href="#_footnoteref_{{ loop.index }}">{{ loop.index }}</a>. {{ note }}
+</div>
+{%- endfor %}
+</div>
+{%- endif -%}
+{%- endmacro -%}

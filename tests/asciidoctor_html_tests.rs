@@ -31,6 +31,7 @@ fn test_full_documents(#[case] fn_pattern: &str) {
 #[case::images("asciidoctor-html/embedded/images")]
 #[case::titles("asciidoctor-html/embedded/titles")]
 #[case::ids_and_roles("asciidoctor-html/embedded/ids-and-roles")]
+#[case::footnotes("asciidoctor-html/embedded/footnotes")]
 fn test_embedded(#[case] fn_pattern: &str) {
     let adoc_fn = format!("{}.adoc", fn_pattern);
     let html_fn = format!("{}.html", fn_pattern);

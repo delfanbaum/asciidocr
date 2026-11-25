@@ -3,7 +3,10 @@ use log::warn;
 use minijinja::{AutoEscape, Environment, context};
 use once_cell::sync::Lazy;
 use regex::Regex;
-use std::{collections::HashMap, sync::Mutex};
+use std::{
+    collections::HashMap,
+    sync::{Arc, Mutex},
+};
 
 use crate::errors::ConversionError;
 use crate::graph::asg::Asg;
@@ -132,6 +135,16 @@ fn render_from_templates(
         *count += 1;
         *count
     });
+    // Footnotes are numbered in the order they appear, and listed together at the end of the
+    // document, so the templates register each one as they render it
+    let footnotes: Arc<Mutex<Vec<String>>> = Arc::new(Mutex::new(Vec::new()));
+    let registered_footnotes = Arc::clone(&footnotes);
+    env.add_function("register_footnote", move |text_html: String| {
+        let mut notes = registered_footnotes.lock().unwrap();
+        notes.push(text_html);
+        notes.len()
+    });
+    env.add_function("footnotes", move || footnotes.lock().unwrap().clone());
     env.add_function("image_alt", |target: String| asciidoctor_image_alt(&target));
     for (name, template) in templates {
         env.add_template(name, template)
