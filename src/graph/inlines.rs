@@ -5,6 +5,8 @@ use std::{
 };
 
 use log::warn;
+use once_cell::sync::Lazy;
+use regex::Regex;
 use serde::Serialize;
 
 use super::{
@@ -192,6 +194,37 @@ impl Inline {
             }
             _ => unreachable!(),
         }
+    }
+
+    /// The children of a span that was never closed, with the span's markup characters put back in
+    /// front of them as text: without a closing mark, the opening one was never markup at all.
+    pub fn children_with_markup_as_text(&mut self) -> VecDeque<Inline> {
+        let markup = self.produce_literal_from_self();
+        let locations = self.locations();
+        let mut children = self.extract_child_inlines();
+        match children.front_mut() {
+            Some(Inline::InlineLiteral(literal))
+                if matches!(literal.name, InlineLiteralName::Text) =>
+            {
+                literal.prepend_to_value(markup, locations);
+            }
+            _ => {
+                // the markup is as wide as it is long, and starts where the span starts
+                let mut location = locations;
+                location.truncate(1);
+                if let Some(start) = location.first().cloned() {
+                    let mut end = start.clone();
+                    end.col += markup.chars().count().saturating_sub(1);
+                    location = vec![start, end];
+                }
+                children.push_front(Inline::InlineLiteral(InlineLiteral::new(
+                    InlineLiteralName::Text,
+                    markup,
+                    location,
+                )));
+            }
+        }
+        children
     }
 
     pub fn prepend_literal(&mut self, preceding_literal: InlineLiteral) {
@@ -438,18 +471,7 @@ impl InlineSpan {
             // handle any open spans
             if inline.is_open() {
                 let mut working_inline = inline.clone();
-                let open_span_literal = working_inline.produce_literal_from_self();
-                let mut inline_children = working_inline.extract_child_inlines();
-                if let Some(inline) = inline_children.front_mut() {
-                    match inline {
-                        Inline::InlineLiteral(literal) => {
-                            literal.prepend_to_value(open_span_literal, literal.location.clone());
-                        }
-                        _ => todo!(),
-                    }
-                } else {
-                    todo!()
-                }
+                let inline_children = working_inline.children_with_markup_as_text();
                 children.extend(inline_children);
             } else {
                 children.push_back(inline.clone());
@@ -741,6 +763,14 @@ impl InlineLiteral {
     pub fn combine_literals(&mut self, inline: InlineLiteral) {
         self.value.push_str(&inline.value());
         self.location = Location::reconcile(self.location.clone(), inline.location.clone());
+    }
+
+    /// Drops the comment markup (`//`, `#`, `--` or `;;`) that ends this text, which is how code
+    /// callouts are usually introduced (e.g., `int x; // <1>`)
+    pub fn strip_trailing_comment_markup(&mut self) {
+        static TRAILING_COMMENT: Lazy<Regex> =
+            Lazy::new(|| Regex::new(r"(?://|#|--|;;)[ \t]*$").unwrap());
+        self.value = TRAILING_COMMENT.replace(&self.value, "").to_string();
     }
 
     pub fn prepend_to_value(&mut self, value: String, value_locations: Vec<Location>) {

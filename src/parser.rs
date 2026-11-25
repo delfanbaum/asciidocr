@@ -1047,10 +1047,10 @@ impl Parser {
     fn parse_code_callout(&mut self, token: Token) -> Result<(), ParserError> {
         if let Some(value) = self.document_attributes.get("icons")
             && value == "true"
-            && let Some(_last_inline) = self.inline_stack.back_mut()
+            && let Some(Inline::InlineLiteral(last_literal)) = self.inline_stack.back_mut()
         {
-            // handle deleting comment markup, IF we're handling icons
-            todo!();
+            // when we're using icons, the comment markup ahead of the callout goes away
+            last_literal.strip_trailing_comment_markup();
         }
         self.inline_stack
             .push_back(Inline::InlineSpan(InlineSpan::inline_span_from_token(
@@ -1382,57 +1382,30 @@ impl Parser {
             .rposition(|inline| inline.is_open())
         {
             let mut open_span = self.inline_stack.remove(open_span_idx).unwrap();
-            let open_span_literal = open_span.produce_literal_from_self();
-            // put the literal char into the stack as a literal...
-            let mut children = open_span.extract_child_inlines();
-            // ... by adding it to the next inline
-            if let Some(inline) = children.front_mut() {
-                match inline {
-                    Inline::InlineLiteral(literal) => {
-                        literal.prepend_to_value(open_span_literal, open_span.locations());
-                    }
-                    _ => todo!(),
-                }
-                // put any appended inlines into the stack at the relevant position
-                while !children.is_empty() {
-                    if let Some(child) = children.pop_back() {
-                        self.inline_stack.insert(open_span_idx, child);
-                    }
-                }
+            // without a closing mark, the span's markup is just text, which goes in front of
+            // whatever the span held
+            let mut children = open_span.children_with_markup_as_text();
+            // put the inlines into the stack at the relevant position
+            while let Some(child) = children.pop_back() {
+                self.inline_stack.insert(open_span_idx, child);
+            }
 
-                // consolidate any resultant or remaining adjacent literals (this should be extracted to a function)
-                let mut temp_stack: Vec<Inline> = vec![];
-                while let Some(mut inline) = self.inline_stack.pop_front() {
-                    if temp_stack.is_empty() {
-                        temp_stack.push(inline);
-                    } else if inline.is_literal() {
-                        if let Some(Inline::InlineLiteral(last_in_stack)) = temp_stack.last_mut() {
-                            last_in_stack.combine_literals(inline.extract_literal());
-                        } else {
-                            temp_stack.push(inline);
-                        }
+            // consolidate any resultant or remaining adjacent literals (this should be extracted to a function)
+            let mut temp_stack: Vec<Inline> = vec![];
+            while let Some(mut inline) = self.inline_stack.pop_front() {
+                if temp_stack.is_empty() {
+                    temp_stack.push(inline);
+                } else if inline.is_literal() {
+                    if let Some(Inline::InlineLiteral(last_in_stack)) = temp_stack.last_mut() {
+                        last_in_stack.combine_literals(inline.extract_literal());
                     } else {
                         temp_stack.push(inline);
                     }
+                } else {
+                    temp_stack.push(inline);
                 }
-                self.inline_stack = temp_stack.into();
-            } else {
-                // ... or if there are no children, add the token to the back of the last one; this
-                // is a little hacky, but it is cleaner compared to the rest of the code just to
-                // create a token and reuse the existing function
-                let (line, startcol, endcol) =
-                    Location::destructure_inline_locations(open_span.locations());
-                let reconstituted_token = Token {
-                    token_type: TokenType::Text,
-                    lexeme: open_span_literal.clone(),
-                    literal: Some(open_span_literal),
-                    line,
-                    startcol,
-                    endcol,
-                    file_stack: self.file_stack.clone(),
-                };
-                self.add_text_to_last_inline(reconstituted_token)
             }
+            self.inline_stack = temp_stack.into();
         }
     }
 

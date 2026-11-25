@@ -255,10 +255,12 @@ fn test_unfinished_markup_is_text(#[case] adoc: &str, #[case] expected: &str) {
     assert_eq!(parsed_text(adoc), expected);
 }
 
-/// Callouts keep working when the `icons` attribute is set
+/// With the `icons` attribute, the comment markup ahead of a callout (`// <1>`) is dropped, as in
+/// Asciidoctor, and the code and the callout's note are kept
 #[test]
 fn test_code_callouts_with_icons_attribute() {
     let text = parsed_text(":icons: true\n\n[source,c]\n----\nint x; // <1>\n----\n<1> A note\n");
     assert!(text.contains("int x;"), "{text}");
     assert!(text.contains("A note"), "{text}");
+    assert!(!text.contains("//"), "{text}");
 }

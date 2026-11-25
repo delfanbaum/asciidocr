@@ -594,8 +594,20 @@ impl<'a> Scanner<'a> {
         self.add_token(TokenType::InlineStyle, true, 0)
     }
 
-    // adds block anchors, e.g., "\n[[some_block_id]]\n"
+    /// Whether the given closing markup shows up before the end of the current line
+    fn closes_on_this_line(&self, closing: &str) -> bool {
+        self.source[self.current..]
+            .split('\n')
+            .next()
+            .is_some_and(|rest_of_line| rest_of_line.contains(closing))
+    }
+
+    // adds cross references, e.g., "<<some_id>>"
     fn add_cross_reference(&mut self) -> Result<Token, ScannerError> {
+        // a cross reference that never closes (on its line) is just text
+        if !self.closes_on_this_line(">>") {
+            return self.add_text_until_next_markup();
+        }
         while self.peeks_ahead(2) != ">>" && !self.is_at_end() {
             self.current += 1
         }
@@ -605,6 +617,10 @@ impl<'a> Scanner<'a> {
 
     // adds block anchors, e.g., "\n[[some_block_id]]\n"
     fn add_block_anchor(&mut self) -> Result<Token, ScannerError> {
+        // an anchor that never closes (on its line) is just text
+        if !self.closes_on_this_line("]]") {
+            return self.add_text_until_next_markup();
+        }
         while self.peeks_ahead(3) != "]]\n" && !self.is_at_end() {
             self.current += 1
         }
