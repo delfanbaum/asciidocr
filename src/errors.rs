@@ -58,7 +58,7 @@ pub enum ParserError {
     BlockContinuation(usize),
     #[error("Line {0}: error: {1}")]
     InternalError(usize, String),
-    #[error("Line: {0} Attribute error: {0}")]
+    #[error("Line {0}: Attribute error: {1}")]
     AttributeError(usize, String),
 }
 
