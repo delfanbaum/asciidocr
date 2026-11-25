@@ -80,8 +80,7 @@ machinery.
 * [ ] CLI-level tests of `-b asciidoctor` and `-e`
 * [ ] Compare a few more real documents against `asciidoctor -s` and file what
   differs
-* [ ] *Decide* whether to commit `Cargo.lock` (usual for a crate that ships a
-  binary)
+* [x] Commit `Cargo.lock` (done in 0.2.1)
 * [ ] Spec checks against the official AsciiDoc language specification and ASG
   schema, not just the Asciidoctor docs: which blocks may carry a `title`
   (lists, description lists, paragraphs?); whether a blank line may come
@@ -141,6 +140,10 @@ from Word and from a browser, and for documents longer than an article.
   before `spacing`), and `rFonts` set for more than `ascii`
 * [ ] Check the output in Word, not only LibreOffice, and fix what Word
   complains about
+* [ ] Move to a `docx-rs` release that depends on `zip` 9.0.5 or later. 0.4.22
+  (the latest as of 0.2.1) needs `zip` 8.x, which is in the range of a critical
+  advisory (a parser differential when reading archives). `docx-rs` only writes
+  archives, so the risk is low, but the alert stays open until then
 * [ ] Put the 0.3 header on the manuscript title page (author, contact details,
   word count: what a publisher or literary journal expects)
 
