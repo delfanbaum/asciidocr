@@ -41,8 +41,8 @@ cargo clippy --all-features
   features enabled, so a plain `cargo test` skips them.
 - The author uses `bacon` (`bacon.toml`). Its default job is `test-features`, and `c` runs
   clippy with all features.
-- Clippy already reports some warnings. Don't add new ones. Don't fix existing warnings unless
-  asked, so that diffs stay focused.
+- Clippy and `cargo fmt --check` are both clean. Keep them that way: don't add warnings, and
+  put any lint-only or format-only change in its own commit.
 
 ## Code conventions
 
