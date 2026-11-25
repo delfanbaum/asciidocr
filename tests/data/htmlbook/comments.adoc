@@ -1,0 +1,10 @@
+Before the comments.
+
+// A single-line comment.
+
+////
+A comment block, which should
+not show up anywhere.
+////
+
+After the comments.
