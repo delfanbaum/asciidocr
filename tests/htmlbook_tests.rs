@@ -1,6 +1,8 @@
 use common::{
     assert_rendered_htmlbook_embedded_matches_expected, assert_rendered_htmlbook_matches_expected,
+    render_htmlbook_embedded_from_str,
 };
+use rstest::rstest;
 
 pub mod common;
 
@@ -304,4 +306,21 @@ fn special_characters_are_escaped() {
     let adoc_fn = format!("{}.adoc", fn_pattern);
     let html_fn = format!("{}.html", fn_pattern);
     assert_rendered_htmlbook_embedded_matches_expected(&adoc_fn, &html_fn)
+}
+
+/// The other tests ignore whitespace, but it is significant inside `<pre>`: the newlines next to
+/// the delimiters are dropped, while indentation and blank lines are kept
+#[rstest]
+#[case::listing(
+    "----\n  indented\n\nlast\n----\n",
+    "<pre data-type=\"programlisting\">  indented\n\nlast</pre>"
+)]
+#[case::literal("....\n  indented\n\nlast\n....\n", "<pre>  indented\n\nlast</pre>")]
+#[case::verse(
+    "[verse]\n____\n  indented\nlast\n____\n",
+    "<pre data-type=\"verse\">  indented\nlast</pre>"
+)]
+fn test_preformatted_whitespace_is_exact(#[case] adoc: &str, #[case] expected: &str) {
+    let html = render_htmlbook_embedded_from_str(adoc);
+    assert!(html.contains(expected), "{html}");
 }
