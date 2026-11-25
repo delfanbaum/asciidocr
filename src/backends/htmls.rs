@@ -1,5 +1,5 @@
 use chrono::Local;
-use minijinja::{Environment, context};
+use minijinja::{AutoEscape, Environment, context};
 
 use crate::errors::ConversionError;
 use crate::graph::asg::Asg;
@@ -40,8 +40,9 @@ fn render_from_templates(
     graph: &Asg,
     templates: Vec<(&'static str, &'static str)>,
 ) -> Result<String, ConversionError> {
-    // set up tera
+    // Content is already entity-encoded by the parser, so don't escape a second time.
     let mut env = Environment::new();
+    env.set_auto_escape_callback(|_| AutoEscape::None);
     for (name, template) in templates {
         env.add_template(name, template)
             .expect(&format!("Error loading template: {}", name))
@@ -62,9 +63,5 @@ fn gather_htmlbook_templates(full_document: bool) -> Vec<(&'static str, &'static
     } else {
         HTMLBOOK_EMBED_TEMPLATE
     };
-    vec![
-        base_template,
-        INLINES_TEMPLATE,
-        BLOCKS_TEMPLATE,
-    ]
+    vec![base_template, INLINES_TEMPLATE, BLOCKS_TEMPLATE]
 }

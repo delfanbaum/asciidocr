@@ -1,25 +1,31 @@
 {#-
 
-NOTE: This file includes all block macros; maybe some day they will be split
-back up again, but I can't get recursive calls (i.e., a list calling
-render_block) to work across files right now. Maybe someday I'll fix that. This
-does simplify the template loading code, however.
+NOTE: This file includes all block macros so that they can call each other
+recursively (e.g., a list calling render_block). This also keeps the template
+loading code simple.
 
 -#}
 {%- from "inline.html" import render_inline -%}
 
-{%- macro render_block(block, skip_tag=false) -%}
+{%- macro render_block(block) -%}
 
 {%- if block.name == "section"-%}
     {{ render_section(block) }}
+    
+{#- lists -#}
+{%- elif block.name == "list" -%}
+    {{ render_list(block)}}
 
-{#- leaf blocks -#}
-{%- elif block.name in ["paragraph", "listing", "verse", "pass", "literal"] %}
-    {{ render_leafblock(block) }}
+{#- list items -#}
+{%- elif block.name == "listItem" -%}
+    {{ render_list_item(block) }}
+{#- description lists -#}
+{%- elif block.name == "dlist" -%}
+    {{ render_dlist(block) }}
 
-{#- tables -#}
-{%- elif block.name == "table" -%}
-    {{ render_table(block) }}
+{#- description list items -#}
+{%- elif block.name == "dlistItem" -%}
+    {{ render_dlist_item(block) }}
 
 {#- breaks -#}
 {%- elif block.name == "break" -%}
@@ -28,9 +34,28 @@ does simplify the template loading code, however.
     {% elif block.variant == "thematic" %}
     <hr />
     {%- endif -%}
-{%-endif-%}
 
+{#- block macros -#}
+{%- elif block.name == "image" -%}
+    {{ render_image(block) }}
+
+{#- leaf blocks -#}
+{%- elif block.name in ["paragraph", "listing", "verse", "pass", "literal"] %}
+    {{ render_leafblock(block) }}
+
+{#- parent blocks -#}
+{%- elif block.name in ["admonition", "example", "open", "quote", "sidebar"] -%}
+    {{ render_parent_block(block) }}
+
+{#- tables -#}
+{%- elif block.name == "table" -%}
+    {{ render_table(block) }}
+
+{%-endif-%}
 {%- endmacro -%}
+
+
+{# ======== shared macros ======== #}
 
 {% macro render_title_for_block(block) %}
         {%- if block.name in ["example", "sidebar"]-%}
@@ -44,11 +69,12 @@ does simplify the template loading code, however.
 
 
 
+{# ======== block-specific macros ======== #}
 
 {%- macro render_section(block) -%}
 <section data-type="sect{{block.level}}"
         {%- if block.metadata -%}
-        {%- if block.metadata.roles %} class="{{ block.metadata.roles | join(sep=" ")}}" {%- endif -%}
+        {%- if block.metadata.roles %} class="{{ block.metadata.roles | join(" ")}}" {%- endif -%}
         {%- if block.metadata.attributes.id %} id="{{ block.metadata.attributes.id }}" {%- endif -%}
         {%- endif -%}>
     {% if block.title %}
@@ -58,6 +84,112 @@ does simplify the template loading code, however.
         {{ render_block(block) }}
     {%- endfor -%}
 </section>
+{%- endmacro -%}
+
+{%- macro render_list(block) -%}
+    {%- set tag = "ul" if block.variant == "unordered" else "ol" -%}
+    <{{tag}}
+    {%- if block.metadata and block.metadata.roles %} class="{{ block.metadata.roles | join(" ") }}"{%- endif -%}>
+    {%- for item in block.items -%}
+        {{ render_block(item) }}
+    {%- endfor -%}
+    </{{tag}}>
+{%- endmacro -%}
+
+{%- macro render_principal(block) -%}
+    {%- if block.principal -%}
+        <p>{%- for inline in block.principal -%}
+            {{- render_inline(inline) -}}
+        {%- endfor -%}</p>
+    {%- endif -%}
+{%- endmacro -%}
+
+{%- macro render_list_item(block) -%}
+    <li>
+    {{- render_principal(block) -}}
+    {%- for child in block.blocks -%}
+        {{- render_block(child) -}}
+    {%- endfor -%}
+    </li>
+{%- endmacro -%}
+
+{%- macro render_dlist(block) -%}
+    <dl>
+    {%- for item in block.items -%}
+        {{ render_block(item) }}
+    {%- endfor -%}
+    </dl>
+{%- endmacro -%}
+
+{%- macro render_dlist_item(block) -%}
+    {%- if block.terms -%}
+    <dt>{%- for inline in block.terms -%}
+        {{- render_inline(inline) -}}
+    {%- endfor -%}</dt>
+    {%- endif -%}
+    <dd>
+    {{- render_principal(block) -}}
+    {%- for child in block.blocks -%}
+        {{- render_block(child) -}}
+    {%- endfor -%}
+    </dd>
+{%- endmacro -%}
+
+{#- Admonitions, examples, open blocks, quotes and sidebars all share the same shape:
+    an enclosing tag, an optional title, child blocks and (for quotes) an attribution. -#}
+{%- macro render_parent_block(block) -%}
+    {%- set attrs = block.metadata.attributes if block.metadata and block.metadata.attributes else {} -%}
+    {%- set data_type = none -%}
+    {%- if block.name == "quote" -%}
+        {%- set tag = "blockquote" -%}
+    {%- elif block.name == "sidebar" -%}
+        {%- set tag = "aside" -%}
+        {%- set data_type = "sidebar" -%}
+    {%- elif block.name == "admonition" -%}
+        {%- set tag = "div" -%}
+        {%- set data_type = block.variant -%}
+    {%- else -%}
+        {%- set tag = "div" -%}
+    {%- endif -%}
+    <{{tag}}
+    {%- if block.metadata and block.metadata.roles %} class="{{ block.metadata.roles | join(" ") }}"{%- endif -%}
+    {%- if attrs.id %} id="{{ attrs.id }}"{%- endif -%}
+    {%- if data_type %} data-type="{{ data_type }}"{%- endif -%}>
+    {%- if block.title -%}
+        {{ render_title_for_block(block) }}
+    {%- endif -%}
+    {%- for child in block.blocks -%}
+        {#- the block syntax for admonitions wraps its content in an example block (from the ==== delimiter); unwrap it -#}
+        {%- if block.name == "admonition" and child.name == "example" -%}
+            {%- for grandchild in child.blocks -%}
+                {{ render_block(grandchild) }}
+            {%- endfor -%}
+        {%- else -%}
+            {{ render_block(child) }}
+        {%- endif -%}
+    {%- endfor -%}
+    {%- if block.name == "quote" and attrs.attribution -%}
+        <p data-type="attribution">{{ attrs.attribution }}
+        {%- if attrs.citation -%}, {{ attrs.citation }}{%- endif -%}</p>
+    {%- endif -%}
+    </{{tag}}>
+{%- endmacro -%}
+
+{%- macro render_image(block) -%}
+    {%- set attrs = block.metadata.attributes if block.metadata and block.metadata.attributes else {} -%}
+    <figure
+    {%- if attrs.id %} id="{{ attrs.id }}"{%- endif -%}>
+    {%- if block.title -%}
+        {{ render_title_for_block(block) }}
+    {%- endif -%}
+    <img src="{{ block.target }}"
+    {%- if attrs.positional_1 %} alt="{{ attrs.positional_1 }}"{%- endif -%}/>
+    {%- if block.caption -%}
+        <figcaption>{%- for inline in block.caption -%}
+            {{- render_inline(inline) -}}
+        {%- endfor -%}</figcaption>
+    {%- endif -%}
+    </figure>
 {%- endmacro -%}
 
 {%- macro render_leafblock(block) -%}
@@ -74,7 +206,7 @@ does simplify the template loading code, however.
     {%- set tag = "p" -%}
     {% elif block.name == "listing" -%}
     {%- set tag = "pre" -%}
-        {%- if block.metadata.attributes.language -%}
+        {%- if block.metadata and block.metadata.attributes and block.metadata.attributes.language -%}
         {%- set code_language = block.metadata.attributes.language -%}
         {%- endif -%}
     {% elif block.name == "verse" -%}
@@ -85,9 +217,8 @@ does simplify the template loading code, however.
     {% elif block.name == "pass" -%}
     {%- endif -%}
 {%- if tag -%}<{{tag}}
-{%- if block.metadata and block.metadata.roles %} class="{{ block.metadata.roles | join(sep=" ")}}" {%- endif -%}
+{%- if block.metadata and block.metadata.roles %} class="{{ block.metadata.roles | join(" ")}}" {%- endif -%}
 {%- if code_language %} data-code-language="{{ code_language }}" {%- endif -%}
-{%- if id %} id="{{ id }}" {%- endif -%}
 {%- if data_type %} data-type="{{ data_type }}"{%- endif -%}>{%- endif -%}
     {% if block.inlines %}
     {%- for inline in block.inlines -%}

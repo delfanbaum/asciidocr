@@ -36,7 +36,7 @@
     {%- endif -%}
 {%- if inline_tag -%}<{{inline_tag}}
     {%- if inline.metadata -%}
-    {%- if inline.metadata.roles %} class="{{inline.metadata.roles | join(sep=" ")}}"
+    {%- if inline.metadata.roles %} class="{{inline.metadata.roles | join(" ")}}"
     {%- endif -%}
     {%- endif -%}
     {%- if data_type %} data-type="{{data_type}}"

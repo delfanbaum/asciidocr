@@ -119,8 +119,11 @@ cargo clippy --all-features
 ## Current state (update as this changes)
 
 - The project is migrating from Tera to minijinja (`templates/*.jinja`). The HTMLBook templates
-  are mid-port, so `htmlbook_tests` currently fail. The asciidoctor backend's templates are still
+  are fully ported and `htmlbook_tests` pass. The asciidoctor backend's templates are still
   `.tera`. Its tests are parked in `tests/asciidoctor_html_tests.rs.hold`, and the matching
   helper in `tests/common/mod.rs` is commented out.
-- The old Tera templates used long if/else dispatch chains because Tera couldn't recurse between
-  macros. Where minijinja allows a cleaner structure, use it, but check that it works in a test.
+- minijinja environments in `src/backends/htmls.rs` have autoescape turned off, because the parser
+  already entity-encodes text. Don't add `| safe` or re-escape in templates.
+- HTMLBook block macros live in one file (`templates/htmlbook/block.html.jinja`) so they can
+  recurse through `render_block`. minijinja filters take positional args (`join(" ")`, not
+  `join(sep=" ")`), and attribute access on a missing `metadata` errors, so guard it first.
