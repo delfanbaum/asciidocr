@@ -261,6 +261,8 @@ mod tests {
     #[case::plain("pixel.png", "pixel")]
     #[case::separators("my-other_pixel.png", "my other pixel")]
     #[case::folders("img/sub/pic.jpg", "pic")]
+    #[case::dots_in_name("img/my.pic.v2.png", "my.pic.v2")]
+    #[case::no_extension("noext", "noext")]
     fn test_asciidoctor_image_alt(#[case] target: &str, #[case] expected: &str) {
         assert_eq!(asciidoctor_image_alt(target), expected);
     }
