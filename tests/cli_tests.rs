@@ -80,3 +80,21 @@ fn test_unknown_backend_fails() {
     let output = run_asciidocr(&["-b", "nonsense", "-o", "-", "-"], DOCUMENT);
     assert!(!output.status.success());
 }
+
+/// `-d` shows debug output whether or not `-v` is also given, since debug is the more detailed
+/// of the two
+#[rstest]
+#[case::debug(&["-d", "-o", "-", "-"], true)]
+#[case::verbose_and_debug(&["-v", "-d", "-o", "-", "-"], true)]
+#[case::verbose(&["-v", "-o", "-", "-"], false)]
+fn test_debug_flag_shows_debug_output(#[case] args: &[&str], #[case] shows_debug: bool) {
+    let output = run_asciidocr(args, DOCUMENT);
+    assert!(output.status.success());
+    // the logger currently writes to stdout, so look at both streams
+    let logged = format!(
+        "{}{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert_eq!(logged.contains("DEBUG"), shows_debug, "{logged}");
+}
