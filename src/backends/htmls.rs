@@ -1,6 +1,9 @@
 use chrono::Local;
 use log::warn;
 use minijinja::{AutoEscape, Environment, context};
+use once_cell::sync::Lazy;
+use regex::Regex;
+use std::{collections::HashMap, sync::Mutex};
 
 use crate::errors::ConversionError;
 use crate::graph::asg::Asg;
@@ -69,6 +72,20 @@ pub fn render_asciidoctor_html_embedded(graph: &Asg) -> Result<String, Conversio
     render_from_templates(graph, templates, ASCIIDOCTOR_EMBED_TEMPLATE.0)
 }
 
+/// Builds section ids the way Asciidoctor does when none is given: `_` followed by the lowercased
+/// title text, with markup and punctuation removed and spaces, periods and hyphens turned into
+/// single underscores (e.g., "An A-Head" becomes `_an_a_head`).
+fn asciidoctor_section_id(title_html: &str) -> String {
+    static INVALID_CHARS: Lazy<Regex> = Lazy::new(|| {
+        Regex::new(r"<[^>]+>|&(?:[a-z][a-z]+\d{0,2}|#\d{3,6}|#x[\da-f]{3,5});|[^ \w\-.]+").unwrap()
+    });
+    static SEPARATORS: Lazy<Regex> = Lazy::new(|| Regex::new(r"[ .\-]+").unwrap());
+    let lowered = title_html.to_lowercase();
+    let cleaned = INVALID_CHARS.replace_all(&lowered, "");
+    let id = SEPARATORS.replace_all(&cleaned, "_");
+    format!("_{}", id.trim_end_matches('_'))
+}
+
 /// Renders the template named `base_template` after loading all of `templates` into a fresh
 /// environment; each backend gets its own environment, so template names can repeat across them.
 fn render_from_templates(
@@ -83,6 +100,20 @@ fn render_from_templates(
     env.add_function("warn", |message: String| {
         warn!("{message}");
         String::new()
+    });
+    // Asciidoctor-style templates generate ids for sections that lack one; ids must be unique, so
+    // repeats get a numeric suffix (e.g., `_title_2`)
+    let seen_ids: Mutex<HashMap<String, usize>> = Mutex::new(HashMap::new());
+    env.add_function("section_id", move |title_html: String| {
+        let id = asciidoctor_section_id(&title_html);
+        let mut seen = seen_ids.lock().unwrap();
+        let count = seen.entry(id.clone()).or_insert(0);
+        *count += 1;
+        if *count == 1 {
+            id
+        } else {
+            format!("{id}_{count}")
+        }
     });
     for (name, template) in templates {
         env.add_template(name, template)
@@ -119,4 +150,22 @@ fn gather_asciidoctor_templates(full_document: bool) -> Vec<(&'static str, &'sta
         ASCIIDOCTOR_INLINES_TEMPLATE,
         ASCIIDOCTOR_BLOCKS_TEMPLATE,
     ]
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rstest::rstest;
+
+    #[rstest]
+    #[case::simple("An A-Head", "_an_a_head")]
+    #[case::numbers_and_periods("Section 1.2 Overview", "_section_1_2_overview")]
+    #[case::markup("A <em>marked</em> up title", "_a_marked_up_title")]
+    #[case::entities_and_punctuation("Q&amp;A: what's next?", "_qa_whats_next")]
+    // Asciidoctor replaces " -- " with a thin space, an em dash and a thin space before making
+    // the id, then drops the resulting entities
+    #[case::replaced_punctuation("One&#8201;&#8212;&#8201;two", "_onetwo")]
+    fn test_asciidoctor_section_id(#[case] title: &str, #[case] expected: &str) {
+        assert_eq!(asciidoctor_section_id(title), expected);
+    }
 }

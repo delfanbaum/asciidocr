@@ -1,5 +1,15 @@
 {%- macro render_inline(inline) -%}
-{%- if inline.value -%}
+{%- if inline.name == "linebreak" -%}
+    <br>
+{%- elif inline.name == "span" -%}
+    {%- set tags = {"strong": "strong", "emphasis": "em", "code": "code", "mark": "mark", "superscript": "sup", "subscript": "sub"} -%}
+    {%- set tag = tags[inline.variant] -%}
+    {%- if tag -%}<{{ tag }}>{%- endif -%}
+    {%- for child in inline.inlines -%}
+        {{- render_inline(child) -}}
+    {%- endfor -%}
+    {%- if tag -%}</{{ tag }}>{%- endif -%}
+{%- elif inline.value -%}
     {{- inline.value -}}
 {%- endif -%}
 {%- endmacro -%}

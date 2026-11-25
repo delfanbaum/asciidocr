@@ -8,4 +8,101 @@ HTMLBook's.
 {%- from "inline.html" import render_inline -%}
 
 {%- macro render_block(block) -%}
+{%- if block.name == "paragraph" -%}
+    {{ render_paragraph(block) }}
+{%- elif block.name == "section" -%}
+    {{ render_section(block) }}
+{%- elif block.name == "list" -%}
+    {{ render_list(block) }}
+{%- elif block.name == "listing" -%}
+    {{ render_listing(block) }}
+{%- elif block.name in ["sidebar", "open"] -%}
+    {{ render_parent_block(block) }}
+{%- endif -%}
+{%- endmacro -%}
+
+{#- the inlines of a block, one after the other -#}
+{%- macro render_inlines(inlines) -%}
+{%- for inline in inlines -%}{{- render_inline(inline) -}}{%- endfor -%}
+{%- endmacro -%}
+
+{%- macro render_title(block) -%}
+{%- if block.title %}
+<div class="title">{{ render_inlines(block.title) }}</div>
+{%- endif -%}
+{%- endmacro -%}
+
+{%- macro render_paragraph(block) %}
+<div class="paragraph">
+<p>{{ render_inlines(block.inlines) }}</p>
+</div>
+{%- endmacro -%}
+
+{#- Asciidoctor wraps the contents of top-level sections (only) in a "sectionbody" -#}
+{%- macro render_section(block) %}
+{%- set title_html = render_inlines(block.title) %}
+<div class="sect{{ block.level }}">
+<h{{ block.level + 1 }} id="{{ section_id(title_html) }}">{{ title_html }}</h{{ block.level + 1 }}>
+{%- if block.level == 1 %}
+<div class="sectionbody">
+{%- endif -%}
+{%- for child in block.blocks %}
+{{ render_block(child) }}
+{%- endfor -%}
+{%- if block.level == 1 %}
+</div>
+{%- endif %}
+</div>
+{%- endmacro -%}
+
+{%- macro render_list(block) %}
+{%- set ordered = block.variant == "ordered" -%}
+<div class="{{ 'olist arabic' if ordered else 'ulist' }}">
+{%- if ordered %}
+<ol class="arabic">
+{%- else %}
+<ul>
+{%- endif -%}
+{%- for item in block.items %}
+<li>
+<p>{{ render_inlines(item.principal) }}</p>
+{%- for child in item.blocks %}
+{{ render_block(child) }}
+{%- endfor %}
+</li>
+{%- endfor %}
+{%- if ordered %}
+</ol>
+{%- else %}
+</ul>
+{%- endif %}
+</div>
+{%- endmacro -%}
+
+{%- macro render_listing(block) %}
+{%- set language = block.metadata.attributes.language if block.metadata and block.metadata.attributes else none %}
+<div class="listingblock">
+{{- render_title(block) }}
+<div class="content">
+{%- if language %}
+<pre class="highlight"><code class="language-{{ language }}" data-lang="{{ language }}">{{ render_inlines(block.inlines) }}</code></pre>
+{%- else %}
+<pre>{{ render_inlines(block.inlines) }}</pre>
+{%- endif %}
+</div>
+</div>
+{%- endmacro -%}
+
+{#- Sidebars put their title inside the content div; open blocks put it before -#}
+{%- macro render_parent_block(block) %}
+{%- set css_class = "sidebarblock" if block.name == "sidebar" else "openblock" %}
+<div class="{{ css_class }}">
+{%- if block.name == "open" -%}{{ render_title(block) }}{%- endif %}
+<div class="content">
+{%- if block.name == "sidebar" -%}{{ render_title(block) }}{%- endif -%}
+{%- for child in block.blocks %}
+{{ render_block(child) }}
+{%- endfor %}
+</div>
+</div>
 {%- endmacro -%}

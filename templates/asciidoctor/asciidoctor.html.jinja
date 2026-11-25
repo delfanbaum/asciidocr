@@ -7,23 +7,25 @@
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>
-{%- if graph.header -%}
+{%- if graph.header and graph.header.title -%}
 {%- for inline in graph.header.title -%}
 {{- render_inline(inline) -}}
 {%- endfor -%}
+{%- else -%}
+Untitled
 {%- endif -%}
 </title>
 </head>
 <body class="article">
-{%- if graph.header %}
 <div id="header">
+{%- if graph.header and graph.header.title %}
 <h1>
 {%- for inline in graph.header.title -%}
 {{- render_inline(inline) -}}
 {%- endfor -%}
 </h1>
-</div>
 {%- endif %}
+</div>
 <div id="content">
 {%- for block in graph.blocks %}
 {{ render_block(block) }}
