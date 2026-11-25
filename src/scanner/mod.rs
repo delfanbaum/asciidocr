@@ -557,19 +557,21 @@ impl<'a> Scanner<'a> {
     /// Adds the link, consuming the target but not any attributes
     fn add_link(&mut self) -> Result<Token, ScannerError> {
         let hyperlink_allowed_punctuation = ['.', '#', ':', '/', '?', '=', '&'];
-        while !['\0', ' '].contains(&self.peek()) && !self.peek().is_ascii_punctuation() {
+        // a bare link ends at whitespace (including the end of the line) or the end of input
+        let link_terminators = ['\0', ' ', '\t', '\n'];
+        while !link_terminators.contains(&self.peek()) && !self.peek().is_ascii_punctuation() {
             self.current += 1
         }
         // it's an attribute-styled link
         if self.peek() == '[' {
             self.current += 1; // consume the '[' char
             self.add_token(TokenType::LinkMacro, true, 0)
-        } else if ['\0', ' '].contains(&self.peek()) {
+        } else if link_terminators.contains(&self.peek()) {
             self.add_token(TokenType::Hyperlink, true, 0)
         } else if hyperlink_allowed_punctuation.contains(&self.peek()) {
             // if it's at the end of a sentence
             if let Some(second_char) = self.peeks_ahead(2).chars().last() {
-                if ['\0', ' '].contains(&second_char) {
+                if link_terminators.contains(&second_char) {
                     // if it's not a possible sentence ender, we want that in the link
                     if !['.', ':', '?'].contains(&self.peek()) {
                         self.current += 1;
