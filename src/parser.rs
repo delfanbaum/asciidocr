@@ -48,6 +48,11 @@ pub struct Parser {
     file_stack: Vec<String>,
     /// holding ground for a block title, to be applied to the subsequent block
     block_title: Option<Vec<Inline>>,
+    /// true only while we are still reading the title line itself; once its newline arrives, the
+    /// title is complete and later inlines belong to the block it precedes
+    block_title_open: bool,
+    /// the line the pending block title was declared on
+    block_title_line: usize,
     /// holding ground for block metadata, to be applied to the subsequent block
     metadata: Option<ElementMetadata>,
     /// counts in/out delimited blocks by line reference; allows us to warn/error if they are
@@ -114,6 +119,8 @@ impl Parser {
             inline_stack: VecDeque::new(),
             file_stack: vec![],
             block_title: None,
+            block_title_open: false,
+            block_title_line: 0,
             metadata: None,
             open_delimited_block_lines: vec![],
             level_offset: 0,
@@ -232,6 +239,8 @@ impl Parser {
             TokenType::BlockLabel => {
                 // open the block title
                 self.block_title = Some(Vec::new());
+                self.block_title_open = true;
+                self.block_title_line = token.line;
                 self.in_block_line = true;
                 // clear out any dangling newlines
                 self.dangling_newline = None;
@@ -452,12 +461,16 @@ impl Parser {
         // newline exits a title, TK line continuation
         self.in_block_line = false;
 
-        // if there is a block title, add the inline stack to the title
-        if let Some(ref mut title_stack) = self.block_title {
-            while !self.inline_stack.is_empty() {
-                let inline = self.inline_stack.pop_front().unwrap();
-                title_stack.push(inline);
+        // if we are on a block title line, add the inline stack to the title; the newline closes
+        // the title, so that subsequent lines are not swallowed by it
+        if self.block_title_open {
+            if let Some(ref mut title_stack) = self.block_title {
+                while !self.inline_stack.is_empty() {
+                    let inline = self.inline_stack.pop_front().unwrap();
+                    title_stack.push(inline);
+                }
             }
+            self.block_title_open = false;
         }
 
         if [TokenType::NewLineChar, TokenType::Eof].contains(&self.last_token_type) {
@@ -1394,6 +1407,8 @@ impl Parser {
         if let Some(first_inline) = self.inline_stack.front() {
             para_locations = first_inline.locations().clone();
         }
+        // a pending title is dealt with below, depending on what the paragraph turns into
+        let pending_title = self.block_title.take();
         let mut para_block = Block::LeafBlock(LeafBlock::new(
             crate::graph::blocks::LeafBlockName::Paragraph,
             crate::graph::blocks::LeafBlockForm::Paragraph,
@@ -1407,6 +1422,7 @@ impl Parser {
             }
         }
         if self.in_block_continuation && self.open_delimited_block_lines.is_empty() {
+            self.warn_paragraph_title_dropped(pending_title.as_deref(), &para_block);
             let Some(last_block) = self.block_stack.last_mut() else {
                 return Err(ParserError::BlockContinuation(self.line));
             };
@@ -1428,12 +1444,37 @@ impl Parser {
                     vec![],
                     vec![],
                 ));
+                // the title belongs to the quote, not the paragraph inside it
+                if let (Block::ParentBlock(quote), Some(title)) = (&mut quote_block, &pending_title)
+                {
+                    quote.title = title.clone();
+                }
                 quote_block.push_block(para_block)?;
                 self.push_block_to_stack(quote_block)?;
                 return Ok(());
             }
         }
+        self.warn_paragraph_title_dropped(pending_title.as_deref(), &para_block);
         self.push_block_to_stack(para_block)
+    }
+
+    /// Titles on regular paragraphs are not supported, so we drop them (keeping the paragraph),
+    /// and let the user know. We only warn when the title sits directly above the paragraph; a
+    /// title left over from some other kind of block (e.g., a list) is dropped quietly.
+    fn warn_paragraph_title_dropped(&self, title: Option<&[Inline]>, para_block: &Block) {
+        let Some(title) = title else { return };
+        // (the paragraph's first location can be the title line's trailing newline, hence `<=`)
+        let adjacent = para_block
+            .locations()
+            .first()
+            .is_some_and(|loc| loc.line <= self.block_title_line + 1);
+        if adjacent {
+            let title_text: String = title.iter().map(|i| i.extract_values_to_string()).collect();
+            warn!(
+                "Line {}: Titles on paragraphs are not supported; dropping title \"{}\"",
+                self.block_title_line, title_text
+            );
+        }
     }
 
     /// Adds data to an existing ElementMetadata object, or creates one

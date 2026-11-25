@@ -20,6 +20,13 @@ Block titles on leaf blocks:: Titles on listing, literal, verse and similar
 leaf blocks are parsed but not currently rendered by the HTMLBook backend. Titles
 on admonitions, examples, sidebars and images do render. Support is planned.
 
+Titles on lists:: A block title above a list (`.Title` then `* item`) is not
+currently rendered, and is quietly discarded; support is planned, but list
+parsing needs some work first.
+
+Titles on paragraphs:: Not supported, and not planned. The paragraph is kept,
+and the title is dropped with a warning.
+
 == Language Features Planned for Inclusion Later
 
 * https://docs.asciidoctor.org/asciidoc/latest/attributes/positional-and-named-attributes/#block-style-and-attribute-shorthand[block style
