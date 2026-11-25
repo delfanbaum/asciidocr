@@ -111,11 +111,14 @@ fn asciidoctor_section_id(title_html: &str) -> String {
     format!("_{}", id.trim_end_matches('_'))
 }
 
-/// Asciidoctor's fallback alt text for an image: the file name without folders or extension,
-/// with spaces in place of hyphens and underscores (e.g., `img/my-pic_1.png` becomes "my pic 1").
+/// Asciidoctor's fallback alt text for an image: the file name without folders or (only the
+/// last) extension, with spaces in place of hyphens and underscores (e.g., `img/my-pic_1.png`
+/// becomes "my pic 1", and `my.pic.v2.png` becomes "my.pic.v2").
 fn asciidoctor_image_alt(target: &str) -> String {
     let file_name = target.rsplit('/').next().unwrap_or(target);
-    let stem = file_name.split('.').next().unwrap_or(file_name);
+    let stem = file_name
+        .rsplit_once('.')
+        .map_or(file_name, |(stem, _)| stem);
     stem.replace(['-', '_'], " ")
 }
 
