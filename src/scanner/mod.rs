@@ -558,7 +558,7 @@ impl<'a> Scanner<'a> {
     fn add_link(&mut self) -> Result<Token, ScannerError> {
         let hyperlink_allowed_punctuation = ['.', '#', ':', '/', '?', '=', '&'];
         // a bare link ends at whitespace (including the end of the line) or the end of input
-        let link_terminators = ['\0', ' ', '\t', '\n'];
+        let link_terminators = ['\0', ' ', '\t', '\r', '\n'];
         while !link_terminators.contains(&self.peek()) && !self.peek().is_ascii_punctuation() {
             self.current += 1
         }
