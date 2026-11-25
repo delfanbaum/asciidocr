@@ -251,8 +251,7 @@ impl ElementMetadata {
                 }
             }
             Some(AttributeType::Lines) => {
-                // need to figure out how to
-                todo!()
+                // nothing declares this type yet, and there is nothing to do with its attributes
             }
             _ => {
                 if attribute.starts_with('"') {

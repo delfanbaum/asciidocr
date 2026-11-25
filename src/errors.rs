@@ -40,6 +40,8 @@ pub enum ParserError {
     Asg(#[from] AsgError),
     #[error("Line {0}: Level 0 headings are only allowed at the top of a document")]
     TopLevelHeading(usize),
+    #[error("Line {0}: Unexpected token: {1}")]
+    UnexpectedToken(usize, String),
     #[error("Line {0}: Invalid open_parse_after_as_text_type occurance")]
     OpenParse(usize),
     #[error("Line {0}: Attempted to close a non-existent delimited block")]

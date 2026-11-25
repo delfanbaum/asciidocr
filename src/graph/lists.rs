@@ -36,7 +36,7 @@ impl List {
         match variant {
             ListVariant::Unordered => list_marker.push('*'),
             ListVariant::Ordered => list_marker.push('.'),
-            ListVariant::Callout => todo!(),
+            ListVariant::Callout => list_marker.push_str("<1>"),
         }
 
         List {
@@ -279,5 +279,16 @@ impl DListItem {
             extracted.extend(child_footnoes);
         }
         Ok(extracted)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn callout_lists_can_be_created() {
+        let list = List::new(ListVariant::Callout, vec![]);
+        assert_eq!(list.marker, "<1>");
     }
 }

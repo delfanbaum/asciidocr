@@ -375,7 +375,11 @@ impl Parser {
                 }
                 Ok(())
             }
-            TokenType::Email => todo!()
+            // the scanner does not produce these (yet), so report them rather than guess
+            TokenType::Email => Err(ParserError::UnexpectedToken(
+                token.line,
+                "email address".to_string(),
+            )),
         }
     }
 

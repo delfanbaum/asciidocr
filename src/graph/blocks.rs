@@ -469,8 +469,14 @@ impl Block {
                     }
                 }
             }
-            _ => todo!(), // placeholder; probably this is a list of panics that should never be
-                          // reached
+            // nothing to extract from these (and some of them are never created)
+            Block::SectionBody
+            | Block::NonSectionBlockBody(_)
+            | Block::DiscreteHeading
+            | Block::Break(_)
+            | Block::BlockMacro(_)
+            | Block::BlockMetadata(_)
+            | Block::TableCell(_) => {}
         }
 
         Ok(extracted)
@@ -702,7 +708,11 @@ impl Block {
             Block::Break(_) => {} // do nothing, since there is nothing to do!
             Block::BlockMacro(_) => {} // do nothing for now; maybe we include the meta
             // locations?
-            _ => todo!(),
+            // never created (and nothing to consolidate if they were)
+            Block::SectionBody
+            | Block::NonSectionBlockBody(_)
+            | Block::DiscreteHeading
+            | Block::BlockMetadata(_) => {}
         }
     }
 
@@ -803,7 +813,8 @@ impl Block {
                     block_text.push_str(&inline.extract_values_to_string())
                 }
             }
-            _ => todo!(),
+            // never created (and have no text if they were)
+            Block::SectionBody | Block::NonSectionBlockBody(_) | Block::DiscreteHeading => {}
         }
         block_text
     }

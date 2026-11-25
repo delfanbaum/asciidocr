@@ -56,6 +56,8 @@ pub enum DocxRenderError {
     ColumnError,
     #[error("Docx error: error writing file")]
     ZipFileError,
+    #[error("Docx error: {0} blocks are not supported")]
+    UnsupportedBlock(String),
 }
 
 // holds some state for us
@@ -351,7 +353,10 @@ impl DocxWriter {
             let pic = Pic::new(&buf);
             docx = docx.add_paragraph(Paragraph::new().add_run(Run::new().add_image(pic)));
         } else {
-            todo!()
+            return Err(DocxRenderError::UnsupportedBlock(format!(
+                "{:?}",
+                block.name
+            )));
         }
         Ok(docx)
     }
@@ -449,4 +454,17 @@ fn styled_run(text: &str, variants: &[&InlineSpanVariant]) -> Run {
         };
     }
     run
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::graph::blocks::BlockMacro;
+
+    #[test]
+    fn unsupported_block_macros_are_an_error() {
+        let block = BlockMacro::new(BlockMacroName::Toc, String::new(), None, vec![]);
+        let result = DocxWriter::new().add_block_macro(Docx::new(), &block);
+        assert!(matches!(result, Err(DocxRenderError::UnsupportedBlock(_))));
+    }
 }
