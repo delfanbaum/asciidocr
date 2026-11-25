@@ -865,7 +865,13 @@ impl Parser {
 
     /// Generic parser for inline spans that close themselves
     fn parse_inline_span(&mut self, mut inline: Inline) -> Result<(), ParserError> {
-        if let Some(last_inline) = self.inline_stack.back_mut() {
+        // Only a span that is still open can be closed by, or contain, the incoming span. A newline
+        // is held back as "dangling" rather than pushed as text, so after "*a*\n" the closed
+        // strong span is still the last inline on the stack; treating it as open would swallow a
+        // span that begins on the next line.
+        if let Some(last_inline) = self.inline_stack.back_mut()
+            && last_inline.is_open()
+        {
             if inline == *last_inline {
                 last_inline.reconcile_locations(inline.locations());
                 last_inline.close();
@@ -873,7 +879,7 @@ impl Parser {
                 return Ok(());
             } else if let Inline::InlineSpan(last_span) = last_inline {
                 if let Some(last_internal_inline) = last_span.inlines.last_mut() {
-                    if inline == *last_internal_inline {
+                    if last_internal_inline.is_open() && inline == *last_internal_inline {
                         last_internal_inline.reconcile_locations(inline.locations());
                         last_internal_inline.close();
                     } else {
