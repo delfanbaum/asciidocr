@@ -94,3 +94,28 @@ fn test_missing_block_image_target_warns_and_renders() {
         "expected a missing target warning, got: {warnings:?}"
     );
 }
+
+#[test]
+fn test_missing_inline_image_target_warns_and_renders() {
+    let mut logger = logger();
+    let adoc = "Some text image:does-not-exist.png[Alt] more text.\n";
+    // unlike the shared helpers, this parser resolves targets
+    let asg = Parser::new(std::env::current_dir().unwrap())
+        .parse(Scanner::new(adoc))
+        .expect("a missing image target should not abort parsing");
+    let json = serde_json::to_string(&asg).unwrap();
+    assert!(
+        json.contains("does-not-exist.png"),
+        "inline image missing: {json}"
+    );
+    let mut warnings = vec![];
+    while let Some(record) = logger.pop() {
+        warnings.push(record.args().to_owned());
+    }
+    assert!(
+        warnings
+            .iter()
+            .any(|w| w.contains("Line 1") && w.contains("Unable to resolve target")),
+        "expected a missing target warning, got: {warnings:?}"
+    );
+}

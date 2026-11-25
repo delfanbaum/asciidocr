@@ -941,7 +941,10 @@ impl Parser {
 
     fn parse_inline_image_macro(&mut self, token: Token) -> Result<(), ParserError> {
         let (target, metadata) = target_and_attrs_from_token(&token);
-        let _ = self.check_target(token.line, &target);
+        // as with block images: report the missing file, but still render the image
+        if let Err(e) = self.check_target(token.line, &target) {
+            warn!("{e}");
+        }
         self.inline_stack
             .push_back(Inline::InlineRef(InlineRef::new_inline_image(
                 target,
