@@ -61,6 +61,22 @@ pub fn parsed_text(adoc: &str) -> String {
     text
 }
 
+/// Parses the Asciidoc source and returns the names of the document's top-level blocks (e.g.,
+/// "paragraph", "section"), for tests of how blocks are arranged rather than of their contents
+pub fn top_level_block_names(adoc: &str) -> Vec<String> {
+    let asg = json!(
+        Parser::new_no_target_resolution(env::current_dir().unwrap())
+            .parse(Scanner::new(adoc))
+            .expect("Unable to parse input")
+    );
+    asg["blocks"]
+        .as_array()
+        .expect("Document has no blocks")
+        .iter()
+        .map(|block| block["name"].as_str().unwrap_or_default().to_string())
+        .collect()
+}
+
 /// Given an asciidoc string and an expected abstract syntax graph json string, assert that the
 /// parser produces the correct json from the asciidoc
 pub fn assert_parsed_doc_matches_expected_asg_from_str(adoc_str: &str, asg_json_str: &str) {

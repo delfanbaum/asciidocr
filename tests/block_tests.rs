@@ -3,6 +3,7 @@ use std::fs;
 
 use common::{
     assert_parsed_doc_matches_expected_asg, assert_parsed_doc_matches_expected_asg_from_str,
+    top_level_block_names,
 };
 use rstest::rstest;
 
@@ -335,4 +336,26 @@ fn test_dangling_markup_in_heading() {
     let adoc_fn = format!("{}.adoc", fn_pattern);
     let asg_json_fn = format!("{}.json", fn_pattern);
     assert_parsed_doc_matches_expected_asg(&adoc_fn, &asg_json_fn)
+}
+
+/// A section starts at the top level (here), whatever block comes before it
+#[rstest]
+#[case::sidebar("****\nSidebar.\n****\n\n== Sec\n\nText.\n", &["sidebar", "section"])]
+#[case::example("====\nExample.\n====\n\n== Sec\n\nText.\n", &["example", "section"])]
+#[case::quote("[quote]\n____\nQuoted.\n____\n\n== Sec\n\nText.\n", &["quote", "section"])]
+#[case::open("--\nOpen.\n--\n\n== Sec\n\nText.\n", &["open", "section"])]
+#[case::table("|===\n|a\n|===\n\n== Sec\n\nText.\n", &["table", "section"])]
+#[case::admonition_block("[NOTE]\n====\nNote.\n====\n\n== Sec\n\nText.\n", &["admonition", "section"])]
+#[case::list("* item\n\n== Sec\n\nText.\n", &["list", "section"])]
+fn test_section_after_block_is_not_nested(#[case] adoc: &str, #[case] expected: &[&str]) {
+    assert_eq!(top_level_block_names(adoc), expected);
+}
+
+/// Sections of a lower level still belong to the section above them
+#[test]
+fn test_subsections_stay_nested() {
+    assert_eq!(
+        top_level_block_names("== One\n\n=== Sub\n\nText.\n\n== Two\n\nText.\n"),
+        ["section", "section"]
+    );
 }
