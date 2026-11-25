@@ -119,3 +119,22 @@ fn test_missing_inline_image_target_warns_and_renders() {
         "expected a missing target warning, got: {warnings:?}"
     );
 }
+
+/// The docx backend can't render footnotes yet, so it warns once per footnote (not once per run
+/// of text inside it), through the logger rather than straight to stderr
+#[cfg(feature = "docx")]
+#[test]
+fn test_docx_footnote_warns_once() {
+    let mut logger = logger();
+    common::rendered_docx_runs("Some text.\n\nA footnote:[With *bold* and plain text.] here.\n");
+    let mut warnings = vec![];
+    while let Some(record) = logger.pop() {
+        warnings.push(record.args().to_owned());
+    }
+    let footnote_warnings: Vec<_> = warnings
+        .iter()
+        .filter(|w| w.contains("Footnotes are not well supported"))
+        .collect();
+    assert_eq!(footnote_warnings.len(), 1, "{warnings:?}");
+    assert!(footnote_warnings[0].contains("Line 3"), "{warnings:?}");
+}
