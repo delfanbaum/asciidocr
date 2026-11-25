@@ -1663,6 +1663,29 @@ mod tests {
         scan_and_assert_eq(markup, expected_tokens);
     }
 
+    /// A bare URL at the end of a line stops at the newline instead of running into the lines
+    /// that follow it
+    #[rstest]
+    #[case::plain("http://example.com", "http://example.com")]
+    #[case::trailing_slash("http://example.com/bar/", "http://example.com/bar/")]
+    #[case::sentence_end("http://example.com.", "http://example.com")]
+    #[case::allowed_punctuation("http://example.com/?a=b", "http://example.com/?a=b")]
+    fn link_no_attribute_fencing_end_of_line(#[case] line: &str, #[case] link: &str) {
+        let markup = format!("Somx {line}\nnext\n\n== Title\n");
+        let tokens: Vec<Token> = Scanner::new(&markup).filter_map(Result::ok).collect();
+        let hyperlink_idx = tokens
+            .iter()
+            .position(|t| t.token_type() == TokenType::Hyperlink)
+            .expect("no hyperlink token");
+        assert_eq!(tokens[hyperlink_idx].lexeme, link);
+        assert!(
+            tokens
+                .iter()
+                .any(|t| t.token_type() == TokenType::Heading2 && t.line == 4),
+            "{tokens:?}"
+        );
+    }
+
     #[test]
     fn link_no_attribute_fencing_more_text() {
         let markup = "Somx http://example.com Somx";
