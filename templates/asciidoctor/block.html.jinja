@@ -22,6 +22,16 @@ HTMLBook's.
     {{ verbatim_text(block) }}
 {%- elif block.name == "break" -%}
     {{ render_break(block) }}
+{%- elif block.name == "admonition" -%}
+    {{ render_admonition(block) }}
+{%- elif block.name == "example" -%}
+    {{ render_example(block) }}
+{%- elif block.name == "quote" -%}
+    {{ render_quote(block) }}
+{%- elif block.name == "dlist" -%}
+    {{ render_dlist(block) }}
+{%- elif block.name == "table" -%}
+    {{ render_table(block) }}
 {%- elif block.name in ["sidebar", "open"] -%}
     {{ render_parent_block(block) }}
 {%- endif -%}
@@ -43,7 +53,8 @@ HTMLBook's.
 {%- macro render_section(block) %}
 {%- set title_html = render_inlines(block.title) %}
 <div class="sect{{ block.level }}">
-<h{{ block.level + 1 }} id="{{ section_id(title_html) }}">{{ title_html }}</h{{ block.level + 1 }}>
+{%- set explicit_id = block.metadata.attributes.id if block.metadata and block.metadata.attributes else none %}
+<h{{ block.level + 1 }} id="{{ explicit_id or section_id(title_html) }}">{{ title_html }}</h{{ block.level + 1 }}>
 {%- if block.level == 1 %}
 <div class="sectionbody">
 {%- endif -%}
@@ -127,4 +138,123 @@ HTMLBook's.
 {%- endfor %}
 </div>
 </div>
+{%- endmacro -%}
+
+{#- An admonition has either a paragraph (the "NOTE: text" form) or an example block (the
+    delimited form) as its content; Asciidoctor shows the paragraph's text without the usual
+    paragraph wrapper -#}
+{%- macro render_admonition(block) %}
+<div class="admonitionblock {{ block.variant }}">
+<table>
+<tr>
+<td class="icon">
+<div class="title">{{ block.variant | capitalize }}</div>
+</td>
+<td class="content">
+{%- for child in block.blocks -%}
+    {%- if child.name == "paragraph" %}
+{{ render_inlines(child.inlines) }}
+    {%- elif child.name == "example" -%}
+        {%- for grandchild in child.blocks %}
+{{ render_block(grandchild) }}
+        {%- endfor -%}
+    {%- else %}
+{{ render_block(child) }}
+    {%- endif -%}
+{%- endfor %}
+</td>
+</tr>
+</table>
+</div>
+{%- endmacro -%}
+
+{%- macro render_example(block) %}
+<div class="exampleblock">
+{{- render_title(block) }}
+<div class="content">
+{%- for child in block.blocks %}
+{{ render_block(child) }}
+{%- endfor %}
+</div>
+</div>
+{%- endmacro -%}
+
+{%- macro render_quote(block) %}
+{%- set attrs = block.metadata.attributes if block.metadata and block.metadata.attributes else {} %}
+<div class="quoteblock">
+{{- render_title(block) }}
+<blockquote>
+{%- for child in block.blocks %}
+{{ render_block(child) }}
+{%- endfor %}
+</blockquote>
+{%- if attrs.attribution or attrs.citation %}
+<div class="attribution">
+{%- if attrs.attribution %}
+&#8212; {{ attrs.attribution }}
+{%- endif -%}
+{%- if attrs.attribution and attrs.citation %}<br>{%- endif -%}
+{%- if attrs.citation %}
+<cite>{{ attrs.citation }}</cite>
+{%- endif %}
+</div>
+{%- endif %}
+</div>
+{%- endmacro -%}
+
+{%- macro render_dlist(block) %}
+<div class="dlist">
+{{- render_title(block) }}
+<dl>
+{%- for item in block.items %}
+<dt class="hdlist1">{{ render_inlines(item.terms) }}</dt>
+<dd>
+{%- if item.principal %}
+<p>{{ render_inlines(item.principal) }}</p>
+{%- endif -%}
+{%- for child in item.blocks %}
+{{ render_block(child) }}
+{%- endfor %}
+</dd>
+{%- endfor %}
+</dl>
+</div>
+{%- endmacro -%}
+
+{#- The ASG keeps table cells in one flat list; the "cols" attribute says how many fit in a row.
+    Column widths are not tracked, so columns are always shared out evenly. -#}
+{%- macro render_table(block) %}
+{%- set columns = block.metadata.attributes.cols | int if block.metadata and block.metadata.attributes.cols else 1 %}
+{%- set has_header = block.metadata and "header" in block.metadata.options %}
+<table class="tableblock frame-all grid-all stretch">
+{%- if block.title %}
+<caption class="title">{{ render_inlines(block.title) }}</caption>
+{%- endif %}
+<colgroup>
+{%- for _ in range(columns) %}
+<col style="width: {{ (100 / columns) | round(4) | string | replace(".0", "") }}%;">
+{%- endfor %}
+</colgroup>
+{%- if has_header %}
+<thead>
+<tr>
+{%- for cell in block.blocks[:columns] %}
+<th class="tableblock halign-left valign-top">{{ render_inlines(cell.inlines) | trim }}</th>
+{%- endfor %}
+</tr>
+</thead>
+{%- endif %}
+<tbody>
+{%- set body = block.blocks[columns:] if has_header else block.blocks %}
+{%- for cell in body %}
+{%- if loop.index0 % columns == 0 %}
+<tr>
+{%- endif %}
+<td class="tableblock halign-left valign-top"><p class="tableblock">{{ render_inlines(cell.inlines) | trim }}</p></td>
+{%- if loop.index0 % columns == columns - 1 or loop.last %}
+</tr>
+{%- endif %}
+{%- endfor %}
+</tbody>
+</table>
 {%- endmacro -%}

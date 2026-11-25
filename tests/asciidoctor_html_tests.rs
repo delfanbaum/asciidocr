@@ -24,6 +24,10 @@ fn test_full_documents(#[case] fn_pattern: &str) {
 #[case::inlines("asciidoctor-html/embedded/inlines")]
 #[case::leaf_blocks("asciidoctor-html/embedded/leaf-blocks")]
 #[case::breaks("asciidoctor-html/embedded/breaks")]
+#[case::parent_blocks("asciidoctor-html/embedded/parent-blocks")]
+#[case::description_list("asciidoctor-html/embedded/description-list")]
+#[case::table("asciidoctor-html/embedded/table")]
+#[case::xrefs("asciidoctor-html/embedded/xrefs")]
 fn test_embedded(#[case] fn_pattern: &str) {
     let adoc_fn = format!("{}.adoc", fn_pattern);
     let html_fn = format!("{}.html", fn_pattern);

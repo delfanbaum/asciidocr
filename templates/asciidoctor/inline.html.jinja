@@ -24,6 +24,10 @@
     <a href="{{ inline.target }}"{% if not inline.inlines %} class="bare"{% endif %}>
     {%- if inline.inlines -%}{{- render_inlines(inline.inlines) -}}{%- else -%}{{- inline.target -}}{%- endif -%}
     </a>
+{%- elif inline.name == "ref" and inline.variant == "xref" -%}
+    <a href="#{{ inline.target }}">
+    {%- if inline.inlines -%}{{- render_inlines(inline.inlines) -}}{%- else -%}[{{ inline.target }}]{%- endif -%}
+    </a>
 {%- elif inline.value -%}
     {{- inline.value -}}
 {%- endif -%}

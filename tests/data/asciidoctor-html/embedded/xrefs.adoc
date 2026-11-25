@@ -1,0 +1,6 @@
+See <<target>>.
+
+[[target]]
+== Target Section
+
+Some text.

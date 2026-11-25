@@ -1,0 +1,2 @@
+Term one:: Definition one
+Term two:: Definition two
