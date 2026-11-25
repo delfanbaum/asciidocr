@@ -1,0 +1,143 @@
+{
+    "name": "document",
+    "type": "block",
+    "blocks": [
+        {
+            "name": "paragraph",
+            "type": "block",
+            "inlines": [
+                {
+                    "name": "text",
+                    "type": "string",
+                    "value": "x ",
+                    "location": [
+                        {
+                            "line": 1,
+                            "col": 1
+                        },
+                        {
+                            "line": 1,
+                            "col": 2
+                        }
+                    ]
+                },
+                {
+                    "name": "span",
+                    "type": "inline",
+                    "variant": "VARIANT",
+                    "form": "constrained",
+                    "inlines": [
+                        {
+                            "name": "text",
+                            "type": "string",
+                            "value": "a",
+                            "location": [
+                                {
+                                    "line": 1,
+                                    "col": 4
+                                },
+                                {
+                                    "line": 1,
+                                    "col": 4
+                                }
+                            ]
+                        }
+                    ],
+                    "location": [
+                        {
+                            "line": 1,
+                            "col": 3
+                        },
+                        {
+                            "line": 1,
+                            "col": 5
+                        }
+                    ]
+                },
+                {
+                    "name": "text",
+                    "type": "string",
+                    "value": "\n",
+                    "location": [
+                        {
+                            "line": 1,
+                            "col": 6
+                        },
+                        {
+                            "line": 1,
+                            "col": 6
+                        }
+                    ]
+                },
+                {
+                    "name": "span",
+                    "type": "inline",
+                    "variant": "VARIANT",
+                    "form": "constrained",
+                    "inlines": [
+                        {
+                            "name": "text",
+                            "type": "string",
+                            "value": "b",
+                            "location": [
+                                {
+                                    "line": 2,
+                                    "col": 2
+                                },
+                                {
+                                    "line": 2,
+                                    "col": 2
+                                }
+                            ]
+                        }
+                    ],
+                    "location": [
+                        {
+                            "line": 2,
+                            "col": 1
+                        },
+                        {
+                            "line": 2,
+                            "col": 3
+                        }
+                    ]
+                },
+                {
+                    "name": "text",
+                    "type": "string",
+                    "value": " y",
+                    "location": [
+                        {
+                            "line": 2,
+                            "col": 4
+                        },
+                        {
+                            "line": 2,
+                            "col": 5
+                        }
+                    ]
+                }
+            ],
+            "location": [
+                {
+                    "line": 1,
+                    "col": 1
+                },
+                {
+                    "line": 2,
+                    "col": 5
+                }
+            ]
+        }
+    ],
+    "location": [
+        {
+            "line": 1,
+            "col": 1
+        },
+        {
+            "line": 2,
+            "col": 5
+        }
+    ]
+}

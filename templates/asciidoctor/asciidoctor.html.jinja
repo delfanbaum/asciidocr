@@ -1,0 +1,33 @@
+{%- from "inline.html" import render_inlines -%}
+{%- from "block.html" import render_document_blocks, render_footnotes -%}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>
+{%- if graph.header and graph.header.title -%}
+{{- render_inlines(graph.header.title) -}}
+{%- else -%}
+Untitled
+{%- endif -%}
+</title>
+</head>
+<body class="article">
+<div id="header">
+{%- if graph.header and graph.header.title %}
+<h1>{{ render_inlines(graph.header.title) }}</h1>
+{%- endif %}
+</div>
+<div id="content">
+{{- render_document_blocks(graph) }}
+</div>
+{{- render_footnotes() }}
+<div id="footer">
+<div id="footer-text">
+Last updated {{ current_time }}
+</div>
+</div>
+</body>
+</html>

@@ -3,7 +3,7 @@ use std::{collections::HashMap, fmt::Display};
 
 use serde::Serialize;
 
-use crate::errors::{BlockError, ParserError};
+use crate::errors::BlockError;
 use crate::graph::{
     inlines::Inline,
     lists::{DList, DListItem, List, ListItem, ListVariant},
@@ -72,7 +72,11 @@ impl Block {
             Block::Section(section) => {
                 if block.is_section() {
                     if let Some(possible_section) = section.blocks.last_mut() {
-                        if possible_section.takes_block_of_type(&block) {
+                        // only a (higher-level) section can contain this section; other blocks
+                        // that take children (sidebars, tables, etc.) are complete by now
+                        if possible_section.is_section()
+                            && possible_section.takes_block_of_type(&block)
+                        {
                             possible_section.push_block(block)?;
                         } else {
                             section.blocks.push(block);
@@ -285,6 +289,8 @@ impl Block {
             Block::Section(block) => Some(block.inlines.clone()),
             Block::ParentBlock(block) => Some(block.title.clone()),
             Block::BlockMacro(block) => Some(block.caption.clone()),
+            Block::List(block) => Some(block.title.clone()),
+            Block::DList(block) => Some(block.title.clone()),
             _ => None,
         }
     }
@@ -306,11 +312,13 @@ impl Block {
                 }
             }
             Block::List(block) => {
+                inlines.extend(block.title.clone());
                 for child in block.items.iter() {
                     inlines.extend(child.inlines())
                 }
             }
             Block::DList(block) => {
+                inlines.extend(block.title.clone());
                 for child in block.items.iter() {
                     inlines.extend(child.inlines())
                 }
@@ -327,7 +335,10 @@ impl Block {
                     inlines.extend(child.inlines())
                 }
             }
-            Block::LeafBlock(block) => inlines.extend(block.inlines.clone()),
+            Block::LeafBlock(block) => {
+                inlines.extend(block.title.clone());
+                inlines.extend(block.inlines.clone())
+            }
             Block::TableCell(block) => inlines.extend(block.inlines.clone()),
             _ => {} // remaining blocks don't have inlines
         }
@@ -351,11 +362,13 @@ impl Block {
                 }
             }
             Block::List(block) => {
+                inlines.extend(block.title.iter_mut());
                 for child in block.items.iter_mut() {
                     inlines.extend(child.inlines_mut())
                 }
             }
             Block::DList(block) => {
+                inlines.extend(block.title.iter_mut());
                 for child in block.items.iter_mut() {
                     inlines.extend(child.inlines_mut())
                 }
@@ -372,7 +385,10 @@ impl Block {
                     inlines.extend(child.inlines_mut())
                 }
             }
-            Block::LeafBlock(block) => inlines.extend(block.inlines.iter_mut()),
+            Block::LeafBlock(block) => {
+                inlines.extend(block.title.iter_mut());
+                inlines.extend(block.inlines.iter_mut())
+            }
             Block::TableCell(block) => inlines.extend(block.inlines.iter_mut()),
             _ => {} // remaining blocks don't have inlines
         }
@@ -398,7 +414,7 @@ impl Block {
                 for child in block.blocks.iter_mut() {
                     let child_footnoes =
                         child.extract_footnote_definitions(extracted.len(), document_id)?;
-                    local_count += child_footnoes.len();
+                    // local_count += child_footnoes.len();
                     extracted.extend(child_footnoes);
                 }
             }
@@ -406,7 +422,7 @@ impl Block {
                 for child in block.blocks.iter_mut() {
                     let child_footnoes =
                         child.extract_footnote_definitions(extracted.len(), document_id)?;
-                    local_count += child_footnoes.len();
+                    // local_count += child_footnoes.len();
                     extracted.extend(child_footnoes);
                 }
             }
@@ -414,7 +430,7 @@ impl Block {
                 for child in block.items.iter_mut() {
                     let child_footnoes =
                         child.extract_footnote_definitions(extracted.len(), document_id)?;
-                    local_count += child_footnoes.len();
+                    // local_count += child_footnoes.len();
                     extracted.extend(child_footnoes);
                 }
             }
@@ -444,36 +460,42 @@ impl Block {
                         };
                         // deconstruct it
                         let (definition_id, replacement_span, footnote_contents) =
-                            footnote.deconstruct_footnote(local_count, document_id);
+                            footnote.deconstruct_footnote(local_count, document_id)?;
                         // add the relevant stuff to the return
                         extracted.push(Block::LeafBlock(
                             LeafBlock::new_footnote_def_from_id_and_inlines(
                                 definition_id,
                                 footnote_contents,
-                            ),
+                            )?,
                         ));
                         // put the reference back where the span was
                         block.inlines.insert(idx, replacement_span);
                     }
                 }
             }
-            _ => todo!(), // placeholder; probably this is a list of panics that should never be
-                          // reached
+            // nothing to extract from these (and some of them are never created)
+            Block::SectionBody
+            | Block::NonSectionBlockBody(_)
+            | Block::DiscreteHeading
+            | Block::Break(_)
+            | Block::BlockMacro(_)
+            | Block::BlockMetadata(_)
+            | Block::TableCell(_) => {}
         }
 
         Ok(extracted)
     }
 
     pub fn create_id(&mut self) {
-        if let Block::Section(section) = self {
-            if section.id == *"" {
-                let mut id = String::new();
-                for inline in &section.inlines {
-                    id.push_str(&inline.extract_values_to_string())
-                }
-                id = id.replace(' ', "-");
-                section.id = id
+        if let Block::Section(section) = self
+            && section.id == *""
+        {
+            let mut id = String::new();
+            for inline in &section.inlines {
+                id.push_str(&inline.extract_values_to_string())
             }
+            id = id.replace(' ', "-");
+            section.id = id
         }
     }
 
@@ -616,7 +638,7 @@ impl Block {
             Block::LeafBlock(block) => {
                 block.location = Location::reconcile(block.location.clone(), locations)
             }
-            _ => todo!(),
+            _ => warn!("Unresolved locations at {}", self),
         }
     }
 
@@ -690,7 +712,11 @@ impl Block {
             Block::Break(_) => {} // do nothing, since there is nothing to do!
             Block::BlockMacro(_) => {} // do nothing for now; maybe we include the meta
             // locations?
-            _ => todo!(),
+            // never created (and nothing to consolidate if they were)
+            Block::SectionBody
+            | Block::NonSectionBlockBody(_)
+            | Block::DiscreteHeading
+            | Block::BlockMetadata(_) => {}
         }
     }
 
@@ -702,7 +728,7 @@ impl Block {
         }
     }
 
-    pub fn add_metadata(&mut self, metadata: ElementMetadata) -> Result<(), ParserError> {
+    pub fn add_metadata(&mut self, metadata: ElementMetadata) -> Result<(), BlockError> {
         if metadata.is_empty() {
             return Ok(());
         }
@@ -722,10 +748,7 @@ impl Block {
             Block::ParentBlock(block) => block.metadata = Some(metadata),
             Block::TableCell(block) => block.metadata = Some(metadata),
             _ => {
-                return Err(ParserError::InternalError(format!(
-                    "Blocks of type {} do not accept metadata.",
-                    self
-                )));
+                return Err(BlockError::InvalidMetadata(format!("{}", self)));
             }
         }
         Ok(())
@@ -794,7 +817,8 @@ impl Block {
                     block_text.push_str(&inline.extract_values_to_string())
                 }
             }
-            _ => todo!(),
+            // never created (and have no text if they were)
+            Block::SectionBody | Block::NonSectionBlockBody(_) | Block::DiscreteHeading => {}
         }
         block_text
     }
@@ -969,6 +993,8 @@ pub struct LeafBlock {
     form: LeafBlockForm,
     #[serde(skip_serializing_if = "Option::is_none")]
     delimiter: Option<String>, // if it's a delimited block, then we provide the delimiter
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub title: Vec<Inline>,
     inlines: Vec<Inline>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub metadata: Option<ElementMetadata>,
@@ -1020,6 +1046,7 @@ impl LeafBlock {
             node_type: NodeTypes::Block,
             form,
             delimiter,
+            title: vec![],
             inlines,
             metadata: None,
             location,
@@ -1032,6 +1059,7 @@ impl LeafBlock {
             node_type: NodeTypes::Block,
             form: LeafBlockForm::Delimited,
             delimiter: Some(token.text()),
+            title: vec![],
             inlines: vec![],
             metadata: None,
             location: token.locations(),
@@ -1067,19 +1095,35 @@ impl LeafBlock {
     pub fn new_footnote_def_from_id_and_inlines(
         definition_id: String,
         inlines: Vec<Inline>,
-    ) -> Self {
-        Self {
+    ) -> Result<LeafBlock, BlockError> {
+        let line = if let Some(inline) = inlines.first() {
+            if let Some(loc) = inline.locations().first() {
+                loc.line
+            } else {
+                return Err(BlockError::Footnote(
+                    "Unable to resolve footnote locations".to_string(),
+                ));
+            }
+        } else {
+            return Err(BlockError::Footnote(
+                "Unable to resolve footnote locations".to_string(),
+            ));
+        };
+
+        Ok(Self {
             name: LeafBlockName::Paragraph,
             node_type: NodeTypes::Block,
             form: LeafBlockForm::Paragraph,
             delimiter: None,
+            title: vec![],
             inlines,
             metadata: Some(ElementMetadata::new_with_id_and_roles(
                 definition_id,
                 vec!["footnote".to_string()],
+                line,
             )),
             location: vec![],
-        }
+        })
     }
 }
 
@@ -1306,21 +1350,22 @@ mod tests {
 
     #[test]
     fn extract_footnote_definitions() {
+        let dummy_locations = vec![Location::new(1, 1, vec![])];
         let mut footnote = Inline::InlineSpan(InlineSpan::new(
             InlineSpanVariant::Footnote,
             InlineSpanForm::Constrained,
-            vec![],
+            dummy_locations.clone(),
         ));
         footnote.push_inline(Inline::InlineLiteral(InlineLiteral::new(
             InlineLiteralName::Text,
             "Foonote text".to_string(),
-            vec![],
+            dummy_locations.clone(),
         )));
         let mut some_leaf = Block::LeafBlock(LeafBlock::new(
             LeafBlockName::Paragraph,
             LeafBlockForm::Paragraph,
             None,
-            vec![],
+            dummy_locations.clone(),
             vec![footnote],
         ));
         let extracted = some_leaf

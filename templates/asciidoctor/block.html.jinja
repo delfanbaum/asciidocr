@@ -1,0 +1,333 @@
+{#-
+
+NOTE: Like the HTMLBook templates, all block macros live in this one file so that they can call
+each other recursively. The markup follows Asciidoctor's (so that its stylesheets apply), not
+HTMLBook's.
+
+-#}
+{%- from "inline.html" import render_inlines, alt_text -%}
+
+{%- macro render_block(block) -%}
+{%- if block.name == "paragraph" -%}
+    {{ render_paragraph(block) }}
+{%- elif block.name == "section" -%}
+    {{ render_section(block) }}
+{%- elif block.name == "list" -%}
+    {{ render_list(block) }}
+{%- elif block.name in ["listing", "literal"] -%}
+    {{ render_verbatim_block(block) }}
+{%- elif block.name == "verse" -%}
+    {{ render_verse(block) }}
+{%- elif block.name == "pass" -%}
+    {#- passthrough content is output exactly as written (Asciidoctor drops only the delimiter newlines) -#}
+    {%- for inline in block.inlines %}{{ inline.value | trim("\n") }}{%- endfor -%}
+{%- elif block.name == "break" -%}
+    {{ render_break(block) }}
+{%- elif block.name == "admonition" -%}
+    {{ render_admonition(block) }}
+{%- elif block.name == "example" -%}
+    {{ render_example(block) }}
+{%- elif block.name == "quote" -%}
+    {{ render_quote(block) }}
+{%- elif block.name == "dlist" -%}
+    {{ render_dlist(block) }}
+{%- elif block.name == "table" -%}
+    {{ render_table(block) }}
+{%- elif block.name == "image" -%}
+    {{ render_image(block) }}
+{%- elif block.name in ["sidebar", "open"] -%}
+    {{ render_parent_block(block) }}
+{%- endif -%}
+{%- endmacro -%}
+
+{#- Asciidoctor puts a block's id and roles on its outermost element: `id` first, then the
+    block's own classes followed by any roles. (A section's id goes on its heading instead.) -#}
+{%- macro wrapper_attrs(block, css_class, with_id=true) -%}
+{%- if with_id and block.metadata and block.metadata.attributes and block.metadata.attributes.id %} id="{{ block.metadata.attributes.id | escape_attr }}"{%- endif %} class="{{ css_class }}
+{%- if block.metadata and block.metadata.roles %} {{ block.metadata.roles | join(" ") | escape_attr }}{%- endif -%}"
+{%- endmacro -%}
+
+{%- macro render_title(block) -%}
+{%- if block.title %}
+<div class="title">{{ render_inlines(block.title) }}</div>
+{%- endif -%}
+{%- endmacro -%}
+
+{%- macro render_paragraph(block) %}
+<div{{ wrapper_attrs(block, "paragraph") }}>
+<p>{{ render_inlines(block.inlines) }}</p>
+</div>
+{%- endmacro -%}
+
+{#- Asciidoctor wraps the contents of top-level sections (only) in a "sectionbody" -#}
+{%- macro render_section(block) %}
+{%- set title_html = render_inlines(block.title) %}
+<div{{ wrapper_attrs(block, "sect" ~ block.level, false) }}>
+{%- set explicit_id = block.metadata.attributes.id if block.metadata and block.metadata.attributes else none %}
+<h{{ block.level + 1 }} id="{{ section_id(title_html, explicit_id) | escape_attr }}">{{ title_html }}</h{{ block.level + 1 }}>
+{%- if block.level == 1 %}
+<div class="sectionbody">
+{%- endif -%}
+{%- for child in block.blocks %}
+{{ render_block(child) }}
+{%- endfor -%}
+{%- if block.level == 1 %}
+</div>
+{%- endif %}
+</div>
+{%- endmacro -%}
+
+{%- macro render_list(block) %}
+{%- set ordered = block.variant == "ordered" -%}
+<div{{ wrapper_attrs(block, 'olist arabic' if ordered else 'ulist') }}>
+{{- render_title(block) }}
+{%- if ordered %}
+<ol class="arabic">
+{%- else %}
+<ul>
+{%- endif -%}
+{%- for item in block.items %}
+<li>
+<p>{{ render_inlines(item.principal) }}</p>
+{%- for child in item.blocks %}
+{{ render_block(child) }}
+{%- endfor %}
+</li>
+{%- endfor %}
+{%- if ordered %}
+</ol>
+{%- else %}
+</ul>
+{%- endif %}
+</div>
+{%- endmacro -%}
+
+{#- The ASG keeps the newlines that follow the opening delimiter and precede the closing one;
+    Asciidoctor drops them, and whitespace matters inside <pre> -#}
+{%- macro verbatim_text(block) -%}
+{{- render_inlines(block.inlines) | trim("\n") -}}
+{%- endmacro -%}
+
+{%- macro render_verbatim_block(block) %}
+{%- set language = block.metadata.attributes.language if block.name == "listing" and block.metadata and block.metadata.attributes else none %}
+<div{{ wrapper_attrs(block, 'listingblock' if block.name == 'listing' else 'literalblock') }}>
+{{- render_title(block) }}
+<div class="content">
+{%- if language %}
+<pre class="highlight"><code class="language-{{ language | escape_attr }}" data-lang="{{ language | escape_attr }}">{{ verbatim_text(block) }}</code></pre>
+{%- else %}
+<pre>{{ verbatim_text(block) }}</pre>
+{%- endif %}
+</div>
+</div>
+{%- endmacro -%}
+
+{%- macro render_verse(block) %}
+{%- set attrs = block.metadata.attributes if block.metadata and block.metadata.attributes else {} %}
+<div{{ wrapper_attrs(block, "verseblock") }}>
+{{- render_title(block) }}
+<pre class="content">{{ verbatim_text(block) }}</pre>
+{{ render_attribution(attrs) }}
+</div>
+{%- endmacro -%}
+
+{%- macro render_break(block) -%}
+{%- if block.variant == "page" %}
+<div style="page-break-after: always;"></div>
+{%- elif block.variant == "thematic" %}
+<hr>
+{%- endif -%}
+{%- endmacro -%}
+
+{#- Sidebars put their title inside the content div; open blocks put it before -#}
+{%- macro render_parent_block(block) %}
+{%- set css_class = "sidebarblock" if block.name == "sidebar" else "openblock" %}
+<div{{ wrapper_attrs(block, css_class) }}>
+{%- if block.name == "open" -%}{{ render_title(block) }}{%- endif %}
+<div class="content">
+{%- if block.name == "sidebar" -%}{{ render_title(block) }}{%- endif -%}
+{%- for child in block.blocks %}
+{{ render_block(child) }}
+{%- endfor %}
+</div>
+</div>
+{%- endmacro -%}
+
+{#- An admonition has either a paragraph (the "NOTE: text" form) or an example block (the
+    delimited form) as its content; Asciidoctor shows the paragraph's text without the usual
+    paragraph wrapper -#}
+{%- macro render_admonition(block) %}
+<div{{ wrapper_attrs(block, "admonitionblock " ~ block.variant) }}>
+<table>
+<tr>
+<td class="icon">
+<div class="title">{{ block.variant | capitalize }}</div>
+</td>
+<td class="content">
+{#- the title of a delimited admonition sits on the example block that wraps its content -#}
+{%- set wrapped = block.blocks | selectattr("name", "equalto", "example") | list -%}
+{%- if block.title %}
+<div class="title">{{ render_inlines(block.title) }}</div>
+{%- elif wrapped and wrapped[0].title %}
+<div class="title">{{ render_inlines(wrapped[0].title) }}</div>
+{%- endif -%}
+{%- for child in block.blocks -%}
+    {%- if child.name == "paragraph" %}
+{{ render_inlines(child.inlines) }}
+    {%- elif child.name == "example" -%}
+        {%- for grandchild in child.blocks %}
+{{ render_block(grandchild) }}
+        {%- endfor -%}
+    {%- else %}
+{{ render_block(child) }}
+    {%- endif -%}
+{%- endfor %}
+</td>
+</tr>
+</table>
+</div>
+{%- endmacro -%}
+
+{%- macro render_example(block) %}
+<div{{ wrapper_attrs(block, "exampleblock") }}>
+{%- if block.title %}
+<div class="title">Example {{ next_number("example") }}. {{ render_inlines(block.title) }}</div>
+{%- endif %}
+<div class="content">
+{%- for child in block.blocks %}
+{{ render_block(child) }}
+{%- endfor %}
+</div>
+</div>
+{%- endmacro -%}
+
+{#- The "— Author" line (with the source in a <cite>) under quotes and verses -#}
+{%- macro render_attribution(attrs) -%}
+{%- if attrs.attribution or attrs.citation %}
+<div class="attribution">
+{%- if attrs.attribution %}
+&#8212; {{ attrs.attribution | escape_text }}
+{%- endif -%}
+{%- if attrs.attribution and attrs.citation %}<br>{%- endif -%}
+{%- if attrs.citation %}
+<cite>{{ attrs.citation | escape_text }}</cite>
+{%- endif %}
+</div>
+{%- endif -%}
+{%- endmacro -%}
+
+{%- macro render_quote(block) %}
+{%- set attrs = block.metadata.attributes if block.metadata and block.metadata.attributes else {} %}
+<div{{ wrapper_attrs(block, "quoteblock") }}>
+{{- render_title(block) }}
+<blockquote>
+{%- for child in block.blocks %}
+{{ render_block(child) }}
+{%- endfor %}
+</blockquote>
+{{ render_attribution(attrs) }}
+</div>
+{%- endmacro -%}
+
+{%- macro render_dlist(block) %}
+<div{{ wrapper_attrs(block, "dlist") }}>
+{{- render_title(block) }}
+<dl>
+{%- for item in block.items %}
+<dt class="hdlist1">{{ render_inlines(item.terms) }}</dt>
+<dd>
+{%- if item.principal %}
+<p>{{ render_inlines(item.principal) }}</p>
+{%- endif -%}
+{%- for child in item.blocks %}
+{{ render_block(child) }}
+{%- endfor %}
+</dd>
+{%- endfor %}
+</dl>
+</div>
+{%- endmacro -%}
+
+{#- The ASG keeps table cells in one flat list; the "cols" attribute says how many fit in a row.
+    Column widths are not tracked, so columns are always shared out evenly. -#}
+{%- macro render_table(block) %}
+{%- set columns = block.metadata.attributes.cols | int if block.metadata and block.metadata.attributes.cols else 1 %}
+{%- set has_header = block.metadata and "header" in block.metadata.options %}
+<table{{ wrapper_attrs(block, "tableblock frame-all grid-all stretch") }}>
+{%- if block.title %}
+<caption class="title">Table {{ next_number("table") }}. {{ render_inlines(block.title) }}</caption>
+{%- endif %}
+<colgroup>
+{%- for _ in range(columns) %}
+<col style="width: {{ (100 / columns) | round(4) | string | replace(".0", "") }}%;">
+{%- endfor %}
+</colgroup>
+{%- if has_header %}
+<thead>
+<tr>
+{%- for cell in block.blocks[:columns] %}
+<th class="tableblock halign-left valign-top">{{ render_inlines(cell.inlines) | trim }}</th>
+{%- endfor %}
+</tr>
+</thead>
+{%- endif %}
+<tbody>
+{%- set body = block.blocks[columns:] if has_header else block.blocks %}
+{%- for cell in body %}
+{%- if loop.index0 % columns == 0 %}
+<tr>
+{%- endif %}
+<td class="tableblock halign-left valign-top"><p class="tableblock">{{ render_inlines(cell.inlines) | trim }}</p></td>
+{%- if loop.index0 % columns == columns - 1 or loop.last %}
+</tr>
+{%- endif %}
+{%- endfor %}
+</tbody>
+</table>
+{%- endmacro -%}
+
+{%- macro render_image(block) %}
+<div{{ wrapper_attrs(block, "imageblock") }}>
+<div class="content">
+<img src="{{ block.target | escape_attr }}" alt="{{ alt_text(block.target, block.metadata) }}">
+</div>
+{%- if block.caption %}
+<div class="title">Figure {{ next_number("figure") }}. {{ render_inlines(block.caption) }}</div>
+{%- endif %}
+</div>
+{%- endmacro -%}
+
+{#- The footnotes collected while rendering, listed after the content -#}
+{%- macro render_footnotes() -%}
+{%- set notes = footnotes() -%}
+{%- if notes %}
+<div id="footnotes">
+<hr>
+{%- for note in notes %}
+<div class="footnote" id="_footnotedef_{{ loop.index }}">
+<a href="#_footnoteref_{{ loop.index }}">{{ loop.index }}</a>. {{ note }}
+</div>
+{%- endfor %}
+</div>
+{%- endif -%}
+{%- endmacro -%}
+
+{#- The document's top-level blocks. When a document with a title has content ahead of its first
+    section, Asciidoctor wraps that content in a "preamble". -#}
+{%- macro render_document_blocks(graph) -%}
+{%- set has_sections = graph.blocks | selectattr("name", "equalto", "section") | list | length > 0 -%}
+{%- set preamble = graph.header and has_sections and graph.blocks and graph.blocks[0].name != "section" -%}
+{%- set state = namespace(open=preamble) -%}
+{%- if preamble %}
+<div id="preamble">
+<div class="sectionbody">
+{%- endif -%}
+{%- for block in graph.blocks -%}
+    {%- if state.open and block.name == "section" %}
+</div>
+</div>
+        {%- set state.open = false -%}
+    {%- endif %}
+{{ render_block(block) }}
+{%- endfor -%}
+{%- endmacro -%}

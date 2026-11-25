@@ -1,0 +1,21 @@
+{%- from "inline.html" import render_inline -%}
+{%- from "block.html" import render_block -%}
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>
+    {%- if graph.header -%}
+    {%- for inline in graph.header.title -%}
+    {{- render_inline(inline) -}}
+    {%- endfor -%}
+    {%- endif -%}
+    </title>
+</head>
+<body>{% for block in graph.blocks %}
+    {{ render_block(block)}}
+{%- endfor -%}
+</body>
+</html>

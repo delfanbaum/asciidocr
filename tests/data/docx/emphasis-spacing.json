@@ -1,0 +1,10 @@
+[
+  [{"text": "This is a title, ignore this"}],
+  [
+    {"text": "There is a "},
+    {"text": "world", "italic": true},
+    {"text": " in which this actually isn't a bug. But "},
+    {"text": "fuck", "bold": true},
+    {"text": " do I seem to see it a lot."}
+  ]
+]

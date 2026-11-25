@@ -1,0 +1,7 @@
+[[
+  {"text": "A "},
+  {"text": "bold ", "bold": true},
+  {"text": "and it", "bold": true, "italic": true},
+  {"text": " then plain", "bold": true},
+  {"text": " tail."}
+]]

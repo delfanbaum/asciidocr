@@ -3,6 +3,7 @@ use std::fs;
 
 use common::{
     assert_parsed_doc_matches_expected_asg, assert_parsed_doc_matches_expected_asg_from_str,
+    block_tree, top_level_block_names,
 };
 use rstest::rstest;
 
@@ -34,6 +35,9 @@ fn test_document(#[case] fn_pattern: &str) {
 #[case::many_unordered("blocks/ordered-list-many-items")]
 #[case::description_simple("blocks/description-list-simple")]
 #[case::description_complex("blocks/description-list-complex")]
+#[case::unordered_title("blocks/unordered-list-title")]
+#[case::ordered_title("blocks/ordered-list-title")]
+#[case::description_title("blocks/description-list-title")]
 fn test_lists(#[case] fn_pattern: &str) {
     let adoc_fn = format!("{}.adoc", fn_pattern);
     let asg_json_fn = format!("{}.json", fn_pattern);
@@ -145,9 +149,11 @@ fn test_admontions_non_delimited(#[case] admonition: &str) {
     assert_parsed_doc_matches_expected_asg_from_str(&adoc_str, &asg_json_str)
 }
 
-#[test]
-fn test_admontions_non_delimited_at_eof() {
-    let fn_pattern = "blocks/admonition-inline-eof";
+/// An inline-style admonition ends with its paragraph, wherever that is
+#[rstest]
+#[case::at_eof("blocks/admonition-inline-eof")]
+#[case::before_section("blocks/admonition-inline-then-section")]
+fn test_admontions_non_delimited_end(#[case] fn_pattern: &str) {
     let adoc_fn = format!("{}.adoc", fn_pattern);
     let asg_json_fn = format!("{}.json", fn_pattern);
     assert_parsed_doc_matches_expected_asg(&adoc_fn, &asg_json_fn)
@@ -186,9 +192,10 @@ fn test_literal() {
     assert_parsed_doc_matches_expected_asg(&adoc_fn, &asg_json_fn)
 }
 
-#[test]
-fn test_verse() {
-    let fn_pattern = "blocks/verse";
+#[rstest]
+#[case::lines("blocks/verse")]
+#[case::stanzas("blocks/verse-stanzas")]
+fn test_verse(#[case] fn_pattern: &str) {
     let adoc_fn = format!("{}.adoc", fn_pattern);
     let asg_json_fn = format!("{}.json", fn_pattern);
     assert_parsed_doc_matches_expected_asg(&adoc_fn, &asg_json_fn)
@@ -329,4 +336,45 @@ fn test_dangling_markup_in_heading() {
     let adoc_fn = format!("{}.adoc", fn_pattern);
     let asg_json_fn = format!("{}.json", fn_pattern);
     assert_parsed_doc_matches_expected_asg(&adoc_fn, &asg_json_fn)
+}
+
+/// A section starts at the top level (here), whatever block comes before it
+#[rstest]
+#[case::sidebar("****\nSidebar.\n****\n\n== Sec\n\nText.\n", &["sidebar", "section"])]
+#[case::example("====\nExample.\n====\n\n== Sec\n\nText.\n", &["example", "section"])]
+#[case::quote("[quote]\n____\nQuoted.\n____\n\n== Sec\n\nText.\n", &["quote", "section"])]
+#[case::open("--\nOpen.\n--\n\n== Sec\n\nText.\n", &["open", "section"])]
+#[case::table("|===\n|a\n|===\n\n== Sec\n\nText.\n", &["table", "section"])]
+#[case::admonition_block("[NOTE]\n====\nNote.\n====\n\n== Sec\n\nText.\n", &["admonition", "section"])]
+#[case::list("* item\n\n== Sec\n\nText.\n", &["list", "section"])]
+fn test_section_after_block_is_not_nested(#[case] adoc: &str, #[case] expected: &[&str]) {
+    assert_eq!(top_level_block_names(adoc), expected);
+}
+
+/// Sections of a lower level still belong to the section above them
+#[test]
+fn test_subsections_stay_nested() {
+    assert_eq!(
+        top_level_block_names("== One\n\n=== Sub\n\nText.\n\n== Two\n\nText.\n"),
+        ["section", "section"]
+    );
+}
+
+/// The same holds inside a section: a subsection is a child of the section, not of the block
+/// that precedes it
+#[rstest]
+#[case::sidebar(
+    "== A\n\n****\nx\n****\n\n=== B\n\ntext\n\n== C\n\nmore\n",
+    "section(sidebar(paragraph),section(paragraph)) section(paragraph)"
+)]
+#[case::inline_admonition(
+    "== A\n\nNOTE: n\n\n=== B\n\ntext\n",
+    "section(admonition(paragraph),section(paragraph))"
+)]
+#[case::table(
+    "== A\n\n|===\n|a\n|===\n\n=== B\n\ntext\n",
+    "section(table(tableCell),section(paragraph))"
+)]
+fn test_subsection_after_block_is_not_nested(#[case] adoc: &str, #[case] expected: &str) {
+    assert_eq!(block_tree(adoc), expected);
 }

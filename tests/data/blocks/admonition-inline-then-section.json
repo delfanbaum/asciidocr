@@ -1,0 +1,131 @@
+{
+    "name": "document",
+    "type": "block",
+    "blocks": [
+        {
+            "name": "admonition",
+            "variant": "note",
+            "type": "block",
+            "form": "delimited",
+            "delimiter": "NOTE: ",
+            "blocks": [
+                {
+                    "name": "paragraph",
+                    "type": "block",
+                    "inlines": [
+                        {
+                            "name": "text",
+                            "type": "string",
+                            "value": "A note.",
+                            "location": [
+                                {
+                                    "line": 1,
+                                    "col": 7
+                                },
+                                {
+                                    "line": 1,
+                                    "col": 13
+                                }
+                            ]
+                        }
+                    ],
+                    "location": [
+                        {
+                            "line": 1,
+                            "col": 7
+                        },
+                        {
+                            "line": 1,
+                            "col": 13
+                        }
+                    ]
+                }
+            ],
+            "location": [
+                {
+                    "line": 1,
+                    "col": 1
+                },
+                {
+                    "line": 1,
+                    "col": 13
+                }
+            ]
+        },
+        {
+            "name": "section",
+            "type": "block",
+            "title": [
+                {
+                    "name": "text",
+                    "type": "string",
+                    "value": "A Section",
+                    "location": [
+                        {
+                            "line": 3,
+                            "col": 4
+                        },
+                        {
+                            "line": 3,
+                            "col": 12
+                        }
+                    ]
+                }
+            ],
+            "level": 1,
+            "blocks": [
+                {
+                    "name": "paragraph",
+                    "type": "block",
+                    "inlines": [
+                        {
+                            "name": "text",
+                            "type": "string",
+                            "value": "Section text.",
+                            "location": [
+                                {
+                                    "line": 5,
+                                    "col": 1
+                                },
+                                {
+                                    "line": 5,
+                                    "col": 13
+                                }
+                            ]
+                        }
+                    ],
+                    "location": [
+                        {
+                            "line": 5,
+                            "col": 1
+                        },
+                        {
+                            "line": 5,
+                            "col": 13
+                        }
+                    ]
+                }
+            ],
+            "location": [
+                {
+                    "line": 3,
+                    "col": 1
+                },
+                {
+                    "line": 5,
+                    "col": 13
+                }
+            ]
+        }
+    ],
+    "location": [
+        {
+            "line": 1,
+            "col": 1
+        },
+        {
+            "line": 5,
+            "col": 13
+        }
+    ]
+}

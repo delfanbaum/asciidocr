@@ -17,6 +17,8 @@ pub struct List {
     marker: String,
     pub variant: ListVariant,
     pub items: Vec<Block>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub title: Vec<Inline>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub metadata: Option<ElementMetadata>,
     pub location: Vec<Location>,
@@ -34,7 +36,7 @@ impl List {
         match variant {
             ListVariant::Unordered => list_marker.push('*'),
             ListVariant::Ordered => list_marker.push('.'),
-            ListVariant::Callout => todo!(),
+            ListVariant::Callout => list_marker.push_str("<1>"),
         }
 
         List {
@@ -43,6 +45,7 @@ impl List {
             marker: list_marker,
             variant,
             items: vec![],
+            title: vec![],
             metadata: None,
             location,
         }
@@ -123,13 +126,13 @@ impl ListItem {
                 };
                 // deconstruct it
                 let (definition_id, replacement_span, footnote_contents) =
-                    footnote.deconstruct_footnote(local_count, document_id);
+                    footnote.deconstruct_footnote(local_count, document_id)?;
                 // add the relevant stuff to the return
                 extracted.push(Block::LeafBlock(
                     LeafBlock::new_footnote_def_from_id_and_inlines(
                         definition_id,
                         footnote_contents,
-                    ),
+                    )?,
                 ));
                 // put the reference back where the span was
                 self.principal.insert(idx, replacement_span);
@@ -152,6 +155,8 @@ pub struct DList {
     node_type: NodeTypes,
     marker: String,
     pub items: Vec<Block>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub title: Vec<Inline>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub metadata: Option<ElementMetadata>,
     pub location: Vec<Location>,
@@ -171,6 +176,7 @@ impl DList {
             node_type: NodeTypes::Block,
             marker: "::".to_string(),
             items: vec![],
+            title: vec![],
             metadata: None,
             location,
         }
@@ -255,13 +261,13 @@ impl DListItem {
                 };
                 // deconstruct it
                 let (definition_id, replacement_span, footnote_contents) =
-                    footnote.deconstruct_footnote(local_count, document_id);
+                    footnote.deconstruct_footnote(local_count, document_id)?;
                 // add the relevant stuff to the return
                 extracted.push(Block::LeafBlock(
                     LeafBlock::new_footnote_def_from_id_and_inlines(
                         definition_id,
                         footnote_contents,
-                    ),
+                    )?,
                 ));
                 // put the reference back where the span was
                 self.principal.insert(idx, replacement_span);
@@ -273,5 +279,16 @@ impl DListItem {
             extracted.extend(child_footnoes);
         }
         Ok(extracted)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn callout_lists_can_be_created() {
+        let list = List::new(ListVariant::Callout, vec![]);
+        assert_eq!(list.marker, "<1>");
     }
 }

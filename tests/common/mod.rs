@@ -1,7 +1,14 @@
 use std::env;
 use std::{fs, path::PathBuf};
 
-use asciidocr::{backends::htmls::render_htmlbook, parser::Parser, scanner::Scanner};
+use asciidocr::{
+    backends::htmls::{
+        render_asciidoctor_html, render_asciidoctor_html_embedded, render_htmlbook,
+        render_htmlbook_embedded,
+    },
+    parser::Parser,
+    scanner::Scanner,
+};
 use assert_json_diff::assert_json_eq;
 use image::RgbImage;
 use serde_json::{Value, json};
@@ -23,6 +30,80 @@ pub fn assert_parsed_doc_matches_expected_asg(adoc_fn: &str, asg_json_fn: &str) 
     )
     .unwrap();
     assert_json_eq!(asg_as_json, expected_asg);
+}
+
+/// Parses the Asciidoc source and returns all of the text in the resulting graph (every literal
+/// `value`, in document order), for tests that only care that nothing was lost or crashed
+pub fn parsed_text(adoc: &str) -> String {
+    fn collect(value: &Value, text: &mut String) {
+        match value {
+            Value::Object(map) => {
+                if let Some(Value::String(v)) = map.get("value") {
+                    text.push_str(v);
+                }
+                for (key, child) in map {
+                    if key != "value" && key != "location" {
+                        collect(child, text);
+                    }
+                }
+            }
+            Value::Array(items) => items.iter().for_each(|child| collect(child, text)),
+            _ => {}
+        }
+    }
+    let asg = json!(
+        Parser::new_no_target_resolution(env::current_dir().unwrap())
+            .parse(Scanner::new(adoc))
+            .expect("Unable to parse input")
+    );
+    let mut text = String::new();
+    collect(&asg, &mut text);
+    text
+}
+
+/// Parses the Asciidoc source and returns the names of the document's top-level blocks (e.g.,
+/// "paragraph", "section"), for tests of how blocks are arranged rather than of their contents
+pub fn top_level_block_names(adoc: &str) -> Vec<String> {
+    let asg = json!(
+        Parser::new_no_target_resolution(env::current_dir().unwrap())
+            .parse(Scanner::new(adoc))
+            .expect("Unable to parse input")
+    );
+    asg["blocks"]
+        .as_array()
+        .expect("Document has no blocks")
+        .iter()
+        .map(|block| block["name"].as_str().unwrap_or_default().to_string())
+        .collect()
+}
+
+/// Parses the Asciidoc source and describes how its blocks nest, e.g.,
+/// `section(sidebar(paragraph),section(paragraph))`; top-level blocks are separated by spaces
+pub fn block_tree(adoc: &str) -> String {
+    fn describe(block: &Value) -> String {
+        let name = block["name"].as_str().unwrap_or_default();
+        let children: Vec<String> = block["blocks"]
+            .as_array()
+            .map(|blocks| blocks.iter().map(describe).collect())
+            .unwrap_or_default();
+        if children.is_empty() {
+            name.to_string()
+        } else {
+            format!("{}({})", name, children.join(","))
+        }
+    }
+    let asg = json!(
+        Parser::new_no_target_resolution(env::current_dir().unwrap())
+            .parse(Scanner::new(adoc))
+            .expect("Unable to parse input")
+    );
+    asg["blocks"]
+        .as_array()
+        .expect("Document has no blocks")
+        .iter()
+        .map(describe)
+        .collect::<Vec<_>>()
+        .join(" ")
 }
 
 /// Given an asciidoc string and an expected abstract syntax graph json string, assert that the
@@ -57,9 +138,186 @@ pub fn assert_rendered_htmlbook_matches_expected(adoc_fn: &str, html_fn: &str) {
     assert_eq!(rendered_html, expected_html);
 }
 
+/// Like `assert_rendered_htmlbook_matches_expected`, but for the embedded (no document wrapper)
+/// rendering
+pub fn assert_rendered_htmlbook_embedded_matches_expected(adoc_fn: &str, html_fn: &str) {
+    let test_dir = PathBuf::from("tests/data/");
+    let mut rendered_html = render_htmlbook_embedded(
+        &Parser::new_no_target_resolution(test_dir.join(adoc_fn))
+            .parse(Scanner::new(
+                &fs::read_to_string(test_dir.join(adoc_fn)).expect("Unable to find adoc"),
+            ))
+            .expect("Unable to parse input file"),
+    )
+    .expect("Unable to render HTML from document");
+    rendered_html.retain(|c| !c.is_whitespace());
+    let mut expected_html =
+        fs::read_to_string(test_dir.join(html_fn)).expect("Unable to read expectd html file");
+    expected_html.retain(|c| !c.is_whitespace());
+    assert_eq!(rendered_html, expected_html);
+}
+
+/// Given a pattern "parent/filename" inside tests/data, assert that the filename.adoc produces the
+/// Asciidoctor-styled full document found in filename.html. Ignores whitespace, and the
+/// "Last updated" timestamp (which is `NOW` in the expected html).
+pub fn assert_rendered_asciidoctor_html_matches_expected(adoc_fn: &str, html_fn: &str) {
+    let test_dir = PathBuf::from("tests/data/");
+    let rendered_html = render_asciidoctor_html(
+        &Parser::new_no_target_resolution(test_dir.join(adoc_fn))
+            .parse(Scanner::new(
+                &fs::read_to_string(test_dir.join(adoc_fn)).expect("Unable to find adoc"),
+            ))
+            .expect("Unable to parse input file"),
+    )
+    .expect("Unable to render HTML from document");
+    let timestamp = regex::Regex::new(r"Last updated [^<]*").unwrap();
+    let mut rendered_html = timestamp
+        .replace(&rendered_html, "Last updated NOW")
+        .to_string();
+    rendered_html.retain(|c| !c.is_whitespace());
+    let mut expected_html =
+        fs::read_to_string(test_dir.join(html_fn)).expect("Unable to read expectd html file");
+    expected_html.retain(|c| !c.is_whitespace());
+    assert_eq!(rendered_html, expected_html);
+}
+
+/// Renders Asciidoc source to embedded HTMLBook, keeping whitespace as is (for tests of things
+/// like `<pre>` contents, where whitespace matters)
+pub fn render_htmlbook_embedded_from_str(adoc: &str) -> String {
+    render_htmlbook_embedded(
+        &Parser::new_no_target_resolution(env::current_dir().unwrap())
+            .parse(Scanner::new(adoc))
+            .expect("Unable to parse input"),
+    )
+    .expect("Unable to render HTML from document")
+}
+
+/// Renders Asciidoc source to embedded Asciidoctor-styled html, keeping whitespace as is (for
+/// tests of things like `<pre>` contents, where whitespace matters)
+pub fn render_asciidoctor_embedded_from_str(adoc: &str) -> String {
+    render_asciidoctor_html_embedded(
+        &Parser::new_no_target_resolution(env::current_dir().unwrap())
+            .parse(Scanner::new(adoc))
+            .expect("Unable to parse input"),
+    )
+    .expect("Unable to render HTML from document")
+}
+
+/// Given a pattern "parent/filename" inside tests/data, assert that the filename.adoc produces the
+/// embedded Asciidoctor-styled html (i.e., the document contents only, like `asciidoctor -s`)
+/// found in filename.html. Ignores whitespace.
+pub fn assert_rendered_asciidoctor_embedded_matches_expected(adoc_fn: &str, html_fn: &str) {
+    let test_dir = PathBuf::from("tests/data/");
+    let mut rendered_html = render_asciidoctor_html_embedded(
+        &Parser::new_no_target_resolution(test_dir.join(adoc_fn))
+            .parse(Scanner::new(
+                &fs::read_to_string(test_dir.join(adoc_fn)).expect("Unable to find adoc"),
+            ))
+            .expect("Unable to parse input file"),
+    )
+    .expect("Unable to render HTML from document");
+    rendered_html.retain(|c| !c.is_whitespace());
+    let mut expected_html =
+        fs::read_to_string(test_dir.join(html_fn)).expect("Unable to read expectd html file");
+    expected_html.retain(|c| !c.is_whitespace());
+    assert_eq!(rendered_html, expected_html);
+}
+
 pub fn generate_temp_image() -> NamedTempFile {
     let img_path = NamedTempFile::with_suffix(".png").unwrap();
     let img = RgbImage::new(32, 32);
     img.save(&img_path.path()).expect("Error creating image");
     img_path
+}
+
+/// Renders the given Asciidoc source to docx and returns the text of one XML part (for example
+/// `word/settings.xml` or `word/document.xml`) from inside the resulting zip archive.
+#[cfg(feature = "docx")]
+pub fn rendered_docx_part(adoc: &str, part: &str) -> String {
+    use std::io::Read;
+
+    let parsed_asg = Parser::new_no_target_resolution(PathBuf::from("tests/data/docx/inline.adoc"))
+        .parse(Scanner::new(adoc))
+        .expect("Failed to parse document");
+    let temp_docx = NamedTempFile::new().unwrap();
+    asciidocr::backends::docx::render_docx(&parsed_asg, temp_docx.path())
+        .expect("Failed to render docx");
+    let mut archive = zip::ZipArchive::new(fs::File::open(temp_docx.path()).unwrap())
+        .expect("Rendered docx is not a valid zip archive");
+    let mut xml = String::new();
+    archive
+        .by_name(part)
+        .unwrap_or_else(|_| panic!("{part} not found in docx"))
+        .read_to_string(&mut xml)
+        .unwrap();
+    xml
+}
+
+/// A flattened view of one docx run, so tests can compare formatting without caring about XML.
+#[cfg(feature = "docx")]
+#[derive(Debug, Default, PartialEq, serde::Serialize)]
+pub struct RunSummary {
+    pub text: String,
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub bold: bool,
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub italic: bool,
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub mono: bool,
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub highlight: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub vert_align: Option<String>,
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub line_break: bool,
+}
+
+/// Renders Asciidoc source to docx and summarizes the runs of every body paragraph.
+#[cfg(feature = "docx")]
+pub fn rendered_docx_runs(adoc: &str) -> Vec<Vec<RunSummary>> {
+    let xml = rendered_docx_part(adoc, "word/document.xml");
+    let doc = roxmltree::Document::parse(&xml).expect("document.xml is not valid XML");
+    let named = |n: &roxmltree::Node, name: &str| n.is_element() && n.tag_name().name() == name;
+    doc.descendants()
+        .filter(|n| named(n, "p"))
+        .map(|p| {
+            p.children()
+                .filter(|r| named(r, "r"))
+                .map(|r| {
+                    let mut run = RunSummary::default();
+                    for prop in r.descendants().filter(|n| n.is_element()) {
+                        match prop.tag_name().name() {
+                            "b" => run.bold = true,
+                            "i" => run.italic = true,
+                            "highlight" => run.highlight = true,
+                            "rFonts" => {
+                                run.mono = prop.attributes().any(|a| a.value() == "Courier New")
+                            }
+                            "vertAlign" => {
+                                run.vert_align =
+                                    prop.attributes().next().map(|a| a.value().to_string())
+                            }
+                            "br" => run.line_break = true,
+                            "t" => run.text.push_str(prop.text().unwrap_or_default()),
+                            _ => {}
+                        }
+                    }
+                    run
+                })
+                .collect()
+        })
+        .collect()
+}
+
+/// Asserts that the runs rendered from `adoc_fn` (inside tests/data) match the expected JSON.
+#[cfg(feature = "docx")]
+pub fn assert_rendered_docx_runs_match_expected(adoc_fn: &str, json_fn: &str) {
+    let test_dir = PathBuf::from("tests/data/");
+    let adoc = fs::read_to_string(test_dir.join(adoc_fn)).expect("Unable to find adoc");
+    let expected: Value = serde_json::from_str(
+        &fs::read_to_string(test_dir.join(json_fn)).expect("Unable to find expected json"),
+    )
+    .expect("Expected json is invalid");
+    let actual = serde_json::to_value(rendered_docx_runs(&adoc)).unwrap();
+    assert_json_eq!(actual, expected);
 }

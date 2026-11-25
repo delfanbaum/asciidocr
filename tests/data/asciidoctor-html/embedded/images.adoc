@@ -1,0 +1,8 @@
+image::pixel.png[A pixel]
+
+.A captioned image
+image::pixel.png[Another pixel]
+
+image::my-other_pixel.png[]
+
+An inline image:pixel.png[tiny] in text.

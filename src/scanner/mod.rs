@@ -2,6 +2,7 @@
 
 pub mod tokens;
 use core::str;
+use log::{debug, warn};
 use tokens::{Token, TokenType};
 
 use crate::errors::ScannerError;
@@ -480,6 +481,7 @@ impl<'a> Scanner<'a> {
             }
         }
         token.validate();
+        debug!("Token {:?} from {}..{}", token, self.start, self.current);
         Ok(token)
     }
 
@@ -494,7 +496,10 @@ impl<'a> Scanner<'a> {
             3 => self.add_token(TokenType::Heading3, false, 0),
             4 => self.add_token(TokenType::Heading4, false, 0),
             5 => self.add_token(TokenType::Heading5, false, 0),
-            _ => Err(ScannerError::HeadingLevelError(self.line)),
+            _ => {
+                warn!("Heading level error at line {}", self.line);
+                Err(ScannerError::HeadingLevelError(self.line))
+            }
         }
     }
 
@@ -525,6 +530,10 @@ impl<'a> Scanner<'a> {
 
     /// Adds the include image, consuming the target as well as any attributes
     fn add_include(&mut self) -> Result<Token, ScannerError> {
+        // a directive that never closes (on its line) is just text
+        if !self.closes_on_this_line("]") {
+            return self.add_text_until_next_markup();
+        }
         while self.peek() != ']' {
             self.current += 1
         }
@@ -548,19 +557,25 @@ impl<'a> Scanner<'a> {
     /// Adds the link, consuming the target but not any attributes
     fn add_link(&mut self) -> Result<Token, ScannerError> {
         let hyperlink_allowed_punctuation = ['.', '#', ':', '/', '?', '=', '&'];
-        while !['\0', ' '].contains(&self.peek()) && !self.peek().is_ascii_punctuation() {
+        // a bare link ends at whitespace (including the end of the line) or the end of input
+        let link_terminators = ['\0', ' ', '\t', '\r', '\n'];
+        while !link_terminators.contains(&self.peek()) && !self.peek().is_ascii_punctuation() {
             self.current += 1
         }
         // it's an attribute-styled link
         if self.peek() == '[' {
             self.current += 1; // consume the '[' char
             self.add_token(TokenType::LinkMacro, true, 0)
-        } else if ['\0', ' '].contains(&self.peek()) {
+        } else if link_terminators.contains(&self.peek()) {
             self.add_token(TokenType::Hyperlink, true, 0)
         } else if hyperlink_allowed_punctuation.contains(&self.peek()) {
             // if it's at the end of a sentence
             if let Some(second_char) = self.peeks_ahead(2).chars().last() {
-                if ['\0', ' '].contains(&second_char) {
+                if link_terminators.contains(&second_char) {
+                    // if it's not a possible sentence ender, we want that in the link
+                    if !['.', ':', '?'].contains(&self.peek()) {
+                        self.current += 1;
+                    }
                     self.add_token(TokenType::Hyperlink, true, 0)
                 } else {
                     // otherwise it contains an allowed url punctuation character
@@ -585,8 +600,20 @@ impl<'a> Scanner<'a> {
         self.add_token(TokenType::InlineStyle, true, 0)
     }
 
-    // adds block anchors, e.g., "\n[[some_block_id]]\n"
+    /// Whether the given closing markup shows up before the end of the current line
+    fn closes_on_this_line(&self, closing: &str) -> bool {
+        self.source[self.current..]
+            .split('\n')
+            .next()
+            .is_some_and(|rest_of_line| rest_of_line.contains(closing))
+    }
+
+    // adds cross references, e.g., "<<some_id>>"
     fn add_cross_reference(&mut self) -> Result<Token, ScannerError> {
+        // a cross reference that never closes (on its line) is just text
+        if !self.closes_on_this_line(">>") {
+            return self.add_text_until_next_markup();
+        }
         while self.peeks_ahead(2) != ">>" && !self.is_at_end() {
             self.current += 1
         }
@@ -596,6 +623,10 @@ impl<'a> Scanner<'a> {
 
     // adds block anchors, e.g., "\n[[some_block_id]]\n"
     fn add_block_anchor(&mut self) -> Result<Token, ScannerError> {
+        // an anchor that never closes (on its line) is just text
+        if !self.closes_on_this_line("]]") {
+            return self.add_text_until_next_markup();
+        }
         while self.peeks_ahead(3) != "]]\n" && !self.is_at_end() {
             self.current += 1
         }
@@ -641,6 +672,7 @@ impl<'a> Scanner<'a> {
             self.expecting_tag_end = false;
         } else {
             return Err(ScannerError::TagError(
+                self.line,
                 self.source[self.start..self.current].to_string(),
             ));
         }
@@ -1604,9 +1636,14 @@ mod tests {
         scan_and_assert_eq(markup, expected_tokens);
     }
 
-    #[test]
-    fn link_no_attribute_fencing() {
-        let markup = "Somx http://example.com";
+    #[rstest]
+    #[case("http://example.com")]
+    #[case("http://example.com/")]
+    #[case("http://example.com/?next=foo")]
+    #[case("http://example.com:80/")]
+    #[case("http://example.com/foo.html#bar")]
+    fn link_no_attribute_fencing(#[case] link: &str) {
+        let markup = &format!("Somx {link}");
         let expected_tokens = vec![
             Token::new_default(
                 TokenType::Text,
@@ -1618,14 +1655,52 @@ mod tests {
             ),
             Token::new_default(
                 TokenType::Hyperlink,
-                "http://example.com".to_string(),
-                Some("http://example.com".to_string()),
+                link.to_string(),
+                Some(link.to_string()),
                 1,
                 6,
-                23,
+                5 + link.len(),
             ),
         ];
         scan_and_assert_eq(markup, expected_tokens);
+    }
+
+    /// A bare URL at the end of a line stops at the newline instead of running into the lines
+    /// that follow it
+    #[rstest]
+    #[case::plain("http://example.com", "http://example.com")]
+    #[case::trailing_slash("http://example.com/bar/", "http://example.com/bar/")]
+    #[case::sentence_end("http://example.com.", "http://example.com")]
+    #[case::allowed_punctuation("http://example.com/?a=b", "http://example.com/?a=b")]
+    fn link_no_attribute_fencing_end_of_line(#[case] line: &str, #[case] link: &str) {
+        let markup = format!("Somx {line}\nnext\n\n== Title\n");
+        let tokens: Vec<Token> = Scanner::new(&markup).filter_map(Result::ok).collect();
+        let hyperlink_idx = tokens
+            .iter()
+            .position(|t| t.token_type() == TokenType::Hyperlink)
+            .expect("no hyperlink token");
+        assert_eq!(tokens[hyperlink_idx].lexeme, link);
+        assert!(
+            tokens
+                .iter()
+                .any(|t| t.token_type() == TokenType::Heading2 && t.line == 4),
+            "{tokens:?}"
+        );
+    }
+
+    /// The same, with Windows (CRLF) line endings: the `\r` is not part of the link
+    #[rstest]
+    #[case::plain("http://example.com", "http://example.com")]
+    #[case::sentence_end("http://example.com.", "http://example.com")]
+    #[case::allowed_punctuation("http://example.com/?a=b", "http://example.com/?a=b")]
+    fn link_no_attribute_fencing_end_of_crlf_line(#[case] line: &str, #[case] link: &str) {
+        let markup = format!("Somx {line}\r\nnext\r\n");
+        let tokens: Vec<Token> = Scanner::new(&markup).filter_map(Result::ok).collect();
+        let hyperlink = tokens
+            .iter()
+            .find(|t| t.token_type() == TokenType::Hyperlink)
+            .expect("no hyperlink token");
+        assert_eq!(hyperlink.lexeme, link);
     }
 
     #[test]
@@ -1668,11 +1743,9 @@ mod tests {
     #[case(": ")]
     #[case("? ")]
     #[case(". ")]
-    #[case("/ ")]
     #[case(":")]
     #[case("?")]
     #[case(".")]
-    #[case("/")]
     fn link_no_attribute_fencing_sentence(#[case] end_: &str) {
         let markup = format!("Somx http://example.com{}", end_);
         let expected_tokens = vec![

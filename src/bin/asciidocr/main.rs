@@ -6,7 +6,13 @@ use simple_logger::SimpleLogger;
 use std::{fs, path::PathBuf};
 
 use asciidocr::{
-    backends::{Backends, htmls::render_htmlbook},
+    backends::{
+        Backends,
+        htmls::{
+            render_asciidoctor_html, render_asciidoctor_html_embedded, render_htmlbook,
+            render_htmlbook_embedded,
+        },
+    },
     parser::Parser as AdocParser,
     scanner::Scanner,
 };
@@ -17,13 +23,23 @@ use asciidocr::backends::docx::render_docx;
 use cli::{Cli, read_input, read_output};
 
 fn main() {
+    let args = Cli::parse();
+
+    // debug is the more detailed level, so it wins when both flags are given
+    let verbosity = if args.debug {
+        log::LevelFilter::Debug
+    } else if args.verbose {
+        log::LevelFilter::Info
+    } else {
+        log::LevelFilter::Warn
+    };
+
     SimpleLogger::new()
-        .with_level(log::LevelFilter::Warn)
+        .with_level(verbosity)
         .with_colors(true)
         .without_timestamps()
         .init()
         .unwrap();
-    let args = Cli::parse();
 
     if let Err(e) = run(args) {
         eprintln!("Error converting document: {}", e);
@@ -32,22 +48,34 @@ fn main() {
 }
 
 fn run(args: Cli) -> Result<()> {
-    let graph = match args.do_not_resolve_targets {
-        true => AdocParser::new_no_target_resolution(PathBuf::from(&args.file))
-            .parse(Scanner::new(&read_input(&args)))?,
-        false => {
-            AdocParser::new(PathBuf::from(&args.file)).parse(Scanner::new(&read_input(&args)))?
-        }
-    };
+    let mut parser = AdocParser::new(PathBuf::from(&args.file));
+    if args.do_not_resolve_targets {
+        parser.resolve_targets = false;
+    }
+
+    let graph = parser.parse(Scanner::new(&read_input(&args)))?;
     if args.count {
         println!("{} words in {}", graph.word_count(), args.file)
     }
 
     match args.backend {
         Backends::Htmlbook => {
-            render_string(render_htmlbook(&graph)?, read_output(args));
+            match args.embedded {
+                true => render_string(render_htmlbook_embedded(&graph)?, read_output(args)),
+                false => render_string(render_htmlbook(&graph)?, read_output(args)),
+            }
             Ok(())
         }
+
+        Backends::Asciidoctor => {
+            match args.embedded {
+                true => render_string(render_asciidoctor_html_embedded(&graph)?, read_output(args)),
+                false => render_string(render_asciidoctor_html(&graph)?, read_output(args)),
+            }
+            Ok(())
+        }
+
+        #[cfg(feature = "json")]
         Backends::Json => {
             render_string(serde_json::to_string_pretty(&graph)?, read_output(args));
             Ok(())

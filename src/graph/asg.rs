@@ -87,7 +87,9 @@ impl Asg {
         self.document_id_hash.extend(block.id_hashes());
         if block.is_section() {
             if let Some(possible_section) = self.blocks.last_mut() {
-                if possible_section.takes_block_of_type(&block) {
+                // only a (higher-level) section can contain this section; other blocks that take
+                // children (sidebars, examples, tables, etc.) are complete once they get here
+                if possible_section.is_section() && possible_section.takes_block_of_type(&block) {
                     possible_section.push_block(block)?;
                 } else {
                     self.blocks.push(block);
@@ -164,21 +166,23 @@ mod tests {
 
     #[test]
     fn consolidate_footnotes() {
+        let dummy_locations = vec![Location::new(1, 1, vec![])];
+
         let mut footnote = Inline::InlineSpan(InlineSpan::new(
             InlineSpanVariant::Footnote,
             InlineSpanForm::Constrained,
-            vec![],
+            dummy_locations.clone(),
         ));
         footnote.push_inline(Inline::InlineLiteral(InlineLiteral::new(
             InlineLiteralName::Text,
             "Foonote text".to_string(),
-            vec![],
+            dummy_locations.clone(),
         )));
         let some_leaf = Block::LeafBlock(LeafBlock::new(
             LeafBlockName::Paragraph,
             LeafBlockForm::Paragraph,
             None,
-            vec![],
+            dummy_locations.clone(),
             vec![footnote],
         ));
         let mut graph = Asg::new();

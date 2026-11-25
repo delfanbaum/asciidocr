@@ -1,0 +1,9 @@
+= Document Title
+
+This is a code block:
+
+[source, python]
+----
+def hello():
+    print("Hello, world!")
+----

@@ -1,0 +1,3 @@
+A footnote.footnote:[The note text.] And another one.footnote:[A *second* note.]
+
+A later paragraph.footnote:[Third note.]

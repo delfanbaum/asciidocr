@@ -1,4 +1,8 @@
-use common::assert_rendered_htmlbook_matches_expected;
+use common::{
+    assert_rendered_htmlbook_embedded_matches_expected, assert_rendered_htmlbook_matches_expected,
+    render_htmlbook_embedded_from_str,
+};
+use rstest::rstest;
 
 pub mod common;
 
@@ -220,4 +224,154 @@ fn links() {
     let adoc_fn = format!("{}.adoc", fn_pattern);
     let html_fn = format!("{}.html", fn_pattern);
     assert_rendered_htmlbook_matches_expected(&adoc_fn, &html_fn)
+}
+
+#[test]
+fn embedded_has_no_document_wrapper() {
+    let fn_pattern = String::from("htmlbook/embedded");
+    let adoc_fn = format!("{}.adoc", fn_pattern);
+    let html_fn = format!("{}.html", fn_pattern);
+    assert_rendered_htmlbook_embedded_matches_expected(&adoc_fn, &html_fn)
+}
+
+#[test]
+fn document_header_sets_title() {
+    let fn_pattern = String::from("htmlbook/document-header");
+    let adoc_fn = format!("{}.adoc", fn_pattern);
+    let html_fn = format!("{}.html", fn_pattern);
+    assert_rendered_htmlbook_matches_expected(&adoc_fn, &html_fn)
+}
+
+#[test]
+fn block_titles() {
+    let fn_pattern = String::from("htmlbook/block-titles");
+    let adoc_fn = format!("{}.adoc", fn_pattern);
+    let html_fn = format!("{}.html", fn_pattern);
+    assert_rendered_htmlbook_matches_expected(&adoc_fn, &html_fn)
+}
+
+#[test]
+fn comments_are_not_rendered() {
+    let fn_pattern = String::from("htmlbook/comments");
+    let adoc_fn = format!("{}.adoc", fn_pattern);
+    let html_fn = format!("{}.html", fn_pattern);
+    assert_rendered_htmlbook_matches_expected(&adoc_fn, &html_fn)
+}
+
+#[test]
+fn leaf_block_titles_wrap_in_example() {
+    let fn_pattern = String::from("htmlbook/leaf-block-titles");
+    let adoc_fn = format!("{}.adoc", fn_pattern);
+    let html_fn = format!("{}.html", fn_pattern);
+    assert_rendered_htmlbook_matches_expected(&adoc_fn, &html_fn)
+}
+
+#[test]
+fn table_title_becomes_caption() {
+    let fn_pattern = String::from("htmlbook/table-title");
+    let adoc_fn = format!("{}.adoc", fn_pattern);
+    let html_fn = format!("{}.html", fn_pattern);
+    assert_rendered_htmlbook_matches_expected(&adoc_fn, &html_fn)
+}
+
+#[test]
+fn paragraph_title_is_dropped_but_content_kept() {
+    let fn_pattern = String::from("htmlbook/paragraph-title-dropped");
+    let adoc_fn = format!("{}.adoc", fn_pattern);
+    let html_fn = format!("{}.html", fn_pattern);
+    assert_rendered_htmlbook_matches_expected(&adoc_fn, &html_fn)
+}
+
+#[test]
+fn list_title_is_not_rendered_and_does_not_linger() {
+    let fn_pattern = String::from("htmlbook/list-title-not-rendered");
+    let adoc_fn = format!("{}.adoc", fn_pattern);
+    let html_fn = format!("{}.html", fn_pattern);
+    assert_rendered_htmlbook_matches_expected(&adoc_fn, &html_fn)
+}
+
+#[test]
+fn inline_admonition_takes_title() {
+    let fn_pattern = String::from("htmlbook/admonition-inline-title");
+    let adoc_fn = format!("{}.adoc", fn_pattern);
+    let html_fn = format!("{}.html", fn_pattern);
+    assert_rendered_htmlbook_matches_expected(&adoc_fn, &html_fn)
+}
+
+/// Special characters in text and attribute values are escaped, while character references (from
+/// replacements or written by the author) and passthrough blocks are left as they are
+#[test]
+fn special_characters_are_escaped() {
+    let fn_pattern = String::from("htmlbook/escaping");
+    let adoc_fn = format!("{}.adoc", fn_pattern);
+    let html_fn = format!("{}.html", fn_pattern);
+    assert_rendered_htmlbook_embedded_matches_expected(&adoc_fn, &html_fn)
+}
+
+/// An unclosed span turns back into text, but that must not merge passthrough content with the
+/// text around it: the text is still escaped and the passthrough is still output as written
+#[rstest]
+#[case::text_after_passthrough(
+    "pass:[<b>x</b>] <script> and _unclosed text\n",
+    "<p><b>x</b> &lt;script&gt; and _unclosed text</p>"
+)]
+#[case::passthrough_after_text(
+    "b pass:[<b>x</b>] <i> and _unclosed\n",
+    "<p>b <b>x</b> &lt;i&gt; and _unclosed</p>"
+)]
+fn test_unclosed_span_keeps_passthrough_separate(#[case] adoc: &str, #[case] expected: &str) {
+    let html = render_htmlbook_embedded_from_str(adoc);
+    assert!(html.contains(expected), "{html}");
+}
+
+/// A list's first item keeps its own text even when the line before the list (a section
+/// heading's blank line, a role or an anchor) starts a new block, so a continuation can follow it
+#[rstest]
+#[case::in_section(
+    "== A\n\n* item text\n+\nmore\n",
+    "<ul><li><p>itemtext</p><p>more</p></li></ul>"
+)]
+#[case::after_role(
+    "[.role]\n* item text\n+\nmore\n",
+    "<li><p>itemtext</p><p>more</p></li></ul>"
+)]
+#[case::after_anchor(
+    "[[id]]\n. item text\n+\nmore\n",
+    "<olid=\"id\"><li><p>itemtext</p><p>more</p></li></ol>"
+)]
+fn test_continuation_on_first_list_item(#[case] adoc: &str, #[case] expected: &str) {
+    let html: String = render_htmlbook_embedded_from_str(adoc)
+        .split_whitespace()
+        .collect();
+    assert!(html.contains(expected), "{html}");
+}
+
+/// The other tests ignore whitespace, but it is significant inside `<pre>`: the newlines next to
+/// the delimiters are dropped, while indentation and blank lines are kept
+#[rstest]
+#[case::listing(
+    "----\n  indented\n\nlast\n----\n",
+    "<pre data-type=\"programlisting\">  indented\n\nlast</pre>"
+)]
+#[case::literal("....\n  indented\n\nlast\n....\n", "<pre>  indented\n\nlast</pre>")]
+#[case::verse(
+    "[verse]\n____\n  indented\nlast\n____\n",
+    "<pre data-type=\"verse\">  indented\nlast</pre>"
+)]
+#[case::verse_stanzas(
+    "[verse]\n____\nOne\n\nTwo\n\n\nThree\n____\n",
+    "<pre data-type=\"verse\">One\n\nTwo\n\n\nThree</pre>"
+)]
+fn test_preformatted_whitespace_is_exact(#[case] adoc: &str, #[case] expected: &str) {
+    let html = render_htmlbook_embedded_from_str(adoc);
+    assert!(html.contains(expected), "{html}");
+}
+
+/// Block ids and roles appear on the elements for all kinds of blocks
+#[test]
+fn block_ids_and_roles() {
+    let fn_pattern = String::from("htmlbook/block-ids-and-roles");
+    let adoc_fn = format!("{}.adoc", fn_pattern);
+    let html_fn = format!("{}.html", fn_pattern);
+    assert_rendered_htmlbook_embedded_matches_expected(&adoc_fn, &html_fn)
 }

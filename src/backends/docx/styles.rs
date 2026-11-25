@@ -1,7 +1,4 @@
-use docx_rs::{
-    AlignmentType, LineSpacing, Name, ParagraphProperty, RunFonts, RunProperty, SpecialIndentType,
-    Style, StyleType, TableCellProperty, TableProperty,
-};
+use docx_rs::{AlignmentType, LineSpacing, RunFonts, SpecialIndentType, Style, StyleType};
 
 #[derive(Debug)]
 pub enum DocumentStyles {
@@ -47,60 +44,24 @@ impl DocumentStyles {
 
     pub fn generate(&self) -> Style {
         match self {
-            DocumentStyles::Normal => Style {
-                style_id: "Normal".into(),
-                name: Name::new("Normal"),
-                style_type: StyleType::Paragraph,
-                run_property: RunProperty::new()
-                    .size(24)
-                    .fonts(RunFonts::new().ascii("Times New Roman")),
-                paragraph_property: ParagraphProperty::new()
-                    .line_spacing(LineSpacing::new().line(480))
-                    .indent(None, Some(SpecialIndentType::FirstLine(720)), None, None),
-                table_property: TableProperty::new(),
-                table_cell_property: TableCellProperty::new(),
-                based_on: None,
-                next: None,
-                link: None,
-            },
-            DocumentStyles::NoSpacing => Style {
-                style_id: "No Spacing".into(),
-                name: Name::new("No Spacing"),
-                style_type: StyleType::Paragraph,
-                run_property: RunProperty::new()
-                    .size(24)
-                    .fonts(RunFonts::new().ascii("Times New Roman")),
-                paragraph_property: ParagraphProperty::new().indent(
-                    None,
-                    Some(SpecialIndentType::FirstLine(720)),
-                    None,
-                    None,
-                ),
-                table_property: TableProperty::new(),
-                table_cell_property: TableCellProperty::new(),
-                based_on: None,
-                next: None,
-                link: None,
-            },
-            DocumentStyles::Monospace => Style {
-                style_id: "Monospace".into(),
-                name: Name::new("Monospace"),
-                style_type: StyleType::Paragraph,
-                run_property: RunProperty::new()
-                    .size(24)
-                    .fonts(RunFonts::new().ascii("Courier New")),
-                paragraph_property: ParagraphProperty::new().indent(
-                    None,
-                    Some(SpecialIndentType::FirstLine(0)),
-                    None,
-                    None,
-                ),
-                table_property: TableProperty::new(),
-                table_cell_property: TableCellProperty::new(),
-                based_on: None,
-                next: None,
-                link: None,
-            },
+            // built with the builder rather than struct literals, because docx-rs adds fields to
+            // `Style` in patch releases (0.4.22 did), which breaks struct literals
+            DocumentStyles::Normal => Style::new("Normal", StyleType::Paragraph)
+                .name("Normal")
+                .size(24)
+                .fonts(RunFonts::new().ascii("Times New Roman"))
+                .line_spacing(LineSpacing::new().line(480))
+                .indent(None, Some(SpecialIndentType::FirstLine(720)), None, None),
+            DocumentStyles::NoSpacing => Style::new("No Spacing", StyleType::Paragraph)
+                .name("No Spacing")
+                .size(24)
+                .fonts(RunFonts::new().ascii("Times New Roman"))
+                .indent(None, Some(SpecialIndentType::FirstLine(720)), None, None),
+            DocumentStyles::Monospace => Style::new("Monospace", StyleType::Paragraph)
+                .name("Monospace")
+                .size(24)
+                .fonts(RunFonts::new().ascii("Courier New"))
+                .indent(None, Some(SpecialIndentType::FirstLine(0)), None, None),
             DocumentStyles::Title => Style::new("Title", StyleType::Paragraph)
                 .name("Title")
                 .based_on("Normal")

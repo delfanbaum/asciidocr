@@ -1,0 +1,10 @@
+[[
+  {"text": "H"},
+  {"text": "2", "vert_align": "subscript"},
+  {"text": "O is "},
+  {"text": "bold", "bold": true},
+  {"text": "2", "bold": true, "vert_align": "superscript"},
+  {"text": " and E=mc"},
+  {"text": "2", "vert_align": "superscript"},
+  {"text": "."}
+]]

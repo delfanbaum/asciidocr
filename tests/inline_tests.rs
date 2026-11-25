@@ -3,6 +3,7 @@ use std::fs;
 
 use common::{
     assert_parsed_doc_matches_expected_asg, assert_parsed_doc_matches_expected_asg_from_str,
+    parsed_text,
 };
 use rstest::rstest;
 
@@ -110,6 +111,34 @@ fn test_spans_across_newlines(#[case] markup_char: &str, #[case] variant: &str) 
     assert_parsed_doc_matches_expected_asg_from_str(&adoc_str, &asg_json_str)
 }
 
+/// A span that closes at the end of a line must not swallow a span that opens at the start of
+/// the next line
+#[rstest]
+#[case::emphasis("_", "emphasis")]
+#[case::strong("*", "strong")]
+#[case::code("`", "code")]
+#[case::mark("#", "mark")]
+fn test_spans_adjacent_across_newline(#[case] markup_char: &str, #[case] variant: &str) {
+    let adoc_str = fs::read_to_string("tests/data/inlines/spans-adjacent-across-newline.adoc")
+        .expect("Unable to read asciidoc test template")
+        .replace("0", markup_char);
+    let asg_json_str = fs::read_to_string("tests/data/inlines/spans-adjacent-across-newline.json")
+        .expect("Unable to read asg json test template")
+        .replace("VARIANT", variant);
+    assert_parsed_doc_matches_expected_asg_from_str(&adoc_str, &asg_json_str)
+}
+
+/// Like Asciidoctor, a newline that precedes a span nested in an open span is text in the
+/// enclosing span, not the start of the nested span
+#[rstest]
+#[case::after_closed_span("inlines/nested-span-after-newline-closed-span")]
+#[case::after_text("inlines/nested-span-after-newline-text")]
+fn test_nested_span_after_newline(#[case] fn_pattern: &str) {
+    let adoc_fn = format!("{}.adoc", fn_pattern);
+    let asg_json_fn = format!("{}.json", fn_pattern);
+    assert_parsed_doc_matches_expected_asg(&adoc_fn, &asg_json_fn)
+}
+
 #[test]
 fn test_spans_in_doc_title() {
     let fn_pattern = "inlines/document-header";
@@ -211,4 +240,49 @@ fn test_inline_markup_edge_cases() {
     let adoc_fn = format!("{}.adoc", fn_pattern);
     let asg_json_fn = format!("{}.json", fn_pattern);
     assert_parsed_doc_matches_expected_asg(&adoc_fn, &asg_json_fn)
+}
+
+/// Markup that is never closed (or never finished) is just text; it must not stop the parser
+#[rstest]
+#[case::lone_markers("*_\n", "*_")]
+#[case::unclosed_span_before_span("A *_x_ and unclosed\n", "A *x and unclosed")]
+#[case::unclosed_span_inside_span("A *b _c\n", "A *b _c")]
+#[case::unclosed_xref("see <<oops\n", "see <<oops")]
+#[case::unclosed_xref_at_end_of_file("see <<oops", "see <<oops")]
+#[case::xref_with_one_bracket("see <<x>\n", "see <<x>")]
+#[case::unclosed_anchor("[[abc\npara\n", "[[abc\npara")]
+fn test_unfinished_markup_is_text(#[case] adoc: &str, #[case] expected: &str) {
+    assert_eq!(parsed_text(adoc), expected);
+}
+
+/// With the `icons` attribute, the comment markup ahead of a callout (`// <1>`) is dropped, as in
+/// Asciidoctor, and the code and the callout's note are kept
+#[test]
+fn test_code_callouts_with_icons_attribute() {
+    let text = parsed_text(":icons: true\n\n[source,c]\n----\nint x; // <1>\n----\n<1> A note\n");
+    assert!(text.contains("int x;"), "{text}");
+    assert!(text.contains("A note"), "{text}");
+    assert!(!text.contains("//"), "{text}");
+}
+
+/// An include directive that never closes is just text; in particular, it must not make the scanner
+/// run forever (the parse happens on its own thread so that a hang fails the test, not the run)
+#[rstest]
+#[case::tag_at_end_of_file("include::x.xml[tag=a", "include::x.xml[tag=a")]
+#[case::lines_at_end_of_file("include::x.xml[lines=1", "include::x.xml[lines=1")]
+#[case::no_attribute_value("include::included.xml[tag=", "include::included.xml[tag=")]
+#[case::unclosed_on_its_line(
+    "include::x.xml[tag=a\nnext line\n",
+    "include::x.xml[tag=a\nnext line"
+)]
+fn test_unclosed_include_is_text(#[case] adoc: &str, #[case] expected: &str) {
+    let (sender, receiver) = std::sync::mpsc::channel();
+    let source = adoc.to_string();
+    std::thread::spawn(move || {
+        let _ = sender.send(parsed_text(&source));
+    });
+    let text = receiver
+        .recv_timeout(std::time::Duration::from_secs(5))
+        .expect("Parsing did not finish: the scanner is stuck");
+    assert_eq!(text, expected);
 }

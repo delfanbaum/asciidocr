@@ -1,0 +1,55 @@
+[[para-id]]
+[role=lead]
+A paragraph.
+
+[[list-id]]
+[role=red]
+* item
+
+[[olist-id]]
+. item
+
+[[listing-id]]
+----
+code
+----
+
+[[literal-id]]
+....
+lit
+....
+
+[[verse-id]]
+[verse]
+____
+poem
+____
+
+[[dlist-id]]
+term:: def
+
+[[table-id]]
+|===
+|a
+|===
+
+[[sidebar-id]]
+****
+side
+****
+
+[[example-id]]
+====
+ex
+====
+
+[[quote-id]]
+[quote]
+____
+q
+____
+
+[[open-id]]
+--
+open
+--

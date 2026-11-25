@@ -1,0 +1,24 @@
+NOTE: A short admonition.
+
+[WARNING]
+====
+A block admonition
+with two lines.
+====
+
+====
+An example block.
+====
+
+[quote, Author Name, Book Title]
+____
+A quoted paragraph.
+____
+
+****
+A sidebar.
+****
+
+--
+An open block.
+--

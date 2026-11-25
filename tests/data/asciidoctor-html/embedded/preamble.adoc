@@ -1,0 +1,7 @@
+= Document Title
+
+An introduction before any section.
+
+== First Section
+
+Section text.

@@ -6,10 +6,13 @@ mod docx_tests {
     use std::fs;
     use std::path::PathBuf;
 
-    use crate::common::generate_temp_image;
+    use crate::common::{
+        assert_rendered_docx_runs_match_expected, generate_temp_image, rendered_docx_part,
+    };
     use asciidocr::backends::docx::render_docx;
     use asciidocr::parser::Parser;
     use asciidocr::scanner::Scanner;
+    use rstest::rstest;
     use tempfile::NamedTempFile;
 
     #[test]
@@ -22,10 +25,7 @@ mod docx_tests {
             ))
             .expect("Failed to parse document");
         let temp_docx = NamedTempFile::new().unwrap();
-        match render_docx(&parsed_asg, &temp_docx.path()) {
-            Ok(_) => assert!(true),
-            Err(_) => assert!(false),
-        }
+        render_docx(&parsed_asg, temp_docx.path()).expect("Failed to render docx");
     }
 
     #[test]
@@ -44,9 +44,52 @@ mod docx_tests {
         let parsed_asg = Parser::new(test_dir.join(adoc_fn))
             .parse(Scanner::new(&adoc_str))
             .expect("Failed to parse document");
-        match render_docx(&parsed_asg, &temp_docx.path()) {
-            Ok(_) => assert!(true),
-            Err(_) => assert!(false),
-        }
+        render_docx(&parsed_asg, temp_docx.path()).expect("Failed to render docx");
+    }
+
+    /// docx-rs writes East Asian layout compatibility flags by default. Word and LibreOffice
+    /// respond to them by adding extra space at every bold/italic run boundary, so we strip them.
+    #[test]
+    fn settings_have_no_east_asian_layout_flags() {
+        let adoc = fs::read_to_string("tests/data/docx/emphasis-spacing.adoc").unwrap();
+        let settings = rendered_docx_part(&adoc, "word/settings.xml");
+        assert!(!settings.contains("useFELayout"), "{settings}");
+        assert!(
+            !settings.contains("balanceSingleByteDoubleByteWidth"),
+            "{settings}"
+        );
+        // We still want the rest of the compat block
+        assert!(settings.contains("compatibilityMode"), "{settings}");
+    }
+
+    #[rstest]
+    #[case::emphasis_spacing("docx/emphasis-spacing")]
+    #[case::nested_spans("docx/nested-spans")]
+    #[case::sub_sup_with_bold("docx/sub-sup-with-bold")]
+    #[case::multiline_spans("docx/multiline-spans")]
+    fn test_inline_runs(#[case] fn_pattern: &str) {
+        let adoc_fn = format!("{}.adoc", fn_pattern);
+        let json_fn = format!("{}.json", fn_pattern);
+        assert_rendered_docx_runs_match_expected(&adoc_fn, &json_fn)
+    }
+
+    #[test]
+    fn styles_are_defined_only_once() {
+        let adoc = fs::read_to_string("tests/data/docx/emphasis-spacing.adoc").unwrap();
+        let styles = rendered_docx_part(&adoc, "word/styles.xml");
+        let doc = roxmltree::Document::parse(&styles).unwrap();
+        let mut ids: Vec<&str> = doc
+            .descendants()
+            .filter(|n| n.is_element() && n.tag_name().name() == "style")
+            .filter_map(|n| {
+                n.attributes()
+                    .find(|a| a.name() == "styleId")
+                    .map(|a| a.value())
+            })
+            .collect();
+        let total = ids.len();
+        ids.sort();
+        ids.dedup();
+        assert_eq!(total, ids.len(), "duplicate styleIds in styles.xml");
     }
 }

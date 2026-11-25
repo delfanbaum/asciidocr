@@ -1,0 +1,5 @@
+NOTE: A note.
+
+== A Section
+
+Section text.

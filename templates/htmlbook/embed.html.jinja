@@ -1,0 +1,4 @@
+{%- from "block.html" import render_block -%}
+{% for block in graph.blocks %}
+    {{ render_block(block)}}
+{%- endfor -%}

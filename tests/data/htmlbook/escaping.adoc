@@ -1,0 +1,31 @@
+A paragraph with <angle brackets>, an & ampersand, "quotes" and 5 > 3.
+
+* A list item with <b>not bold</b>
+
+----
+if (a < b && c > d) { return "x"; }
+----
+
+`code <with> & stuff` and *bold & <strong>*.
+
+https://example.com/?a=1&b=2[A link & more]
+
+.A title with <tags> & ampersands
+....
+literal <text> & more
+....
+
+++++
+<b>raw passthrough stays raw</b>
+++++
+
+Already encoded: &amp; and &lt;tag&gt; stay as they are.
+
+image::ab.png[Alt "q" & <x>]
+
+An inline image:c&d.png[Tiny <i>] here.
+
+[quote, Smith & Sons, A <Book>]
+____
+A quote.
+____

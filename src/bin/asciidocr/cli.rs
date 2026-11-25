@@ -23,6 +23,20 @@ pub struct Cli {
     #[arg(short, long = "count-words")]
     pub count: bool,
 
+    /// If this flag is given alongside an HTML backend (htmlbook or asciidoctor), an "embeddable"
+    /// document is output, i.e., one that includes only the <body> element contents (excluding any
+    /// headers, footers, etc.)
+    #[arg(short, long = "embedded")]
+    pub embedded: bool,
+
+    /// Show verbose processing output
+    #[arg(short, long)]
+    pub verbose: bool,
+
+    /// Show debug processing output
+    #[arg(short, long)]
+    pub debug: bool,
+
     /// Run asciidocr without resolving resource targets; by default, asciidocr will fail to parse a
     /// document if a given resource is not found. This option allows parsing to continue if the
     /// backend supports missing targets.
@@ -61,6 +75,8 @@ pub fn read_output(args: Cli) -> Option<PathBuf> {
                 out_destination.push(args.file.clone());
                 match args.backend {
                     Backends::Htmlbook => out_destination.set_extension("html"),
+                    Backends::Asciidoctor => out_destination.set_extension("html"),
+                    #[cfg(feature = "json")]
                     Backends::Json => out_destination.set_extension("json"),
                     #[cfg(feature = "docx")]
                     Backends::Docx => out_destination.set_extension("docx"),

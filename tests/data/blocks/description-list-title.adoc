@@ -1,0 +1,2 @@
+.Favorites
+Term:: Description of that term.

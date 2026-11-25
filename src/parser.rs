@@ -8,7 +8,7 @@ use std::{
     str::FromStr,
 };
 
-use log::{error, warn};
+use log::{error, info, warn};
 
 use crate::scanner::tokens::{Token, TokenType};
 use crate::{
@@ -48,6 +48,11 @@ pub struct Parser {
     file_stack: Vec<String>,
     /// holding ground for a block title, to be applied to the subsequent block
     block_title: Option<Vec<Inline>>,
+    /// true only while we are still reading the title line itself; once its newline arrives, the
+    /// title is complete and later inlines belong to the block it precedes
+    block_title_open: bool,
+    /// the line the pending block title was declared on
+    block_title_line: usize,
     /// holding ground for block metadata, to be applied to the subsequent block
     metadata: Option<ElementMetadata>,
     /// counts in/out delimited blocks by line reference; allows us to warn/error if they are
@@ -76,7 +81,10 @@ pub struct Parser {
     /// Used to see if we need to add a newline before new text; we don't add newlines to the text
     /// literals unless they're continuous (i.e., we never count newline paras as paras)
     dangling_newline: Option<Token>,
-    /// Testing helper
+    /// Track lines for better error handling
+    line: usize,
+    /// Flag for whether or not the parser will require any targets (images, included files, etc.)
+    /// to exist to successfully parse the document
     pub resolve_targets: bool,
 }
 
@@ -111,6 +119,8 @@ impl Parser {
             inline_stack: VecDeque::new(),
             file_stack: vec![],
             block_title: None,
+            block_title_open: false,
+            block_title_line: 0,
             metadata: None,
             open_delimited_block_lines: vec![],
             level_offset: 0,
@@ -122,6 +132,7 @@ impl Parser {
             force_new_block: false,
             close_parent_after_push: false,
             dangling_newline: None,
+            line: 1,
             resolve_targets: true,
         }
     }
@@ -145,6 +156,7 @@ impl Parser {
             match result {
                 Ok(token) => {
                     let token_type = token.token_type();
+                    self.line = token.line;
                     self.token_into(token, &mut asg)?;
 
                     self.last_token_type = token_type;
@@ -227,6 +239,8 @@ impl Parser {
             TokenType::BlockLabel => {
                 // open the block title
                 self.block_title = Some(Vec::new());
+                self.block_title_open = true;
+                self.block_title_line = token.line;
                 self.in_block_line = true;
                 // clear out any dangling newlines
                 self.dangling_newline = None;
@@ -361,7 +375,11 @@ impl Parser {
                 }
                 Ok(())
             }
-            TokenType::Email => todo!()
+            // the scanner does not produce these (yet), so report them rather than guess
+            TokenType::Email => Err(ParserError::UnexpectedToken(
+                token.line,
+                "email address".to_string(),
+            )),
         }
     }
 
@@ -402,6 +420,7 @@ impl Parser {
                 }
                 // relative value, or error
                 Err(_) => Err(ParserError::InternalError(
+                    self.line,
                     "Error parsing level offset".to_string(),
                 )),
             }
@@ -429,11 +448,11 @@ impl Parser {
     /// Handle document header
     fn check_and_move_header(&mut self, asg: &mut Asg) -> Result<(), ParserError> {
         self.add_inlines_to_block_stack()?;
-        if let Some(header) = &mut self.document_header {
-            if !header.is_empty() {
-                header.consolidate();
-                asg.add_header(header.clone(), self.document_attributes.clone())
-            }
+        if let Some(header) = &mut self.document_header
+            && !header.is_empty()
+        {
+            header.consolidate();
+            asg.add_header(header.clone(), self.document_attributes.clone())
         }
 
         self.document_header = None;
@@ -446,15 +465,29 @@ impl Parser {
         // newline exits a title, TK line continuation
         self.in_block_line = false;
 
-        // if there is a block title, add the inline stack to the title
-        if let Some(ref mut title_stack) = self.block_title {
-            while !self.inline_stack.is_empty() {
-                let inline = self.inline_stack.pop_front().unwrap();
-                title_stack.push(inline);
+        // if we are on a block title line, add the inline stack to the title; the newline closes
+        // the title, so that subsequent lines are not swallowed by it
+        let closes_title = self.block_title_open;
+        if closes_title {
+            if let Some(ref mut title_stack) = self.block_title {
+                while !self.inline_stack.is_empty() {
+                    let inline = self.inline_stack.pop_front().unwrap();
+                    title_stack.push(inline);
+                }
             }
+            self.block_title_open = false;
         }
 
-        if [TokenType::NewLineChar, TokenType::Eof].contains(&self.last_token_type) {
+        if self.last_token_type == TokenType::NewLineChar
+            && self.open_parse_after_as_text_type == Some(TokenType::QuoteVerseBlock)
+        {
+            // a blank line inside a verse block separates stanzas; it is part of the verse's text,
+            // not the end of a paragraph
+            if let Some(newline_token) = self.dangling_newline.take() {
+                self.add_text_to_last_inline(newline_token);
+            }
+            self.add_text_to_last_inline(token);
+        } else if [TokenType::NewLineChar, TokenType::Eof].contains(&self.last_token_type) {
             // clear any dangling newline
             self.dangling_newline = None;
             if self.document_header.is_some() {
@@ -484,8 +517,12 @@ impl Parser {
                     }
                 } // if Some(last_block)
             }
-        } else if self.in_block_continuation || self.last_token_type.clears_newline_after() {
-            // don't add a newline ahead of text in these cases
+        } else if closes_title
+            || self.in_block_continuation
+            || self.last_token_type.clears_newline_after()
+        {
+            // don't add a newline ahead of text in these cases (including the newline that ends
+            // a block title line, which would otherwise be glued onto the following block's text)
             self.dangling_newline = None;
         } else {
             self.dangling_newline = Some(token);
@@ -528,6 +565,7 @@ impl Parser {
         let mut current_tag: Option<String> = None;
 
         let (target, meta) = target_and_attrs_from_token(&token);
+        info!("Parsing included file: {}", &target);
         // check for level offsets in the include
         if let Some(metadata) = meta {
             if let Some(value) = metadata.attributes.get("leveloffset") {
@@ -538,11 +576,11 @@ impl Parser {
             }
             if let Some(value) = metadata.attributes.get("lines") {
                 included_lines = extract_page_ranges(value);
-                if let Some(line) = included_lines.last() {
-                    if *line == -1 {
-                        include_to_end = true;
-                        included_lines.pop();
-                    }
+                if let Some(line) = included_lines.last()
+                    && *line == -1
+                {
+                    include_to_end = true;
+                    included_lines.pop();
                 }
             }
             if let Some(value) = metadata.attributes.get("tag") {
@@ -585,21 +623,19 @@ impl Parser {
                     }
                     // tags
                     if !included_tags.is_empty() {
-                        if token.token_type() == TokenType::StartTag {
-                            if let Some(tag) = token.tag() {
-                                if included_tags.contains(&tag) {
-                                    current_tag = Some(tag);
-                                    continue;
-                                }
-                            }
+                        if token.token_type() == TokenType::StartTag
+                            && let Some(tag) = token.tag()
+                            && included_tags.contains(&tag)
+                        {
+                            current_tag = Some(tag);
+                            continue;
                         }
-                        if token.token_type() == TokenType::EndTag {
-                            if let Some(tag) = token.tag() {
-                                if current_tag == Some(tag) {
-                                    current_tag = None;
-                                    continue;
-                                }
-                            }
+                        if token.token_type() == TokenType::EndTag
+                            && let Some(tag) = token.tag()
+                            && current_tag == Some(tag)
+                        {
+                            current_tag = None;
+                            continue;
                         }
                         if current_tag.is_none() {
                             continue;
@@ -669,7 +705,11 @@ impl Parser {
             self.add_last_list_item_to_list()?
         } else {
             // we need to create the list first
-            self.push_block_to_stack(Block::DList(DList::new(dlist_item.locations().clone())))?;
+            let mut dlist = DList::new(dlist_item.locations().clone());
+            if let Some(title) = self.block_title.take() {
+                dlist.title = title;
+            }
+            self.push_block_to_stack(Block::DList(dlist))?;
         }
         // either way, add the new list item
         self.push_block_to_stack(Block::DListItem(dlist_item))?;
@@ -694,17 +734,25 @@ impl Parser {
             if token.token_type() == TokenType::CodeCalloutListItem {
                 // check to see if we ought to "close" the source block (almost always)
                 // TODO source blocks should close themselves, I think.
-                if let Some(block) = self.block_stack.last() {
-                    if block.is_source_block() {
-                        // we need to add this before we create the new list
-                        self.add_last_to_block_stack_or_graph(asg)?;
-                    }
+                if let Some(block) = self.block_stack.last()
+                    && block.is_source_block()
+                {
+                    // we need to add this before we create the new list
+                    self.add_last_to_block_stack_or_graph(asg)?;
                 }
-                list.metadata = Some(ElementMetadata::new_with_role("colist".to_string()));
+                list.metadata = Some(ElementMetadata::new_with_role(
+                    "colist".to_string(),
+                    self.line,
+                ));
+            }
+            if let Some(title) = self.block_title.take() {
+                list.title = title;
             }
             self.push_block_to_stack(Block::List(list))?;
         }
-        // either way, add the new list item
+        // either way, add the new list item, whose text follows on this line even if an
+        // attribute line or a section heading asked for a new block
+        self.force_new_block = false;
         self.push_block_to_stack(Block::ListItem(list_item))
     }
     //
@@ -720,12 +768,15 @@ impl Parser {
             self.add_last_list_item_to_list()?
         } else {
             // we need to create the list first
-            self.push_block_to_stack(Block::List(List::new(
-                ListVariant::Unordered,
-                token.locations().clone(),
-            )))?;
+            let mut list = List::new(ListVariant::Unordered, token.locations().clone());
+            if let Some(title) = self.block_title.take() {
+                list.title = title;
+            }
+            self.push_block_to_stack(Block::List(list))?;
         }
-        // either way, add the new list item
+        // either way, add the new list item, whose text follows on this line even if an
+        // attribute line or a section heading asked for a new block
+        self.force_new_block = false;
         self.push_block_to_stack(Block::ListItem(list_item))
     }
 
@@ -787,6 +838,7 @@ impl Parser {
             TokenType::Heading5 => 4 + self.level_offset,
             _ => {
                 return Err(ParserError::InternalError(
+                    self.line,
                     "Inavlid token given to parse_section_headings".to_string(),
                 ));
             }
@@ -811,8 +863,12 @@ impl Parser {
     }
 
     fn parse_admonition_para_syntax(&mut self, token: Token) -> Result<(), ParserError> {
-        self.block_stack
-            .push(Block::ParentBlock(ParentBlock::new_from_token(token)?));
+        let mut admonition = ParentBlock::new_from_token(token)?;
+        // a block title above an inline-style admonition (`NOTE: text`) belongs to the admonition
+        if let Some(title) = self.block_title.take() {
+            admonition.title = title;
+        }
+        self.block_stack.push(Block::ParentBlock(admonition));
         self.close_parent_after_push = true;
         Ok(())
     }
@@ -826,21 +882,33 @@ impl Parser {
 
     /// Generic parser for inline spans that close themselves
     fn parse_inline_span(&mut self, mut inline: Inline) -> Result<(), ParserError> {
-        if let Some(last_inline) = self.inline_stack.back_mut() {
+        // Only a span that is still open can be closed by, or contain, the incoming span. A newline
+        // is held back as "dangling" rather than pushed as text, so after "*a*\n" the closed
+        // strong span is still the last inline on the stack; treating it as open would swallow a
+        // span that begins on the next line.
+        if let Some(last_inline) = self.inline_stack.back_mut()
+            && last_inline.is_open()
+        {
             if inline == *last_inline {
                 last_inline.reconcile_locations(inline.locations());
                 last_inline.close();
                 self.in_inline_span = false;
                 return Ok(());
             } else if let Inline::InlineSpan(last_span) = last_inline {
-                if let Some(last_internal_inline) = last_span.inlines.last_mut() {
-                    if inline == *last_internal_inline {
-                        last_internal_inline.reconcile_locations(inline.locations());
-                        last_internal_inline.close();
-                    } else {
-                        last_span.add_inline(inline);
-                    }
+                if let Some(last_internal_inline) = last_span.inlines.last_mut()
+                    && last_internal_inline.is_open()
+                    && inline == *last_internal_inline
+                {
+                    last_internal_inline.reconcile_locations(inline.locations());
+                    last_internal_inline.close();
                 } else {
+                    // Like Asciidoctor, a newline ahead of a nested span is text in the
+                    // enclosing span, so flush it before the nested span starts
+                    if let Some(newline_token) = self.dangling_newline.take() {
+                        last_span.add_inline(Inline::InlineLiteral(
+                            InlineLiteral::new_text_from_token(&newline_token),
+                        ));
+                    }
                     last_span.add_inline(inline);
                 }
                 return Ok(());
@@ -880,7 +948,11 @@ impl Parser {
 
     fn parse_block_image(&mut self, token: Token, asg: &mut Asg) -> Result<(), ParserError> {
         let (target, metadata) = target_and_attrs_from_token(&token);
-        self.check_target(token.line, &target)?;
+        // like Asciidoctor, a missing image is a problem to report, not a reason to stop: the
+        // block is still rendered with the target as written
+        if let Err(e) = self.check_target(token.line, &target) {
+            warn!("{e}");
+        }
         let mut image_block = BlockMacro::new_image_block(target, metadata, token.locations());
         if let Some(metadata) = &self.metadata {
             // TODO see if there is a cleaner way to manage the borrowing here.
@@ -896,7 +968,10 @@ impl Parser {
 
     fn parse_inline_image_macro(&mut self, token: Token) -> Result<(), ParserError> {
         let (target, metadata) = target_and_attrs_from_token(&token);
-        let _ = self.check_target(token.line, &target);
+        // as with block images: report the missing file, but still render the image
+        if let Err(e) = self.check_target(token.line, &target) {
+            warn!("{e}");
+        }
         self.inline_stack
             .push_back(Inline::InlineRef(InlineRef::new_inline_image(
                 target,
@@ -927,10 +1002,13 @@ impl Parser {
         } else if let Some(inline_macro_idx) = self
             .inline_stack
             .iter()
-            .rposition(|inline| inline.is_macro())
+            .rposition(|inline| inline.is_open_macro())
         {
-            // consolidate into the inline macro
+            // consolidate into the inline macro, which is then complete
             let mut inline_macro = self.inline_stack.remove(inline_macro_idx).unwrap();
+            if let Inline::InlineRef(iref) = &mut inline_macro {
+                iref.open = false;
+            }
             while self.inline_stack.len() > inline_macro_idx {
                 let subsequent_inline = self.inline_stack.remove(inline_macro_idx).unwrap();
                 inline_macro.push_inline(subsequent_inline);
@@ -978,13 +1056,12 @@ impl Parser {
     }
 
     fn parse_code_callout(&mut self, token: Token) -> Result<(), ParserError> {
-        if let Some(value) = self.document_attributes.get("icons") {
-            if value == "true" {
-                if let Some(_last_inline) = self.inline_stack.back_mut() {
-                    // handle deleting comment markup, IF we're handling icons
-                    todo!();
-                }
-            }
+        if let Some(value) = self.document_attributes.get("icons")
+            && value == "true"
+            && let Some(Inline::InlineLiteral(last_literal)) = self.inline_stack.back_mut()
+        {
+            // when we're using icons, the comment markup ahead of the callout goes away
+            last_literal.strip_trailing_comment_markup();
         }
         self.inline_stack
             .push_back(Inline::InlineSpan(InlineSpan::inline_span_from_token(
@@ -1035,7 +1112,13 @@ impl Parser {
                 self.dangling_newline = None;
             }
         }
-        self.pass_text_to_last_inline(token);
+        // text inside an inline passthrough macro is kept apart from regular text, as it must not
+        // be escaped when output
+        let raw = matches!(
+            self.open_parse_after_as_text_type,
+            Some(TokenType::PassthroughInlineMacro)
+        );
+        self.pass_text_to_last_inline(token, raw);
         Ok(())
     }
 
@@ -1067,7 +1150,7 @@ impl Parser {
                     }
                 }
                 Inline::InlineRef(inline_ref) => {
-                    if !self.close_parent_after_push {
+                    if inline_ref.open {
                         inline_ref.inlines.push(inline_literal);
                     } else {
                         self.inline_stack.push_back(inline_literal)
@@ -1099,7 +1182,12 @@ impl Parser {
             }
         } else {
             self.open_parse_after_as_text_type = Some(token.token_type());
-            let block = LeafBlock::new_from_token(token)?;
+            let mut block = LeafBlock::new_from_token(token)?;
+            // a pending block title belongs to this block (and must not linger, or it will
+            // swallow the inlines that follow)
+            if let Some(title) = self.block_title.take() {
+                block.title = title;
+            }
             self.push_block_to_stack(Block::LeafBlock(block))?;
             // note that we're to just add
             self.force_new_block = false;
@@ -1133,7 +1221,7 @@ impl Parser {
                 self.add_inlines_to_block_stack()?;
                 // remove the open delimiter line from the count and confirm we're nested properly
                 let Some(line) = self.open_delimited_block_lines.pop() else {
-                    return Err(ParserError::DelimitedBlock);
+                    return Err(ParserError::DelimitedBlock(matched.opening_line()?));
                 };
                 if line != matched.opening_line()? {
                     warn!("Error nesting delimited blocks, see line {}", line)
@@ -1199,7 +1287,7 @@ impl Parser {
         // close itself, emptying the open_delimited_block_lines)
         if self.in_block_continuation && self.open_delimited_block_lines.is_empty() {
             let Some(last_block) = self.block_stack.last_mut() else {
-                return Err(ParserError::BlockContinuation);
+                return Err(ParserError::BlockContinuation(self.line));
             };
             last_block.push_block(block)?;
             self.in_block_continuation = false;
@@ -1225,14 +1313,18 @@ impl Parser {
                     }
                 }
                 Inline::InlineLiteral(prior_literal) => {
-                    if matches!(prior_literal.name, InlineLiteralName::Charref) {
+                    if matches!(
+                        prior_literal.name,
+                        InlineLiteralName::Charref | InlineLiteralName::Raw
+                    ) {
+                        // character references and passthroughs stay on their own
                         self.inline_stack.push_back(inline_literal)
                     } else {
                         prior_literal.add_text_from_token(&token)
                     }
                 }
                 Inline::InlineRef(inline_ref) => {
-                    if !self.close_parent_after_push {
+                    if inline_ref.open {
                         inline_ref.add_text_from_token(token)
                     } else {
                         self.inline_stack.push_back(inline_literal)
@@ -1248,8 +1340,12 @@ impl Parser {
         }
     }
 
-    fn pass_text_to_last_inline(&mut self, token: Token) {
-        let inline_literal = Inline::InlineLiteral(InlineLiteral::new_text_from_token_pass(&token));
+    fn pass_text_to_last_inline(&mut self, token: Token, raw: bool) {
+        let inline_literal = Inline::InlineLiteral(if raw {
+            InlineLiteral::new_raw_from_token(&token)
+        } else {
+            InlineLiteral::new_text_from_token_pass(&token)
+        });
         if let Some(last_inline) = self.inline_stack.back_mut() {
             match last_inline {
                 Inline::InlineSpan(span) => {
@@ -1260,14 +1356,20 @@ impl Parser {
                     }
                 }
                 Inline::InlineLiteral(prior_literal) => {
-                    if matches!(prior_literal.name, InlineLiteralName::Charref) {
-                        self.inline_stack.push_back(inline_literal)
-                    } else {
+                    let same_kind = match prior_literal.name {
+                        InlineLiteralName::Raw => raw,
+                        InlineLiteralName::Text => !raw,
+                        InlineLiteralName::Charref => false,
+                    };
+                    if same_kind {
                         prior_literal.pass_text_from_token(&token)
+                    } else {
+                        // passthrough text must not be mixed into regular text, or vice versa
+                        self.inline_stack.push_back(inline_literal)
                     }
                 }
                 Inline::InlineRef(inline_ref) => {
-                    if !self.close_parent_after_push {
+                    if inline_ref.open {
                         inline_ref.pass_text_from_token(token)
                     } else {
                         self.inline_stack.push_back(inline_literal)
@@ -1291,57 +1393,28 @@ impl Parser {
             .rposition(|inline| inline.is_open())
         {
             let mut open_span = self.inline_stack.remove(open_span_idx).unwrap();
-            let open_span_literal = open_span.produce_literal_from_self();
-            // put the literal char into the stack as a literal...
-            let mut children = open_span.extract_child_inlines();
-            // ... by adding it to the next inline
-            if let Some(inline) = children.front_mut() {
-                match inline {
-                    Inline::InlineLiteral(literal) => {
-                        literal.prepend_to_value(open_span_literal, open_span.locations());
-                    }
-                    _ => todo!(),
-                }
-                // put any appended inlines into the stack at the relevant position
-                while children.len() > 0 {
-                    if let Some(child) = children.pop_back() {
-                        self.inline_stack.insert(open_span_idx, child);
-                    }
-                }
-
-                // consolidate any resultant or remaining adjacent literals (this should be extracted to a function)
-                let mut temp_stack: Vec<Inline> = vec![];
-                while let Some(mut inline) = self.inline_stack.pop_front() {
-                    if temp_stack.len() == 0 {
-                        temp_stack.push(inline);
-                    } else if inline.is_literal() {
-                        if let Some(Inline::InlineLiteral(last_in_stack)) = temp_stack.last_mut() {
-                            last_in_stack.combine_literals(inline.extract_literal());
-                        } else {
-                            temp_stack.push(inline);
-                        }
-                    } else {
-                        temp_stack.push(inline);
-                    }
-                }
-                self.inline_stack = temp_stack.into();
-            } else {
-                // ... or if there are no children, add the token to the back of the last one; this
-                // is a little hacky, but it is cleaner compared to the rest of the code just to
-                // create a token and reuse the existing function
-                let (line, startcol, endcol) =
-                    Location::destructure_inline_locations(open_span.locations());
-                let reconstituted_token = Token {
-                    token_type: TokenType::Text,
-                    lexeme: open_span_literal.clone(),
-                    literal: Some(open_span_literal),
-                    line,
-                    startcol,
-                    endcol,
-                    file_stack: self.file_stack.clone(),
-                };
-                self.add_text_to_last_inline(reconstituted_token)
+            // without a closing mark, the span's markup is just text, which goes in front of
+            // whatever the span held
+            let mut children = open_span.children_with_markup_as_text();
+            // put the inlines into the stack at the relevant position
+            while let Some(child) = children.pop_back() {
+                self.inline_stack.insert(open_span_idx, child);
             }
+
+            // consolidate any resultant or remaining adjacent literals, but never merge
+            // passthrough (raw) content with text, since text is escaped and passthroughs aren't
+            let mut temp_stack: Vec<Inline> = vec![];
+            while let Some(inline) = self.inline_stack.pop_front() {
+                if let (Some(Inline::InlineLiteral(last_in_stack)), Inline::InlineLiteral(literal)) =
+                    (temp_stack.last_mut(), &inline)
+                    && last_in_stack.can_merge_with(literal)
+                {
+                    last_in_stack.combine_literals(literal.clone());
+                } else {
+                    temp_stack.push(inline);
+                }
+            }
+            self.inline_stack = temp_stack.into();
         }
     }
 
@@ -1363,14 +1436,16 @@ impl Parser {
             return Ok(());
         }
 
-        if let Some(last_block) = self.block_stack.last_mut() {
-            if last_block.takes_inlines() && !self.in_block_line && !self.force_new_block {
-                while !self.inline_stack.is_empty() {
-                    let inline = self.inline_stack.pop_front().unwrap();
-                    last_block.push_inline(inline)?;
-                }
-                return Ok(());
+        if let Some(last_block) = self.block_stack.last_mut()
+            && last_block.takes_inlines()
+            && !self.in_block_line
+            && !self.force_new_block
+        {
+            while !self.inline_stack.is_empty() {
+                let inline = self.inline_stack.pop_front().unwrap();
+                last_block.push_inline(inline)?;
             }
+            return Ok(());
         }
         // create a new para from the locations of the first span (subsequent locations are
         // consolidated later)
@@ -1378,6 +1453,8 @@ impl Parser {
         if let Some(first_inline) = self.inline_stack.front() {
             para_locations = first_inline.locations().clone();
         }
+        // a pending title is dealt with below, depending on what the paragraph turns into
+        let pending_title = self.block_title.take();
         let mut para_block = Block::LeafBlock(LeafBlock::new(
             crate::graph::blocks::LeafBlockName::Paragraph,
             crate::graph::blocks::LeafBlockForm::Paragraph,
@@ -1391,8 +1468,9 @@ impl Parser {
             }
         }
         if self.in_block_continuation && self.open_delimited_block_lines.is_empty() {
+            self.warn_paragraph_title_dropped(pending_title.as_deref(), &para_block);
             let Some(last_block) = self.block_stack.last_mut() else {
-                return Err(ParserError::BlockContinuation);
+                return Err(ParserError::BlockContinuation(self.line));
             };
             last_block.push_block(para_block)?;
             return Ok(());
@@ -1412,12 +1490,36 @@ impl Parser {
                     vec![],
                     vec![],
                 ));
+                // the title belongs to the quote, not the paragraph inside it
+                if let (Block::ParentBlock(quote), Some(title)) = (&mut quote_block, &pending_title)
+                {
+                    quote.title = title.clone();
+                }
                 quote_block.push_block(para_block)?;
                 self.push_block_to_stack(quote_block)?;
                 return Ok(());
             }
         }
+        self.warn_paragraph_title_dropped(pending_title.as_deref(), &para_block);
         self.push_block_to_stack(para_block)
+    }
+
+    /// Titles on regular paragraphs are not supported, so we drop them (keeping the paragraph),
+    /// and let the user know. We only warn when the title sits directly above the paragraph; a
+    /// title left over from some other kind of block (e.g., a list) is dropped quietly.
+    fn warn_paragraph_title_dropped(&self, title: Option<&[Inline]>, para_block: &Block) {
+        let Some(title) = title else { return };
+        let adjacent = para_block
+            .locations()
+            .first()
+            .is_some_and(|loc| loc.line == self.block_title_line + 1);
+        if adjacent {
+            let title_text: String = title.iter().map(|i| i.extract_values_to_string()).collect();
+            warn!(
+                "Line {}: Titles on paragraphs are not supported; dropping title \"{}\"",
+                self.block_title_line, title_text
+            );
+        }
     }
 
     /// Adds data to an existing ElementMetadata object, or creates one
@@ -1455,11 +1557,11 @@ impl Parser {
         asg: &mut Asg,
         mut block: Block,
     ) -> Result<(), ParserError> {
-        if let Some(last_block) = self.block_stack.last_mut() {
-            if last_block.takes_block_of_type(&block) {
-                last_block.push_block(block)?;
-                return Ok(());
-            }
+        if let Some(last_block) = self.block_stack.last_mut()
+            && last_block.takes_block_of_type(&block)
+        {
+            last_block.push_block(block)?;
+            return Ok(());
         }
         if self.metadata.is_some() {
             block.add_metadata(self.metadata.as_ref().unwrap().clone())?;
@@ -1471,16 +1573,16 @@ impl Parser {
 
     fn add_last_to_block_stack_or_graph(&mut self, asg: &mut Asg) -> Result<(), ParserError> {
         if let Some(last_block) = self.block_stack.pop() {
-            if let Some(prior_block) = self.block_stack.last_mut() {
-                if prior_block.takes_block_of_type(&last_block) {
-                    prior_block.push_block(last_block)?;
-                    return Ok(());
-                }
+            if let Some(prior_block) = self.block_stack.last_mut()
+                && prior_block.takes_block_of_type(&last_block)
+            {
+                prior_block.push_block(last_block)?;
+                return Ok(());
             }
             asg.push_block(last_block)?;
             Ok(())
         } else {
-            Err(ParserError::BlockStack)
+            Err(ParserError::BlockStack(self.line))
         }
     }
 

@@ -1,4 +1,4 @@
-{%- macro process_inline(inline) -%}
+{%- macro render_inline(inline) -%}
 {%- if inline.name == "linebreak" -%}
     <br />
 {%- else -%}
@@ -29,13 +29,15 @@
         {%- elif inline.variant == "image" -%}
             {%- set inline_tag = "img" -%}
             {%- set ref = inline.target -%}
-            {%- set self_close = True -%}
+            {%- set self_close = true -%}
             {%- set target_attr = "src" -%}
         {%- endif -%}
-        {%- set target = target_attr ~ '="' ~ ref ~ '"' -%}
+        {%- set target = target_attr ~ '="' ~ (ref | escape_attr) ~ '"' -%}
     {%- endif -%}
 {%- if inline_tag -%}<{{inline_tag}}
-    {%- if inline.metadata.roles %} class="{{inline.metadata.roles | join(sep=" ")}}"
+    {%- if inline.metadata -%}
+    {%- if inline.metadata.roles %} class="{{inline.metadata.roles | join(" ") | escape_attr}}"
+    {%- endif -%}
     {%- endif -%}
     {%- if data_type %} data-type="{{data_type}}"
     {%- endif -%}
@@ -46,16 +48,16 @@
         {#- Handle recursion -#}
             {%- if inline.inlines -%}
                 {%- for child in inline.inlines -%}
-                    {{- self::process_inline(inline=child) -}}
+                    {{- render_inline(child) -}}
                 {%- endfor -%}
     {%- elif inline.variant -%}
         {%- if inline.variant == "xref" or inline.variant == "link" -%}
-                {{ref}} {#- putting the ref in as text for now-#}
+                {{ ref | escape_text }} {#- putting the ref in as text for now-#}
             {%- endif -%}
             {%- elif inline.value -%}
-                {{- inline.value -}}
+                {{- inline.value | escape_text if inline.name == "text" else inline.value -}}
             {%- endif -%}
     {%- if inline_tag -%}</{{inline_tag}}>{%- endif -%}
     {%- endif -%}
 {%- endif -%}
-{%- endmacro process_inline -%}
+{%- endmacro -%}

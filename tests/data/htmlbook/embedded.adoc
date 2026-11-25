@@ -1,0 +1,5 @@
+A paragraph with *strong* text.
+
+== A Section
+
+Section text.
