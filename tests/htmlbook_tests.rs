@@ -295,3 +295,13 @@ fn inline_admonition_takes_title() {
     let html_fn = format!("{}.html", fn_pattern);
     assert_rendered_htmlbook_matches_expected(&adoc_fn, &html_fn)
 }
+
+/// Special characters in text and attribute values are escaped, while character references (from
+/// replacements or written by the author) and passthrough blocks are left as they are
+#[test]
+fn special_characters_are_escaped() {
+    let fn_pattern = String::from("htmlbook/escaping");
+    let adoc_fn = format!("{}.adoc", fn_pattern);
+    let html_fn = format!("{}.html", fn_pattern);
+    assert_rendered_htmlbook_embedded_matches_expected(&adoc_fn, &html_fn)
+}

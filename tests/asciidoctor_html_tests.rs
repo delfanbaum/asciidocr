@@ -35,6 +35,7 @@ fn test_full_documents(#[case] fn_pattern: &str) {
 #[case::verse_attribution("asciidoctor-html/embedded/verse-attribution")]
 #[case::preamble("asciidoctor-html/embedded/preamble")]
 #[case::no_preamble("asciidoctor-html/embedded/no-preamble")]
+#[case::escaping("asciidoctor-html/embedded/escaping")]
 fn test_embedded(#[case] fn_pattern: &str) {
     let adoc_fn = format!("{}.adoc", fn_pattern);
     let html_fn = format!("{}.html", fn_pattern);
