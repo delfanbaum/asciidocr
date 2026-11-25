@@ -1394,17 +1394,15 @@ impl Parser {
                 self.inline_stack.insert(open_span_idx, child);
             }
 
-            // consolidate any resultant or remaining adjacent literals (this should be extracted to a function)
+            // consolidate any resultant or remaining adjacent literals, but never merge
+            // passthrough (raw) content with text, since text is escaped and passthroughs aren't
             let mut temp_stack: Vec<Inline> = vec![];
-            while let Some(mut inline) = self.inline_stack.pop_front() {
-                if temp_stack.is_empty() {
-                    temp_stack.push(inline);
-                } else if inline.is_literal() {
-                    if let Some(Inline::InlineLiteral(last_in_stack)) = temp_stack.last_mut() {
-                        last_in_stack.combine_literals(inline.extract_literal());
-                    } else {
-                        temp_stack.push(inline);
-                    }
+            while let Some(inline) = self.inline_stack.pop_front() {
+                if let (Some(Inline::InlineLiteral(last_in_stack)), Inline::InlineLiteral(literal)) =
+                    (temp_stack.last_mut(), &inline)
+                    && last_in_stack.can_merge_with(literal)
+                {
+                    last_in_stack.combine_literals(literal.clone());
                 } else {
                     temp_stack.push(inline);
                 }
