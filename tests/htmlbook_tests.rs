@@ -328,3 +328,12 @@ fn test_preformatted_whitespace_is_exact(#[case] adoc: &str, #[case] expected: &
     let html = render_htmlbook_embedded_from_str(adoc);
     assert!(html.contains(expected), "{html}");
 }
+
+/// Block ids and roles appear on the elements for all kinds of blocks
+#[test]
+fn block_ids_and_roles() {
+    let fn_pattern = String::from("htmlbook/block-ids-and-roles");
+    let adoc_fn = format!("{}.adoc", fn_pattern);
+    let html_fn = format!("{}.html", fn_pattern);
+    assert_rendered_htmlbook_embedded_matches_expected(&adoc_fn, &html_fn)
+}
