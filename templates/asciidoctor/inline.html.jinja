@@ -35,7 +35,10 @@
 {%- elif inline.name == "span" -%}
     {%- set tags = {"strong": "strong", "emphasis": "em", "code": "code", "mark": "mark", "superscript": "sup", "subscript": "sub"} -%}
     {%- set tag = tags[inline.variant] -%}
-    {%- if tag -%}<{{ tag }}>{%- endif -%}
+    {%- set roles = inline.metadata.roles if inline.metadata and inline.metadata.roles else [] -%}
+    {#- a mark with a role is a plain span carrying that class -#}
+    {%- if tag == "mark" and roles -%}{%- set tag = "span" -%}{%- endif -%}
+    {%- if tag -%}<{{ tag }}{%- if roles %} class="{{ roles | join(" ") }}"{%- endif -%}>{%- endif -%}
     {{- render_inlines(inline.inlines) -}}
     {%- if tag -%}</{{ tag }}>{%- endif -%}
 {%- elif inline.name == "ref" and inline.variant == "link" -%}

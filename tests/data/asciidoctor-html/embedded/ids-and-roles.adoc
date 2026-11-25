@@ -1,0 +1,29 @@
+[[para-id]]
+[role=lead]
+A paragraph with an id and role.
+
+[[sect-id]]
+[role=special]
+== A Section
+
+[role=red]
+* one
+
+[[my-listing]]
+[role=code-role]
+----
+code
+----
+
+[role=note-role]
+****
+Sidebar.
+****
+
+[[quote-id]]
+[quote]
+____
+Quoted.
+____
+
+A [.big]#roled span# and a [.x]*roled strong*.

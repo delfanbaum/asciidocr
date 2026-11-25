@@ -39,6 +39,13 @@ HTMLBook's.
 {%- endif -%}
 {%- endmacro -%}
 
+{#- Asciidoctor puts a block's id and roles on its outermost element: `id` first, then the
+    block's own classes followed by any roles. (A section's id goes on its heading instead.) -#}
+{%- macro wrapper_attrs(block, css_class, with_id=true) -%}
+{%- if with_id and block.metadata and block.metadata.attributes and block.metadata.attributes.id %} id="{{ block.metadata.attributes.id }}"{%- endif %} class="{{ css_class }}
+{%- if block.metadata and block.metadata.roles %} {{ block.metadata.roles | join(" ") }}{%- endif -%}"
+{%- endmacro -%}
+
 {%- macro render_title(block) -%}
 {%- if block.title %}
 <div class="title">{{ render_inlines(block.title) }}</div>
@@ -46,7 +53,7 @@ HTMLBook's.
 {%- endmacro -%}
 
 {%- macro render_paragraph(block) %}
-<div class="paragraph">
+<div{{ wrapper_attrs(block, "paragraph") }}>
 <p>{{ render_inlines(block.inlines) }}</p>
 </div>
 {%- endmacro -%}
@@ -54,7 +61,7 @@ HTMLBook's.
 {#- Asciidoctor wraps the contents of top-level sections (only) in a "sectionbody" -#}
 {%- macro render_section(block) %}
 {%- set title_html = render_inlines(block.title) %}
-<div class="sect{{ block.level }}">
+<div{{ wrapper_attrs(block, "sect" ~ block.level, false) }}>
 {%- set explicit_id = block.metadata.attributes.id if block.metadata and block.metadata.attributes else none %}
 <h{{ block.level + 1 }} id="{{ explicit_id or section_id(title_html) }}">{{ title_html }}</h{{ block.level + 1 }}>
 {%- if block.level == 1 %}
@@ -71,7 +78,7 @@ HTMLBook's.
 
 {%- macro render_list(block) %}
 {%- set ordered = block.variant == "ordered" -%}
-<div class="{{ 'olist arabic' if ordered else 'ulist' }}">
+<div{{ wrapper_attrs(block, 'olist arabic' if ordered else 'ulist') }}>
 {{- render_title(block) }}
 {%- if ordered %}
 <ol class="arabic">
@@ -102,7 +109,7 @@ HTMLBook's.
 
 {%- macro render_verbatim_block(block) %}
 {%- set language = block.metadata.attributes.language if block.name == "listing" and block.metadata and block.metadata.attributes else none %}
-<div class="{{ 'listingblock' if block.name == 'listing' else 'literalblock' }}">
+<div{{ wrapper_attrs(block, 'listingblock' if block.name == 'listing' else 'literalblock') }}>
 {{- render_title(block) }}
 <div class="content">
 {%- if language %}
@@ -115,7 +122,7 @@ HTMLBook's.
 {%- endmacro -%}
 
 {%- macro render_verse(block) %}
-<div class="verseblock">
+<div{{ wrapper_attrs(block, "verseblock") }}>
 {{- render_title(block) }}
 <pre class="content">{{ verbatim_text(block) }}</pre>
 </div>
@@ -132,7 +139,7 @@ HTMLBook's.
 {#- Sidebars put their title inside the content div; open blocks put it before -#}
 {%- macro render_parent_block(block) %}
 {%- set css_class = "sidebarblock" if block.name == "sidebar" else "openblock" %}
-<div class="{{ css_class }}">
+<div{{ wrapper_attrs(block, css_class) }}>
 {%- if block.name == "open" -%}{{ render_title(block) }}{%- endif %}
 <div class="content">
 {%- if block.name == "sidebar" -%}{{ render_title(block) }}{%- endif -%}
@@ -147,7 +154,7 @@ HTMLBook's.
     delimited form) as its content; Asciidoctor shows the paragraph's text without the usual
     paragraph wrapper -#}
 {%- macro render_admonition(block) %}
-<div class="admonitionblock {{ block.variant }}">
+<div{{ wrapper_attrs(block, "admonitionblock " ~ block.variant) }}>
 <table>
 <tr>
 <td class="icon">
@@ -179,7 +186,7 @@ HTMLBook's.
 {%- endmacro -%}
 
 {%- macro render_example(block) %}
-<div class="exampleblock">
+<div{{ wrapper_attrs(block, "exampleblock") }}>
 {%- if block.title %}
 <div class="title">Example {{ next_number("example") }}. {{ render_inlines(block.title) }}</div>
 {%- endif %}
@@ -193,7 +200,7 @@ HTMLBook's.
 
 {%- macro render_quote(block) %}
 {%- set attrs = block.metadata.attributes if block.metadata and block.metadata.attributes else {} %}
-<div class="quoteblock">
+<div{{ wrapper_attrs(block, "quoteblock") }}>
 {{- render_title(block) }}
 <blockquote>
 {%- for child in block.blocks %}
@@ -215,7 +222,7 @@ HTMLBook's.
 {%- endmacro -%}
 
 {%- macro render_dlist(block) %}
-<div class="dlist">
+<div{{ wrapper_attrs(block, "dlist") }}>
 {{- render_title(block) }}
 <dl>
 {%- for item in block.items %}
@@ -238,7 +245,7 @@ HTMLBook's.
 {%- macro render_table(block) %}
 {%- set columns = block.metadata.attributes.cols | int if block.metadata and block.metadata.attributes.cols else 1 %}
 {%- set has_header = block.metadata and "header" in block.metadata.options %}
-<table class="tableblock frame-all grid-all stretch">
+<table{{ wrapper_attrs(block, "tableblock frame-all grid-all stretch") }}>
 {%- if block.title %}
 <caption class="title">Table {{ next_number("table") }}. {{ render_inlines(block.title) }}</caption>
 {%- endif %}
@@ -272,7 +279,7 @@ HTMLBook's.
 {%- endmacro -%}
 
 {%- macro render_image(block) %}
-<div class="imageblock">
+<div{{ wrapper_attrs(block, "imageblock") }}>
 <div class="content">
 <img src="{{ block.target }}" alt="{{ alt_text(block.target, block.metadata) }}">
 </div>
