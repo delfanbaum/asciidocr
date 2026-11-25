@@ -113,3 +113,17 @@ pub enum TokenError {
     #[error("Invalid character match to produce block TokenType")]
     CharacterMatch,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn attribute_error_shows_line_and_description() {
+        let error = ParserError::AttributeError(5, "foo does not contain a named attribute".into());
+        assert_eq!(
+            error.to_string(),
+            "Line 5: Attribute error: foo does not contain a named attribute"
+        );
+    }
+}
