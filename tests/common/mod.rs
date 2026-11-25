@@ -10,7 +10,6 @@ use asciidocr::{
     scanner::Scanner,
 };
 use assert_json_diff::assert_json_eq;
-use chrono::Local;
 use image::RgbImage;
 use serde_json::{Value, json};
 use tempfile::NamedTempFile;
