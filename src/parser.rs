@@ -444,12 +444,11 @@ impl Parser {
     /// Handle document header
     fn check_and_move_header(&mut self, asg: &mut Asg) -> Result<(), ParserError> {
         self.add_inlines_to_block_stack()?;
-        if let Some(header) = &mut self.document_header {
-            if !header.is_empty() {
+        if let Some(header) = &mut self.document_header
+            && !header.is_empty() {
                 header.consolidate();
                 asg.add_header(header.clone(), self.document_attributes.clone())
             }
-        }
 
         self.document_header = None;
         Ok(())
@@ -563,12 +562,11 @@ impl Parser {
             }
             if let Some(value) = metadata.attributes.get("lines") {
                 included_lines = extract_page_ranges(value);
-                if let Some(line) = included_lines.last() {
-                    if *line == -1 {
+                if let Some(line) = included_lines.last()
+                    && *line == -1 {
                         include_to_end = true;
                         included_lines.pop();
                     }
-                }
             }
             if let Some(value) = metadata.attributes.get("tag") {
                 included_tags.push(value.clone());
@@ -610,22 +608,18 @@ impl Parser {
                     }
                     // tags
                     if !included_tags.is_empty() {
-                        if token.token_type() == TokenType::StartTag {
-                            if let Some(tag) = token.tag() {
-                                if included_tags.contains(&tag) {
+                        if token.token_type() == TokenType::StartTag
+                            && let Some(tag) = token.tag()
+                                && included_tags.contains(&tag) {
                                     current_tag = Some(tag);
                                     continue;
                                 }
-                            }
-                        }
-                        if token.token_type() == TokenType::EndTag {
-                            if let Some(tag) = token.tag() {
-                                if current_tag == Some(tag) {
+                        if token.token_type() == TokenType::EndTag
+                            && let Some(tag) = token.tag()
+                                && current_tag == Some(tag) {
                                     current_tag = None;
                                     continue;
                                 }
-                            }
-                        }
                         if current_tag.is_none() {
                             continue;
                         }
@@ -723,12 +717,11 @@ impl Parser {
             if token.token_type() == TokenType::CodeCalloutListItem {
                 // check to see if we ought to "close" the source block (almost always)
                 // TODO source blocks should close themselves, I think.
-                if let Some(block) = self.block_stack.last() {
-                    if block.is_source_block() {
+                if let Some(block) = self.block_stack.last()
+                    && block.is_source_block() {
                         // we need to add this before we create the new list
                         self.add_last_to_block_stack_or_graph(asg)?;
                     }
-                }
                 list.metadata = Some(ElementMetadata::new_with_role(
                     "colist".to_string(),
                     self.line,
@@ -1026,14 +1019,12 @@ impl Parser {
     }
 
     fn parse_code_callout(&mut self, token: Token) -> Result<(), ParserError> {
-        if let Some(value) = self.document_attributes.get("icons") {
-            if value == "true" {
-                if let Some(_last_inline) = self.inline_stack.back_mut() {
+        if let Some(value) = self.document_attributes.get("icons")
+            && value == "true"
+                && let Some(_last_inline) = self.inline_stack.back_mut() {
                     // handle deleting comment markup, IF we're handling icons
                     todo!();
                 }
-            }
-        }
         self.inline_stack
             .push_back(Inline::InlineSpan(InlineSpan::inline_span_from_token(
                 token,
@@ -1356,7 +1347,7 @@ impl Parser {
                     _ => todo!(),
                 }
                 // put any appended inlines into the stack at the relevant position
-                while children.len() > 0 {
+                while !children.is_empty() {
                     if let Some(child) = children.pop_back() {
                         self.inline_stack.insert(open_span_idx, child);
                     }
@@ -1365,7 +1356,7 @@ impl Parser {
                 // consolidate any resultant or remaining adjacent literals (this should be extracted to a function)
                 let mut temp_stack: Vec<Inline> = vec![];
                 while let Some(mut inline) = self.inline_stack.pop_front() {
-                    if temp_stack.len() == 0 {
+                    if temp_stack.is_empty() {
                         temp_stack.push(inline);
                     } else if inline.is_literal() {
                         if let Some(Inline::InlineLiteral(last_in_stack)) = temp_stack.last_mut() {
@@ -1416,15 +1407,14 @@ impl Parser {
             return Ok(());
         }
 
-        if let Some(last_block) = self.block_stack.last_mut() {
-            if last_block.takes_inlines() && !self.in_block_line && !self.force_new_block {
+        if let Some(last_block) = self.block_stack.last_mut()
+            && last_block.takes_inlines() && !self.in_block_line && !self.force_new_block {
                 while !self.inline_stack.is_empty() {
                     let inline = self.inline_stack.pop_front().unwrap();
                     last_block.push_inline(inline)?;
                 }
                 return Ok(());
             }
-        }
         // create a new para from the locations of the first span (subsequent locations are
         // consolidated later)
         let mut para_locations: Vec<Location> = Vec::new();
@@ -1535,12 +1525,11 @@ impl Parser {
         asg: &mut Asg,
         mut block: Block,
     ) -> Result<(), ParserError> {
-        if let Some(last_block) = self.block_stack.last_mut() {
-            if last_block.takes_block_of_type(&block) {
+        if let Some(last_block) = self.block_stack.last_mut()
+            && last_block.takes_block_of_type(&block) {
                 last_block.push_block(block)?;
                 return Ok(());
             }
-        }
         if self.metadata.is_some() {
             block.add_metadata(self.metadata.as_ref().unwrap().clone())?;
             self.metadata = None;
@@ -1551,12 +1540,11 @@ impl Parser {
 
     fn add_last_to_block_stack_or_graph(&mut self, asg: &mut Asg) -> Result<(), ParserError> {
         if let Some(last_block) = self.block_stack.pop() {
-            if let Some(prior_block) = self.block_stack.last_mut() {
-                if prior_block.takes_block_of_type(&last_block) {
+            if let Some(prior_block) = self.block_stack.last_mut()
+                && prior_block.takes_block_of_type(&last_block) {
                     prior_block.push_block(last_block)?;
                     return Ok(());
                 }
-            }
             asg.push_block(last_block)?;
             Ok(())
         } else {

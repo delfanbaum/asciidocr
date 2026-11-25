@@ -51,7 +51,7 @@ fn render_from_templates(
     });
     for (name, template) in templates {
         env.add_template(name, template)
-            .expect(&format!("Error loading template: {}", name))
+            .unwrap_or_else(|_| panic!("Error loading template: {}", name))
     }
     // set up context
     let build_ctx = context!(current_time => Local::now());

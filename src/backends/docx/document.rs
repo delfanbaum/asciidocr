@@ -297,15 +297,14 @@ impl DocxWriter {
         for child in parent.blocks.iter() {
             docx = self.add_block_to_doc(docx, child)?
         }
-        if let Some(metadata) = &parent.metadata {
-            if let Some(attribution) = metadata.attributes.get("attribution") {
+        if let Some(metadata) = &parent.metadata
+            && let Some(attribution) = metadata.attributes.get("attribution") {
                 let para = Paragraph::new()
                     .line_spacing(LineSpacing::new().after(480))
                     .add_run(Run::new().add_text(format!("— {}\n", attribution)));
 
                 docx = self.add_paragraph(docx, para)?
             }
-        }
         self.reset_style();
         Ok(docx)
     }
@@ -314,14 +313,13 @@ impl DocxWriter {
         // TODO: headers on tables
         docx = self.set_style(docx, DocumentStyles::Table)?;
         let mut cols: usize = 0;
-        if let Some(ref metadata) = table.metadata {
-            if let Some(col_num) = metadata.attributes.get("cols") {
+        if let Some(ref metadata) = table.metadata
+            && let Some(col_num) = metadata.attributes.get("cols") {
                 cols = match col_num.parse() {
                     Ok(c) => c,
                     Err(_) => return Err(DocxRenderError::ColumnError),
                 }
             }
-        }
         let mut rows: Vec<TableRow> = vec![];
         let num_cells = table.blocks.len();
         let mut current_row: Vec<TableCell> = vec![];

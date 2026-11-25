@@ -20,13 +20,12 @@ pub fn render_docx(graph: &Asg, output_path: &Path) -> Result<(), ConversionErro
     let mut docx = document::asciidocr_default_docx();
 
     // Add document title if present
-    if let Some(header) = &graph.header {
-        if !header.title.is_empty() {
+    if let Some(header) = &graph.header
+        && !header.title.is_empty() {
             let mut para = Paragraph::new().style("Title");
             para = writer.add_inlines_to_para(para, header.title());
             docx = docx.add_paragraph(para);
         }
-    }
 
     // Add document contents
     for block in graph.blocks.iter() {

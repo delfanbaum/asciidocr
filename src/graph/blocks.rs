@@ -477,8 +477,8 @@ impl Block {
     }
 
     pub fn create_id(&mut self) {
-        if let Block::Section(section) = self {
-            if section.id == *"" {
+        if let Block::Section(section) = self
+            && section.id == *"" {
                 let mut id = String::new();
                 for inline in &section.inlines {
                     id.push_str(&inline.extract_values_to_string())
@@ -486,7 +486,6 @@ impl Block {
                 id = id.replace(' ', "-");
                 section.id = id
             }
-        }
     }
 
     pub fn id_hashes(&self) -> HashMap<String, Vec<Inline>> {
