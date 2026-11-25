@@ -257,7 +257,13 @@ loading code simple.
 {%- set header = true -%}
 {%- set body_start = cols -%}
 {%- endif -%}
-    <table>{% if header %}
+    <table>
+    {%- if block.title -%}
+    <caption>{%- for inline in block.title -%}
+        {{- render_inline(inline) -}}
+    {%- endfor -%}</caption>
+    {%- endif -%}
+    {% if header %}
     <thead>
         {% for idx in range(0, body_start) -%}
             {%- set cell = block.blocks[idx] -%}

@@ -263,3 +263,19 @@ fn leaf_block_titles_wrap_in_example() {
     let html_fn = format!("{}.html", fn_pattern);
     assert_rendered_htmlbook_matches_expected(&adoc_fn, &html_fn)
 }
+
+#[test]
+fn table_title_becomes_caption() {
+    let fn_pattern = String::from("htmlbook/table-title");
+    let adoc_fn = format!("{}.adoc", fn_pattern);
+    let html_fn = format!("{}.html", fn_pattern);
+    assert_rendered_htmlbook_matches_expected(&adoc_fn, &html_fn)
+}
+
+#[test]
+fn paragraph_title_is_dropped_but_content_kept() {
+    let fn_pattern = String::from("htmlbook/paragraph-title-dropped");
+    let adoc_fn = format!("{}.adoc", fn_pattern);
+    let html_fn = format!("{}.html", fn_pattern);
+    assert_rendered_htmlbook_matches_expected(&adoc_fn, &html_fn)
+}
