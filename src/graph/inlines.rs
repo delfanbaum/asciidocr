@@ -102,6 +102,15 @@ impl Inline {
         }
     }
 
+    /// Whether this is a macro still waiting for its closing `]`: a footnote, or a link macro
+    /// (but not a bare URL, which is also a link)
+    pub fn is_open_macro(&self) -> bool {
+        match self {
+            Inline::InlineRef(iref) => iref.open,
+            _ => self.is_macro(),
+        }
+    }
+
     pub fn is_passthrough(&self) -> bool {
         match self {
             Inline::InlineRef(iref) => iref.variant == InlineRefVariant::Link,
@@ -558,6 +567,10 @@ pub struct InlineRef {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub metadata: Option<ElementMetadata>,
     location: Vec<Location>,
+    /// Whether the ref still takes the text that follows it: only a link macro does, until its
+    /// closing `]`. A bare URL, an xref or an image is complete as soon as it is scanned.
+    #[serde(skip)]
+    pub open: bool,
 }
 
 impl InlineRef {
@@ -570,6 +583,7 @@ impl InlineRef {
             inlines: vec![],
             metadata: None,
             location,
+            open: false,
         }
     }
 
@@ -603,6 +617,7 @@ impl InlineRef {
             inlines: vec![numbering],
             metadata,
             location,
+            open: false,
         })
     }
 
@@ -614,7 +629,10 @@ impl InlineRef {
     pub fn new_link_from_macro_token(token: Token) -> Self {
         let mut target = token.text();
         target.pop(); // remove trailing '['
-        InlineRef::new(InlineRefVariant::Link, target, token.locations())
+        InlineRef {
+            open: true,
+            ..InlineRef::new(InlineRefVariant::Link, target, token.locations())
+        }
     }
 
     pub fn new_link_from_token(token: Token) -> Self {
@@ -636,6 +654,7 @@ impl InlineRef {
                 inlines: vec![],
                 metadata,
                 location,
+                open: false,
             }
         } else {
             InlineRef::new(InlineRefVariant::Image, target, location)

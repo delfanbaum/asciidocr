@@ -998,10 +998,13 @@ impl Parser {
         } else if let Some(inline_macro_idx) = self
             .inline_stack
             .iter()
-            .rposition(|inline| inline.is_macro())
+            .rposition(|inline| inline.is_open_macro())
         {
-            // consolidate into the inline macro
+            // consolidate into the inline macro, which is then complete
             let mut inline_macro = self.inline_stack.remove(inline_macro_idx).unwrap();
+            if let Inline::InlineRef(iref) = &mut inline_macro {
+                iref.open = false;
+            }
             while self.inline_stack.len() > inline_macro_idx {
                 let subsequent_inline = self.inline_stack.remove(inline_macro_idx).unwrap();
                 inline_macro.push_inline(subsequent_inline);
@@ -1143,7 +1146,7 @@ impl Parser {
                     }
                 }
                 Inline::InlineRef(inline_ref) => {
-                    if !self.close_parent_after_push {
+                    if inline_ref.open {
                         inline_ref.inlines.push(inline_literal);
                     } else {
                         self.inline_stack.push_back(inline_literal)
@@ -1317,7 +1320,7 @@ impl Parser {
                     }
                 }
                 Inline::InlineRef(inline_ref) => {
-                    if !self.close_parent_after_push {
+                    if inline_ref.open {
                         inline_ref.add_text_from_token(token)
                     } else {
                         self.inline_stack.push_back(inline_literal)
@@ -1362,7 +1365,7 @@ impl Parser {
                     }
                 }
                 Inline::InlineRef(inline_ref) => {
-                    if !self.close_parent_after_push {
+                    if inline_ref.open {
                         inline_ref.pass_text_from_token(token)
                     } else {
                         self.inline_stack.push_back(inline_literal)
