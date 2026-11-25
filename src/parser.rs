@@ -474,7 +474,16 @@ impl Parser {
             self.block_title_open = false;
         }
 
-        if [TokenType::NewLineChar, TokenType::Eof].contains(&self.last_token_type) {
+        if self.last_token_type == TokenType::NewLineChar
+            && self.open_parse_after_as_text_type == Some(TokenType::QuoteVerseBlock)
+        {
+            // a blank line inside a verse block separates stanzas; it is part of the verse's text,
+            // not the end of a paragraph
+            if let Some(newline_token) = self.dangling_newline.take() {
+                self.add_text_to_last_inline(newline_token);
+            }
+            self.add_text_to_last_inline(token);
+        } else if [TokenType::NewLineChar, TokenType::Eof].contains(&self.last_token_type) {
             // clear any dangling newline
             self.dangling_newline = None;
             if self.document_header.is_some() {

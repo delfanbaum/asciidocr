@@ -320,6 +320,10 @@ fn special_characters_are_escaped() {
     "[verse]\n____\n  indented\nlast\n____\n",
     "<pre data-type=\"verse\">  indented\nlast</pre>"
 )]
+#[case::verse_stanzas(
+    "[verse]\n____\nOne\n\nTwo\n\n\nThree\n____\n",
+    "<pre data-type=\"verse\">One\n\nTwo\n\n\nThree</pre>"
+)]
 fn test_preformatted_whitespace_is_exact(#[case] adoc: &str, #[case] expected: &str) {
     let html = render_htmlbook_embedded_from_str(adoc);
     assert!(html.contains(expected), "{html}");
