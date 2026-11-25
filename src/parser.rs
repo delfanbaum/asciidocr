@@ -463,7 +463,8 @@ impl Parser {
 
         // if we are on a block title line, add the inline stack to the title; the newline closes
         // the title, so that subsequent lines are not swallowed by it
-        if self.block_title_open {
+        let closes_title = self.block_title_open;
+        if closes_title {
             if let Some(ref mut title_stack) = self.block_title {
                 while !self.inline_stack.is_empty() {
                     let inline = self.inline_stack.pop_front().unwrap();
@@ -503,8 +504,12 @@ impl Parser {
                     }
                 } // if Some(last_block)
             }
-        } else if self.in_block_continuation || self.last_token_type.clears_newline_after() {
-            // don't add a newline ahead of text in these cases
+        } else if closes_title
+            || self.in_block_continuation
+            || self.last_token_type.clears_newline_after()
+        {
+            // don't add a newline ahead of text in these cases (including the newline that ends
+            // a block title line, which would otherwise be glued onto the following block's text)
             self.dangling_newline = None;
         } else {
             self.dangling_newline = Some(token);
@@ -689,7 +694,11 @@ impl Parser {
             self.add_last_list_item_to_list()?
         } else {
             // we need to create the list first
-            self.push_block_to_stack(Block::DList(DList::new(dlist_item.locations().clone())))?;
+            let mut dlist = DList::new(dlist_item.locations().clone());
+            if let Some(title) = self.block_title.take() {
+                dlist.title = title;
+            }
+            self.push_block_to_stack(Block::DList(dlist))?;
         }
         // either way, add the new list item
         self.push_block_to_stack(Block::DListItem(dlist_item))?;
@@ -725,6 +734,9 @@ impl Parser {
                     self.line,
                 ));
             }
+            if let Some(title) = self.block_title.take() {
+                list.title = title;
+            }
             self.push_block_to_stack(Block::List(list))?;
         }
         // either way, add the new list item
@@ -743,10 +755,11 @@ impl Parser {
             self.add_last_list_item_to_list()?
         } else {
             // we need to create the list first
-            self.push_block_to_stack(Block::List(List::new(
-                ListVariant::Unordered,
-                token.locations().clone(),
-            )))?;
+            let mut list = List::new(ListVariant::Unordered, token.locations().clone());
+            if let Some(title) = self.block_title.take() {
+                list.title = title;
+            }
+            self.push_block_to_stack(Block::List(list))?;
         }
         // either way, add the new list item
         self.push_block_to_stack(Block::ListItem(list_item))
@@ -1463,11 +1476,10 @@ impl Parser {
     /// title left over from some other kind of block (e.g., a list) is dropped quietly.
     fn warn_paragraph_title_dropped(&self, title: Option<&[Inline]>, para_block: &Block) {
         let Some(title) = title else { return };
-        // (the paragraph's first location can be the title line's trailing newline, hence `<=`)
         let adjacent = para_block
             .locations()
             .first()
-            .is_some_and(|loc| loc.line <= self.block_title_line + 1);
+            .is_some_and(|loc| loc.line == self.block_title_line + 1);
         if adjacent {
             let title_text: String = title.iter().map(|i| i.extract_values_to_string()).collect();
             warn!(

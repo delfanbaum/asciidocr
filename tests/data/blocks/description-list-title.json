@@ -1,0 +1,99 @@
+{
+  "name": "document",
+  "type": "block",
+  "blocks": [
+    {
+      "name": "dlist",
+      "type": "block",
+      "marker": "::",
+      "items": [
+        {
+          "name": "dlistItem",
+          "type": "block",
+          "marker": "::",
+          "terms": [
+            {
+              "name": "text",
+              "type": "string",
+              "value": "Term",
+              "location": [
+                {
+                  "line": 2,
+                  "col": 1
+                },
+                {
+                  "line": 2,
+                  "col": 4
+                }
+              ]
+            }
+          ],
+          "principal": [
+            {
+              "name": "text",
+              "type": "string",
+              "value": "Description of that term.",
+              "location": [
+                {
+                  "line": 2,
+                  "col": 8
+                },
+                {
+                  "line": 2,
+                  "col": 32
+                }
+              ]
+            }
+          ],
+          "location": [
+            {
+              "line": 2,
+              "col": 1
+            },
+            {
+              "line": 2,
+              "col": 32
+            }
+          ]
+        }
+      ],
+      "title": [
+        {
+          "name": "text",
+          "type": "string",
+          "value": "Favorites",
+          "location": [
+            {
+              "line": 1,
+              "col": 2
+            },
+            {
+              "line": 1,
+              "col": 10
+            }
+          ]
+        }
+      ],
+      "location": [
+        {
+          "line": 2,
+          "col": 1
+        },
+        {
+          "line": 2,
+          "col": 32
+        }
+      ]
+    }
+  ],
+  "location": [
+    {
+      "line": 1,
+      "col": 1
+    },
+    {
+      "line": 2,
+      "col": 32
+    }
+  ]
+}

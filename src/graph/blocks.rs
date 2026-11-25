@@ -285,6 +285,8 @@ impl Block {
             Block::Section(block) => Some(block.inlines.clone()),
             Block::ParentBlock(block) => Some(block.title.clone()),
             Block::BlockMacro(block) => Some(block.caption.clone()),
+            Block::List(block) => Some(block.title.clone()),
+            Block::DList(block) => Some(block.title.clone()),
             _ => None,
         }
     }
@@ -306,11 +308,13 @@ impl Block {
                 }
             }
             Block::List(block) => {
+                inlines.extend(block.title.clone());
                 for child in block.items.iter() {
                     inlines.extend(child.inlines())
                 }
             }
             Block::DList(block) => {
+                inlines.extend(block.title.clone());
                 for child in block.items.iter() {
                     inlines.extend(child.inlines())
                 }
@@ -354,11 +358,13 @@ impl Block {
                 }
             }
             Block::List(block) => {
+                inlines.extend(block.title.iter_mut());
                 for child in block.items.iter_mut() {
                     inlines.extend(child.inlines_mut())
                 }
             }
             Block::DList(block) => {
+                inlines.extend(block.title.iter_mut());
                 for child in block.items.iter_mut() {
                     inlines.extend(child.inlines_mut())
                 }

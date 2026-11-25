@@ -34,6 +34,9 @@ fn test_document(#[case] fn_pattern: &str) {
 #[case::many_unordered("blocks/ordered-list-many-items")]
 #[case::description_simple("blocks/description-list-simple")]
 #[case::description_complex("blocks/description-list-complex")]
+#[case::unordered_title("blocks/unordered-list-title")]
+#[case::ordered_title("blocks/ordered-list-title")]
+#[case::description_title("blocks/description-list-title")]
 fn test_lists(#[case] fn_pattern: &str) {
     let adoc_fn = format!("{}.adoc", fn_pattern);
     let asg_json_fn = format!("{}.json", fn_pattern);

@@ -17,6 +17,8 @@ pub struct List {
     marker: String,
     pub variant: ListVariant,
     pub items: Vec<Block>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub title: Vec<Inline>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub metadata: Option<ElementMetadata>,
     pub location: Vec<Location>,
@@ -43,6 +45,7 @@ impl List {
             marker: list_marker,
             variant,
             items: vec![],
+            title: vec![],
             metadata: None,
             location,
         }
@@ -152,6 +155,8 @@ pub struct DList {
     node_type: NodeTypes,
     marker: String,
     pub items: Vec<Block>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub title: Vec<Inline>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub metadata: Option<ElementMetadata>,
     pub location: Vec<Location>,
@@ -171,6 +176,7 @@ impl DList {
             node_type: NodeTypes::Block,
             marker: "::".to_string(),
             items: vec![],
+            title: vec![],
             metadata: None,
             location,
         }
