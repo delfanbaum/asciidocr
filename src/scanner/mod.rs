@@ -530,6 +530,10 @@ impl<'a> Scanner<'a> {
 
     /// Adds the include image, consuming the target as well as any attributes
     fn add_include(&mut self) -> Result<Token, ScannerError> {
+        // a directive that never closes (on its line) is just text
+        if !self.closes_on_this_line("]") {
+            return self.add_text_until_next_markup();
+        }
         while self.peek() != ']' {
             self.current += 1
         }
