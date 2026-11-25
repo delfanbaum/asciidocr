@@ -25,10 +25,7 @@ mod docx_tests {
             ))
             .expect("Failed to parse document");
         let temp_docx = NamedTempFile::new().unwrap();
-        match render_docx(&parsed_asg, &temp_docx.path()) {
-            Ok(_) => assert!(true),
-            Err(_) => assert!(false),
-        }
+        render_docx(&parsed_asg, temp_docx.path()).expect("Failed to render docx");
     }
 
     #[test]
@@ -47,10 +44,7 @@ mod docx_tests {
         let parsed_asg = Parser::new(test_dir.join(adoc_fn))
             .parse(Scanner::new(&adoc_str))
             .expect("Failed to parse document");
-        match render_docx(&parsed_asg, &temp_docx.path()) {
-            Ok(_) => assert!(true),
-            Err(_) => assert!(false),
-        }
+        render_docx(&parsed_asg, temp_docx.path()).expect("Failed to render docx");
     }
 
     /// docx-rs writes East Asian layout compatibility flags by default. Word and LibreOffice
