@@ -6,7 +6,7 @@ mod docx_tests {
     use std::fs;
     use std::path::PathBuf;
 
-    use crate::common::generate_temp_image;
+    use crate::common::{generate_temp_image, rendered_docx_part};
     use asciidocr::backends::docx::render_docx;
     use asciidocr::parser::Parser;
     use asciidocr::scanner::Scanner;
@@ -48,5 +48,20 @@ mod docx_tests {
             Ok(_) => assert!(true),
             Err(_) => assert!(false),
         }
+    }
+
+    /// docx-rs writes East Asian layout compatibility flags by default. Word and LibreOffice
+    /// respond to them by adding extra space at every bold/italic run boundary, so we strip them.
+    #[test]
+    fn settings_have_no_east_asian_layout_flags() {
+        let adoc = fs::read_to_string("tests/data/docx/emphasis-spacing.adoc").unwrap();
+        let settings = rendered_docx_part(&adoc, "word/settings.xml");
+        assert!(!settings.contains("useFELayout"), "{settings}");
+        assert!(
+            !settings.contains("balanceSingleByteDoubleByteWidth"),
+            "{settings}"
+        );
+        // We still want the rest of the compat block
+        assert!(settings.contains("compatibilityMode"), "{settings}");
     }
 }

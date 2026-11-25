@@ -107,3 +107,26 @@ pub fn generate_temp_image() -> NamedTempFile {
     img.save(&img_path.path()).expect("Error creating image");
     img_path
 }
+
+/// Renders the given Asciidoc source to docx and returns the text of one XML part (for example
+/// `word/settings.xml` or `word/document.xml`) from inside the resulting zip archive.
+#[cfg(feature = "docx")]
+pub fn rendered_docx_part(adoc: &str, part: &str) -> String {
+    use std::io::Read;
+
+    let parsed_asg = Parser::new_no_target_resolution(PathBuf::from("tests/data/docx/inline.adoc"))
+        .parse(Scanner::new(adoc))
+        .expect("Failed to parse document");
+    let temp_docx = NamedTempFile::new().unwrap();
+    asciidocr::backends::docx::render_docx(&parsed_asg, temp_docx.path())
+        .expect("Failed to render docx");
+    let mut archive = zip::ZipArchive::new(fs::File::open(temp_docx.path()).unwrap())
+        .expect("Rendered docx is not a valid zip archive");
+    let mut xml = String::new();
+    archive
+        .by_name(part)
+        .unwrap_or_else(|_| panic!("{part} not found in docx"))
+        .read_to_string(&mut xml)
+        .unwrap();
+    xml
+}

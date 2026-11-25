@@ -13,6 +13,17 @@ use crate::graph::asg::Asg;
 
 use self::document::DocxRenderError;
 
+/// docx-rs hardcodes `useFELayout` and `balanceSingleByteDoubleByteWidth` into `settings.xml`.
+/// Word and LibreOffice treat those as East Asian layout modes and add extra space at the
+/// boundaries of bold/italic runs, which shows up as doubled spaces around emphasis. docx-rs
+/// offers no way to turn them off, so we remove them from the generated settings part.
+fn strip_east_asian_layout_flags(settings: Vec<u8>) -> Vec<u8> {
+    String::from_utf8_lossy(&settings)
+        .replace("<w:useFELayout />", "")
+        .replace("<w:balanceSingleByteDoubleByteWidth />", "")
+        .into_bytes()
+}
+
 /// !Experimental! Renders a Docx file. Some [`Asg`] blocks are still unsupported.
 pub fn render_docx(graph: &Asg, output_path: &Path) -> Result<(), ConversionError> {
     let file = File::create(output_path).unwrap();
@@ -32,7 +43,9 @@ pub fn render_docx(graph: &Asg, output_path: &Path) -> Result<(), ConversionErro
     for block in graph.blocks.iter() {
         docx = writer.add_block_to_doc(docx, block)?
     }
-    match docx.build().pack(file) {
+    let mut xml_docx = docx.build();
+    xml_docx.settings = strip_east_asian_layout_flags(xml_docx.settings);
+    match xml_docx.pack(file) {
         Ok(_) => Ok(()),
         Err(_) => Err(ConversionError::DocxRender(DocxRenderError::ZipFileError)),
     }

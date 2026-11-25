@@ -32,6 +32,7 @@ image = "0.25.6"
 logtest = "2.0.0"
 rstest = "0.26.0"
 tempfile = "3.14.0"
+zip = { version = "0.6.6", default-features = false, features = ["deflate"] }
 
 [features]
 docx = ["dep:docx-rs"]
