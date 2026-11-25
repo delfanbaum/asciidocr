@@ -57,8 +57,10 @@ loading code simple.
 
 {# ======== shared macros ======== #}
 
-{% macro render_title_for_block(block) %}
-        {%- if block.name in ["example", "sidebar"]-%}
+{% macro render_title_for_block(block, level=none) %}
+        {%- if level -%}
+            {%- set title_heading_level = level -%}
+        {%- elif block.name in ["example", "sidebar"]-%}
             {%- set title_heading_level = 5 -%}
         {%- else -%}
             {%- set title_heading_level = 1 -%}
@@ -161,6 +163,10 @@ loading code simple.
     {%- for child in block.blocks -%}
         {#- the block syntax for admonitions wraps its content in an example block (from the ==== delimiter); unwrap it -#}
         {%- if block.name == "admonition" and child.name == "example" -%}
+            {#- ...so the title lives on the wrapper, but is still the admonition's title -#}
+            {%- if child.title -%}
+                {{ render_title_for_block(child, 1) }}
+            {%- endif -%}
             {%- for grandchild in child.blocks -%}
                 {{ render_block(grandchild) }}
             {%- endfor -%}

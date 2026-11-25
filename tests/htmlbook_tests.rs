@@ -1,4 +1,6 @@
-use common::assert_rendered_htmlbook_matches_expected;
+use common::{
+    assert_rendered_htmlbook_embedded_matches_expected, assert_rendered_htmlbook_matches_expected,
+};
 
 pub mod common;
 
@@ -217,6 +219,30 @@ fn description_list_ordering() {
 // it's just easier to reason about this in HTML than in JSON, so testing this here
 fn links() {
     let fn_pattern = String::from("htmlbook/links");
+    let adoc_fn = format!("{}.adoc", fn_pattern);
+    let html_fn = format!("{}.html", fn_pattern);
+    assert_rendered_htmlbook_matches_expected(&adoc_fn, &html_fn)
+}
+
+#[test]
+fn embedded_has_no_document_wrapper() {
+    let fn_pattern = String::from("htmlbook/embedded");
+    let adoc_fn = format!("{}.adoc", fn_pattern);
+    let html_fn = format!("{}.html", fn_pattern);
+    assert_rendered_htmlbook_embedded_matches_expected(&adoc_fn, &html_fn)
+}
+
+#[test]
+fn document_header_sets_title() {
+    let fn_pattern = String::from("htmlbook/document-header");
+    let adoc_fn = format!("{}.adoc", fn_pattern);
+    let html_fn = format!("{}.html", fn_pattern);
+    assert_rendered_htmlbook_matches_expected(&adoc_fn, &html_fn)
+}
+
+#[test]
+fn block_titles() {
+    let fn_pattern = String::from("htmlbook/block-titles");
     let adoc_fn = format!("{}.adoc", fn_pattern);
     let html_fn = format!("{}.html", fn_pattern);
     assert_rendered_htmlbook_matches_expected(&adoc_fn, &html_fn)

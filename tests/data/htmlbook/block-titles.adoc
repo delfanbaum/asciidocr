@@ -3,3 +3,13 @@
 ====
 This is some important information, you hear?
 ====
+
+.Example Title
+====
+Example text.
+====
+
+.Sidebar Title
+****
+Sidebar text.
+****
