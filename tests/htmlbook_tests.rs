@@ -324,6 +324,28 @@ fn test_unclosed_span_keeps_passthrough_separate(#[case] adoc: &str, #[case] exp
     assert!(html.contains(expected), "{html}");
 }
 
+/// A list's first item keeps its own text even when the line before the list (a section
+/// heading's blank line, a role or an anchor) starts a new block, so a continuation can follow it
+#[rstest]
+#[case::in_section(
+    "== A\n\n* item text\n+\nmore\n",
+    "<ul><li><p>itemtext</p><p>more</p></li></ul>"
+)]
+#[case::after_role(
+    "[.role]\n* item text\n+\nmore\n",
+    "<li><p>itemtext</p><p>more</p></li></ul>"
+)]
+#[case::after_anchor(
+    "[[id]]\n. item text\n+\nmore\n",
+    "<olid=\"id\"><li><p>itemtext</p><p>more</p></li></ol>"
+)]
+fn test_continuation_on_first_list_item(#[case] adoc: &str, #[case] expected: &str) {
+    let html: String = render_htmlbook_embedded_from_str(adoc)
+        .split_whitespace()
+        .collect();
+    assert!(html.contains(expected), "{html}");
+}
+
 /// The other tests ignore whitespace, but it is significant inside `<pre>`: the newlines next to
 /// the delimiters are dropped, while indentation and blank lines are kept
 #[rstest]
