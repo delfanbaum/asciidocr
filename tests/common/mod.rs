@@ -77,6 +77,35 @@ pub fn top_level_block_names(adoc: &str) -> Vec<String> {
         .collect()
 }
 
+/// Parses the Asciidoc source and describes how its blocks nest, e.g.,
+/// `section(sidebar(paragraph),section(paragraph))`; top-level blocks are separated by spaces
+pub fn block_tree(adoc: &str) -> String {
+    fn describe(block: &Value) -> String {
+        let name = block["name"].as_str().unwrap_or_default();
+        let children: Vec<String> = block["blocks"]
+            .as_array()
+            .map(|blocks| blocks.iter().map(describe).collect())
+            .unwrap_or_default();
+        if children.is_empty() {
+            name.to_string()
+        } else {
+            format!("{}({})", name, children.join(","))
+        }
+    }
+    let asg = json!(
+        Parser::new_no_target_resolution(env::current_dir().unwrap())
+            .parse(Scanner::new(adoc))
+            .expect("Unable to parse input")
+    );
+    asg["blocks"]
+        .as_array()
+        .expect("Document has no blocks")
+        .iter()
+        .map(describe)
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
 /// Given an asciidoc string and an expected abstract syntax graph json string, assert that the
 /// parser produces the correct json from the asciidoc
 pub fn assert_parsed_doc_matches_expected_asg_from_str(adoc_str: &str, asg_json_str: &str) {

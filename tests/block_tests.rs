@@ -3,7 +3,7 @@ use std::fs;
 
 use common::{
     assert_parsed_doc_matches_expected_asg, assert_parsed_doc_matches_expected_asg_from_str,
-    top_level_block_names,
+    block_tree, top_level_block_names,
 };
 use rstest::rstest;
 
@@ -358,4 +358,23 @@ fn test_subsections_stay_nested() {
         top_level_block_names("== One\n\n=== Sub\n\nText.\n\n== Two\n\nText.\n"),
         ["section", "section"]
     );
+}
+
+/// The same holds inside a section: a subsection is a child of the section, not of the block
+/// that precedes it
+#[rstest]
+#[case::sidebar(
+    "== A\n\n****\nx\n****\n\n=== B\n\ntext\n\n== C\n\nmore\n",
+    "section(sidebar(paragraph),section(paragraph)) section(paragraph)"
+)]
+#[case::inline_admonition(
+    "== A\n\nNOTE: n\n\n=== B\n\ntext\n",
+    "section(admonition(paragraph),section(paragraph))"
+)]
+#[case::table(
+    "== A\n\n|===\n|a\n|===\n\n=== B\n\ntext\n",
+    "section(table(tableCell),section(paragraph))"
+)]
+fn test_subsection_after_block_is_not_nested(#[case] adoc: &str, #[case] expected: &str) {
+    assert_eq!(block_tree(adoc), expected);
 }
