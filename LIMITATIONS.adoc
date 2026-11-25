@@ -19,6 +19,14 @@ non-features.
   `* one`, `+`, `more`, `* two` merges "more" into the first item's text
   ("onemore"), leaves the second item empty, and moves "two" out of the list
   into a paragraph before it. A continuation on the last item of a list works
+* A continuation followed by a blank line and another list item (`* one`, `+`,
+  `para`, a blank line, `* two`) stops the conversion with an error ("invalid
+  block continuation; no previous block") instead of producing output
+* A block attached to a list item without a continuation (`* one`, then a
+  `[source]` listing, then `* two`) reorders and garbles the list
+* A section heading followed immediately by a list, with no blank line between
+  them (`== Head` then `* a`), loses its title: the title text is merged into
+  the first list item ("Heada"). Put a blank line after the heading
 * A footnote in a list item moves the item's text out of the item's principal
   text if an earlier footnote exists in the document
 * `+pass:[]+` inline passthroughs work, but `+++text+++` does not (it is
