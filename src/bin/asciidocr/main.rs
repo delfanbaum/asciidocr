@@ -25,10 +25,11 @@ use cli::{Cli, read_input, read_output};
 fn main() {
     let args = Cli::parse();
 
-    let verbosity = if args.verbose {
-        log::LevelFilter::Info
-    } else if args.debug {
+    // debug is the more detailed level, so it wins when both flags are given
+    let verbosity = if args.debug {
         log::LevelFilter::Debug
+    } else if args.verbose {
+        log::LevelFilter::Info
     } else {
         log::LevelFilter::Warn
     };
