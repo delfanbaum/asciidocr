@@ -57,6 +57,11 @@ loading code simple.
 
 {# ======== shared macros ======== #}
 
+{#- ` id="..."` for a block that was given an id (e.g., with `[[id]]`) -#}
+{%- macro id_attr(block) -%}
+    {%- if block.metadata and block.metadata.attributes and block.metadata.attributes.id %} id="{{ block.metadata.attributes.id | escape_attr }}"{%- endif -%}
+{%- endmacro -%}
+
 {% macro render_title_for_block(block, level=none) %}
         {%- if level -%}
             {%- set title_heading_level = level -%}
@@ -99,7 +104,8 @@ loading code simple.
     {{- warn_unrendered_list_title(block) -}}
     {%- set tag = "ul" if block.variant == "unordered" else "ol" -%}
     <{{tag}}
-    {%- if block.metadata and block.metadata.roles %} class="{{ block.metadata.roles | join(" ") | escape_attr }}"{%- endif -%}>
+    {%- if block.metadata and block.metadata.roles %} class="{{ block.metadata.roles | join(" ") | escape_attr }}"{%- endif -%}
+    {{- id_attr(block) -}}>
     {%- for item in block.items -%}
         {{ render_block(item) }}
     {%- endfor -%}
@@ -125,7 +131,7 @@ loading code simple.
 
 {%- macro render_dlist(block) -%}
     {{- warn_unrendered_list_title(block) -}}
-    <dl>
+    <dl{{ id_attr(block) }}>
     {%- for item in block.items -%}
         {{ render_block(item) }}
     {%- endfor -%}
@@ -246,6 +252,7 @@ loading code simple.
 {%- endif -%}
 {%- if tag -%}<{{tag}}
 {%- if block.metadata and block.metadata.roles %} class="{{ block.metadata.roles | join(" ") | escape_attr }}" {%- endif -%}
+{{- id_attr(block) -}}
 {%- if data_type %} data-type="{{ data_type }}"{%- endif -%}
 {%- if code_language %} data-code-language="{{ code_language | escape_attr }}" {%- endif -%}>{%- endif -%}
     {#- The ASG keeps the newlines next to a delimited block's delimiters, and whitespace matters
@@ -270,7 +277,7 @@ loading code simple.
 {%- set header = true -%}
 {%- set body_start = cols -%}
 {%- endif -%}
-    <table>
+    <table{{ id_attr(block) }}>
     {%- if block.title -%}
     <caption>{%- for inline in block.title -%}
         {{- render_inline(inline) -}}
