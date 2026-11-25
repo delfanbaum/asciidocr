@@ -10,6 +10,25 @@
 {%- endfor -%}
 {%- endmacro -%}
 
+{#- The alt text given for an image, or Asciidoctor's fallback (see `image_alt` in htmls.rs) -#}
+{%- macro alt_text(target, metadata) -%}
+{%- if metadata and metadata.attributes and metadata.attributes.positional_1 -%}
+    {{- metadata.attributes.positional_1 -}}
+{%- else -%}
+    {{- image_alt(target) -}}
+{%- endif -%}
+{%- endmacro -%}
+
+{%- macro render_inlines(inlines) -%}
+{%- for inline in inlines -%}
+    {%- if inline.name == "text" and loop.nextitem and loop.nextitem.name == "linebreak" -%}
+        {{- inline.value | trim(" ") -}}
+    {%- else -%}
+        {{- render_inline(inline) -}}
+    {%- endif -%}
+{%- endfor -%}
+{%- endmacro -%}
+
 {%- macro render_inline(inline) -%}
 {%- if inline.name == "linebreak" -%}
     <br>
@@ -24,6 +43,8 @@
     <a href="{{ inline.target }}"{% if not inline.inlines %} class="bare"{% endif %}>
     {%- if inline.inlines -%}{{- render_inlines(inline.inlines) -}}{%- else -%}{{- inline.target -}}{%- endif -%}
     </a>
+{%- elif inline.name == "ref" and inline.variant == "image" -%}
+    <span class="image"><img src="{{ inline.target }}" alt="{{ alt_text(inline.target, inline.metadata) }}"></span>
 {%- elif inline.name == "ref" and inline.variant == "xref" -%}
     <a href="#{{ inline.target }}">
     {%- if inline.inlines -%}{{- render_inlines(inline.inlines) -}}{%- else -%}[{{ inline.target }}]{%- endif -%}

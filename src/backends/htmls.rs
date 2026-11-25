@@ -86,6 +86,14 @@ fn asciidoctor_section_id(title_html: &str) -> String {
     format!("_{}", id.trim_end_matches('_'))
 }
 
+/// Asciidoctor's fallback alt text for an image: the file name without folders or extension,
+/// with spaces in place of hyphens and underscores (e.g., `img/my-pic_1.png` becomes "my pic 1").
+fn asciidoctor_image_alt(target: &str) -> String {
+    let file_name = target.rsplit('/').next().unwrap_or(target);
+    let stem = file_name.split('.').next().unwrap_or(file_name);
+    stem.replace(['-', '_'], " ")
+}
+
 /// Renders the template named `base_template` after loading all of `templates` into a fresh
 /// environment; each backend gets its own environment, so template names can repeat across them.
 fn render_from_templates(
@@ -115,6 +123,16 @@ fn render_from_templates(
             format!("{id}_{count}")
         }
     });
+    // Asciidoctor numbers captioned blocks by kind ("Figure 1.", "Figure 2.", ...); the templates
+    // ask for the next number as they go
+    let counters: Mutex<HashMap<String, usize>> = Mutex::new(HashMap::new());
+    env.add_function("next_number", move |kind: String| {
+        let mut counters = counters.lock().unwrap();
+        let count = counters.entry(kind).or_insert(0);
+        *count += 1;
+        *count
+    });
+    env.add_function("image_alt", |target: String| asciidoctor_image_alt(&target));
     for (name, template) in templates {
         env.add_template(name, template)
             .unwrap_or_else(|_| panic!("Error loading template: {}", name))
@@ -167,5 +185,13 @@ mod tests {
     #[case::replaced_punctuation("One&#8201;&#8212;&#8201;two", "_onetwo")]
     fn test_asciidoctor_section_id(#[case] title: &str, #[case] expected: &str) {
         assert_eq!(asciidoctor_section_id(title), expected);
+    }
+
+    #[rstest]
+    #[case::plain("pixel.png", "pixel")]
+    #[case::separators("my-other_pixel.png", "my other pixel")]
+    #[case::folders("img/sub/pic.jpg", "pic")]
+    fn test_asciidoctor_image_alt(#[case] target: &str, #[case] expected: &str) {
+        assert_eq!(asciidoctor_image_alt(target), expected);
     }
 }

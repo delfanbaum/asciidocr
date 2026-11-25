@@ -5,7 +5,7 @@ each other recursively. The markup follows Asciidoctor's (so that its stylesheet
 HTMLBook's.
 
 -#}
-{%- from "inline.html" import render_inlines -%}
+{%- from "inline.html" import render_inlines, alt_text -%}
 
 {%- macro render_block(block) -%}
 {%- if block.name == "paragraph" -%}
@@ -32,6 +32,8 @@ HTMLBook's.
     {{ render_dlist(block) }}
 {%- elif block.name == "table" -%}
     {{ render_table(block) }}
+{%- elif block.name == "image" -%}
+    {{ render_image(block) }}
 {%- elif block.name in ["sidebar", "open"] -%}
     {{ render_parent_block(block) }}
 {%- endif -%}
@@ -257,4 +259,15 @@ HTMLBook's.
 {%- endfor %}
 </tbody>
 </table>
+{%- endmacro -%}
+
+{%- macro render_image(block) %}
+<div class="imageblock">
+<div class="content">
+<img src="{{ block.target }}" alt="{{ alt_text(block.target, block.metadata) }}">
+</div>
+{%- if block.caption %}
+<div class="title">Figure {{ next_number("figure") }}. {{ render_inlines(block.caption) }}</div>
+{%- endif %}
+</div>
 {%- endmacro -%}
