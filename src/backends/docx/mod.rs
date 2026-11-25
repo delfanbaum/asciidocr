@@ -24,6 +24,16 @@ fn strip_east_asian_layout_flags(settings: Vec<u8>) -> Vec<u8> {
         .into_bytes()
 }
 
+/// docx-rs always writes its own empty `Normal` style ahead of the styles we add, so
+/// `styles.xml` ends up with two definitions. Word uses the first one (and so ignores our font,
+/// size, spacing and indent) while LibreOffice uses the last; we drop the empty one.
+fn strip_default_normal_style(styles: Vec<u8>) -> Vec<u8> {
+    const EMPTY_NORMAL: &str = r#"<w:style w:type="paragraph" w:styleId="Normal"><w:name w:val="Normal" /><w:rPr /><w:pPr><w:rPr /></w:pPr><w:qFormat /></w:style>"#;
+    String::from_utf8_lossy(&styles)
+        .replacen(EMPTY_NORMAL, "", 1)
+        .into_bytes()
+}
+
 /// !Experimental! Renders a Docx file. Some [`Asg`] blocks are still unsupported.
 pub fn render_docx(graph: &Asg, output_path: &Path) -> Result<(), ConversionError> {
     let file = File::create(output_path).unwrap();
@@ -45,6 +55,7 @@ pub fn render_docx(graph: &Asg, output_path: &Path) -> Result<(), ConversionErro
     }
     let mut xml_docx = docx.build();
     xml_docx.settings = strip_east_asian_layout_flags(xml_docx.settings);
+    xml_docx.styles = strip_default_normal_style(xml_docx.styles);
     match xml_docx.pack(file) {
         Ok(_) => Ok(()),
         Err(_) => Err(ConversionError::DocxRender(DocxRenderError::ZipFileError)),

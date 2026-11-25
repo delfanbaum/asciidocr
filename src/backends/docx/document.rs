@@ -2,7 +2,7 @@ use std::{fs::File, io::Read};
 
 use docx_rs::{
     BreakType, Docx, Header, IndentLevel, LineSpacing, Numbering, NumberingId, PageMargin, PageNum,
-    Paragraph, Pic, Run, RunFonts, RunProperty, Style, Table, TableCell, TableRow, VertAlignType,
+    Paragraph, Pic, Run, RunFonts, Style, Table, TableCell, TableRow, VertAlignType,
 };
 use once_cell::sync::Lazy;
 use regex::Regex;
@@ -375,17 +375,21 @@ impl DocxWriter {
     /// Adds inlines to a given paragraph
     pub fn add_inlines_to_para(&mut self, mut para: Paragraph, inlines: Vec<Inline>) -> Paragraph {
         for inline in inlines.iter() {
-            for run in self.runs_from_inline(inline) {
+            for run in self.runs_from_inline(inline, &[]) {
                 para = para.add_run(run)
             }
         }
         para
     }
 
-    /// Creates runs from inlines, called from a block
-    fn runs_from_inline(&mut self, inline: &Inline) -> Vec<Run> {
-        let mut variants: Vec<&InlineSpanVariant> = vec![];
-        let mut runs: Vec<Run> = vec![];
+    /// Creates runs from an inline. The `variants` slice holds the spans enclosing this inline;
+    /// each recursion gets its own extended copy, so a span's formatting never leaks into the
+    /// siblings that follow it.
+    fn runs_from_inline<'a>(
+        &mut self,
+        inline: &'a Inline,
+        variants: &[&'a InlineSpanVariant],
+    ) -> Vec<Run> {
         match inline {
             Inline::InlineLiteral(lit) => {
                 let mut literal_text = lit.value_or_refd_char();
@@ -393,92 +397,56 @@ impl DocxWriter {
                     literal_text = literal_text.trim_start().into();
                     self.line_break_before = false;
                 }
-                runs.push(
-                    Run::new().add_text(RE_WHITESPACE_NEWLINE.replace_all(&literal_text, " ")),
-                );
+                let text = RE_WHITESPACE_NEWLINE.replace_all(&literal_text, " ");
+                vec![styled_run(&text, variants)]
             }
             Inline::InlineSpan(span) => {
-                variants.push(&span.variant);
-                for inline in span.inlines.iter() {
-                    runs.extend(self.runs_from_inline_with_variant(inline, &mut variants))
-                }
+                let mut nested = variants.to_vec();
+                nested.push(&span.variant);
+                span.inlines
+                    .iter()
+                    .flat_map(|inline| self.runs_from_inline(inline, &nested))
+                    .collect()
             }
             Inline::InlineBreak(_) => {
-                runs.push(Run::new().add_break(BreakType::TextWrapping));
                 self.line_break_before = true;
+                vec![Run::new().add_break(BreakType::TextWrapping)]
             }
-            Inline::InlineRef(iref) => {
-                // for now, just append the text; we can handle the actual linking later, as that's
-                // more complicated
-                for inline in iref.inlines.iter() {
-                    runs.extend(self.runs_from_inline_with_variant(inline, &mut variants))
-                }
-            }
+            // for now, just append the text; we can handle the actual linking later, as that's
+            // more complicated
+            Inline::InlineRef(iref) => iref
+                .inlines
+                .iter()
+                .flat_map(|inline| self.runs_from_inline(inline, variants))
+                .collect(),
         }
-        runs
     }
+}
 
-    /// The version that allows for recursion, specifically nested inline spans
-    fn runs_from_inline_with_variant<'a>(
-        &mut self,
-        inline: &'a Inline,
-        variants: &mut Vec<&'a InlineSpanVariant>,
-    ) -> Vec<Run> {
-        let mut runs: Vec<Run> = Vec::new();
-        match inline {
-            Inline::InlineLiteral(lit) => {
-                let mut literal_text = lit.value_or_refd_char().replace("\n", " ");
-                if self.line_break_before {
-                    literal_text = literal_text.trim_start().into();
-                    self.line_break_before = false;
-                }
-                let mut run = Run::new().add_text(literal_text);
-                if !variants.is_empty() {
-                    for variant in variants {
-                        match variant {
-                            InlineSpanVariant::Strong => run = run.bold(),
-                            InlineSpanVariant::Emphasis => run = run.italic(),
-                            InlineSpanVariant::Code => {
-                                run = run.fonts(RunFonts::new().ascii("Courier New"))
-                            }
-                            InlineSpanVariant::Mark => run = run.highlight("yellow"),
-                            InlineSpanVariant::Subscript => {
-                                run.run_property =
-                                    RunProperty::new().vert_align(VertAlignType::SubScript)
-                            }
-                            InlineSpanVariant::Superscript => {
-                                run.run_property =
-                                    RunProperty::new().vert_align(VertAlignType::SuperScript)
-                            }
-                            InlineSpanVariant::Footnote => {
-                                eprintln!(
-                                    "Footnotes are not well supported; footnote text will be included in-line and higlighted for the time being."
-                                );
-                                run = run.highlight("blue")
-                            }
-                        }
-                    }
-                }
-                runs.push(run)
+/// Builds a run of text with the formatting of every enclosing span applied together.
+fn styled_run(text: &str, variants: &[&InlineSpanVariant]) -> Run {
+    let mut run = Run::new().add_text(text);
+    for variant in variants {
+        run = match variant {
+            InlineSpanVariant::Strong => run.bold(),
+            InlineSpanVariant::Emphasis => run.italic(),
+            InlineSpanVariant::Code => run.fonts(RunFonts::new().ascii("Courier New")),
+            InlineSpanVariant::Mark => run.highlight("yellow"),
+            InlineSpanVariant::Subscript => {
+                run.run_property = run.run_property.vert_align(VertAlignType::SubScript);
+                run
             }
-            Inline::InlineSpan(span) => {
-                variants.push(&span.variant);
-                for inline in span.inlines.iter() {
-                    runs.extend(self.runs_from_inline_with_variant(inline, variants))
-                }
+            InlineSpanVariant::Superscript => {
+                run.run_property = run.run_property.vert_align(VertAlignType::SuperScript);
+                run
             }
-            Inline::InlineBreak(_) => {
-                runs.push(Run::new().add_break(BreakType::TextWrapping));
-                self.line_break_before = true;
+            InlineSpanVariant::Footnote => {
+                eprintln!(
+                    "Footnotes are not well supported; footnote text will be included in-line and higlighted for the time being."
+                );
+                run.highlight("blue")
             }
-            Inline::InlineRef(iref) => {
-                // for now, just append the text; we can handle the actual linking later, as that's
-                // more complicated
-                for inline in iref.inlines.iter() {
-                    runs.extend(self.runs_from_inline_with_variant(inline, variants))
-                }
-            }
-        }
-        runs
+        };
     }
+    run
 }
