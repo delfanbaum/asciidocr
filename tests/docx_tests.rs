@@ -6,10 +6,13 @@ mod docx_tests {
     use std::fs;
     use std::path::PathBuf;
 
-    use crate::common::{generate_temp_image, rendered_docx_part};
+    use crate::common::{
+        assert_rendered_docx_runs_match_expected, generate_temp_image, rendered_docx_part,
+    };
     use asciidocr::backends::docx::render_docx;
     use asciidocr::parser::Parser;
     use asciidocr::scanner::Scanner;
+    use rstest::rstest;
     use tempfile::NamedTempFile;
 
     #[test]
@@ -63,5 +66,36 @@ mod docx_tests {
         );
         // We still want the rest of the compat block
         assert!(settings.contains("compatibilityMode"), "{settings}");
+    }
+
+    #[rstest]
+    #[case::emphasis_spacing("docx/emphasis-spacing")]
+    #[case::nested_spans("docx/nested-spans")]
+    #[case::sub_sup_with_bold("docx/sub-sup-with-bold")]
+    #[case::multiline_spans("docx/multiline-spans")]
+    fn test_inline_runs(#[case] fn_pattern: &str) {
+        let adoc_fn = format!("{}.adoc", fn_pattern);
+        let json_fn = format!("{}.json", fn_pattern);
+        assert_rendered_docx_runs_match_expected(&adoc_fn, &json_fn)
+    }
+
+    #[test]
+    fn styles_are_defined_only_once() {
+        let adoc = fs::read_to_string("tests/data/docx/emphasis-spacing.adoc").unwrap();
+        let styles = rendered_docx_part(&adoc, "word/styles.xml");
+        let doc = roxmltree::Document::parse(&styles).unwrap();
+        let mut ids: Vec<&str> = doc
+            .descendants()
+            .filter(|n| n.is_element() && n.tag_name().name() == "style")
+            .filter_map(|n| {
+                n.attributes()
+                    .find(|a| a.name() == "styleId")
+                    .map(|a| a.value())
+            })
+            .collect();
+        let total = ids.len();
+        ids.sort();
+        ids.dedup();
+        assert_eq!(total, ids.len(), "duplicate styleIds in styles.xml");
     }
 }

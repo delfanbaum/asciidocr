@@ -130,3 +130,72 @@ pub fn rendered_docx_part(adoc: &str, part: &str) -> String {
         .unwrap();
     xml
 }
+
+/// A flattened view of one docx run, so tests can compare formatting without caring about XML.
+#[cfg(feature = "docx")]
+#[derive(Debug, Default, PartialEq, serde::Serialize)]
+pub struct RunSummary {
+    pub text: String,
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub bold: bool,
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub italic: bool,
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub mono: bool,
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub highlight: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub vert_align: Option<String>,
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub line_break: bool,
+}
+
+/// Renders Asciidoc source to docx and summarizes the runs of every body paragraph.
+#[cfg(feature = "docx")]
+pub fn rendered_docx_runs(adoc: &str) -> Vec<Vec<RunSummary>> {
+    let xml = rendered_docx_part(adoc, "word/document.xml");
+    let doc = roxmltree::Document::parse(&xml).expect("document.xml is not valid XML");
+    let named = |n: &roxmltree::Node, name: &str| n.is_element() && n.tag_name().name() == name;
+    doc.descendants()
+        .filter(|n| named(n, "p"))
+        .map(|p| {
+            p.children()
+                .filter(|r| named(r, "r"))
+                .map(|r| {
+                    let mut run = RunSummary::default();
+                    for prop in r.descendants().filter(|n| n.is_element()) {
+                        match prop.tag_name().name() {
+                            "b" => run.bold = true,
+                            "i" => run.italic = true,
+                            "highlight" => run.highlight = true,
+                            "rFonts" => {
+                                run.mono = prop.attributes().any(|a| a.value() == "Courier New")
+                            }
+                            "vertAlign" => {
+                                run.vert_align =
+                                    prop.attributes().next().map(|a| a.value().to_string())
+                            }
+                            "br" => run.line_break = true,
+                            "t" => run.text.push_str(prop.text().unwrap_or_default()),
+                            _ => {}
+                        }
+                    }
+                    run
+                })
+                .collect()
+        })
+        .collect()
+}
+
+/// Asserts that the runs rendered from `adoc_fn` (inside tests/data) match the expected JSON.
+#[cfg(feature = "docx")]
+pub fn assert_rendered_docx_runs_match_expected(adoc_fn: &str, json_fn: &str) {
+    let test_dir = PathBuf::from("tests/data/");
+    let adoc = fs::read_to_string(test_dir.join(adoc_fn)).expect("Unable to find adoc");
+    let expected: Value = serde_json::from_str(
+        &fs::read_to_string(test_dir.join(json_fn)).expect("Unable to find expected json"),
+    )
+    .expect("Expected json is invalid");
+    let actual = serde_json::to_value(rendered_docx_runs(&adoc)).unwrap();
+    assert_json_eq!(actual, expected);
+}
