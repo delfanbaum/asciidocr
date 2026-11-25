@@ -34,14 +34,14 @@ Also run:
 
 ```console
 cargo fmt                      # default rustfmt settings; there is no rustfmt.toml
-cargo clippy --all-features
+cargo clippy --all-features --all-targets
 ```
 
 - Always pass `--all-features`. The `docx` and `json` code and tests only compile with their
   features enabled, so a plain `cargo test` skips them.
 - The author uses `bacon` (`bacon.toml`). Its default job is `test-features`, and `c` runs
   clippy with all features.
-- Clippy and `cargo fmt --check` are both clean. Keep them that way: don't add warnings, and
+- Clippy (with `--all-targets`, so tests are linted too) and `cargo fmt --check` are both clean. Keep them that way: don't add warnings, and
   put any lint-only or format-only change in its own commit.
 
 ## Code conventions
@@ -73,11 +73,22 @@ cargo clippy --all-features
 - **Unit tests** live inline at the bottom of the file, in `#[cfg(test)] mod tests { use super::*; ... }`.
   Use small local helpers (for example `scan_and_assert_eq`, `newline_token_at`).
 - **Integration tests** live in `tests/*_tests.rs`, named by area: `block_tests`, `inline_tests`,
-  `document_tests`, `htmlbook_tests`, `docx_tests`, `log_tests`, `offset_tests`. Each one starts
-  with `pub mod common;` and uses the shared assertion helpers in `tests/common/mod.rs`:
+  `document_tests`, `htmlbook_tests`, `asciidoctor_html_tests`, `docx_tests`, `log_tests`,
+  `offset_tests`, and `cli_tests` (which runs the `asciidocr` binary itself). Each one starts
+  with `pub mod common;` (except `cli_tests`) and uses the shared helpers in `tests/common/mod.rs`:
   - `assert_parsed_doc_matches_expected_asg(adoc_fn, json_fn)`
   - `assert_parsed_doc_matches_expected_asg_from_str(adoc, json)`
-  - `assert_rendered_htmlbook_matches_expected(adoc_fn, html_fn)`. It ignores whitespace.
+  - `assert_rendered_htmlbook_matches_expected(adoc_fn, html_fn)` and its `_embedded_` sibling.
+    They ignore whitespace.
+  - `assert_rendered_asciidoctor_html_matches_expected(adoc_fn, html_fn)` (a full document; it
+    ignores whitespace and the "Last updated" time) and
+    `assert_rendered_asciidoctor_embedded_matches_expected`
+  - `parsed_text(adoc)`, `top_level_block_names(adoc)` and `block_tree(adoc)` for tests that
+    only care about a document's text or how its blocks nest, without hand-writing JSON with
+    locations
+  - `rendered_docx_part(adoc, part)`, `rendered_docx_runs(adoc)` and
+    `assert_rendered_docx_runs_match_expected(adoc_fn, json_fn)` for docx: the runs of each
+    paragraph (text, bold, italic, ...) are compared against a `.json` fixture in `tests/data/docx/`
 
   Add a helper to `common` instead of repeating parse/render boilerplate.
 - **Fixtures** live in `tests/data/<area>/`, as an `.adoc` file and its expected output under the
@@ -102,6 +113,15 @@ cargo clippy --all-features
   `htmlbook_tests.rs`.
 - Tests that need real files use `tempfile` (and `image` to generate test images). Parse with
   `Parser::new_no_target_resolution` unless the test is about target resolution.
+- **Whitespace**: the HTML comparison helpers ignore whitespace, so they cannot see bugs inside
+  `<pre>` or verse blocks. When whitespace matters, add an exact test (render to a string with
+  `render_htmlbook_embedded_from_str`/`render_asciidoctor_embedded_from_str` and `assert!(html.contains(..))`).
+- **Logging** (`tests/log_tests.rs`): `Logger::start` can only be called once per process, so the
+  tests share one `logtest` logger behind a mutex (see the `logger()` helper); anything logged by
+  earlier tests is discarded when a test takes the lock.
+- **Hangs**: a test that could loop forever should parse on its own thread and use
+  `recv_timeout`, so that a regression fails the test instead of hanging the run (see
+  `test_unclosed_include_is_text`).
 - Bug fixes start with a failing test and fixture that reproduce the bug.
 - Never edit an expected `.json`/`.html` fixture just to make a test pass. Fix the code, or
   explain why the expected output was wrong.
@@ -131,7 +151,27 @@ cargo clippy --all-features
   `register_footnote`/`footnotes`, `image_alt`). Those tests ignore whitespace, so whitespace
   that matters (inside `<pre>`) has its own exact-match test.
 - minijinja environments in `src/backends/htmls.rs` have autoescape turned off, because the parser
-  already entity-encodes text. Don't add `| safe` or re-escape in templates.
+  makes character references (`&#8217;`, `&amp;`) of replacements and of references the author
+  wrote, and those must not be escaped again. Templates escape the rest themselves, with the
+  `escape_text` filter (text: `&`, `<`, `>`) on `text` literals and the `escape_attr` filter
+  (also `"`) on every attribute value. Passthrough content (`pass` blocks, `raw` literals) is
+  output as written. Don't add `| safe`.
+- Templates report recoverable problems in the document through the `warn(...)` template function,
+  with a `"Line {n}: …"` message (e.g., the HTMLBook list-title warning); tests assert on these
+  (`tests/log_tests.rs`), so don't reword them casually.
+- **Titles** (decided 2026-11-25, checked against Asciidoctor 2.0.17):
+
+  | Block | HTMLBook | Asciidoctor-style |
+  | --- | --- | --- |
+  | listing, literal, verse | wrapped in `<div data-type="example">` with an `<h5>` | `<div class="title">` |
+  | example, sidebar | `<h5>` | `<div class="title">`; examples are numbered ("Example 1.") |
+  | admonition (both forms) | `<h1>` | `<div class="title">` in the content cell |
+  | table | `<caption>` | `<caption class="title">`, numbered ("Table 1.") |
+  | image | `<figcaption>` | `<div class="title">`, numbered ("Figure 1.") |
+  | list, description list | kept in the ASG, not rendered; a `warn!` is logged | rendered |
+  | paragraph | not supported: dropped with a warning (the paragraph is kept) | same |
+
+  The DOCX backend renders none of the list titles.
 - HTMLBook block macros live in one file (`templates/htmlbook/block.html.jinja`) so they can
   recurse through `render_block`. minijinja filters take positional args (`join(" ")`, not
   `join(sep=" ")`), and attribute access on a missing `metadata` errors, so guard it first.
