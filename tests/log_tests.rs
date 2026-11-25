@@ -46,3 +46,21 @@ fn test_title_on_paragraph_warns() {
         "expected a paragraph title warning, got: {warnings:?}"
     );
 }
+
+#[test]
+fn test_title_on_list_warns() {
+    let mut logger = logger();
+    assert_rendered_htmlbook_matches_expected(
+        "htmlbook/list-title-not-rendered.adoc",
+        "htmlbook/list-title-not-rendered.html",
+    );
+    let mut warnings = vec![];
+    while let Some(record) = logger.pop() {
+        warnings.push(record.args().to_owned());
+    }
+    assert!(
+        warnings.iter().any(|w| w.contains("Line 2")
+            && w.contains("Titles on lists are not rendered by the HTMLBook backend yet")),
+        "expected a list title warning, got: {warnings:?}"
+    );
+}

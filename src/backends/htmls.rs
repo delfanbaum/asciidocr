@@ -1,4 +1,5 @@
 use chrono::Local;
+use log::warn;
 use minijinja::{AutoEscape, Environment, context};
 
 use crate::errors::ConversionError;
@@ -43,6 +44,11 @@ fn render_from_templates(
     // Content is already entity-encoded by the parser, so don't escape a second time.
     let mut env = Environment::new();
     env.set_auto_escape_callback(|_| AutoEscape::None);
+    // lets templates report recoverable problems in the document (e.g., unsupported titles)
+    env.add_function("warn", |message: String| {
+        warn!("{message}");
+        String::new()
+    });
     for (name, template) in templates {
         env.add_template(name, template)
             .expect(&format!("Error loading template: {}", name))

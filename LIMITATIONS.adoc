@@ -16,13 +16,14 @@ three-column table, but with columns of "default" widths. Tables also do not
 currently support spanning columns or rows; if you require this functionality,
 please use an HTML table in a passthrough block.
 
-Block titles on leaf blocks:: Titles on listing, literal, verse and similar
-leaf blocks are parsed but not currently rendered by the HTMLBook backend. Titles
-on admonitions, examples, sidebars and images do render. Support is planned.
+Block titles:: Titles on listing, literal and verse blocks, tables,
+admonitions, examples, sidebars and images are rendered. Titles on passthrough
+blocks are parsed but not rendered.
 
-Titles on lists:: A block title above a list (`.Title` then `* item`) is not
-currently rendered, and is quietly discarded; support is planned, but list
-parsing needs some work first.
+Titles on lists:: A block title above a list (`.Title` then `* item`) is
+parsed and kept in the ASG, but is intentionally not rendered by the HTMLBook
+backend (or the DOCX backend) yet; the HTMLBook backend logs a warning
+instead. Asciidoctor-style output, which does render them, is planned.
 
 Titles on paragraphs:: Not supported, and not planned. The paragraph is kept,
 and the title is dropped with a warning.

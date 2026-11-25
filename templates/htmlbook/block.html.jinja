@@ -88,7 +88,15 @@ loading code simple.
 </section>
 {%- endmacro -%}
 
+{#- List titles are kept in the ASG, but intentionally not rendered by this backend (yet) -#}
+{%- macro warn_unrendered_list_title(block) -%}
+    {%- if block.title -%}
+        {{- warn("Line " ~ block.location[0].line ~ ": Titles on lists are not rendered by the HTMLBook backend yet") -}}
+    {%- endif -%}
+{%- endmacro -%}
+
 {%- macro render_list(block) -%}
+    {{- warn_unrendered_list_title(block) -}}
     {%- set tag = "ul" if block.variant == "unordered" else "ol" -%}
     <{{tag}}
     {%- if block.metadata and block.metadata.roles %} class="{{ block.metadata.roles | join(" ") }}"{%- endif -%}>
@@ -116,6 +124,7 @@ loading code simple.
 {%- endmacro -%}
 
 {%- macro render_dlist(block) -%}
+    {{- warn_unrendered_list_title(block) -}}
     <dl>
     {%- for item in block.items -%}
         {{ render_block(item) }}
