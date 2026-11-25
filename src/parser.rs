@@ -750,7 +750,9 @@ impl Parser {
             }
             self.push_block_to_stack(Block::List(list))?;
         }
-        // either way, add the new list item
+        // either way, add the new list item, whose text follows on this line even if an
+        // attribute line or a section heading asked for a new block
+        self.force_new_block = false;
         self.push_block_to_stack(Block::ListItem(list_item))
     }
     //
@@ -772,7 +774,9 @@ impl Parser {
             }
             self.push_block_to_stack(Block::List(list))?;
         }
-        // either way, add the new list item
+        // either way, add the new list item, whose text follows on this line even if an
+        // attribute line or a section heading asked for a new block
+        self.force_new_block = false;
         self.push_block_to_stack(Block::ListItem(list_item))
     }
 
