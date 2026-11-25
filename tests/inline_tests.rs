@@ -110,6 +110,23 @@ fn test_spans_across_newlines(#[case] markup_char: &str, #[case] variant: &str) 
     assert_parsed_doc_matches_expected_asg_from_str(&adoc_str, &asg_json_str)
 }
 
+/// A span that closes at the end of a line must not swallow a span that opens at the start of
+/// the next line
+#[rstest]
+#[case::emphasis("_", "emphasis")]
+#[case::strong("*", "strong")]
+#[case::code("`", "code")]
+#[case::mark("#", "mark")]
+fn test_spans_adjacent_across_newline(#[case] markup_char: &str, #[case] variant: &str) {
+    let adoc_str = fs::read_to_string("tests/data/inlines/spans-adjacent-across-newline.adoc")
+        .expect("Unable to read asciidoc test template")
+        .replace("0", markup_char);
+    let asg_json_str = fs::read_to_string("tests/data/inlines/spans-adjacent-across-newline.json")
+        .expect("Unable to read asg json test template")
+        .replace("VARIANT", variant);
+    assert_parsed_doc_matches_expected_asg_from_str(&adoc_str, &asg_json_str)
+}
+
 #[test]
 fn test_spans_in_doc_title() {
     let fn_pattern = "inlines/document-header";
