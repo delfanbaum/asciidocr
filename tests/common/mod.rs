@@ -108,6 +108,17 @@ pub fn assert_rendered_asciidoctor_html_matches_expected(adoc_fn: &str, html_fn:
     assert_eq!(rendered_html, expected_html);
 }
 
+/// Renders Asciidoc source to embedded Asciidoctor-styled html, keeping whitespace as is (for
+/// tests of things like `<pre>` contents, where whitespace matters)
+pub fn render_asciidoctor_embedded_from_str(adoc: &str) -> String {
+    render_asciidoctor_html_embedded(
+        &Parser::new_no_target_resolution(env::current_dir().unwrap())
+            .parse(Scanner::new(adoc))
+            .expect("Unable to parse input"),
+    )
+    .expect("Unable to render HTML from document")
+}
+
 /// Given a pattern "parent/filename" inside tests/data, assert that the filename.adoc produces the
 /// embedded Asciidoctor-styled html (i.e., the document contents only, like `asciidoctor -s`)
 /// found in filename.html. Ignores whitespace.

@@ -1,3 +1,15 @@
+{#- Renders inlines one after the other. Asciidoctor drops the space that precedes a hard line
+    break (" +"), so text followed by a break loses its trailing whitespace. -#}
+{%- macro render_inlines(inlines) -%}
+{%- for inline in inlines -%}
+    {%- if inline.name == "text" and loop.nextitem and loop.nextitem.name == "linebreak" -%}
+        {{- inline.value | trim(" ") -}}
+    {%- else -%}
+        {{- render_inline(inline) -}}
+    {%- endif -%}
+{%- endfor -%}
+{%- endmacro -%}
+
 {%- macro render_inline(inline) -%}
 {%- if inline.name == "linebreak" -%}
     <br>
@@ -5,10 +17,13 @@
     {%- set tags = {"strong": "strong", "emphasis": "em", "code": "code", "mark": "mark", "superscript": "sup", "subscript": "sub"} -%}
     {%- set tag = tags[inline.variant] -%}
     {%- if tag -%}<{{ tag }}>{%- endif -%}
-    {%- for child in inline.inlines -%}
-        {{- render_inline(child) -}}
-    {%- endfor -%}
+    {{- render_inlines(inline.inlines) -}}
     {%- if tag -%}</{{ tag }}>{%- endif -%}
+{%- elif inline.name == "ref" and inline.variant == "link" -%}
+    {#- a link with no text of its own is a "bare" URL -#}
+    <a href="{{ inline.target }}"{% if not inline.inlines %} class="bare"{% endif %}>
+    {%- if inline.inlines -%}{{- render_inlines(inline.inlines) -}}{%- else -%}{{- inline.target -}}{%- endif -%}
+    </a>
 {%- elif inline.value -%}
     {{- inline.value -}}
 {%- endif -%}

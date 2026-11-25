@@ -5,7 +5,7 @@ each other recursively. The markup follows Asciidoctor's (so that its stylesheet
 HTMLBook's.
 
 -#}
-{%- from "inline.html" import render_inline -%}
+{%- from "inline.html" import render_inlines -%}
 
 {%- macro render_block(block) -%}
 {%- if block.name == "paragraph" -%}
@@ -14,16 +14,17 @@ HTMLBook's.
     {{ render_section(block) }}
 {%- elif block.name == "list" -%}
     {{ render_list(block) }}
-{%- elif block.name == "listing" -%}
-    {{ render_listing(block) }}
+{%- elif block.name in ["listing", "literal"] -%}
+    {{ render_verbatim_block(block) }}
+{%- elif block.name == "verse" -%}
+    {{ render_verse(block) }}
+{%- elif block.name == "pass" -%}
+    {{ verbatim_text(block) }}
+{%- elif block.name == "break" -%}
+    {{ render_break(block) }}
 {%- elif block.name in ["sidebar", "open"] -%}
     {{ render_parent_block(block) }}
 {%- endif -%}
-{%- endmacro -%}
-
-{#- the inlines of a block, one after the other -#}
-{%- macro render_inlines(inlines) -%}
-{%- for inline in inlines -%}{{- render_inline(inline) -}}{%- endfor -%}
 {%- endmacro -%}
 
 {%- macro render_title(block) -%}
@@ -79,18 +80,39 @@ HTMLBook's.
 </div>
 {%- endmacro -%}
 
-{%- macro render_listing(block) %}
-{%- set language = block.metadata.attributes.language if block.metadata and block.metadata.attributes else none %}
-<div class="listingblock">
+{#- The ASG keeps the newlines that follow the opening delimiter and precede the closing one;
+    Asciidoctor drops them, and whitespace matters inside <pre> -#}
+{%- macro verbatim_text(block) -%}
+{{- render_inlines(block.inlines) | trim("\n") -}}
+{%- endmacro -%}
+
+{%- macro render_verbatim_block(block) %}
+{%- set language = block.metadata.attributes.language if block.name == "listing" and block.metadata and block.metadata.attributes else none %}
+<div class="{{ 'listingblock' if block.name == 'listing' else 'literalblock' }}">
 {{- render_title(block) }}
 <div class="content">
 {%- if language %}
-<pre class="highlight"><code class="language-{{ language }}" data-lang="{{ language }}">{{ render_inlines(block.inlines) }}</code></pre>
+<pre class="highlight"><code class="language-{{ language }}" data-lang="{{ language }}">{{ verbatim_text(block) }}</code></pre>
 {%- else %}
-<pre>{{ render_inlines(block.inlines) }}</pre>
+<pre>{{ verbatim_text(block) }}</pre>
 {%- endif %}
 </div>
 </div>
+{%- endmacro -%}
+
+{%- macro render_verse(block) %}
+<div class="verseblock">
+{{- render_title(block) }}
+<pre class="content">{{ verbatim_text(block) }}</pre>
+</div>
+{%- endmacro -%}
+
+{%- macro render_break(block) -%}
+{%- if block.variant == "page" %}
+<div style="page-break-after: always;"></div>
+{%- elif block.variant == "thematic" %}
+<hr>
+{%- endif -%}
 {%- endmacro -%}
 
 {#- Sidebars put their title inside the content div; open blocks put it before -#}
