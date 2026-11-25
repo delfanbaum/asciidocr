@@ -127,6 +127,17 @@ fn test_spans_adjacent_across_newline(#[case] markup_char: &str, #[case] variant
     assert_parsed_doc_matches_expected_asg_from_str(&adoc_str, &asg_json_str)
 }
 
+/// Like Asciidoctor, a newline that precedes a span nested in an open span is text in the
+/// enclosing span, not the start of the nested span
+#[rstest]
+#[case::after_closed_span("inlines/nested-span-after-newline-closed-span")]
+#[case::after_text("inlines/nested-span-after-newline-text")]
+fn test_nested_span_after_newline(#[case] fn_pattern: &str) {
+    let adoc_fn = format!("{}.adoc", fn_pattern);
+    let asg_json_fn = format!("{}.json", fn_pattern);
+    assert_parsed_doc_matches_expected_asg(&adoc_fn, &asg_json_fn)
+}
+
 #[test]
 fn test_spans_in_doc_title() {
     let fn_pattern = "inlines/document-header";
