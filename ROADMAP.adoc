@@ -1,0 +1,252 @@
+= Roadmap
+
+The plan for the next three releases, and some ideas beyond them. Each release
+has one theme, a scope, a bar for calling it done, and the decisions it needs
+before work starts. Known gaps that aren't scheduled yet live in
+`LIMITATIONS.adoc`.
+
+Sizes are rough: *S* (an afternoon), *M* (a few sessions), *L* (needs a design
+pass first).
+
+== 0.3: Lists and the known bugs
+
+Theme: empty the README's "Known Bugs" section. Almost everything here is a
+parser bug that a writer hits in ordinary prose. The one new language feature
+is the document header, which goes into the ASG now so that the 0.4 Python
+bindings and DOCX title page can build on it.
+
+=== Lists (L)
+
+List parsing needs a design pass before more patches: the continuation bugs all
+look like the same stack-handling problem, and nested lists need the same
+machinery.
+
+* [ ] Nested lists: `+* parent+` / `+** nested+` (and `.` / `..`), including
+  mixed ordered and unordered lists
+* [ ] A continued item followed by another item (`+* one+`, `+`, `more`,
+  `+* two+`) garbles the list
+* [ ] A continuation that attaches a nested list (`+* parent+`, `+`, `. one`,
+  `. two`)
+* [ ] A continuation, then a blank line, then an item is a hard error ("invalid
+  block continuation; no previous block")
+* [ ] A block attached without `+` (`+* one+`, a `[source]` listing,
+  `+* two+`) reorders the list
+* [ ] `== Head` directly followed by `+* a+` merges the title into the item
+  ("Heada")
+* [ ] A footnote in a list item, when an earlier footnote exists, moves the
+  item's text
+* [ ] Asciidoctor-style backend: nested list markers (depth classes,
+  `arabic`/`loweralpha`) once the parser produces nested lists
+
+=== Inline and block parser bugs (S–M each)
+
+* [ ] A footnote runs to the last `]` in its paragraph
+  (`+A footnote:[plain] here and a stray ] there.+`); close it at the first
+  one, as Asciidoctor does
+* [ ] The `link:` prefix is output as text; the scanner should recognize the
+  `link:` macro name, not only the URL
+* [ ] Formatting with a URL inside a link macro mis-nests
+  (`+link:x.html[*x http://q.com y*]+`); probably falls out of the `link:` fix
+* [ ] An unclosed span before another block still renders as formatting
+  (`+a _unclosed text+`, a blank line, `b`), while the same paragraph at the end
+  of the file is correctly left as text
+* [ ] Apostrophes inside some spans aren't replaced (`+_don't stop_+`, while
+  `+*it's here*+` works)
+* [ ] CRLF input leaves `\r` in paragraph text: normalize line endings in the
+  scanner
+* [ ] An ID on an admonition lands on its content, in both the `NOTE: text` and
+  the `[NOTE]` + `====` forms
+* [ ] A paragraph after a `+[[anchor]]+` line gets a leading space
+* [ ] A warning for the block macros we don't support (`toc::`, `audio::`,
+  `video::`, `[stem]`), which are currently output as plain text without one
+
+=== Cross references and section IDs (M)
+
+* [ ] *Decide* where section IDs are generated: in the parser and ASG (changes
+  the JSON/TCK output, but HTMLBook, xrefs and DOCX all get them for free) or
+  per backend (what the Asciidoctor-style backend does now). The ASG is the
+  likelier answer, since an xref to a generated ID can only show the section
+  title if the parser knows the ID
+* [ ] Xrefs to generated IDs show the section title (not `[_first_section]`) and
+  no longer log a warning
+* [ ] Custom xref text: `+<<id,custom text>>+`
+* [ ] The `idprefix` and `idseparator` attributes, if the IDs move into the
+  parser
+
+=== Quality and housekeeping (S)
+
+* [ ] Fuzz the scanner and parser for hangs and panics (truncated inputs, with a
+  short timeout per input); each finding becomes a test
+* [ ] CLI-level tests of `-b asciidoctor` and `-e`
+* [ ] Compare a few more real documents against `asciidoctor -s` and file what
+  differs
+* [ ] *Decide* whether to commit `Cargo.lock` (usual for a crate that ships a
+  binary)
+* [ ] Spec checks against the official AsciiDoc language specification and ASG
+  schema, not just the Asciidoctor docs: which blocks may carry a `title`
+  (lists, description lists, paragraphs?); whether a blank line may come
+  between a `.Title` line and its block; what two title lines in a row should
+  do. Each answer becomes a test or a `LIMITATIONS.adoc` entry
+
+=== Library API (M)
+
+* [ ] Audit the public API in `src/lib.rs`: what's `pub` by accident, and what a
+  library user actually needs. Tidy it before the 0.4 Python bindings freeze it
+* [ ] Docs on docs.rs good enough to use the crate without reading the source
+
+=== Document header (M)
+
+Parse the header into the ASG; the backends can mostly ignore it for now.
+
+* [ ] Author information and revision information (author line, `:author:`,
+  `:email:`, revision line)
+* [ ] Document metadata (`:description:`, `:keywords:`)
+* [ ] Render the header in the Asciidoctor-style backend (Asciidoctor's
+  `#header` details), since it already copies Asciidoctor's document shell
+
+*Done when:* the README's "Known Bugs" is empty (or lists only things
+deliberately moved to a later release), every fixed bug has a fixture, a fuzz
+run finds no hangs, the public API has been audited, and the header is in the
+ASG.
+
+== 0.4: Outside the terminal
+
+Theme: `asciidocr` as something other programs and people use: from Python,
+from Word and from a browser, and for documents longer than an article.
+
+=== Python bindings (L)
+
+* [ ] Start from the existing `py03` branch and decide what to keep
+* [ ] *Decide* the API surface. A suggested minimum: `parse(str)` returning the
+  ASG, `to_html(str, backend=..., embedded=False)` and `to_docx(str, path)`,
+  behind a `python` feature
+* [ ] Package with `maturin`, build wheels in CI and publish to PyPI
+* [ ] Map our errors to Python exceptions that keep the line number
+
+=== Browser playground (S–M)
+
+* [ ] A static page with a text area and live HTMLBook or Asciidoctor-style
+  output (and the ASG as JSON), running the parser as wasm in the browser. The
+  existing wasm build targets WASI (for a-Shell), so this likely needs a
+  `wasm32-unknown-unknown` build with `wasm-bindgen`
+* [ ] Host it (e.g., GitHub Pages) and link it from the README; a "copy as bug
+  report" button would make it an easy way to report bugs
+
+=== DOCX out of "experimental" (M–L)
+
+* [ ] List continuations and list titles (easier once the 0.3 list work lands)
+* [ ] Headers on tables
+* [ ] Real footnotes instead of highlighted in-line text
+* [ ] Schema element order in the generated XML (`sz` before `rFonts`, `ind`
+  before `spacing`), and `rFonts` set for more than `ascii`
+* [ ] Check the output in Word, not only LibreOffice, and fix what Word
+  complains about
+* [ ] Put the 0.3 header on the manuscript title page (author, contact details,
+  word count: what a publisher or literary journal expects)
+
+=== Document types (M)
+
+* [ ] Parse `:doctype:` into the ASG (`article`, the default, and `book`)
+* [ ] Handle the `book` structure: level-0 sections as parts, level-1 sections
+  as chapters, and the special section styles (`[preface]`, `[appendix]`,
+  `[glossary]`, `[bibliography]`, `[index]`, ...)
+* [ ] DOCX: start each chapter on a new page in a `book`
+* [ ] Asciidoctor-style backend: the `book` body class and part and chapter
+  markup, checked against Asciidoctor
+
+*Done when:* `pip install asciidocr` works on macOS and Linux; the DOCX backend
+drops "experimental" from the README and `LIMITATIONS.adoc` and opens cleanly in
+Word; the playground is live; and a `book` parses into parts and chapters.
+
+== 0.5: Asciidoctor parity and HTMLBook
+
+Theme: close the gaps between what a typical document uses and what we parse.
+The Asciidoctor-style backend's list of known gaps gets short, HTMLBook catches
+up with the header and document types, and TCK conformance becomes a number we
+track.
+
+=== HTMLBook (M)
+
+* [ ] Render the 0.3 header (title, author and metadata in the HTMLBook
+  `<head>` and the title page)
+* [ ] Render a `book` the HTMLBook way: `data-type="book"` on the body,
+  `data-type="part"` and `data-type="chapter"` sections, and the matching
+  `data-type` for prefaces, appendixes, glossaries, bibliographies and indexes
+* [ ] Check the output against the HTMLBook specification
+
+=== Blocks (S–M each)
+
+* [ ] Callout lists. *Decide* first: produce `ListVariant::Callout` from the
+  parser (it's what the ASG schema has, and both HTML backends need to tell
+  callout lists from ordered lists) or drop the variant
+* [ ] Table column widths (`cols="3,1,1"`), then column and row spanning (`2+|`,
+  `.2+|`), then cell alignment and styles (`a|`, `^`, `>`)
+* [ ] `[source]` without a language: the ASG needs to keep the style, so the
+  Asciidoctor-style backend can emit `<pre class="highlight"><code>`
+* [ ] Checklists (`+* [x]+`, `+* [ ]+`)
+* [ ] Discrete headings (`[discrete]`)
+* [ ] The hardbreaks option (`[%hardbreaks]`, `:hardbreaks-option:`), for our
+  poet friends who don't want to wrap everything in `[verse]`
+* [ ] `pass` blocks with roles
+
+=== Inlines (S each)
+
+* [ ] `+++text+++` inline passthroughs, and `[pass]` as a paragraph style
+* [ ] `+ -- +` with thin spaces around the em dash (`+&#8201;&#8212;&#8201;+`),
+  as Asciidoctor does
+* [ ] Email autolinks and `mailto:`
+
+=== Conformance (M)
+
+* [ ] Research where the
+  https://gitlab.eclipse.org/eclipse/asciidoc-lang/asciidoc-tck[AsciiDoc TCK]
+  and the language specification stand now: what has been standardized, which
+  parts of the ASG schema are stable, and what the TCK actually tests. The
+  answer decides how much the next item is worth
+* [ ] Run the TCK through the `json` backend in CI, publish the pass count in
+  the README, and treat a drop as a regression
+
+*Done when:* the Asciidoctor-style backend's section of `LIMITATIONS.adoc` lists
+only admonition icons, HTMLBook renders the header and `book` structure, and
+the TCK's status is researched and, if it's ready, its pass count is published.
+
+== Beyond 0.5
+
+Ideas worth keeping, roughly in the order they follow from the releases above.
+None of them is a commitment.
+
+EPUB backend:: HTMLBook is most of the way to EPUB 3 XHTML already; what's
+missing is the packaging (the OPF, the navigation document, and a spine built
+from a `book` document's chapters). Fits the "writers first" target better than
+almost anything else here.
+
+Automatic tables of contents:: `:toc:` and `toc::[]`, once section IDs live in
+the ASG.
+
+Syntax highlighting:: For source blocks, either built in (e.g., with `syntect`)
+or as classes for highlight.js or Prism.
+
+Watch mode:: `asciidocr --watch`, for writing with a live preview.
+
+PDF output:: Without a Ruby toolchain. Two candidate routes: a Typst backend, or
+a print-ready CSS theme for our HTML (our own stylesheet, or one built on
+`paged.js`) that a headless browser turns into a PDF. The CSS route reuses the
+HTML backends we already have.
+
+Full TCK conformance:: The bar for 1.0, along with a stable ASG/JSON output,
+depending on what the 0.5 research finds the TCK has standardized.
+
+A linter or language server:: Built on the ASG and the warnings we already log
+(unresolved xrefs, unreadable includes, dropped titles), which are most of a
+linter already.
+
+== Not currently planned
+
+These match "Not Currently Planned" in `LIMITATIONS.adoc`. Any of them could
+come back if the TCK requires them.
+
+Block style shorthand:: `[#id.role]`. `role=` and `+[[id]]+` work fine.
+
+Conditionals:: `ifdef::`, `ifndef::` and `ifeval::`.
+
+STEM and the UI macros:: Equations, and the `kbd`, `btn` and `menu` macros.
