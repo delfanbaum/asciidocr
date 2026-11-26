@@ -210,6 +210,41 @@ impl Inline {
 
     /// The children of a span that was never closed, with the span's markup characters put back in
     /// front of them as text: without a closing mark, the opening one was never markup at all.
+    /// Markup that was never closed (a span, or a link macro), as what it was all along: its
+    /// markup is text, in front of what it held. A URL followed by a `[` that never closes
+    /// (`http://x.com[ y`) is a bare link, and the `[` is text, as in Asciidoctor.
+    pub fn unclosed_as_text(&mut self) -> VecDeque<Inline> {
+        if let Inline::InlineRef(iref) = self
+            && iref.open
+            && let Some(url) = iref.markup.strip_suffix('[')
+            && !iref.markup.starts_with("link:")
+        {
+            let bracket_location = iref.location.clone();
+            let link = Inline::InlineRef(InlineRef::new(
+                InlineRefVariant::Link,
+                url.to_string(),
+                iref.location.clone(),
+            ));
+            let mut pieces = VecDeque::from([link]);
+            let mut text = VecDeque::from(std::mem::take(&mut iref.inlines));
+            match text.front_mut() {
+                Some(Inline::InlineLiteral(literal))
+                    if matches!(literal.name, InlineLiteralName::Text) =>
+                {
+                    literal.prepend_to_value("[".to_string(), bracket_location);
+                }
+                _ => text.push_front(Inline::InlineLiteral(InlineLiteral::new(
+                    InlineLiteralName::Text,
+                    "[".to_string(),
+                    bracket_location,
+                ))),
+            }
+            pieces.extend(text);
+            return pieces;
+        }
+        self.children_with_markup_as_text()
+    }
+
     pub fn children_with_markup_as_text(&mut self) -> VecDeque<Inline> {
         let markup = self.produce_literal_from_self();
         let locations = self.locations();
@@ -488,7 +523,7 @@ impl InlineSpan {
         let mut inlines: Vec<Inline> = vec![];
         for mut inline in std::mem::take(&mut self.inlines) {
             let pieces: VecDeque<Inline> = match &inline {
-                Inline::InlineRef(iref) if iref.open => inline.children_with_markup_as_text(),
+                Inline::InlineRef(iref) if iref.open => inline.unclosed_as_text(),
                 _ => VecDeque::from([inline]),
             };
             for piece in pieces {

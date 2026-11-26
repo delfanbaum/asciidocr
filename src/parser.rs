@@ -1387,6 +1387,12 @@ impl Parser {
     fn parse_inline_macro_close(&mut self, token: Token) -> Result<(), ParserError> {
         if let Some(TokenType::PassthroughInlineMacro) = self.open_parse_after_as_text_type {
             self.open_parse_after_as_text_type = None
+        } else if let Some(Inline::InlineSpan(span)) = self.inline_stack.back_mut()
+            && span.open
+            && span.close_open_link()
+        {
+            // a link macro inside a span (`` `link:x[y]` ``, or a footnote's
+            // `footnote:[see link:x[y]]`) closes first; the span stays open
         } else if let Some(inline_macro_idx) = self
             .inline_stack
             .iter()
@@ -1412,11 +1418,6 @@ impl Parser {
             self.close_parent_after_push = true;
             // and that the inline span is ended
             self.in_inline_span = false;
-        } else if let Some(Inline::InlineSpan(span)) = self.inline_stack.back_mut()
-            && span.open
-            && span.close_open_link()
-        {
-            // a link macro inside a span (`` `link:x[y]` ``), which stays open
         } else {
             self.add_text_to_last_inline(token);
         }
@@ -1908,7 +1909,7 @@ impl Parser {
             let mut open_span = self.inline_stack.remove(open_span_idx).unwrap();
             // without a closing mark, the span's markup is just text, which goes in front of
             // whatever the span held
-            let mut children = open_span.children_with_markup_as_text();
+            let mut children = open_span.unclosed_as_text();
             // put the inlines into the stack at the relevant position
             while let Some(child) = children.pop_back() {
                 self.inline_stack.insert(open_span_idx, child);
