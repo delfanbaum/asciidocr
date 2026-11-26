@@ -123,6 +123,8 @@ fn fuzz(variants: impl Fn(&str) -> Vec<String>) {
     let mut failures = vec![];
     let mut count = 0;
     for path in fixtures() {
+        // (shown with --nocapture, to see how far a run that dies got)
+        eprintln!("{}", path.display());
         let source = std::fs::read_to_string(&path).expect("Unable to read a fixture");
         for input in variants(&source) {
             count += 1;

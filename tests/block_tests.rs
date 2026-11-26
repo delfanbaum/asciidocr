@@ -499,3 +499,27 @@ fn test_markup_at_end_of_file(#[case] adoc: &str, #[case] expected: &str) {
     };
     assert_eq!(outline, expected);
 }
+
+/// Found by the fuzz run: a table whose first row isn't all on one line stopped the whole process
+/// ("Error creating table"). As in Asciidoctor, the cells on the first line are the columns
+#[rstest]
+#[case::one_cell_per_line("|===\n|a\n|b\n|===\n", "table(tableCell \"a\", tableCell \"b\")")]
+#[case::first_line_one_cell(
+    "|===\n|Name|Value\n\n|a\n|1\n|===\n",
+    "table(tableCell \"Name|Value\", tableCell \"a\", tableCell \"1\")"
+)]
+fn test_tables_with_one_cell_on_the_first_line(#[case] adoc: &str, #[case] expected: &str) {
+    let asg = common::parsed_asg_with_timeout(adoc);
+    assert_eq!(asg["blocks"][0]["metadata"]["attributes"]["cols"], "1");
+    assert_eq!(block_outline(adoc), expected);
+}
+
+/// An include that can't be read (a directory, here) is skipped with a warning; it used to stop
+/// the whole process
+#[test]
+fn test_unreadable_include_is_skipped() {
+    assert_eq!(
+        block_outline_from_file("blocks/include-unreadable.adoc"),
+        "paragraph \"before\" paragraph \"after\""
+    );
+}
