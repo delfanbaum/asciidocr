@@ -26,6 +26,7 @@ fn test_full_documents(#[case] fn_pattern: &str) {
 #[case::breaks("asciidoctor-html/embedded/breaks")]
 #[case::parent_blocks("asciidoctor-html/embedded/parent-blocks")]
 #[case::description_list("asciidoctor-html/embedded/description-list")]
+#[case::nested_lists("asciidoctor-html/embedded/nested-lists")]
 #[case::table("asciidoctor-html/embedded/table")]
 #[case::xrefs("asciidoctor-html/embedded/xrefs")]
 #[case::images("asciidoctor-html/embedded/images")]

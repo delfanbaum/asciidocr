@@ -1,0 +1,35 @@
+* parent
+** child
+*** grandchild
+** child two
+* parent two
+- dash under star
+
+. one
+.. one-a
+... one-a-i
+.... one-a-i-A
+..... one-a-i-A-I
+. two
+
+* a
+** b
++
+attached to b
+
+* c
+** d
+
++
+attached to c
+
+* x
+Term:: definition
++
+attached to the definition
+
+Term:: def
+* item in the definition
+
+1. numbered
+2. numbered again
