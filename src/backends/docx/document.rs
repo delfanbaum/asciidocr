@@ -1,8 +1,9 @@
 use std::{fs::File, io::Read};
 
 use docx_rs::{
-    BreakType, Docx, Header, IndentLevel, LineSpacing, Numbering, NumberingId, PageMargin, PageNum,
-    Paragraph, Pic, Run, RunFonts, Style, Table, TableCell, TableRow, VertAlignType,
+    AlignmentType, BreakType, Docx, Header, IndentLevel, LineSpacing, Numbering, NumberingId,
+    PageMargin, PageNum, Paragraph, Pic, Run, RunFonts, Style, Table, TableCell, TableRow,
+    VertAlignType,
 };
 use log::warn;
 use once_cell::sync::Lazy;
@@ -28,12 +29,13 @@ pub fn asciidocr_default_docx() -> Docx {
         .add_style(DocumentStyles::normal())
         .add_style(DocumentStyles::no_spacing())
         .add_style(DocumentStyles::title())
+        // Right-justify the page number rather than placing it in a right-aligned text frame:
+        // Word honors the frame, but LibreOffice ignores its alignment and puts the number on
+        // the left.
         .header(
             Header::new().add_paragraph(
                 Paragraph::new()
-                    .v_anchor("text")
-                    .h_anchor("margin")
-                    .x_align("right")
+                    .align(AlignmentType::Right)
                     .add_page_num(PageNum::new()),
             ),
         )

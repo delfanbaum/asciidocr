@@ -62,6 +62,32 @@ mod docx_tests {
         assert!(settings.contains("compatibilityMode"), "{settings}");
     }
 
+    /// The page number is right-aligned with paragraph justification. A text frame (`framePr`)
+    /// also works in Word, but LibreOffice ignores its alignment and puts the number on the left.
+    #[test]
+    fn header_page_number_is_right_justified() {
+        let header = rendered_docx_part("Some text.", "word/header1.xml");
+        let doc = roxmltree::Document::parse(&header).unwrap();
+        let para = doc
+            .descendants()
+            .find(|n| n.is_element() && n.tag_name().name() == "p")
+            .expect("header has no paragraph");
+        assert!(
+            para.descendants().any(|n| n.is_element()
+                && n.tag_name().name() == "instrText"
+                && n.text() == Some("PAGE")),
+            "{header}"
+        );
+        let jc = para
+            .descendants()
+            .find(|n| n.is_element() && n.tag_name().name() == "jc")
+            .and_then(|n| n.attributes().find(|a| a.name() == "val"))
+            .map(|a| a.value());
+        assert_eq!(jc, Some("right"), "{header}");
+        assert!(!header.contains("framePr"), "{header}");
+        assert!(!header.contains("<w:tab"), "{header}");
+    }
+
     #[rstest]
     #[case::emphasis_spacing("docx/emphasis-spacing")]
     #[case::nested_spans("docx/nested-spans")]
