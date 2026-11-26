@@ -1,0 +1,7 @@
+|===
+|a
+include::include-table-text-part.adoc[]
+|b
+|===
+
+after

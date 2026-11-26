@@ -2,7 +2,7 @@
 
 pub mod tokens;
 use core::str;
-use log::{debug, warn};
+use log::debug;
 use once_cell::sync::Lazy;
 use regex::Regex;
 use std::borrow::Cow;
@@ -103,6 +103,10 @@ impl<'a> Scanner<'a> {
     }
 
     fn track_verbatim_block(&mut self, delimiter: TokenType) {
+        // in a table, delimiters are text
+        if self.in_table {
+            return;
+        }
         if self.verbatim == Some(delimiter) {
             self.verbatim = None;
         } else if self.verbatim.is_none()
@@ -598,9 +602,11 @@ impl<'a> Scanner<'a> {
             3 => self.add_token(TokenType::Heading3, false, 0),
             4 => self.add_token(TokenType::Heading4, false, 0),
             5 => self.add_token(TokenType::Heading5, false, 0),
+            6 => self.add_token(TokenType::Heading6, false, 0),
+            // a longer run is text
             _ => {
-                warn!("Heading level error at line {}", self.line);
-                Err(ScannerError::HeadingLevelError(self.line))
+                self.current = self.start + 1;
+                self.add_text_until_next_markup()
             }
         }
     }

@@ -205,13 +205,13 @@ removed (with the helpers only it used, `InlineError`, and the never-created
   doesn't treat as a heading
 * [x] A table cell's text on a following line (`|a`, `more`, `|b`) went to the
   next cell
-* [ ] A heading with six or more `=` signs (`====== A`) stops the conversion;
-  Asciidoctor makes it a level 5 section
+* [x] A heading with six `=` signs (`====== A`) stopped the conversion;
+  Asciidoctor makes it a level 5 section. So did seven or more, which are text
 * [ ] `[NOTE,id=x]` (above a delimited block or a paragraph) loses the ID and
   roles
-* [ ] Attribute lines, anchors, attribute entries, block macros and delimiters
-  inside a table cell aren't text: they are dropped, land outside the cell, or
-  (`====`, `----`) stop the conversion
+* [x] Attribute lines, anchors, attribute entries, block macros and delimiters
+  inside a table cell weren't text: they were dropped, landed outside the cell,
+  or (`====`, `----`) stopped the conversion
 * [ ] A table with no closing delimiter loses its last cell
 * [ ] Longer table delimiters (`|=====`) aren't recognized, and the rows are
   dropped

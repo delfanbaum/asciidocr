@@ -64,6 +64,8 @@ stylesheet. Known gaps:
 * A `[source]` block without a language is rendered like any other listing
   (as `<pre>`, not `<pre class="highlight"><code>`)
 * Checklists and admonition icons
+* Block markup in a table cell is output as text (there are no AsciiDoc `a|`
+  cells), an anchor (`[[id]]`) included
 * Table cell specifiers (`2+|`, `^|`, `h|`) are ignored
 * A blank line inside a table cell doesn't start a new paragraph: the cell's
   text goes on

@@ -308,6 +308,7 @@ impl Parser {
             TokenType::Heading3 => self.parse_section_headings(token, asg),
             TokenType::Heading4 => self.parse_section_headings(token, asg),
             TokenType::Heading5 => self.parse_section_headings(token, asg),
+            TokenType::Heading6 => self.parse_section_headings(token, asg),
 
             // document attributes
             TokenType::Attribute => self.parse_attribute(token),
@@ -573,6 +574,7 @@ impl Parser {
                 | TokenType::Heading3
                 | TokenType::Heading4
                 | TokenType::Heading5
+                | TokenType::Heading6
         );
         let is_list_item = matches!(
             token.token_type(),

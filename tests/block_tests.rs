@@ -884,3 +884,60 @@ fn test_first_table_row(#[case] adoc: &str, #[case] cols: &str, #[case] header: 
         .is_some_and(|options| options.iter().any(|option| option == "header"));
     assert_eq!(has_header, header, "{asg}");
 }
+
+/// Like Asciidoctor, block markup inside a table cell is the cell's text. Delimiters used to
+/// stop the conversion, or take the rest of the document into a block
+#[rstest]
+#[case::example("====")]
+#[case::listing("----")]
+#[case::listing_pair("----\nx\n----")]
+#[case::literal("....")]
+#[case::passthrough("++++")]
+#[case::comment("////")]
+#[case::open("--")]
+#[case::sidebar("****")]
+#[case::quote("____")]
+#[case::breaks("'''\n<<<")]
+#[case::attribute_list("[.role]\n[source]")]
+#[case::anchor("[[anchor]]")]
+#[case::attribute_entry(":foo: bar")]
+#[case::block_image("image::x.png[]")]
+#[case::block_title_and_lists(".T\n<1> c\n- d\n1. e")]
+#[case::heading("====== f")]
+fn test_block_markup_in_table_cell_is_text(#[case] markup: &str) {
+    let adoc = format!("|===\n|a\n{markup}\n|b\n|===\n\nafter *c*\n");
+    assert_eq!(
+        block_outline(&adoc),
+        format!("table(tableCell \"a\n{markup}\", tableCell \"b\") paragraph \"after c\"")
+    );
+}
+
+/// The same for a cell's first line, and for lines that come from an include
+#[test]
+fn test_delimiters_that_start_table_cells_are_text() {
+    assert_eq!(
+        block_outline("|===\n|a ====\n|----\n|===\n\nafter\n"),
+        "table(tableCell \"a ====\", tableCell \"----\") paragraph \"after\""
+    );
+    assert_eq!(
+        block_outline_from_file("blocks/include-table-text.adoc"),
+        "table(tableCell \"a\ninc cell\n====\", tableCell \"b\") paragraph \"after\""
+    );
+}
+
+/// Six `=` signs make the deepest section (they stopped the conversion), and seven are text
+#[rstest]
+#[case::first("====== A\n\ntext\n", "section \"A\"(paragraph \"text\")")]
+#[case::nested("== A\n\n====== B\n", "section \"A\"(section \"B\")")]
+#[case::after_text("x\n====== A\n", "paragraph \"x\n====== A\"")]
+#[case::seven("======= A\n", "paragraph \"======= A\"")]
+#[case::in_listing("----\n====== A\n----\n", "listing \"\n====== A\n\"")]
+fn test_deepest_headings(#[case] adoc: &str, #[case] expected: &str) {
+    assert_eq!(block_outline(adoc), expected);
+}
+
+#[test]
+fn test_six_equals_signs_are_level_five() {
+    let asg = common::parsed_asg("x\n\n====== A\n");
+    assert_eq!(asg["blocks"][1]["level"], 5, "{asg}");
+}

@@ -99,26 +99,20 @@ impl Token {
         self.literal = Some(self.lexeme.clone());
     }
 
-    /// Markup that, in a table, is more of a cell's text: list markup and the like is only
-    /// parsed in AsciiDoc (`a|`) cells, which we don't support
+    /// Markup that, in a table, is more of a cell's text: block markup is only parsed in
+    /// AsciiDoc (`a|`) cells, which we don't support. (Includes still work, and comment lines
+    /// are still comments.)
     pub(crate) fn is_text_in_table(&self) -> bool {
-        matches!(
-            self.token_type,
-            TokenType::Heading1
-                | TokenType::Heading2
-                | TokenType::Heading3
-                | TokenType::Heading4
-                | TokenType::Heading5
-                | TokenType::BlockLabel
-                | TokenType::UnorderedListItem
-                | TokenType::OrderedListItem
-                | TokenType::DescriptionListMarker
-                | TokenType::NotePara
-                | TokenType::TipPara
-                | TokenType::ImportantPara
-                | TokenType::CautionPara
-                | TokenType::WarningPara
-        )
+        // everything that would start a block, and the other markup that belongs to one
+        self.token_type.ends_list_item() && self.token_type != TokenType::Table
+            || matches!(
+                self.token_type,
+                TokenType::Attribute
+                    | TokenType::UnorderedListItem
+                    | TokenType::OrderedListItem
+                    | TokenType::CodeCalloutListItem
+                    | TokenType::DescriptionListMarker
+            )
     }
 
     /// Convince function to return the [`TokenType`] for matching
@@ -281,6 +275,7 @@ pub enum TokenType {
     Heading3,
     Heading4,
     Heading5,
+    Heading6,
 
     NotePara,      // NOTE:
     TipPara,       // TIP:
@@ -402,6 +397,7 @@ impl TokenType {
                 | TokenType::Heading3
                 | TokenType::Heading4
                 | TokenType::Heading5
+                | TokenType::Heading6
                 | TokenType::SidebarBlock
                 | TokenType::OpenBlock
                 | TokenType::ExampleBlock

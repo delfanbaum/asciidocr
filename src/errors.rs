@@ -22,8 +22,6 @@ pub enum AsciidocrError {
 pub enum ScannerError {
     #[error(transparent)]
     Token(#[from] TokenError),
-    #[error("Line {0}: Invalid headling level")]
-    HeadingLevelError(usize),
     #[error("Line {0}: Invalid include tag pattern: {1}")]
     TagError(usize, String),
     #[error("Line {0}: Unknown scanner error")]

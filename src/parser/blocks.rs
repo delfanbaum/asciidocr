@@ -173,6 +173,7 @@ impl Parser {
             TokenType::Heading3 => 2,
             TokenType::Heading4 => 3,
             TokenType::Heading5 => 4,
+            TokenType::Heading6 => 5,
             _ => {
                 return Err(ParserError::InternalError(
                     self.line,
