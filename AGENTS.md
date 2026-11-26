@@ -76,7 +76,10 @@ cargo clippy --all-features --all-targets
   Use small local helpers (for example `scan_and_assert_eq`, `newline_token_at`).
 - **Integration tests** live in `tests/*_tests.rs`, named by area: `block_tests`, `list_tests`,
   `inline_tests`, `document_tests`, `htmlbook_tests`, `asciidoctor_html_tests`, `docx_tests`, `log_tests`,
-  `offset_tests`, `html_compare_tests` (tests of the HTML comparison itself), and `cli_tests` (which
+  `offset_tests`, `html_compare_tests` (tests of the HTML comparison itself), `fuzz_tests` (every
+  fixture cut off and mutated, checked for panics and hangs; the full run is
+  `cargo test --all-features --test fuzz_tests -- --ignored`, and anything it finds becomes a test
+  of its own in the area's test file), and `cli_tests` (which
   runs the `asciidocr` binary itself). Each one starts
   with `pub mod common;` (except `cli_tests`) and uses the shared helpers in `tests/common/mod.rs`:
   - `assert_parsed_doc_matches_expected_asg(adoc_fn, json_fn)`
