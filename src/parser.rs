@@ -1638,12 +1638,16 @@ impl Parser {
             self.block_title = None;
         }
 
-        // check for any prior parents in reverse
-        if let Some(parent_block_idx) = self
-            .block_stack
-            .iter()
-            .rposition(|parent_block| matches!(parent_block, Block::ParentBlock(_)))
-        {
+        // the innermost delimited block that is still open: the one that opened on the line
+        // `open_delimited_block_lines` ends with (other parent blocks on the stack, a sidebar that
+        // has closed inside an example, say, are complete, and waiting for the example to close)
+        let open_line = self.open_delimited_block_lines.last().copied();
+        if let Some(parent_block_idx) = open_line.and_then(|line| {
+            self.block_stack.iter().rposition(|parent_block| {
+                matches!(parent_block, Block::ParentBlock(open)
+                    if open.opening_line().ok() == Some(line))
+            })
+        }) {
             let closes_open_block = matches!(
                 &self.block_stack[parent_block_idx],
                 Block::ParentBlock(open) if *open == block
