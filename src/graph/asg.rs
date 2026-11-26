@@ -7,7 +7,7 @@ use crate::errors::{AsciidocrError, AsgError};
 use crate::parser::Parser;
 use crate::scanner::Scanner;
 
-use super::blocks::{Block, ParentBlock};
+use super::blocks::Block;
 use super::inlines::Inline;
 use super::nodes::{Header, Location, NodeTypes};
 
@@ -127,22 +127,6 @@ impl Asg {
         }
     }
 
-    /// Pulls footnote definitions into a separate block, replacing the inlines with references to
-    /// the definitions
-    pub fn standardize_footnotes(&mut self) -> Result<(), AsgError> {
-        // Until the spec says otherwise, put footnote definitions in leaf blocks
-        let mut footnote_defs: Vec<Block> = vec![];
-        for block in self.blocks.iter_mut() {
-            footnote_defs.extend(
-                block.extract_footnote_definitions(footnote_defs.len(), &self.document_id)?,
-            );
-        }
-        // create a parent block to hold the footnote definitions
-        self.push_block(Block::ParentBlock(ParentBlock::new_footnotes_container(
-            footnote_defs,
-        )))
-    }
-
     /// Gathers all the "literal" text in a given document graph (i.e., without styling, etc.)
     /// (Largely a testing/verification function)
     pub fn all_text(&self) -> String {
@@ -155,54 +139,5 @@ impl Asg {
 
     pub fn word_count(&self) -> usize {
         self.all_text().split_whitespace().count()
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::graph::blocks::*;
-    use crate::graph::inlines::*;
-
-    #[test]
-    fn consolidate_footnotes() {
-        let dummy_locations = vec![Location::new(1, 1, vec![])];
-
-        let mut footnote = Inline::InlineSpan(InlineSpan::new(
-            InlineSpanVariant::Footnote,
-            InlineSpanForm::Constrained,
-            dummy_locations.clone(),
-        ));
-        footnote.push_inline(Inline::InlineLiteral(InlineLiteral::new(
-            InlineLiteralName::Text,
-            "Foonote text".to_string(),
-            dummy_locations.clone(),
-        )));
-        let some_leaf = Block::LeafBlock(LeafBlock::new(
-            LeafBlockName::Paragraph,
-            LeafBlockForm::Paragraph,
-            None,
-            dummy_locations.clone(),
-            vec![footnote],
-        ));
-        let mut graph = Asg::new();
-        graph.document_id = "test".into();
-        let _ = graph.push_block(some_leaf);
-        assert_eq!(graph.blocks.len(), 1);
-        // just spot-check that we break them out; the actual logic is checked elsewhere
-        let _ = graph.standardize_footnotes();
-        assert_eq!(graph.blocks.len(), 2);
-        // but also spot-check that we add the document_id, if any
-        let Some(Block::LeafBlock(leaf)) = graph.blocks.first() else {
-            panic!("Destroyed the block we were only supposed to modify")
-        };
-        let inlines = leaf.inlines();
-        let Some(Inline::InlineSpan(footnoteref)) = inlines.first() else {
-            panic!("Missing footnote ref in leaf block")
-        };
-        let Some(Inline::InlineRef(iref)) = footnoteref.inlines.first() else {
-            panic!("Missing footnote ref link")
-        };
-        assert_eq!(iref.target, "test_footnotedef_1");
     }
 }

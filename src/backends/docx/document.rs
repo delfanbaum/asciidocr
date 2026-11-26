@@ -184,7 +184,6 @@ impl DocxWriter {
                 }
                 ParentBlockName::Quote => Self::update(docx, |d| self.add_quote(d, parent))?,
                 ParentBlockName::Table => Self::update(docx, |d| self.add_table(d, parent))?,
-                ParentBlockName::FootnoteContainer => {} // should never appear in this context
             },
             Block::BlockMacro(block) => Self::update(docx, |d| self.add_block_macro(d, block))?,
             Block::TableCell(_) => {} // handled directly in the parent block

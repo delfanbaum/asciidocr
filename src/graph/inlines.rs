@@ -14,10 +14,7 @@ use super::{
     nodes::{Location, NodeTypes},
     substitutions::CHARREF_MAP,
 };
-use crate::{
-    errors::InlineError,
-    scanner::tokens::{Token, TokenType},
-};
+use crate::scanner::tokens::{Token, TokenType};
 
 /// Inlines enum containing literals, spans, and references (the latter not implemented)
 #[derive(Serialize, Clone, Debug)]
@@ -129,13 +126,6 @@ impl Inline {
     pub fn is_newline(&self) -> bool {
         match self {
             Inline::InlineLiteral(lit) => lit.value == *"\n",
-            _ => false,
-        }
-    }
-
-    pub fn is_footnote(&self) -> bool {
-        match self {
-            Inline::InlineSpan(span) => span.variant == InlineSpanVariant::Footnote,
             _ => false,
         }
     }
@@ -455,23 +445,6 @@ impl InlineSpan {
         }
     }
 
-    fn new_footnote_ref(footnote_ref: InlineRef) -> Result<Self, InlineError> {
-        let mut footnote = InlineSpan::new(
-            InlineSpanVariant::Superscript,
-            InlineSpanForm::Constrained,
-            footnote_ref.location.clone(),
-        );
-        footnote
-            .inlines
-            .push(Inline::InlineRef(footnote_ref.clone()));
-        if let Some(line) = footnote_ref.line() {
-            footnote.metadata = Some(ElementMetadata::new_with_role("footnote".to_string(), line));
-            Ok(footnote)
-        } else {
-            Err(InlineError::FootnoteRef(format!("{:?}", footnote_ref)))
-        }
-    }
-
     // extracts the inlines inside the span, closing any open (dangling) spans that may be
     // inside of it
     fn extract_span_inlines(&self) -> VecDeque<Inline> {
@@ -487,53 +460,6 @@ impl InlineSpan {
             }
         }
         children
-    }
-
-    /// Deconstructs a footnote span into the relevant footnote definition ID (to be applied to
-    /// the leafblock that contains the footnote text), an InlineSpan `Sup<InlineRef>` that replaces the footnote
-    /// with a link to said leafblock, and the vector of inlines that will be inserted into
-    /// said leafblock
-    pub fn deconstruct_footnote(
-        &mut self,
-        count: usize,
-        document_id: &str,
-    ) -> Result<(String, Inline, Vec<Inline>), InlineError> {
-        // setup
-        let footnote_def_pattern = format!("{}_footnotedef_{}", document_id, count);
-        let footnote_ref_pattern = format!("{}_footnoteref_{}", document_id, count);
-        // Literal text for the numbering
-        let numbering = Inline::InlineLiteral(InlineLiteral {
-            name: InlineLiteralName::Text,
-            node_type: NodeTypes::Inline,
-            value: format!("{}", count),
-            location: self.location.clone(),
-        });
-
-        // For now, just copy over the footnote span locations everywhere -- since that almost
-        // makes sense -- until the spec clarifies what's supposed to happen here
-        // Footnote ref targets the definition
-        let footnote_ref = InlineRef::new_footnote_ref(
-            footnote_def_pattern.clone(),
-            Some(footnote_ref_pattern.clone()),
-            numbering.clone(),
-            self.location.clone(),
-        )?;
-        // Footnote def targets the reference
-        let footnote_def = InlineRef::new_footnote_ref(
-            footnote_ref_pattern,
-            None,
-            numbering,
-            self.location.clone(),
-        )?;
-        // put the footnote def (with targets back to the reference) into the inline vec
-        self.inlines.insert(0, Inline::InlineRef(footnote_def));
-        // handle adding a ". " after the footnote numbering in the template
-
-        Ok((
-            footnote_def_pattern,
-            Inline::InlineSpan(InlineSpan::new_footnote_ref(footnote_ref)?),
-            self.inlines.clone(),
-        ))
     }
 }
 
@@ -585,40 +511,6 @@ impl InlineRef {
             location,
             open: false,
         }
-    }
-
-    fn line(&self) -> Option<usize> {
-        self.location.first().map(|loc| loc.line)
-    }
-
-    pub fn new_footnote_ref(
-        target: String,
-        id: Option<String>,
-        numbering: Inline,
-        location: Vec<Location>,
-    ) -> Result<Self, InlineError> {
-        let mut metadata: Option<ElementMetadata> = None;
-
-        let line = if let Some(loc) = location.first() {
-            loc.line
-        } else {
-            return Err(InlineError::FootnoteRef(target));
-        };
-
-        if let Some(ref_id) = id {
-            metadata = Some(ElementMetadata::new_inline_with_id(ref_id, line));
-        }
-
-        Ok(InlineRef {
-            name: "ref".to_string(),
-            node_type: NodeTypes::Inline,
-            variant: InlineRefVariant::Xref,
-            target,
-            inlines: vec![numbering],
-            metadata,
-            location,
-            open: false,
-        })
     }
 
     pub fn new_xref_from_token(token: Token) -> Self {

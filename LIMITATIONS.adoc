@@ -12,8 +12,6 @@ non-features.
   than the section title, and logs a warning
 * Custom text for cross references: `+<<id,custom text>>+` is left as text
   (`+<<id>>+` works, and uses the title of the target)
-* A footnote in a list item moves the item's text out of the item's principal
-  text if an earlier footnote exists in the document
 * `[verse]` and literal (indented) paragraphs: only the delimited forms (`____`
   and `....`) are verse and literal blocks
 * `+pass:[]+` inline passthroughs work, but `+++text+++` does not (it is

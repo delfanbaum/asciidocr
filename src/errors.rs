@@ -96,18 +96,8 @@ pub enum BlockError {
     Location,
     #[error("Tried to create a block from an invalid Token")]
     InvalidToken,
-    #[error("Footnote error: {0}")]
-    Footnote(String),
     #[error("Blocks of type {0} do not accept metadata")]
     InvalidMetadata(String),
-    #[error(transparent)]
-    InlineError(#[from] InlineError),
-}
-
-#[derive(thiserror::Error, PartialEq, Debug)]
-pub enum InlineError {
-    #[error("Error creating footnote reference to {0}")]
-    FootnoteRef(String),
 }
 
 #[derive(thiserror::Error, PartialEq, Debug)]

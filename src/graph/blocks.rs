@@ -396,96 +396,6 @@ impl Block {
         inlines
     }
 
-    /// Helper for extracting footnote definitions, replacing the footnote span with a reference
-    /// that counts based on what's passed to the function
-    pub fn extract_footnote_definitions(
-        &mut self,
-        footnote_count: usize,
-        document_id: &str,
-    ) -> Result<Vec<Block>, BlockError> {
-        // setup references
-        let mut local_count = footnote_count;
-        // setup list to return
-        let mut extracted: Vec<Block> = Vec::new();
-
-        match self {
-            // parents
-            Block::Section(block) => {
-                for child in block.blocks.iter_mut() {
-                    let child_footnoes =
-                        child.extract_footnote_definitions(extracted.len(), document_id)?;
-                    // local_count += child_footnoes.len();
-                    extracted.extend(child_footnoes);
-                }
-            }
-            Block::ParentBlock(block) => {
-                for child in block.blocks.iter_mut() {
-                    let child_footnoes =
-                        child.extract_footnote_definitions(extracted.len(), document_id)?;
-                    // local_count += child_footnoes.len();
-                    extracted.extend(child_footnoes);
-                }
-            }
-            Block::List(block) => {
-                for child in block.items.iter_mut() {
-                    let child_footnoes =
-                        child.extract_footnote_definitions(extracted.len(), document_id)?;
-                    // local_count += child_footnoes.len();
-                    extracted.extend(child_footnoes);
-                }
-            }
-            Block::DList(block) => {
-                for child in block.items.iter_mut() {
-                    let child_footnoes =
-                        child.extract_footnote_definitions(extracted.len(), document_id)?;
-                    extracted.extend(child_footnoes);
-                }
-            }
-            Block::ListItem(block) => {
-                let child_footnotes = block.extract_footnotes(extracted.len(), document_id)?;
-                extracted.extend(child_footnotes);
-            }
-            Block::DListItem(block) => {
-                let child_footnotes = block.extract_footnotes(extracted.len(), document_id)?;
-                extracted.extend(child_footnotes);
-            }
-            // nonparents
-            Block::LeafBlock(block) => {
-                for idx in 0..block.inlines.len() {
-                    if block.inlines[idx].is_footnote() {
-                        local_count += 1;
-                        let inline_span = block.inlines.remove(idx);
-                        let Inline::InlineSpan(mut footnote) = inline_span else {
-                            return Err(BlockError::Footnote("Bad is_footnote match".to_string()));
-                        };
-                        // deconstruct it
-                        let (definition_id, replacement_span, footnote_contents) =
-                            footnote.deconstruct_footnote(local_count, document_id)?;
-                        // add the relevant stuff to the return
-                        extracted.push(Block::LeafBlock(
-                            LeafBlock::new_footnote_def_from_id_and_inlines(
-                                definition_id,
-                                footnote_contents,
-                            )?,
-                        ));
-                        // put the reference back where the span was
-                        block.inlines.insert(idx, replacement_span);
-                    }
-                }
-            }
-            // nothing to extract from these (and some of them are never created)
-            Block::SectionBody
-            | Block::NonSectionBlockBody(_)
-            | Block::DiscreteHeading
-            | Block::Break(_)
-            | Block::BlockMacro(_)
-            | Block::BlockMetadata(_)
-            | Block::TableCell(_) => {}
-        }
-
-        Ok(extracted)
-    }
-
     pub fn create_id(&mut self) {
         if let Block::Section(section) = self
             && section.id == *""
@@ -1092,39 +1002,6 @@ impl LeafBlock {
     pub fn inlines(&self) -> Vec<Inline> {
         self.inlines.clone()
     }
-    pub fn new_footnote_def_from_id_and_inlines(
-        definition_id: String,
-        inlines: Vec<Inline>,
-    ) -> Result<LeafBlock, BlockError> {
-        let line = if let Some(inline) = inlines.first() {
-            if let Some(loc) = inline.locations().first() {
-                loc.line
-            } else {
-                return Err(BlockError::Footnote(
-                    "Unable to resolve footnote locations".to_string(),
-                ));
-            }
-        } else {
-            return Err(BlockError::Footnote(
-                "Unable to resolve footnote locations".to_string(),
-            ));
-        };
-
-        Ok(Self {
-            name: LeafBlockName::Paragraph,
-            node_type: NodeTypes::Block,
-            form: LeafBlockForm::Paragraph,
-            delimiter: None,
-            title: vec![],
-            inlines,
-            metadata: Some(ElementMetadata::new_with_id_and_roles(
-                definition_id,
-                vec!["footnote".to_string()],
-                line,
-            )),
-            location: vec![],
-        })
-    }
 }
 
 #[derive(Serialize, Clone, Debug)]
@@ -1168,8 +1045,7 @@ pub enum ParentBlockName {
     Open,
     Quote,
     Table, // Tables function basically the same in terms of delimiter, so I'm going to reuse
-    // ParentBlock until someone convinces me otherwise
-    FootnoteContainer,
+           // ParentBlock until someone convinces me otherwise
 }
 
 #[derive(Serialize, Clone, Debug, PartialEq)]
@@ -1292,16 +1168,6 @@ impl ParentBlock {
         }
     }
 
-    pub fn new_footnotes_container(footnote_defs: Vec<Block>) -> Self {
-        Self::new(
-            ParentBlockName::FootnoteContainer,
-            None,
-            "".to_string(),
-            footnote_defs,
-            vec![],
-        )
-    }
-
     pub fn opening_line(&self) -> Result<usize, BlockError> {
         match self.location.first() {
             Some(first_location) => Ok(first_location.line),
@@ -1335,70 +1201,5 @@ impl TableCell {
             metadata: None,
             location: token.locations(),
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::graph::inlines::{
-        InlineLiteral, InlineLiteralName, InlineRefVariant, InlineSpan, InlineSpanForm,
-        InlineSpanVariant,
-    };
-
-    use super::*;
-    use core::panic;
-
-    #[test]
-    fn extract_footnote_definitions() {
-        let dummy_locations = vec![Location::new(1, 1, vec![])];
-        let mut footnote = Inline::InlineSpan(InlineSpan::new(
-            InlineSpanVariant::Footnote,
-            InlineSpanForm::Constrained,
-            dummy_locations.clone(),
-        ));
-        footnote.push_inline(Inline::InlineLiteral(InlineLiteral::new(
-            InlineLiteralName::Text,
-            "Foonote text".to_string(),
-            dummy_locations.clone(),
-        )));
-        let mut some_leaf = Block::LeafBlock(LeafBlock::new(
-            LeafBlockName::Paragraph,
-            LeafBlockForm::Paragraph,
-            None,
-            dummy_locations.clone(),
-            vec![footnote],
-        ));
-        let extracted = some_leaf
-            .extract_footnote_definitions(0, "")
-            .expect("Error extracting footnote definitions");
-        let Block::LeafBlock(result) = some_leaf else {
-            panic!("Destroyed the leaf block somehow")
-        };
-
-        let Some(inline) = result.inlines.first() else {
-            panic!("Removed the inlines from the block instead of replacing them")
-        };
-        // ensure we've swapped the span
-        if let Inline::InlineSpan(span) = inline {
-            assert_eq!(span.variant, InlineSpanVariant::Superscript)
-        }
-        assert_eq!(result.inlines.len(), 1);
-
-        // ensure our result is what we expect it to be
-        assert_eq!(extracted.len(), 1);
-        let Some(Block::LeafBlock(block)) = extracted.first() else {
-            panic!("Extracted block was not a leaf block")
-        };
-        assert_eq!(block.name, LeafBlockName::Paragraph);
-        let Some(ref metadata) = block.metadata else {
-            panic!("Extracted leaf block is missing metadata")
-        };
-        assert_eq!(metadata.element_id().unwrap(), "_footnotedef_1");
-        assert_eq!(metadata.roles.first().unwrap(), "footnote");
-        let Some(Inline::InlineRef(inline)) = block.inlines.first() else {
-            panic!("Missing footnote def content!")
-        };
-        assert_eq!(inline.variant, InlineRefVariant::Xref);
-        assert_eq!(inline.target, "_footnoteref_1");
     }
 }

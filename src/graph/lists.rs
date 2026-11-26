@@ -1,6 +1,5 @@
-use crate::errors::BlockError;
 use crate::graph::{
-    blocks::{Block, LeafBlock},
+    blocks::Block,
     inlines::Inline,
     nodes::{Location, NodeTypes},
 };
@@ -166,42 +165,6 @@ impl ListItem {
     pub fn blocks(&self) -> Vec<Block> {
         self.blocks.clone()
     }
-
-    pub fn extract_footnotes(
-        &mut self,
-        count: usize,
-        document_id: &str,
-    ) -> Result<Vec<Block>, BlockError> {
-        let mut local_count = count;
-        let mut extracted: Vec<Block> = Vec::new();
-        for idx in 0..self.principal.len() {
-            if self.principal[idx].is_footnote() {
-                local_count += 1;
-                let inline_span = self.principal.remove(idx);
-                let Inline::InlineSpan(mut footnote) = inline_span else {
-                    return Err(BlockError::Footnote("Bad is_footnote match".to_string()));
-                };
-                // deconstruct it
-                let (definition_id, replacement_span, footnote_contents) =
-                    footnote.deconstruct_footnote(local_count, document_id)?;
-                // add the relevant stuff to the return
-                extracted.push(Block::LeafBlock(
-                    LeafBlock::new_footnote_def_from_id_and_inlines(
-                        definition_id,
-                        footnote_contents,
-                    )?,
-                ));
-                // put the reference back where the span was
-                self.principal.insert(idx, replacement_span);
-            }
-        }
-        for child in self.blocks.iter_mut() {
-            let child_footnoes = child.extract_footnote_definitions(local_count, document_id)?;
-            local_count += child_footnoes.len();
-            extracted.extend(child_footnoes);
-        }
-        Ok(extracted)
-    }
 }
 
 /// Functions essentially the same as a list
@@ -305,42 +268,6 @@ impl DListItem {
 
     pub fn locations(&self) -> Vec<Location> {
         self.location.clone()
-    }
-
-    pub fn extract_footnotes(
-        &mut self,
-        count: usize,
-        document_id: &str,
-    ) -> Result<Vec<Block>, BlockError> {
-        let mut local_count = count;
-        let mut extracted: Vec<Block> = Vec::new();
-        for idx in 0..self.principal.len() {
-            if self.principal[idx].is_footnote() {
-                local_count += 1;
-                let inline_span = self.principal.remove(idx);
-                let Inline::InlineSpan(mut footnote) = inline_span else {
-                    return Err(BlockError::Footnote("Bad is_footnote match".to_string()));
-                };
-                // deconstruct it
-                let (definition_id, replacement_span, footnote_contents) =
-                    footnote.deconstruct_footnote(local_count, document_id)?;
-                // add the relevant stuff to the return
-                extracted.push(Block::LeafBlock(
-                    LeafBlock::new_footnote_def_from_id_and_inlines(
-                        definition_id,
-                        footnote_contents,
-                    )?,
-                ));
-                // put the reference back where the span was
-                self.principal.insert(idx, replacement_span);
-            }
-        }
-        for child in self.blocks.iter_mut() {
-            let child_footnoes = child.extract_footnote_definitions(local_count, document_id)?;
-            local_count += child_footnoes.len();
-            extracted.extend(child_footnoes);
-        }
-        Ok(extracted)
     }
 }
 
