@@ -201,6 +201,9 @@ removed (with the helpers only it used, `InlineError`, and the never-created
 * [x] A footnote followed by a span (`footnote:[x] and *b*`) lost the footnote
 * [ ] An unclosed span inside a closed one (`+mix *a _b* c+`) renders as
   formatting; Asciidoctor keeps `_b` as text
+* [ ] A constrained mark directly before a letter closes a span (`+*a b *c+`
+  gives "<strong>a b </strong>c"); in Asciidoctor a closing `*` can't be
+  followed by a letter, so it's all text
 * [ ] Apostrophes in code stay straight (`` `foo's` ``), as the
   `literals-straight-squo` fixture asks, where Asciidoctor curls them; *Decide*
   whether that's the rule for the Asciidoctor-style backend too
