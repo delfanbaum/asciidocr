@@ -1,6 +1,6 @@
 use chrono::Local;
 use log::warn;
-use minijinja::{AutoEscape, Environment, context};
+use minijinja::{AutoEscape, Environment, context, value::Serde};
 use once_cell::sync::Lazy;
 use regex::Regex;
 use std::{
@@ -197,8 +197,8 @@ fn render_from_templates(
         .get_template(base_template)
         .expect("Error finding base template.");
 
-    // do the rendering
-    Ok(tmpl.render(context!(..build_ctx, ..context! {graph}))?)
+    // do the rendering; since minijinja 3, serde types have to be wrapped in `Serde` explicitly
+    Ok(tmpl.render(context!(graph => Serde(graph), ..build_ctx))?)
 }
 
 fn gather_htmlbook_templates(full_document: bool) -> Vec<(&'static str, &'static str)> {
