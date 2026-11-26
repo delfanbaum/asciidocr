@@ -8,7 +8,7 @@ use std::{
     str::FromStr,
 };
 
-use log::{error, info, warn};
+use log::{info, warn};
 
 use crate::scanner::tokens::{Token, TokenType};
 use crate::{
@@ -123,13 +123,8 @@ pub struct Parser {
 impl Default for Parser {
     fn default() -> Self {
         // defaults assuming stdin
-        match env::current_dir() {
-            Ok(dir) => Self::new(dir),
-            Err(e) => {
-                error!("Unexpeced error: {e}");
-                std::process::exit(1)
-            }
-        }
+        // (or the current directory as `.`, if its path can't be had)
+        Self::new(env::current_dir().unwrap_or_else(|_| PathBuf::from(".")))
     }
 }
 
@@ -398,7 +393,9 @@ impl Parser {
 
             // table cells -- note that we just create the cells; up to the backend/template to handle the
             // column-making (for now, so we can just reuse ParentBlock)
-            TokenType::TableCell => self.parse_table_cell(token, asg),
+            // (the scanner can't tell a `|` in a table from one that isn't)
+            TokenType::TableCell if self.in_open_table() => self.parse_table_cell(token, asg),
+            TokenType::TableCell => self.parse_text(token),
 
             TokenType::QuoteVerseBlock => {
                 // check if it's verse
@@ -888,9 +885,12 @@ impl Parser {
             asciidoc_include = true;
         }
 
-        // now parse the file
-        for result in Scanner::new_with_stack(&open_file(resolved_target), self.file_stack.clone())
-        {
+        // now parse the file (or skip it, if it can't be read)
+        let Some(included) = open_file(resolved_target) else {
+            self.file_stack.pop();
+            return Ok(());
+        };
+        for result in Scanner::new_with_stack(&included, self.file_stack.clone()) {
             match result {
                 Ok(token) => {
                     // lines
@@ -1858,6 +1858,23 @@ impl Parser {
         self.push_block_to_stack(Block::ParentBlock(block))
     }
 
+    /// Whether the innermost open delimited block is a table
+    fn in_open_table(&self) -> bool {
+        let (Some(line), Some(file)) = (
+            self.open_delimited_block_lines.last(),
+            self.open_delimited_block_files.last(),
+        ) else {
+            return false;
+        };
+        self.block_stack.iter().rev().any(|block| {
+            block.is_table()
+                && block
+                    .locations()
+                    .first()
+                    .is_some_and(|start| start.line == *line && &start.file == file)
+        })
+    }
+
     fn parse_table_cell(&mut self, token: Token, asg: &mut Asg) -> Result<(), ParserError> {
         // take the token text, which begins with a `|`, and then use everything after
         let cell_contents = token.text()[1..].to_string();
@@ -2334,15 +2351,16 @@ impl Parser {
     }
 }
 
-fn open_file<P>(filename: P) -> String
+/// The contents of an included file, or `None` (with a warning) if it can't be read
+fn open_file<P>(filename: P) -> Option<String>
 where
     P: AsRef<Path> + Into<PathBuf> + Debug,
 {
     match fs::read_to_string(&filename) {
-        Ok(file_string) => file_string,
+        Ok(file_string) => Some(file_string),
         Err(e) => {
             warn!("Unable to read file {:?}: {e}", filename);
-            std::process::exit(1)
+            None
         }
     }
 }

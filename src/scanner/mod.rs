@@ -277,7 +277,7 @@ impl<'a> Scanner<'a> {
             }
             ':' => {
                 if self.starts_new_line() && self.starts_attr() {
-                    while self.peek() != '\n' {
+                    while self.peek() != '\n' && !self.is_at_end() {
                         // TK line continuation
                         self.current += 1
                     }
@@ -514,6 +514,11 @@ impl<'a> Scanner<'a> {
         while self.peek() == '=' {
             self.current += 1
         }
+        // a heading's equals signs are followed by a space; anything else is text
+        if self.peek() != ' ' {
+            self.current = self.start + 1;
+            return self.add_text_until_next_markup();
+        }
         self.current += 1; // add the space to the lexeme, but remove from count
         match self.source.as_bytes()[self.start..self.current - 1].len() {
             1 => self.add_token(TokenType::Heading1, false, 0),
@@ -606,6 +611,10 @@ impl<'a> Scanner<'a> {
 
     /// Adds the block image, consuming the target as well as any attributes
     fn add_block_image(&mut self) -> Result<Token, ScannerError> {
+        // a macro whose brackets don't close on its line is just text
+        if !self.closes_on_this_line("]") {
+            return self.add_text_until_next_markup();
+        }
         while self.peek() != ']' {
             self.current += 1
         }
@@ -615,6 +624,10 @@ impl<'a> Scanner<'a> {
 
     /// Adds the block image, consuming the target as well as any attributes
     fn add_inline_image(&mut self) -> Result<Token, ScannerError> {
+        // a macro whose brackets don't close on its line is just text
+        if !self.closes_on_this_line("]") {
+            return self.add_text_until_next_markup();
+        }
         while self.peek() != ']' {
             self.current += 1
         }
@@ -624,8 +637,8 @@ impl<'a> Scanner<'a> {
 
     /// Adds the include image, consuming the target as well as any attributes
     fn add_include(&mut self) -> Result<Token, ScannerError> {
-        // a directive that never closes (on its line) is just text
-        if !self.closes_on_this_line("]") {
+        // a directive without its brackets (on its line) is just text
+        if !self.closes_on_this_line("[") || !self.closes_on_this_line("]") {
             return self.add_text_until_next_markup();
         }
         while self.peek() != ']' {
@@ -678,6 +691,10 @@ impl<'a> Scanner<'a> {
     }
 
     fn add_inline_style(&mut self) -> Result<Token, ScannerError> {
+        // a style whose brackets don't close on its line is just text
+        if !self.closes_on_this_line("]") {
+            return self.add_text_until_next_markup();
+        }
         while self.peek() != ']' {
             self.current += 1
         }
@@ -712,10 +729,13 @@ impl<'a> Scanner<'a> {
         if !self.closes_on_this_line("]]") {
             return self.add_text_until_next_markup();
         }
-        while self.peeks_ahead(3) != "]]\n" && !self.is_at_end() {
-            self.current += 1
+        // to the line's last `]]` (not the newline); `closes_on_this_line` found one
+        let line_end = self.source[self.current..]
+            .find('\n')
+            .map_or(self.source.len(), |idx| self.current + idx);
+        if let Some(idx) = self.source[self.current..line_end].rfind("]]") {
+            self.current += idx + 2;
         }
-        self.current += 2; // consume the ']]' chars, NOT newline
         self.add_token(TokenType::BlockAnchor, true, 0)
     }
 
@@ -794,7 +814,7 @@ impl<'a> Scanner<'a> {
     fn add_tag(&mut self) -> Result<Token, ScannerError> {
         let tag_type: TokenType;
         if self.expecting_tag_end {
-            while self.peek() != 'e' {
+            while self.peek() != 'e' && !self.is_at_end() {
                 self.current += 1;
             }
             self.start = self.current;
@@ -832,12 +852,14 @@ impl<'a> Scanner<'a> {
         self.start == 0 || self.source.as_bytes()[self.start - 1] == b'\n'
     }
 
+    /// Whether the line is `delimiter_len` of `c` and nothing else (the line may be the last one,
+    /// with no newline after it)
     fn starts_repeated_char_line(&self, c: char, delimiter_len: usize) -> bool {
-        let mut expected_block = String::from(c).repeat(delimiter_len - 1);
-        expected_block.push('\n');
-
-        self.current + delimiter_len <= self.source.len()
-            && self.peeks_ahead(delimiter_len) == expected_block
+        let rest = String::from(c).repeat(delimiter_len - 1);
+        let end = self.current + delimiter_len - 1;
+        end <= self.source.len()
+            && self.source.get(self.current..end) == Some(rest.as_str())
+            && matches!(self.source.as_bytes().get(end), None | Some(b'\n'))
     }
 
     /// Checks for document attribute lines, e.g., ":foo: bar" or ":foo:"
@@ -846,7 +868,7 @@ impl<'a> Scanner<'a> {
         while ![' ', '\n', ':'].contains(&self.peek()) && !self.is_at_end() {
             self.current += 1
         }
-        let check = self.source.as_bytes()[self.current] as char == ':';
+        let check = self.source.as_bytes().get(self.current) == Some(&b':');
         self.current = current_placeholder;
         check
     }
@@ -865,7 +887,7 @@ impl<'a> Scanner<'a> {
         while (self.peek().is_alphanumeric() || self.peek() == '-') && !self.is_at_end() {
             self.current += 1
         }
-        let check = self.source.as_bytes()[self.current] as char == '}';
+        let check = self.source.as_bytes().get(self.current) == Some(&b'}');
         self.current = current_placeholder;
         check
     }
@@ -876,7 +898,7 @@ impl<'a> Scanner<'a> {
         while self.peek().is_alphanumeric() && !self.is_at_end() {
             self.current += 1
         }
-        let check = self.source.as_bytes()[self.current] as char == ';';
+        let check = self.source.as_bytes().get(self.current) == Some(&b';');
         self.current = current_placeholder;
         check
     }

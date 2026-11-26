@@ -48,8 +48,11 @@ pub fn target_and_attrs_from_token(token: &Token) -> (String, Option<ElementMeta
     };
 
     let target: String = target_and_attrs.chars().take_while(|c| c != &'[').collect();
-    // get rid of the "[]" chars
-    let attributes = target_and_attrs[target.len() + 1..target_and_attrs.len() - 1].to_string();
+    // get rid of the "[]" chars (there are none if the target runs to the end)
+    let attributes = target_and_attrs
+        .get(target.len() + 1..target_and_attrs.len().saturating_sub(1))
+        .unwrap_or_default()
+        .to_string();
     let mut metadata: Option<ElementMetadata> = None;
     if !attributes.is_empty() {
         let mut token_metadata = ElementMetadata {

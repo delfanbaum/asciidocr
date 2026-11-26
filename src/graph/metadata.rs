@@ -254,8 +254,12 @@ impl ElementMetadata {
                 // nothing declares this type yet, and there is nothing to do with its attributes
             }
             _ => {
-                if attribute.starts_with('"') {
-                    *attribute = attribute[1..attribute.len() - 1].to_string()
+                // a quoted value loses its quotes (a lone `"` isn't a quoted value)
+                if let Some(unquoted) = attribute
+                    .strip_prefix('"')
+                    .and_then(|rest| rest.strip_suffix('"'))
+                {
+                    *attribute = unquoted.to_string()
                 }
                 self.attributes
                     .insert(format!("positional_{}", idx + 1), attribute.to_string());

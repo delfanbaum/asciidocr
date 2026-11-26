@@ -1,4 +1,4 @@
-use log::{error, warn};
+use log::warn;
 use std::{
     collections::{HashMap, HashSet},
     fmt::Display,
@@ -221,51 +221,32 @@ impl Block {
         let Block::ParentBlock(table) = self else {
             return Err(BlockError::IncorrectCall);
         };
-        // check if there is an implicit header
-        if table.blocks.len() >= 2 {
-            // if the cells in the first row are on the same line, either serves as cols
-            // designation
-            let first_cell_line = table.blocks[0].line()?;
-            if first_cell_line == table.blocks[1].line()? {
-                // check for an implicit header
-                if first_cell_line == table.location[0].line + 1 {
-                    if let Some(ref mut metadata) = table.metadata {
-                        metadata.options.push("header".to_string());
-                    } else {
-                        let mut metadata = ElementMetadata::default();
-                        metadata.options.push("header".to_string());
-                        table.metadata = Some(metadata)
-                    }
-                }
-                // count for implicit column designation
-                let cols = table
-                    .blocks
-                    .iter()
-                    .fold(0usize, |acc, block| match block.line() {
-                        Ok(line) => acc + (line == first_cell_line) as usize,
-                        Err(_) => acc, // shouldn't ever happen
-                    });
-                if let Some(ref mut metadata) = table.metadata {
-                    if !metadata.attributes.contains_key("cols") {
-                        metadata
-                            .attributes
-                            .insert("cols".to_string(), format!("{cols}"));
-                    }
-                } else {
-                    let mut metadata = ElementMetadata::default();
-                    metadata
-                        .attributes
-                        .insert("cols".to_string(), format!("{cols}"));
-                    table.metadata = Some(metadata)
-                }
-            }
-            // FOR NOW, make the cols an integer for easier templating.
-            let Some(ref mut metadata) = table.metadata else {
-                error!("Error creating table at Line: {}", first_cell_line);
-                std::process::exit(1)
-            };
-            metadata.simplify_cols();
+        let Some(first_cell) = table.blocks.first() else {
+            return Ok(());
+        };
+        let first_cell_line = first_cell.line()?;
+        let cells_on_first_line = table
+            .blocks
+            .iter()
+            .filter(|block| block.line().is_ok_and(|line| line == first_cell_line))
+            .count();
+        // an implicit header: a first row of several cells, directly under the delimiter
+        if cells_on_first_line >= 2 && first_cell_line == table.location[0].line + 1 {
+            table
+                .metadata
+                .get_or_insert_with(ElementMetadata::default)
+                .options
+                .push("header".to_string());
         }
+        // as in Asciidoctor, unless `cols` says otherwise, the cells on the first line are the
+        // columns (one, if the first row has a cell per line)
+        let metadata = table.metadata.get_or_insert_with(ElementMetadata::default);
+        metadata
+            .attributes
+            .entry("cols".to_string())
+            .or_insert_with(|| format!("{cells_on_first_line}"));
+        // FOR NOW, make the cols an integer for easier templating.
+        metadata.simplify_cols();
         Ok(())
     }
 
