@@ -141,19 +141,19 @@ removed (with the helpers only it used, `InlineError`, and the never-created
 
 === Inline and block parser bugs (S–M each)
 
-* [ ] A footnote runs to the last `]` in its paragraph
+* [x] A footnote runs to the last `]` in its paragraph
   (`+A footnote:[plain] here and a stray ] there.+`); close it at the first
   one, as Asciidoctor does
-* [ ] The `link:` prefix is output as text; the scanner should recognize the
+* [x] The `link:` prefix is output as text; the scanner should recognize the
   `link:` macro name, not only the URL
-* [ ] Formatting with a URL inside a link macro mis-nests
+* [x] Formatting with a URL inside a link macro mis-nests
   (`+link:x.html[*x http://q.com y*]+`); probably falls out of the `link:` fix
-* [ ] An unclosed span before another block still renders as formatting
+* [x] An unclosed span before another block still renders as formatting
   (`+a _unclosed text+`, a blank line, `b`), while the same paragraph at the end
   of the file is correctly left as text
-* [ ] Apostrophes inside some spans aren't replaced (`+_don't stop_+`, while
+* [x] Apostrophes inside some spans aren't replaced (`+_don't stop_+`, while
   `+*it's here*+` works)
-* [ ] CRLF input leaves `\r` in paragraph text: normalize line endings in the
+* [x] CRLF input leaves `\r` in paragraph text: normalize line endings in the
   scanner
 * [ ] An ID on an admonition lands on its content, in both the `NOTE: text` and
   the `[NOTE]` + `====` forms
@@ -162,7 +162,7 @@ removed (with the helpers only it used, `InlineError`, and the never-created
   `video::`, `[stem]`), which are currently output as plain text without one
 * [x] A line of text directly after a section heading (`== Head`, `Text`) is
   merged into the section title ("Head\nText")
-* [ ] A line of text directly before or after a delimited listing (`Text`,
+* [x] A line of text directly before or after a delimited listing (`Text`,
   `----`, `x`, `----`, or `----`, `x`, `----`, `more`) is added to the listing;
   it should be a paragraph. (Asciidoctor reads `Text` then `----` as a setext
   section title, which we don't support)
@@ -196,8 +196,14 @@ removed (with the helpers only it used, `InlineError`, and the never-created
   on the next line) doesn't count that newline, so every later location in the
   document is a line too early. The indentation of that next line is also
   kept, where Asciidoctor strips it as it does for other lines of an item's text
-* [ ] `C++` in prose (`C++ uses a::b`) comes out as "C``"; Asciidoctor leaves
+* [x] `C++` in prose (`C++ uses a::b`) comes out as "C``"; Asciidoctor leaves
   it as written
+* [x] A footnote followed by a span (`footnote:[x] and *b*`) lost the footnote
+* [ ] An unclosed span inside a closed one (`+mix *a _b* c+`) renders as
+  formatting; Asciidoctor keeps `_b` as text
+* [ ] Apostrophes in code stay straight (`` `foo's` ``), as the
+  `literals-straight-squo` fixture asks, where Asciidoctor curls them; *Decide*
+  whether that's the rule for the Asciidoctor-style backend too
 * [x] A bare URL stopped at `-`, `_`, `%`, `~` or `;` (`http://x.com/my-page`
   linked to `http://x.com/my`), and a URL with a non-ASCII character stopped the
   conversion with a panic
