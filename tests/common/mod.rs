@@ -213,11 +213,11 @@ pub fn assert_parsed_doc_matches_expected_asg_from_str(adoc_str: &str, asg_json_
     assert_json_eq!(parsed_asg, expected_asg);
 }
 
-/// Ignoring whitespace (because that's less important for now), ensure that our tags, ordering,
-/// blocks, inlines, etc., are correct
+/// Given a pattern "parent/filename" inside tests/data, assert that the filename.adoc produces the
+/// HTMLBook document in filename.html, compared as it renders (see [`html::assert_html_eq`])
 pub fn assert_rendered_htmlbook_matches_expected(adoc_fn: &str, html_fn: &str) {
     let test_dir = PathBuf::from("tests/data/");
-    let mut rendered_html = render_htmlbook(
+    let rendered_html = render_htmlbook(
         &Parser::new_no_target_resolution(test_dir.join(adoc_fn))
             .parse(Scanner::new(
                 &fs::read_to_string(test_dir.join(adoc_fn)).expect("Unable to find adoc"),
@@ -225,18 +225,16 @@ pub fn assert_rendered_htmlbook_matches_expected(adoc_fn: &str, html_fn: &str) {
             .expect("Unable to parse input file"),
     )
     .expect("Unable to render HTML from document");
-    rendered_html.retain(|c| !c.is_whitespace());
-    let mut expected_html =
-        fs::read_to_string(test_dir.join(html_fn)).expect("Unable to read expectd html file");
-    expected_html.retain(|c| !c.is_whitespace());
-    assert_eq!(rendered_html, expected_html);
+    let expected_html =
+        fs::read_to_string(test_dir.join(html_fn)).expect("Unable to read expected html file");
+    html::assert_html_eq(&rendered_html, &expected_html);
 }
 
 /// Like `assert_rendered_htmlbook_matches_expected`, but for the embedded (no document wrapper)
 /// rendering
 pub fn assert_rendered_htmlbook_embedded_matches_expected(adoc_fn: &str, html_fn: &str) {
     let test_dir = PathBuf::from("tests/data/");
-    let mut rendered_html = render_htmlbook_embedded(
+    let rendered_html = render_htmlbook_embedded(
         &Parser::new_no_target_resolution(test_dir.join(adoc_fn))
             .parse(Scanner::new(
                 &fs::read_to_string(test_dir.join(adoc_fn)).expect("Unable to find adoc"),
@@ -244,16 +242,14 @@ pub fn assert_rendered_htmlbook_embedded_matches_expected(adoc_fn: &str, html_fn
             .expect("Unable to parse input file"),
     )
     .expect("Unable to render HTML from document");
-    rendered_html.retain(|c| !c.is_whitespace());
-    let mut expected_html =
-        fs::read_to_string(test_dir.join(html_fn)).expect("Unable to read expectd html file");
-    expected_html.retain(|c| !c.is_whitespace());
-    assert_eq!(rendered_html, expected_html);
+    let expected_html =
+        fs::read_to_string(test_dir.join(html_fn)).expect("Unable to read expected html file");
+    html::assert_html_eq(&rendered_html, &expected_html);
 }
 
 /// Given a pattern "parent/filename" inside tests/data, assert that the filename.adoc produces the
-/// Asciidoctor-styled full document found in filename.html. Ignores whitespace, and the
-/// "Last updated" timestamp (which is `NOW` in the expected html).
+/// Asciidoctor-styled full document found in filename.html, compared as it renders (see
+/// [`html::assert_html_eq`]), ignoring the "Last updated" timestamp (`NOW` in the expected html).
 pub fn assert_rendered_asciidoctor_html_matches_expected(adoc_fn: &str, html_fn: &str) {
     let test_dir = PathBuf::from("tests/data/");
     let rendered_html = render_asciidoctor_html(
@@ -265,14 +261,12 @@ pub fn assert_rendered_asciidoctor_html_matches_expected(adoc_fn: &str, html_fn:
     )
     .expect("Unable to render HTML from document");
     let timestamp = regex::Regex::new(r"Last updated [^<]*").unwrap();
-    let mut rendered_html = timestamp
+    let rendered_html = timestamp
         .replace(&rendered_html, "Last updated NOW")
         .to_string();
-    rendered_html.retain(|c| !c.is_whitespace());
-    let mut expected_html =
-        fs::read_to_string(test_dir.join(html_fn)).expect("Unable to read expectd html file");
-    expected_html.retain(|c| !c.is_whitespace());
-    assert_eq!(rendered_html, expected_html);
+    let expected_html =
+        fs::read_to_string(test_dir.join(html_fn)).expect("Unable to read expected html file");
+    html::assert_html_eq(&rendered_html, &expected_html);
 }
 
 /// Renders Asciidoc source to embedded HTMLBook, keeping whitespace as is (for tests of things
@@ -299,10 +293,10 @@ pub fn render_asciidoctor_embedded_from_str(adoc: &str) -> String {
 
 /// Given a pattern "parent/filename" inside tests/data, assert that the filename.adoc produces the
 /// embedded Asciidoctor-styled html (i.e., the document contents only, like `asciidoctor -s`)
-/// found in filename.html. Ignores whitespace.
+/// found in filename.html, compared as it renders (see [`html::assert_html_eq`]).
 pub fn assert_rendered_asciidoctor_embedded_matches_expected(adoc_fn: &str, html_fn: &str) {
     let test_dir = PathBuf::from("tests/data/");
-    let mut rendered_html = render_asciidoctor_html_embedded(
+    let rendered_html = render_asciidoctor_html_embedded(
         &Parser::new_no_target_resolution(test_dir.join(adoc_fn))
             .parse(Scanner::new(
                 &fs::read_to_string(test_dir.join(adoc_fn)).expect("Unable to find adoc"),
@@ -310,11 +304,9 @@ pub fn assert_rendered_asciidoctor_embedded_matches_expected(adoc_fn: &str, html
             .expect("Unable to parse input file"),
     )
     .expect("Unable to render HTML from document");
-    rendered_html.retain(|c| !c.is_whitespace());
-    let mut expected_html =
-        fs::read_to_string(test_dir.join(html_fn)).expect("Unable to read expectd html file");
-    expected_html.retain(|c| !c.is_whitespace());
-    assert_eq!(rendered_html, expected_html);
+    let expected_html =
+        fs::read_to_string(test_dir.join(html_fn)).expect("Unable to read expected html file");
+    html::assert_html_eq(&rendered_html, &expected_html);
 }
 
 pub fn generate_temp_image() -> NamedTempFile {
