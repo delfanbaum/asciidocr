@@ -3,14 +3,26 @@
 pub mod tokens;
 use core::str;
 use log::{debug, warn};
+use std::borrow::Cow;
 use tokens::{Token, TokenType};
 
 use crate::errors::ScannerError;
 
+/// Windows line endings are line endings: `\r\n` becomes `\n` (the text is only copied when it
+/// has any)
+fn normalize_line_endings(source: &str) -> Cow<'_, str> {
+    if source.contains("\r\n") {
+        Cow::Owned(source.replace("\r\n", "\n"))
+    } else {
+        Cow::Borrowed(source)
+    }
+}
+
 #[derive(Debug)]
 /// Scans an asciidoc `&str` into [`Token`]s to be consumed by the Parser.
 pub struct Scanner<'a> {
-    pub source: &'a str,
+    /// the text to scan, with Windows line endings (`\r\n`) made `\n`
+    pub source: Cow<'a, str>,
     start: usize,
     startcol: usize,
     current: usize,
@@ -40,7 +52,7 @@ impl Iterator for Scanner<'_> {
 impl<'a> Scanner<'a> {
     pub fn new(source: &'a str) -> Self {
         Scanner {
-            source,
+            source: normalize_line_endings(source),
             start: 0,    // beginning of the current lexeme being scanned
             startcol: 1, // because asciidoc spec wants start/end locations
             current: 0,  // the character we're looking at *now*
@@ -53,7 +65,7 @@ impl<'a> Scanner<'a> {
 
     pub fn new_with_stack(source: &'a str, file_stack: Vec<String>) -> Self {
         Scanner {
-            source,
+            source: normalize_line_endings(source),
             start: 0,    // beginning of the current lexeme being scanned
             startcol: 1, // because asciidoc spec wants start/end locations
             current: 0,  // the character we're looking at *now*
