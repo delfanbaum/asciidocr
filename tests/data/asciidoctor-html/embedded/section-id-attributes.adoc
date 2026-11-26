@@ -1,0 +1,11 @@
+= Document
+:idprefix: id_
+:idseparator: -
+
+== First Section
+
+See <<id_first-section>> and <<id_second-section-again>>.
+
+== Second Section, Again
+
+=== A sub.section with --dashes-- and spaces

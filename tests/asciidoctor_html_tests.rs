@@ -43,6 +43,9 @@ fn test_full_documents(#[case] fn_pattern: &str) {
 #[case::no_preamble("asciidoctor-html/embedded/no-preamble")]
 #[case::escaping("asciidoctor-html/embedded/escaping")]
 #[case::section_ids("asciidoctor-html/embedded/section-ids")]
+#[case::section_id_xrefs("asciidoctor-html/embedded/section-id-xrefs")]
+#[case::section_id_attributes("asciidoctor-html/embedded/section-id-attributes")]
+#[case::section_ids_off("asciidoctor-html/embedded/section-ids-off")]
 fn test_embedded(#[case] fn_pattern: &str) {
     let adoc_fn = format!("{}.adoc", fn_pattern);
     let html_fn = format!("{}.html", fn_pattern);

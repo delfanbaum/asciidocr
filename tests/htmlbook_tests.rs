@@ -1,5 +1,6 @@
 use common::{
     assert_rendered_htmlbook_embedded_matches_expected, assert_rendered_htmlbook_matches_expected,
+    html::{assert_html_eq, select},
     render_htmlbook_embedded_from_str,
 };
 use rstest::rstest;
@@ -374,4 +375,16 @@ fn block_ids_and_roles() {
     let adoc_fn = format!("{}.adoc", fn_pattern);
     let html_fn = format!("{}.html", fn_pattern);
     assert_rendered_htmlbook_embedded_matches_expected(&adoc_fn, &html_fn)
+}
+
+/// Sections without an explicit id get one, as in the Asciidoctor-style backend, and an xref to
+/// it shows the section's title
+#[test]
+fn generated_section_ids_and_xrefs() {
+    let html = render_htmlbook_embedded_from_str("== My Section\n\nSee <<_my_section>>.\n");
+    assert_html_eq(
+        &select(&html, "section"),
+        "<section data-type=\"sect1\" id=\"_my_section\"><h1>My Section</h1>\
+         <p>See <a href=\"#_my_section\">My Section</a>.</p></section>",
+    );
 }

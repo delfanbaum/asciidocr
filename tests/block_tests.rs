@@ -456,3 +456,19 @@ fn test_delimited_block_in_include() {
         "paragraph \"x\" example(paragraph \"first\", paragraph \"a\", sidebar(paragraph \"sidebar in the include\"), paragraph \"last\") paragraph \"after\""
     );
 }
+
+/// Generated section ids are for the backends and for xrefs, not part of the graph: the ASG
+/// (TCK) output has no `id` for a section without an explicit one. An xref to it gets the title.
+#[test]
+fn test_generated_section_ids_stay_out_of_the_graph() {
+    let asg = common::parsed_asg("== My Section\n\nSee <<_my_section>>.\n");
+    let section = &asg["blocks"][0];
+    assert!(section.get("id").is_none(), "{section}");
+    assert!(
+        !section.to_string().contains("_my_section\\\""),
+        "{section}"
+    );
+    let xref = &section["blocks"][0]["inlines"][1];
+    assert_eq!(xref["target"], "_my_section");
+    assert_eq!(xref["inlines"][0]["value"], "My Section", "{xref}");
+}

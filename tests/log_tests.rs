@@ -29,6 +29,21 @@ fn test_missing_references_warns() {
     assert!(log_str.contains("Unable to find xref:"));
 }
 
+/// An xref to a generated section id finds it
+#[test]
+fn test_xref_to_generated_id_does_not_warn() {
+    let mut logger = logger();
+    common::parsed_asg("== My Section\n\nSee <<_my_section>>.\n");
+    let mut warnings = vec![];
+    while let Some(record) = logger.pop() {
+        warnings.push(record.args().to_owned());
+    }
+    assert!(
+        !warnings.iter().any(|w| w.contains("Unable to find xref")),
+        "{warnings:?}"
+    );
+}
+
 #[test]
 fn test_title_on_paragraph_warns() {
     let mut logger = logger();

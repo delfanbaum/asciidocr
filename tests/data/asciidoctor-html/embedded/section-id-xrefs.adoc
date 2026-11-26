@@ -1,0 +1,7 @@
+== Introduction
+
+See <<_details>> and <<_introduction_2>>.
+
+== Details
+
+== Introduction
