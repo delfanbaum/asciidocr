@@ -174,6 +174,7 @@ impl Inline {
 
     pub fn produce_literal_from_self(&mut self) -> String {
         match &self {
+            Inline::InlineSpan(span) if !span.markup.is_empty() => span.markup.clone(),
             Inline::InlineSpan(span) => {
                 let mut literal = match span.variant {
                     InlineSpanVariant::Strong => "*".to_string(),
@@ -313,6 +314,10 @@ pub struct InlineSpan {
     location: Vec<Location>,
     #[serde(skip)]
     pub open: bool,
+    /// the markup that opened the span, as written (`+` and `` ` `` are both code, e.g.), to put
+    /// back as text if the span is never closed
+    #[serde(skip)]
+    markup: String,
 }
 
 impl InlineSpan {
@@ -330,10 +335,18 @@ impl InlineSpan {
             metadata: None,
             location,
             open: true,
+            markup: String::new(),
         }
     }
 
     pub fn inline_span_from_token(token: Token) -> Self {
+        let markup = token.lexeme.clone();
+        let mut span = Self::span_from_token(token);
+        span.markup = markup;
+        span
+    }
+
+    fn span_from_token(token: Token) -> Self {
         match token.token_type() {
             TokenType::Strong => Self::new(
                 InlineSpanVariant::Strong,
@@ -416,6 +429,8 @@ impl InlineSpan {
                         format!("({})", &token.text()[1..token.text().len() - 1]),
                         token.locations(),
                     )));
+                // complete as it is: there is no closing markup to wait for
+                code_span.open = false;
                 code_span
             }
             _ => {

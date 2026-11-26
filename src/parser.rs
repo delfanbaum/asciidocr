@@ -554,7 +554,6 @@ impl Parser {
             } else if self.lists.active(self.block_stack.len()).is_some() {
                 // a blank line ends the current list item's text, but not the list: the next
                 // line that isn't blank decides that (see `end_list_after_blank_line`)
-                self.in_inline_span = false;
                 self.add_inlines_to_block_stack()?;
                 if let Some(scope) = self.lists.active(self.block_stack.len()) {
                     scope.blank_line();
@@ -580,8 +579,8 @@ impl Parser {
     /// A blank line completes the open paragraph, and the text after it starts a new block
     fn end_blocks_at_blank_line(&mut self, asg: &mut Asg) -> Result<(), ParserError> {
         // clear out any inlines
-        self.in_inline_span = false;
         self.add_inlines_to_block_stack()?;
+        self.in_inline_span = false;
         self.add_empty_admonition(asg)?;
         // and then force a new block hereafter
         self.force_new_block = true;
@@ -1878,10 +1877,11 @@ impl Parser {
             return Ok(());
         }
 
-        // dangling inlines
-        if self.in_inline_span {
+        // spans that were never closed are text (their markup included)
+        while self.inline_stack.iter().any(|inline| inline.is_open()) {
             self.handle_dangling_spans();
         }
+        self.in_inline_span = false;
 
         if let Some(header) = &mut self.document_header {
             while !self.inline_stack.is_empty() {
