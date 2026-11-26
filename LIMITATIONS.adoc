@@ -62,6 +62,8 @@ stylesheet. Known gaps:
 * Callout lists
 * Table column widths are always shared out evenly, and table cell alignment and
   styles are not supported
+* An apostrophe in code (`` `foo's` ``) stays straight, where Asciidoctor makes it
+  a typographic one (`&#8217;`): a curly quote changes code
 * A `[source]` block without a language is rendered like any other listing
   (as `<pre>`, not `<pre class="highlight"><code>`)
 * Checklists and admonition icons

@@ -206,9 +206,8 @@ removed (with the helpers only it used, `InlineError`, and the never-created
   followed by a letter, so it's all text
 * [ ] Apostrophes in bare URLs and link targets stay straight
   (`http://x.com/it's`); Asciidoctor curls them there too, in the `href` as well
-* [ ] Apostrophes in code stay straight (`` `foo's` ``), as the
-  `literals-straight-squo` fixture asks, where Asciidoctor curls them; *Decide*
-  whether that's the rule for the Asciidoctor-style backend too
+* [x] *Decided*: apostrophes in code stay straight (`` `foo's` ``), where
+  Asciidoctor curls them, since a curly quote changes code (see LIMITATIONS)
 * [x] A bare URL stopped at `-`, `_`, `%`, `~` or `;` (`http://x.com/my-page`
   linked to `http://x.com/my`), and a URL with a non-ASCII character stopped the
   conversion with a panic
