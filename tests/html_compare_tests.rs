@@ -60,3 +60,28 @@ fn test_select() {
     assert_html_eq(&select(html, "dd p"), "<p>b</p>");
     assert_eq!(select(html, "table"), "");
 }
+
+/// A match inside another match is part of that one, not a match of its own
+#[test]
+fn test_select_nested_matches() {
+    let html = "<div class=\"a\"><p>x</p><div class=\"a\"><p>y</p></div></div>";
+    assert_html_eq(&select(html, ".a"), html);
+}
+
+/// `select` keeps the text of a `<pre>` as it is, even where HTML parsing would drop a newline
+/// from it again
+#[test]
+fn test_select_pre() {
+    let html = "<div><pre>\n\nx</pre></div>";
+    assert_eq!(
+        canonical_html(&select(html, "pre")),
+        canonical_html("<pre>\n\nx</pre>")
+    );
+}
+
+/// Tables are selected whole (a row or cell outside its table doesn't parse)
+#[test]
+fn test_select_table() {
+    let html = "<div><table><tr><td>a</td></tr></table><p>b</p></div>";
+    assert_html_eq(&select(html, "table"), "<table><tr><td>a</td></tr></table>");
+}

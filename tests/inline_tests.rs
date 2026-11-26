@@ -316,6 +316,11 @@ fn test_footnote_ends_at_its_bracket(#[case] adoc: &str, #[case] expected: &str)
     "See link:other.html[other] now.\n",
     "<p>See <a href=\"other.html\">other</a> now.</p>"
 )]
+#[case::in_footnote("footnote:[see link:x.html[y]] after\n", "</sup> after</p>")]
+#[case::bare_url_then_bracket(
+    "see http://y.com[ x\n",
+    "<p>see <a href=\"http://y.com\" class=\"bare\">http://y.com</a>[ x</p>"
+)]
 #[case::formatted_text_with_url(
     "link:x.html[*x http://q.com y*]\n",
     "<a href=\"x.html\"><strong>x <a href=\"http://q.com\" class=\"bare\">http://q.com</a> y</strong></a>"

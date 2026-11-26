@@ -446,3 +446,15 @@ fn test_delimiters_end_paragraphs(#[case] adoc: &str, #[case] expected: &str) {
 fn test_nested_delimited_blocks(#[case] adoc: &str, #[case] expected: &str) {
     assert_eq!(block_outline(adoc), expected);
 }
+
+/// A delimited block in an included file that opens on the same line number as the block the
+/// include is in is a block of its own (the lines of the two files are counted separately)
+#[test]
+fn test_delimited_block_in_include() {
+    assert_eq!(
+        block_outline(
+            "x\n\n====\nfirst\n\ninclude::tests/data/blocks/included-sidebar.adoc[]\n\nlast\n====\nafter\n"
+        ),
+        "paragraph \"x\" example(paragraph \"first\", paragraph \"a\", sidebar(paragraph \"sidebar in the include\"), paragraph \"last\") paragraph \"after\""
+    );
+}
