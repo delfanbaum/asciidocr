@@ -491,6 +491,13 @@ fn test_xref_custom_text() {
 #[case::attribute_entry("text\n\n:cat: George", "paragraph \"text\"")]
 #[case::header_attribute_entry("= Title\n:foo: bar", "")]
 #[case::equals_signs_without_space("====x", "paragraph \"====x\"")]
+#[case::inline_image_name("image:", "paragraph \"image:\"")]
+#[case::block_image_without_brackets("image::pixel", "paragraph \"image::pixel\"")]
+#[case::block_image_unclosed("image::ab.png[Alt", "paragraph \"image::ab.png[Alt\"")]
+#[case::inline_image_without_brackets("An image:c&d.png", "paragraph \"An image:c&d.png\"")]
+// without its brackets on its own line, an image macro doesn't reach a later line's `]`
+#[case::image_then_bracket_later("image::x.png\nlater ]\n", "paragraph \"image::x.png\nlater ]\"")]
+#[case::inline_style_unclosed("a [.role", "paragraph \"a [.role\"")]
 fn test_markup_at_end_of_file(#[case] adoc: &str, #[case] expected: &str) {
     let asg = common::parsed_asg_with_timeout(adoc);
     let outline = match asg["blocks"].as_array() {
