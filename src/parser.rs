@@ -1294,7 +1294,7 @@ impl Parser {
             self.dangling_newline = None;
         }
         // check for any other dangling spans (otherwise they disappear!)
-        self.handle_dangling_spans();
+        self.handle_dangling_spans(false);
         // add any metadata to new inline
         if self.metadata.is_some() {
             inline.add_metadata(self.metadata.as_ref().unwrap().clone());
@@ -1307,16 +1307,24 @@ impl Parser {
     }
 
     fn parse_link_macro(&mut self, token: Token) -> Result<(), ParserError> {
-        self.inline_stack
-            .push_back(Inline::InlineRef(InlineRef::new_link_from_macro_token(
-                token,
-            )));
+        let link = Inline::InlineRef(InlineRef::new_link_from_macro_token(token));
+        self.push_link(link);
         Ok(())
     }
 
     fn parse_hyperlink(&mut self, token: Token) -> Result<(), ParserError> {
         let link = Inline::InlineRef(InlineRef::new_link_from_token(token));
-        // a bare URL inside an open span (`*see http://x.com*`) belongs to the span
+        self.push_link(link);
+        Ok(())
+    }
+
+    /// A link goes after the text before it (including the newline that ended the line before,
+    /// which is text, not the link's), inside the span it's in (`` `link:x[y]` ``,
+    /// `*see http://x.com*`), if any
+    fn push_link(&mut self, link: Inline) {
+        if let Some(newline_token) = self.dangling_newline.take() {
+            self.add_text_to_last_inline(newline_token);
+        }
         if let Some(Inline::InlineSpan(span)) = self.inline_stack.back_mut()
             && span.open
         {
@@ -1324,7 +1332,6 @@ impl Parser {
         } else {
             self.inline_stack.push_back(link);
         }
-        Ok(())
     }
 
     fn parse_block_image(&mut self, token: Token, asg: &mut Asg) -> Result<(), ParserError> {
@@ -1405,6 +1412,11 @@ impl Parser {
             self.close_parent_after_push = true;
             // and that the inline span is ended
             self.in_inline_span = false;
+        } else if let Some(Inline::InlineSpan(span)) = self.inline_stack.back_mut()
+            && span.open
+            && span.close_open_link()
+        {
+            // a link macro inside a span (`` `link:x[y]` ``), which stays open
         } else {
             self.add_text_to_last_inline(token);
         }
@@ -1882,13 +1894,17 @@ impl Parser {
         }
     }
 
-    fn handle_dangling_spans(&mut self) {
+    /// Makes the last span that is still open text. With `links_too`, a link macro still waiting
+    /// for its `]` counts (at the end of a paragraph; in the middle of one, the link may close yet)
+    fn handle_dangling_spans(&mut self, links_too: bool) {
         // look for the last span in the stack
-        if let Some(open_span_idx) = self
-            .inline_stack
-            .iter()
-            .rposition(|inline| inline.is_open())
-        {
+        if let Some(open_span_idx) = self.inline_stack.iter().rposition(|inline| {
+            if links_too {
+                inline.is_unclosed()
+            } else {
+                inline.is_open()
+            }
+        }) {
             let mut open_span = self.inline_stack.remove(open_span_idx).unwrap();
             // without a closing mark, the span's markup is just text, which goes in front of
             // whatever the span held
@@ -1921,9 +1937,9 @@ impl Parser {
             return Ok(());
         }
 
-        // spans that were never closed are text (their markup included)
-        while self.inline_stack.iter().any(|inline| inline.is_open()) {
-            self.handle_dangling_spans();
+        // spans (and link macros) that were never closed are text, their markup included
+        while self.inline_stack.iter().any(|inline| inline.is_unclosed()) {
+            self.handle_dangling_spans(true);
         }
         self.in_inline_span = false;
 

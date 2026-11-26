@@ -123,6 +123,16 @@ impl Inline {
         }
     }
 
+    /// Whether this is markup still waiting to be closed: an open span, or a link macro waiting
+    /// for its `]`. At the end of a paragraph, such markup is text.
+    pub fn is_unclosed(&self) -> bool {
+        match self {
+            Inline::InlineSpan(span) => span.open,
+            Inline::InlineRef(iref) => iref.open,
+            _ => false,
+        }
+    }
+
     /// Used for checking if a given inline is just a literal "\n"
     pub fn is_newline(&self) -> bool {
         match self {
@@ -174,6 +184,7 @@ impl Inline {
 
     pub fn produce_literal_from_self(&mut self) -> String {
         match &self {
+            Inline::InlineRef(iref) => iref.markup.clone(),
             Inline::InlineSpan(span) if !span.markup.is_empty() => span.markup.clone(),
             Inline::InlineSpan(span) => {
                 let mut literal = match span.variant {
@@ -282,7 +293,10 @@ impl Inline {
 
     pub fn close(&mut self) {
         match self {
-            Inline::InlineSpan(span) => span.open = false,
+            Inline::InlineSpan(span) => {
+                span.open = false;
+                span.open_links_to_text();
+            }
             _ => panic!("Invalid action: this inline does not take metadata"),
         }
     }
@@ -442,6 +456,13 @@ impl InlineSpan {
     pub fn add_inline(&mut self, inline: Inline) {
         // update the locations
         self.location = Location::reconcile(self.location.clone(), inline.locations());
+        // a link macro inside the span takes what follows, until its `]`
+        if let Some(Inline::InlineRef(last_ref)) = self.inlines.last_mut()
+            && last_ref.open
+        {
+            last_ref.inlines.push(inline);
+            return;
+        }
         if let Some(Inline::InlineSpan(last_span)) = self.inlines.last_mut() {
             if last_span.open {
                 last_span.add_inline(inline);
@@ -461,13 +482,49 @@ impl InlineSpan {
         }
     }
 
+    /// A link macro still open when the span around it closes (`` `see link:x[y` ``) was never a
+    /// link: its markup and text are text, as in Asciidoctor
+    fn open_links_to_text(&mut self) {
+        let mut inlines: Vec<Inline> = vec![];
+        for mut inline in std::mem::take(&mut self.inlines) {
+            let pieces: VecDeque<Inline> = match &inline {
+                Inline::InlineRef(iref) if iref.open => inline.children_with_markup_as_text(),
+                _ => VecDeque::from([inline]),
+            };
+            for piece in pieces {
+                if let (Some(Inline::InlineLiteral(last)), Inline::InlineLiteral(literal)) =
+                    (inlines.last_mut(), &piece)
+                    && last.can_merge_with(literal)
+                {
+                    last.combine_literals(literal.clone());
+                } else {
+                    inlines.push(piece);
+                }
+            }
+        }
+        self.inlines = inlines;
+    }
+
+    /// Closes the link macro open inside this span (or a span open inside it), at its `]`.
+    /// Returns whether there was one.
+    pub fn close_open_link(&mut self) -> bool {
+        match self.inlines.last_mut() {
+            Some(Inline::InlineRef(last_ref)) if last_ref.open => {
+                last_ref.open = false;
+                true
+            }
+            Some(Inline::InlineSpan(last_span)) if last_span.open => last_span.close_open_link(),
+            _ => false,
+        }
+    }
+
     // extracts the inlines inside the span, closing any open (dangling) spans that may be
     // inside of it
     fn extract_span_inlines(&self) -> VecDeque<Inline> {
         let mut children = VecDeque::new();
         for inline in self.inlines.iter() {
             // handle any open spans
-            if inline.is_open() {
+            if inline.is_unclosed() {
                 let mut working_inline = inline.clone();
                 let inline_children = working_inline.children_with_markup_as_text();
                 children.extend(inline_children);
@@ -513,6 +570,10 @@ pub struct InlineRef {
     /// closing `]`. A bare URL, an xref or an image is complete as soon as it is scanned.
     #[serde(skip)]
     pub open: bool,
+    /// the markup that opened a link macro, as written (`link:x.html[`), to put back as text if
+    /// the macro is never closed
+    #[serde(skip)]
+    markup: String,
 }
 
 impl InlineRef {
@@ -526,6 +587,7 @@ impl InlineRef {
             metadata: None,
             location,
             open: false,
+            markup: String::new(),
         }
     }
 
@@ -535,7 +597,8 @@ impl InlineRef {
     }
 
     pub fn new_link_from_macro_token(token: Token) -> Self {
-        let mut target = token.text();
+        let markup = token.text();
+        let mut target = markup.clone();
         target.pop(); // remove trailing '['
         // the `link:` macro name, when the target isn't a URL by itself
         if let Some(stripped) = target.strip_prefix("link:") {
@@ -543,6 +606,7 @@ impl InlineRef {
         }
         InlineRef {
             open: true,
+            markup,
             ..InlineRef::new(InlineRefVariant::Link, target, token.locations())
         }
     }
@@ -567,6 +631,7 @@ impl InlineRef {
                 metadata,
                 location,
                 open: false,
+                markup: String::new(),
             }
         } else {
             InlineRef::new(InlineRefVariant::Image, target, location)

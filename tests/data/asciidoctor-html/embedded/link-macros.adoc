@@ -5,6 +5,6 @@ link:b.html[y]
 
 a link:d.html[unclosed
 
-*a link:e.html[f *g
+`code link:e.html[open` and more
 
 link:h.html[Foo *bold*] and link:http://i.com/?q[1]=2[query]
