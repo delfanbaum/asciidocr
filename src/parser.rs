@@ -207,6 +207,8 @@ impl Parser {
             "Lists left open inside closed blocks"
         );
         // cleanup the final tree locations and xrefs
+        // the IDs of sections that weren't given one, before cross references are resolved
+        asg.generate_section_ids(&self.document_attributes);
         asg.consolidate();
         Ok(asg)
     }

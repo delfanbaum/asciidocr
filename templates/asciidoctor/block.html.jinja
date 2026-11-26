@@ -63,8 +63,8 @@ HTMLBook's.
 {%- macro render_section(block) %}
 {%- set title_html = render_inlines(block.title) %}
 <div{{ wrapper_attrs(block, "sect" ~ block.level, false) }}>
-{%- set explicit_id = block.metadata.attributes.id if block.metadata and block.metadata.attributes else none %}
-<h{{ block.level + 1 }} id="{{ section_id(title_html, explicit_id) | escape_attr }}">{{ title_html }}</h{{ block.level + 1 }}>
+{%- set id = section_id(block) %}
+<h{{ block.level + 1 }}{% if id %} id="{{ id | escape_attr }}"{% endif %}>{{ title_html }}</h{{ block.level + 1 }}>
 {%- if block.level == 1 %}
 <div class="sectionbody">
 {%- endif -%}

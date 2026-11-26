@@ -1,15 +1,16 @@
 use chrono::Local;
 use log::warn;
-use minijinja::{AutoEscape, Environment, context, value::Serde};
+use minijinja::{AutoEscape, Environment, Value, context, value::Serde};
 use once_cell::sync::Lazy;
 use regex::Regex;
 use std::{
-    collections::{HashMap, HashSet},
+    collections::HashMap,
     sync::{Arc, Mutex},
 };
 
 use crate::errors::ConversionError;
 use crate::graph::asg::Asg;
+use crate::graph::blocks::Block;
 use crate::graph::lists::NumeralStyle;
 
 // HTMLBook templates
@@ -98,18 +99,45 @@ fn escape_attr(text: &str) -> String {
     escape_text(text).replace('"', "&quot;")
 }
 
-/// Builds section ids the way Asciidoctor does when none is given: `_` followed by the lowercased
-/// title text, with markup and punctuation removed and spaces, periods and hyphens turned into
-/// single underscores (e.g., "An A-Head" becomes `_an_a_head`).
-fn asciidoctor_section_id(title_html: &str) -> String {
-    static INVALID_CHARS: Lazy<Regex> = Lazy::new(|| {
-        Regex::new(r"<[^>]+>|&(?:[a-z][a-z]+\d{0,2}|#\d{3,6}|#x[\da-f]{3,5});|[^ \w\-.]+").unwrap()
-    });
-    static SEPARATORS: Lazy<Regex> = Lazy::new(|| Regex::new(r"[ .\-]+").unwrap());
-    let lowered = title_html.to_lowercase();
-    let cleaned = INVALID_CHARS.replace_all(&lowered, "");
-    let id = SEPARATORS.replace_all(&cleaned, "_");
-    format!("_{}", id.trim_end_matches('_'))
+/// Where a block starts, as a key to find it by
+fn location_key(line: usize, col: usize, files: &[String]) -> String {
+    format!("{line}:{col}:{}", files.join("\u{0}"))
+}
+
+/// Every section's ID (the one it was given, or the one the parser generated), by where the
+/// section starts
+fn section_ids_by_location(graph: &Asg) -> HashMap<String, String> {
+    fn collect(block: &Block, ids: &mut HashMap<String, String>) {
+        if let (Some(id), Some(start)) = (block.section_id(), block.locations().first()) {
+            ids.insert(location_key(start.line, start.col, &start.file), id);
+        }
+        for child in block.child_blocks() {
+            collect(child, ids);
+        }
+    }
+    let mut ids = HashMap::new();
+    for block in &graph.blocks {
+        collect(block, &mut ids);
+    }
+    ids
+}
+
+/// The `location_key` of a block, as the templates see it
+fn location_key_of(block: &Value) -> Option<String> {
+    let start = block
+        .get_attr("location")
+        .ok()?
+        .get_item(&Value::from(0))
+        .ok()?;
+    let line = start.get_attr("line").ok()?.as_usize()?;
+    let col = start.get_attr("col").ok()?.as_usize()?;
+    let files: Vec<String> = start
+        .get_attr("file")
+        .ok()
+        .and_then(|file| file.try_iter().ok())
+        .map(|files| files.map(|file| file.to_string()).collect())
+        .unwrap_or_default();
+    Some(location_key(line, col, &files))
 }
 
 /// Asciidoctor's fallback alt text for an image: the file name without folders or (only the
@@ -138,30 +166,12 @@ fn render_from_templates(
         warn!("{message}");
         String::new()
     });
-    // Asciidoctor-style templates generate ids for sections that lack one; ids must be unique, so
-    // a generated id that is already taken (by an earlier generated or explicit id) gets the
-    // first free numeric suffix (e.g., `_title_2`). Explicit ids are passed in so they are
-    // registered, and are returned unchanged.
-    let used_ids: Mutex<HashSet<String>> = Mutex::new(HashSet::new());
-    env.add_function(
-        "section_id",
-        move |title_html: String, explicit_id: Option<String>| {
-            let mut used = used_ids.lock().unwrap();
-            if let Some(id) = explicit_id {
-                used.insert(id.clone());
-                return id;
-            }
-            let base = asciidoctor_section_id(&title_html);
-            let mut id = base.clone();
-            let mut suffix = 2;
-            while used.contains(&id) {
-                id = format!("{base}_{suffix}");
-                suffix += 1;
-            }
-            used.insert(id.clone());
-            id
-        },
-    );
+    // a section's ID: the one it was given, or the one the parser generated (see
+    // `crate::graph::ids`); none if `sectids` is unset
+    let section_ids = section_ids_by_location(graph);
+    env.add_function("section_id", move |section: Value| -> Option<String> {
+        section_ids.get(&location_key_of(&section)?).cloned()
+    });
     // Asciidoctor numbers captioned blocks by kind ("Figure 1.", "Figure 2.", ...); the templates
     // ask for the next number as they go
     let counters: Mutex<HashMap<String, usize>> = Mutex::new(HashMap::new());
@@ -232,18 +242,6 @@ fn gather_asciidoctor_templates(full_document: bool) -> Vec<(&'static str, &'sta
 mod tests {
     use super::*;
     use rstest::rstest;
-
-    #[rstest]
-    #[case::simple("An A-Head", "_an_a_head")]
-    #[case::numbers_and_periods("Section 1.2 Overview", "_section_1_2_overview")]
-    #[case::markup("A <em>marked</em> up title", "_a_marked_up_title")]
-    #[case::entities_and_punctuation("Q&amp;A: what's next?", "_qa_whats_next")]
-    // Asciidoctor replaces " -- " with a thin space, an em dash and a thin space before making
-    // the id, then drops the resulting entities
-    #[case::replaced_punctuation("One&#8201;&#8212;&#8201;two", "_onetwo")]
-    fn test_asciidoctor_section_id(#[case] title: &str, #[case] expected: &str) {
-        assert_eq!(asciidoctor_section_id(title), expected);
-    }
 
     #[rstest]
     #[case::all_three("a < b & c > d", "a &lt; b &amp; c &gt; d")]

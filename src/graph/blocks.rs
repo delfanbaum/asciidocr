@@ -1,10 +1,14 @@
 use log::{error, warn};
-use std::{collections::HashMap, fmt::Display};
+use std::{
+    collections::{HashMap, HashSet},
+    fmt::Display,
+};
 
 use serde::Serialize;
 
 use crate::errors::BlockError;
 use crate::graph::{
+    ids::{IdSettings, generate_id, title_for_id, unique_id},
     inlines::Inline,
     lists::{DList, DListItem, List, ListItem, ListVariant},
     metadata::ElementMetadata,
@@ -409,6 +413,65 @@ impl Block {
         }
     }
 
+    /// The blocks directly inside this one (a section's, a list's items, ...)
+    pub fn child_blocks(&self) -> &[Block] {
+        match self {
+            Block::Section(block) => &block.blocks,
+            Block::ParentBlock(block) => &block.blocks,
+            Block::List(block) => &block.items,
+            Block::DList(block) => &block.items,
+            Block::ListItem(block) => &block.blocks,
+            Block::DListItem(block) => &block.blocks,
+            _ => &[],
+        }
+    }
+
+    /// A section's ID: the one it was given, or the one generated for it
+    pub fn section_id(&self) -> Option<String> {
+        match self {
+            Block::Section(section) => self.id().or_else(|| section.generated_id.clone()),
+            _ => None,
+        }
+    }
+
+    /// Generates IDs for the sections in this block (itself included) that weren't given one, in
+    /// document order, unique among the IDs in `taken` (which they are added to, as are the
+    /// explicit IDs met on the way); each generated ID and its section's title go in `titles`, for
+    /// cross references
+    pub fn generate_section_ids(
+        &mut self,
+        settings: &IdSettings,
+        taken: &mut HashSet<String>,
+        titles: &mut HashMap<String, Vec<Inline>>,
+    ) {
+        if let Some(id) = self.id() {
+            taken.insert(id);
+        } else if let Block::Section(section) = self
+            && settings.enabled
+        {
+            let id = unique_id(
+                generate_id(&title_for_id(&section.inlines), settings),
+                settings,
+                taken,
+            );
+            taken.insert(id.clone());
+            titles.insert(id.clone(), section.inlines.clone());
+            section.generated_id = Some(id);
+        }
+        let children: &mut Vec<Block> = match self {
+            Block::Section(block) => &mut block.blocks,
+            Block::ParentBlock(block) => &mut block.blocks,
+            Block::List(block) => &mut block.items,
+            Block::DList(block) => &mut block.items,
+            Block::ListItem(block) => &mut block.blocks,
+            Block::DListItem(block) => &mut block.blocks,
+            _ => return,
+        };
+        for child in children.iter_mut() {
+            child.generate_section_ids(settings, taken, titles);
+        }
+    }
+
     pub fn id_hashes(&self) -> HashMap<String, Vec<Inline>> {
         let mut block_id_hash = HashMap::new();
         if let Some(id) = self.id() {
@@ -750,6 +813,10 @@ pub struct Section {
     pub level: usize,
     pub blocks: Vec<Block>,
     location: Vec<Location>,
+    /// the ID generated for a section that wasn't given one (see [`crate::graph::ids`]); not part
+    /// of the JSON (TCK) output
+    #[serde(skip)]
+    pub generated_id: Option<String>,
 }
 
 impl PartialEq for Section {
@@ -771,6 +838,7 @@ impl Section {
             level,
             blocks: vec![],
             location: vec![first_location],
+            generated_id: None,
         }
     }
 

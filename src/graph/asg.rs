@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::env::current_dir;
 
 use serde::Serialize;
@@ -8,6 +8,7 @@ use crate::parser::Parser;
 use crate::scanner::Scanner;
 
 use super::blocks::Block;
+use super::ids::IdSettings;
 use super::inlines::Inline;
 use super::nodes::{Header, Location, NodeTypes};
 
@@ -101,6 +102,22 @@ impl Asg {
             self.blocks.push(block)
         }
         Ok(())
+    }
+
+    /// Generates IDs for the sections that weren't given one, as the document's attributes
+    /// (`sectids`, `idprefix`, `idseparator`) ask, so that the backends can use them, and cross
+    /// references to them find the section's title. They aren't part of the JSON (TCK) output.
+    pub fn generate_section_ids(&mut self, attributes: &HashMap<String, String>) {
+        let settings = IdSettings::from_attributes(attributes);
+        let mut taken = HashSet::new();
+        let mut titles = HashMap::new();
+        for block in self.blocks.iter_mut() {
+            block.generate_section_ids(&settings, &mut taken, &mut titles);
+        }
+        // (unique, so these don't replace the explicit IDs)
+        for (id, title) in titles {
+            self.document_id_hash.entry(id).or_insert(title);
+        }
     }
 
     /// Consolidates location information about the tree

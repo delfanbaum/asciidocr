@@ -8,6 +8,7 @@
 
 pub mod asg;
 pub mod blocks;
+pub mod ids;
 pub mod inlines;
 pub mod lists;
 pub mod metadata;

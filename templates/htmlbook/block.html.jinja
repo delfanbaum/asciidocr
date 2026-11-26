@@ -79,11 +79,11 @@ loading code simple.
 {# ======== block-specific macros ======== #}
 
 {%- macro render_section(block) -%}
+{#- the section's id is the one it was given, or the one the parser generated -#}
+{%- set id = section_id(block) -%}
 <section data-type="sect{{block.level}}"
-        {%- if block.metadata -%}
-        {%- if block.metadata.roles %} class="{{ block.metadata.roles | join(" ") | escape_attr }}" {%- endif -%}
-        {%- if block.metadata.attributes.id %} id="{{ block.metadata.attributes.id | escape_attr }}" {%- endif -%}
-        {%- endif -%}>
+        {%- if block.metadata and block.metadata.roles %} class="{{ block.metadata.roles | join(" ") | escape_attr }}" {%- endif -%}
+        {%- if id %} id="{{ id | escape_attr }}" {%- endif -%}>
     {% if block.title %}
         {{ render_title_for_block(block) }}
     {% endif -%}
