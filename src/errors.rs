@@ -46,8 +46,6 @@ pub enum ParserError {
     DelimitedBlock(usize),
     #[error("Line {0}: Unexpected block in Block::ParentBlock")]
     ParentBlock(usize),
-    #[error("Line {0}: Invalid heading level; parser level offest at the time of error was: {1}")]
-    HeadingOffsetError(usize, i8),
     #[error("Line {0}: Unable to resolve target: {1:?}")]
     TargetResolution(usize, String),
     #[error("Line {0}: Tried to add last block when block stack was empty.")]

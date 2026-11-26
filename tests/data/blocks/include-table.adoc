@@ -1,0 +1,5 @@
+|===
+|a |b
+
+include::include-table-rows.adoc[]
+|===

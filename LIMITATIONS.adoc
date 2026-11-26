@@ -18,8 +18,6 @@ non-features.
 * Typographic replacements are not complete: ` -- ` becomes a plain em dash
   (Asciidoctor adds thin spaces around it), and apostrophes inside some spans
   (e.g., `+_don't_+`) are not replaced
-* An ID on an admonition (`[[id]]` above `NOTE: text`) ends up on the content of
-  the admonition, not on the admonition itself
 
 == Working Caveats
 
@@ -66,6 +64,9 @@ stylesheet. Known gaps:
 * A `[source]` block without a language is rendered like any other listing
   (as `<pre>`, not `<pre class="highlight"><code>`)
 * Checklists and admonition icons
+* Table cell specifiers (`2+|`, `^|`, `h|`) are ignored
+* A blank line inside a table cell doesn't start a new paragraph: the cell's
+  text goes on
 * Attributes (an ID, say) above a document title that isn't on the first line
   are ignored, with a warning
 

@@ -155,19 +155,19 @@ removed (with the helpers only it used, `InlineError`, and the never-created
   `+*it's here*+` works)
 * [x] CRLF input leaves `\r` in paragraph text: normalize line endings in the
   scanner
-* [ ] An ID on an admonition lands on its content, in both the `NOTE: text` and
+* [x] An ID on an admonition landed on its content, in both the `NOTE: text` and
   the `[NOTE]` + `====` forms
 * [x] A paragraph after a `+[[anchor]]+` line gets a leading space
-* [ ] A warning for the block macros we don't support (`toc::`, `audio::`,
-  `video::`, `[stem]`), which are currently output as plain text without one
+* [x] A warning for the block macros we don't support (`toc::`, `audio::`,
+  `video::`, `[stem]`), which are output as plain text
 * [x] A line of text directly after a section heading (`== Head`, `Text`) is
   merged into the section title ("Head\nText")
 * [x] A line of text directly before or after a delimited listing (`Text`,
   `----`, `x`, `----`, or `----`, `x`, `----`, `more`) is added to the listing;
   it should be a paragraph. (Asciidoctor reads `Text` then `----` as a setext
   section title, which we don't support)
-* [ ] A table cell scanned as `|Name|Value` (no space before the second `|`)
-  is one cell; Asciidoctor splits it in two
+* [x] A table cell scanned as `|Name|Value` (no space before the second `|`)
+  was one cell; Asciidoctor splits it in two. `\|` is now a pipe
 * [x] A `+` line outside a list (or a second one in a row) stopped the conversion
   after a paragraph ("push_block not implemented for LeafBlock") and was dropped
   after a heading; Asciidoctor keeps it as text
@@ -185,26 +185,41 @@ removed (with the helpers only it used, `InlineError`, and the never-created
 * [x] A `::` line directly after a list item (`+* a+`, `:: b`) dropped the text
   after it; Asciidoctor keeps "a:: b" as the item's text. (A line starting `::`
   was read as an attribute entry with no name)
-* [ ] A `+` on the last line, with no newline after it, comes out as a backtick
-  at the end of the paragraph before it
+* [x] A `+` on the last line, with no newline after it, wasn't a continuation
+  or a line break
 * [x] `= Title` after content (`+* a+`, a blank line, `= Title`) stopped the
   conversion with an error; Asciidoctor warns and makes it a level 0 section. So
   did a title below a comment, an attribute entry or a blank line, which is the
   document title
-* [ ] With `:leveloffset: -1`, a `= Title` or `== Title` after content still
-  stops the conversion
-* [ ] A `leveloffset` that isn't a number (in an attribute entry or an include)
-  stops the conversion; Asciidoctor ignores it
+* [x] With `:leveloffset: -1`, a `= Title` or `== Title` after content stopped
+  the conversion, as did any offset that put a level out of range. Levels are now
+  brought into range (0 to 5). A signed offset is relative (`+1` was read as 1),
+  and an include's offset ends with the include
+* [x] A `leveloffset` that isn't a number stopped the conversion; it is now
+  ignored (the offset is reset to 0, as in Asciidoctor)
 * [ ] A heading inside a delimited block is a section; Asciidoctor keeps it as
   text
 * [ ] Three or more `+` lines in a row in a list item make two paragraphs;
   Asciidoctor makes one ("+ b")
 * [ ] DOCX: a level 0 section gets a made-up "Heading 0" style, which Word
   doesn't treat as a heading
-* [ ] A table cell's text on a following line (`|a`, `more`, `|b`) goes to the
+* [x] A table cell's text on a following line (`|a`, `more`, `|b`) went to the
   next cell
-* [ ] `Parser::preserve_newline_text` is set by the first description list item
-  and never unset, so every paragraph after it has its newlines as separate
+* [ ] A heading with six or more `=` signs (`====== A`) stops the conversion;
+  Asciidoctor makes it a level 5 section
+* [ ] `[NOTE,id=x]` (above a delimited block or a paragraph) loses the ID and
+  roles
+* [ ] Attribute lines, anchors, attribute entries, block macros and delimiters
+  inside a table cell aren't text: they are dropped, land outside the cell, or
+  (`====`, `----`) stop the conversion
+* [ ] A table with no closing delimiter loses its last cell
+* [ ] Longer table delimiters (`|=====`) aren't recognized, and the rows are
+  dropped
+* [ ] In an example block with no closing delimiter, a paragraph after a `+`
+  comes out ahead of the text before it
+* [ ] Including the same file twice gives its sections the same ID in the HTML
+  (the second one's)
+* [x] Every paragraph after a description list had its newlines as separate
   inlines in the ASG
 * [x] A single-column table with one cell per line (`|===`, `|a`, `|b`,
   `|===`) fails with "Error creating table" (and stopped the whole process)
@@ -215,11 +230,10 @@ removed (with the helpers only it used, `InlineError`, and the never-created
 * [x] `C++` in prose (`C++ uses a::b`) comes out as "C``"; Asciidoctor leaves
   it as written
 * [x] A footnote followed by a span (`footnote:[x] and *b*`) lost the footnote
-* [ ] An unclosed span inside a closed one (`+mix *a _b* c+`) renders as
+* [x] An unclosed span inside a closed one (`+mix *a _b* c+`) rendered as
   formatting; Asciidoctor keeps `_b` as text
-* [ ] A constrained mark directly before a letter closes a span (`+*a b *c+`
-  gives "<strong>a b </strong>c"); in Asciidoctor a closing `*` can't be
-  followed by a letter, so it's all text
+* [x] A constrained mark after a space or directly before a letter closed a span
+  (`+*a b *c+` gave "<strong>a b </strong>c")
 * [ ] Apostrophes in bare URLs and link targets stay straight
   (`http://x.com/it's`); Asciidoctor curls them there too, in the `href` as well
 * [x] *Decided*: apostrophes in code stay straight (`` `foo's` ``), where
@@ -227,7 +241,7 @@ removed (with the helpers only it used, `InlineError`, and the never-created
 * [x] A bare URL stopped at `-`, `_`, `%`, `~` or `;` (`http://x.com/my-page`
   linked to `http://x.com/my`), and a URL with a non-ASCII character stopped the
   conversion with a panic
-* [ ] A one-row table (`|===`, `|a |b`, `|===`) makes that row a header;
+* [x] A one-row table (`|===`, `|a |b`, `|===`) made that row a header;
   Asciidoctor only makes the first row a header when a blank line follows it
 * [ ] `[TIP]` (or another admonition label) above a listing or literal block
   wraps it in an admonition; Asciidoctor ignores the label there

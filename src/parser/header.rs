@@ -42,32 +42,35 @@ impl Parser {
         }
         match *key {
             "leveloffset" => self.parse_level_offset(value),
+            // unsetting it
+            "leveloffset!" | "!leveloffset" => self.level_offset = 0,
             _ => {
                 self.document_attributes
                     .insert(key.to_string(), value.to_string());
-                Ok(())
             }
         }
+        Ok(())
     }
 
-    pub(super) fn parse_level_offset(&mut self, value: &str) -> Result<(), ParserError> {
-        if let Ok(value) = value.parse::<usize>() {
-            self.level_offset = value as i8;
-            Ok(())
-        } else {
-            match value.parse::<i8>() {
-                // absolute value
-                Ok(value) => {
-                    self.level_offset += value;
-                    Ok(())
-                }
-                // relative value, or error
-                Err(_) => Err(ParserError::InternalError(
-                    self.line,
-                    "Error parsing level offset".to_string(),
-                )),
+    /// Sets the heading level offset: a signed value is relative to the current one, and, as in
+    /// Asciidoctor, an empty one resets it. So does one that isn't a number, with a warning
+    pub(super) fn parse_level_offset(&mut self, value: &str) {
+        let offset = if value.is_empty() {
+            0
+        } else if let Ok(offset) = value.parse::<i32>() {
+            if value.starts_with(['+', '-']) {
+                self.level_offset.saturating_add(offset)
+            } else {
+                offset
             }
-        }
+        } else {
+            warn!(
+                "Line {}: Invalid leveloffset \"{value}\"; using 0",
+                self.line
+            );
+            0
+        };
+        self.level_offset = offset;
     }
 
     /// Handle document header

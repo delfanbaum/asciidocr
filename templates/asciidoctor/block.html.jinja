@@ -288,8 +288,9 @@ HTMLBook's.
 </tr>
 </thead>
 {%- endif %}
-<tbody>
 {%- set body = block.blocks[columns:] if has_header else block.blocks %}
+{%- if body %}
+<tbody>
 {%- for cell in body %}
 {%- if loop.index0 % columns == 0 %}
 <tr>
@@ -300,6 +301,7 @@ HTMLBook's.
 {%- endif %}
 {%- endfor %}
 </tbody>
+{%- endif %}
 </table>
 {%- endmacro -%}
 

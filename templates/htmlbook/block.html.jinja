@@ -294,8 +294,9 @@ loading code simple.
                 {{ process_table_cell(cell, tag="th") }}
     {% endfor %}</tr>
     </thead>
+    {%- if body_start < block.blocks | length %}
     <tbody>
-        <tr>
+        <tr>{%- endif %}
         {%- else -%}
         <tr>
         {%- endif %}
@@ -306,8 +307,9 @@ loading code simple.
         {% if idx > 0 and (idx + 1) % cols == 0 and idx+1 != num_cells %}
         </tr>
         <tr>{%- endif %}
-        {% endfor %}</tr>
-    {%- if header %}
+        {% endfor %}
+    {%- if not header %}</tr>
+    {%- elif body_start < num_cells %}</tr>
     </tbody>{%- endif %}
     </table>
 {%- endmacro -%}

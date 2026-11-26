@@ -104,8 +104,6 @@ impl Parser {
 
         self.add_inlines_to_block_stack()?;
         self.drop_admonition_above_list();
-        // preserve newlines for now
-        self.preserve_newline_text = true;
         // a term directly after a term is another term for the same description
         let term = match self.lists.active(depth) {
             Some(scope) => match scope.add_term(&key, term) {

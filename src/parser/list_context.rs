@@ -192,6 +192,15 @@ impl ListContext {
         self.scopes.is_empty()
     }
 
+    /// Whether a description list is open. The newlines in its text are kept as separate
+    /// inlines (for now; its fixtures expect it)
+    pub fn in_description_list(&self) -> bool {
+        self.scopes
+            .iter()
+            .flat_map(|scope| &scope.lists)
+            .any(|open| matches!(open.list, Block::DList(_)))
+    }
+
     /// Like [`active`](Self::active), but only to look
     pub fn get(&self, depth: usize) -> Option<&ListScope> {
         self.scopes.last().filter(|scope| scope.depth == depth)

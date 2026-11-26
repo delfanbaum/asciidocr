@@ -12,7 +12,7 @@ use crate::errors::{ParserError, ScannerError};
 use crate::graph::{
     asg::Asg,
     blocks::{Block, LeafBlock, ParentBlock},
-    inlines::{Inline, InlineSpan, LineBreak},
+    inlines::{Inline, LineBreak},
     metadata::{AttributeType, ElementMetadata},
     nodes::{Header, Location},
 };
@@ -80,7 +80,7 @@ pub struct Parser {
     /// if/when we handle code callouts)
     open_parse_after_as_text_type: Option<TokenType>,
     /// tracks the document heading level offset
-    level_offset: i8,
+    level_offset: i32,
     /// designates whether we're to be adding inlines to the previous block until a newline
     in_block_line: bool,
     /// designates whether new literal text should be added to the last span
@@ -90,9 +90,6 @@ pub struct Parser {
     /// forces a new block when we add inlines; helps distinguish between adding to section.title
     /// and section.blocks
     force_new_block: bool,
-    /// Preserves newline characters as separate inline literal tokens. Set by the first
-    /// description list item, whose fixtures expect it, and never unset
-    preserve_newline_text: bool,
     /// Some parent elements have non-obvious closing conditions, so we want an easy way to close these
     close_parent_after_push: bool,
     /// Used to see if we need to add a newline before new text; we don't add newlines to the text
@@ -144,7 +141,6 @@ impl Parser {
             level_offset: 0,
             in_block_line: false,
             in_inline_span: false,
-            preserve_newline_text: false,
             continuation_line: None,
             open_parse_after_as_text_type: None,
             force_new_block: false,
@@ -220,6 +216,9 @@ impl Parser {
         }
         if token.token_type() == TokenType::BlockContinuation {
             self.make_text_if_not_a_continuation(&mut token, asg)?;
+        }
+        if token.is_text_in_table() && self.in_open_table() {
+            token.make_text();
         }
         let token_type = token.token_type();
         self.parse_token(token, asg)?;
@@ -345,9 +344,7 @@ impl Parser {
             | TokenType::UnconstrainedMark
             | TokenType::UnconstrainedMonospace
             | TokenType::UnconstrainedLiteral
-            | TokenType::UnconstrainedEmphasis => self.parse_inline_span(Inline::InlineSpan(
-                InlineSpan::inline_span_from_token(token),
-            )),
+            | TokenType::UnconstrainedEmphasis => self.parse_inline_span(token),
 
             // replacements -- done on token.text()
             TokenType::OpenDoubleQuote
@@ -510,6 +507,9 @@ impl Parser {
                 self.add_text_to_last_inline(newline_token);
             }
             self.add_text_to_last_inline(token);
+        } else if self.last_token_type == TokenType::NewLineChar && self.in_open_table() {
+            // a cell's text goes on past a blank line (as one paragraph, since cells can't
+            // hold several)
         } else if [TokenType::NewLineChar, TokenType::Eof].contains(&self.last_token_type) {
             // clear any dangling newline
             self.dangling_newline = None;
@@ -587,8 +587,7 @@ impl Parser {
             None => self.in_paragraph(),
         };
         if as_text {
-            token.token_type = TokenType::Text;
-            token.literal = Some(token.lexeme.clone());
+            token.make_text();
         }
         token
     }
@@ -627,8 +626,7 @@ impl Parser {
             // inside a verbatim block, `parse_token` passes it through
             Some(_) => return Ok(()),
         }
-        token.token_type = TokenType::Text;
-        token.literal = Some(token.lexeme.clone());
+        token.make_text();
         Ok(())
     }
 
@@ -702,6 +700,13 @@ impl Parser {
 
         // the current list item's principal text
         let depth = self.block_stack.len();
+        // a table cell takes all the text up to the next cell
+        if let Some(cell @ Block::TableCell(_)) = self.block_stack.last_mut() {
+            while let Some(inline) = self.inline_stack.pop_front() {
+                cell.push_inline(inline)?;
+            }
+            return Ok(());
+        }
         if let Some(scope) = self.lists.active(depth)
             && scope.principal_open
         {
@@ -742,15 +747,16 @@ impl Parser {
                 para_block.push_inline(inline)?
             }
         }
+        self.warn_unsupported_block_macro(&para_block);
         // a styled paragraph: an admonition (`NOTE: text`), or a quote
         let mut block = para_block;
         let mut title_dropped = pending_title.clone();
         if let Some(admonition) = self.pending_admonition.take() {
-            // the attributes above stay with the paragraph, as they always have (see the roadmap)
-            if let Some(metadata) = self.metadata.take() {
-                block.add_metadata(metadata)?;
-            }
             let mut admonition = Block::ParentBlock(admonition);
+            // the attributes above are the admonition's
+            if let Some(metadata) = self.metadata.take() {
+                admonition.add_metadata(metadata)?;
+            }
             admonition.push_block(block)?;
             block = admonition;
         } else if let Some(ref block_metadata) = self.metadata {
@@ -792,6 +798,33 @@ impl Parser {
             return Ok(());
         }
         self.push_block_to_stack(block)
+    }
+
+    /// A block macro we don't support is a paragraph's text, so let the user know
+    fn warn_unsupported_block_macro(&self, para_block: &Block) {
+        let Block::LeafBlock(paragraph) = para_block else {
+            return;
+        };
+        let inlines = paragraph.inlines();
+        let Some(first) = inlines.first() else { return };
+        let text = para_block.block_text();
+        let line = text.lines().next().unwrap_or_default().trim_end();
+        let first_text = first.extract_values_to_string();
+        for name in ["toc", "audio", "video"] {
+            let prefix = format!("{name}::");
+            // a URL target is a link of its own, which takes the brackets
+            let url_target =
+                first_text == prefix && matches!(inlines.get(1), Some(Inline::InlineRef(_)));
+            let local_target = line
+                .strip_prefix(&prefix)
+                .is_some_and(|rest| !rest.starts_with(' ') && rest.ends_with(']'));
+            if url_target || local_target {
+                warn!(
+                    "Line {}: The {name}:: block macro is not supported; it is output as text",
+                    para_block.locations().first().map_or(0, |start| start.line)
+                );
+            }
+        }
     }
 
     /// Titles on regular paragraphs are not supported, so we drop them (keeping the paragraph),

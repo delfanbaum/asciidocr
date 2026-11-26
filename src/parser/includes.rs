@@ -30,13 +30,14 @@ impl Parser {
 
         let (target, meta) = target_and_attrs_from_token(&token)?;
         info!("Parsing included file: {}", &target);
+        // an include's level offset is only for the file it includes
+        let outer_level_offset = self.level_offset;
+        let mut offsets_levels = false;
         // check for level offsets in the include
         if let Some(metadata) = meta {
             if let Some(value) = metadata.attributes.get("leveloffset") {
-                match self.parse_level_offset(value) {
-                    Ok(_) => {}
-                    Err(e) => return Err(e),
-                }
+                self.parse_level_offset(value);
+                offsets_levels = true;
             }
             if let Some(value) = metadata.attributes.get("lines") {
                 included_lines = extract_page_ranges(value);
@@ -73,9 +74,12 @@ impl Parser {
         // now parse the file (or skip it, if it can't be read)
         let Some(included) = open_file(resolved_target) else {
             self.file_stack.pop();
+            self.level_offset = outer_level_offset;
             return Ok(());
         };
-        for result in Scanner::new_with_stack(&included, self.file_stack.clone()) {
+        let mut scanner = Scanner::new_with_stack(&included, self.file_stack.clone());
+        scanner.set_in_table(self.in_open_table());
+        for result in scanner {
             match result {
                 Ok(token) => {
                     // lines
@@ -136,6 +140,9 @@ impl Parser {
         }
         // ...then pop the file off the stack
         self.file_stack.pop();
+        if offsets_levels {
+            self.level_offset = outer_level_offset;
+        }
         Ok(())
     }
 

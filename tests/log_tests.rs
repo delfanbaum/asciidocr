@@ -69,6 +69,43 @@ fn test_title_problems_warn(#[case] adoc: &str, #[case] expected: &str) {
     );
 }
 
+/// Problems the conversion carries on from are reported
+#[rstest]
+#[case::invalid_level_offset(
+    "x\n\n:leveloffset: y\n",
+    "Line 3: Invalid leveloffset \"y\"; using 0"
+)]
+#[case::level_out_of_range(
+    "x\n\n:leveloffset: 9\n\n== A\n",
+    "Line 5: Heading level 10 is out of range; using 5"
+)]
+#[case::level_below_zero(
+    "x\n\n:leveloffset: -1\n\n== A\n",
+    "Line 5: Level 0 headings are only allowed at the top of a document"
+)]
+#[case::toc("x\n\ntoc::[]\n", "Line 3: The toc:: block macro is not supported")]
+#[case::audio("audio::a.mp3[]\n", "Line 1: The audio:: block macro is not supported")]
+#[case::video(
+    "video::https://example.com/v[width=1]\n",
+    "Line 1: The video:: block macro is not supported"
+)]
+#[case::stem(
+    "[stem]\n++++\nx\n++++\n",
+    "Line 1: Equations ([stem]) are not supported"
+)]
+fn test_recoverable_problems_warn(#[case] adoc: &str, #[case] expected: &str) {
+    let mut logger = logger();
+    common::parsed_asg(adoc);
+    let mut warnings = vec![];
+    while let Some(record) = logger.pop() {
+        warnings.push(record.args().to_owned());
+    }
+    assert!(
+        warnings.iter().any(|w| w.contains(expected)),
+        "{warnings:?}"
+    );
+}
+
 /// A book's parts are level 0 sections, so they aren't reported
 #[test]
 fn test_book_part_does_not_warn() {

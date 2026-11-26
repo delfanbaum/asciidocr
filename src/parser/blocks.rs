@@ -18,6 +18,9 @@ use crate::{
 
 use super::{HeaderLine, Parser};
 
+/// The deepest section level, an `h6` in HTML
+const MAX_SECTION_LEVEL: i32 = 5;
+
 impl Parser {
     pub(super) fn parse_block_anchor_attributes(
         &mut self,
@@ -33,6 +36,12 @@ impl Parser {
         &mut self,
         token: Token,
     ) -> Result<(), ParserError> {
+        if ["[stem]", "[latexmath]", "[asciimath]"].contains(&token.lexeme.as_str()) {
+            warn!(
+                "Line {}: Equations ({}) are not supported",
+                token.line, token.lexeme
+            );
+        }
         self.add_metadata_from_token(token);
         self.force_new_block = true;
         Ok(())
@@ -106,17 +115,6 @@ impl Parser {
             self.document_header = Some(header);
             Ok(())
         } else {
-            // like Asciidoctor, report it and carry on (only a book may have these, as parts)
-            if self
-                .document_attributes
-                .get("doctype")
-                .is_none_or(|doctype| doctype != "book")
-            {
-                warn!(
-                    "Line {}: Level 0 headings are only allowed at the top of a document",
-                    token.line
-                );
-            }
             self.parse_section_headings(token, asg)
         }
     }
@@ -127,6 +125,18 @@ impl Parser {
         asg: &mut Asg,
     ) -> Result<(), ParserError> {
         let level = self.get_heading_level(&token)?;
+        // like Asciidoctor, report it and carry on (only a book may have these, as parts)
+        if level == 0
+            && self
+                .document_attributes
+                .get("doctype")
+                .is_none_or(|doctype| doctype != "book")
+        {
+            warn!(
+                "Line {}: Level 0 headings are only allowed at the top of a document",
+                token.line
+            );
+        }
 
         // if the last section is at the same level, we need to push that up, otherwise the
         // accordion effect gets screwy with section levels
@@ -154,14 +164,15 @@ impl Parser {
         Ok(())
     }
 
-    /// Returns a valid heading level for a given token
+    /// Returns the level of a heading, with the level offset applied. Like Asciidoctor, an
+    /// offset never stops the conversion; a level it puts out of range is brought into it
     fn get_heading_level(&self, token: &Token) -> Result<usize, ParserError> {
-        let level: i8 = match token.token_type() {
-            TokenType::Heading1 => self.level_offset,
-            TokenType::Heading2 => 1 + self.level_offset,
-            TokenType::Heading3 => 2 + self.level_offset,
-            TokenType::Heading4 => 3 + self.level_offset,
-            TokenType::Heading5 => 4 + self.level_offset,
+        let level: i32 = match token.token_type() {
+            TokenType::Heading1 => 0,
+            TokenType::Heading2 => 1,
+            TokenType::Heading3 => 2,
+            TokenType::Heading4 => 3,
+            TokenType::Heading5 => 4,
             _ => {
                 return Err(ParserError::InternalError(
                     self.line,
@@ -169,29 +180,15 @@ impl Parser {
                 ));
             }
         };
-
-        // level 0 is only what a `= Title` below the top of the document is (see `parse_title`)
-        let lowest = if token.token_type() == TokenType::Heading1 && self.level_offset == 0 {
-            0
-        } else {
-            1
-        };
-        match level.try_into() {
-            Ok(value) => {
-                if !(lowest..=4).contains(&value) {
-                    Err(ParserError::HeadingOffsetError(
-                        token.line,
-                        self.level_offset,
-                    ))
-                } else {
-                    Ok(value)
-                }
-            }
-            Err(_) => Err(ParserError::HeadingOffsetError(
-                token.line,
-                self.level_offset,
-            )),
+        let level = level.saturating_add(self.level_offset);
+        if level > MAX_SECTION_LEVEL {
+            warn!(
+                "Line {}: Heading level {level} is out of range; using {MAX_SECTION_LEVEL}",
+                token.line
+            );
         }
+        // (a level below 0 is reported as the level 0 it becomes)
+        Ok(level.clamp(0, MAX_SECTION_LEVEL) as usize)
     }
 
     pub(super) fn parse_admonition_para_syntax(&mut self, token: Token) -> Result<(), ParserError> {
@@ -391,6 +388,12 @@ impl Parser {
                 .map(|start| start.file.clone())
                 .unwrap_or_default(),
         );
+        // the attributes above are the admonition's, if there is one
+        if let Some(admonition) = &mut self.pending_admonition
+            && let Some(metadata) = self.metadata.take()
+        {
+            admonition.metadata = Some(metadata).filter(|metadata| !metadata.is_empty());
+        }
         self.open_pending_admonition();
         self.push_block_to_stack(Block::ParentBlock(block))
     }
@@ -418,10 +421,14 @@ impl Parser {
         asg: &mut Asg,
     ) -> Result<(), ParserError> {
         // take the token text, which begins with a `|`, and then use everything after
-        let cell_contents = token.text()[1..].to_string();
+        let cell_contents = token.text()[1..].replace("\\|", "|");
         let cell_line = token.first_location().line;
         let cell_col = token.first_location().col;
 
+        // text on the lines since the last cell is the rest of that cell's
+        if matches!(self.block_stack.last(), Some(Block::TableCell(_))) {
+            self.add_inlines_to_block_stack()?;
+        }
         self.push_block_to_stack(Block::TableCell(TableCell::new_from_token(token)))?;
 
         // create new inlines from the stack, clearing any dangling newlines
@@ -432,22 +439,10 @@ impl Parser {
                     // update the line numbering for the token to match the table cell mathematically, in
                     // case my vague memory of multi-line cells is correct
                     inline_token.update_token_loc_offsets_by(cell_line, cell_col);
-                    // the cell is scanned as if it started a line, but list markup is only
-                    // parsed in AsciiDoc ("a|") cells, which we don't support, so `| 1. b` is text,
-                    // and so are description list markers and admonition labels
-                    if matches!(
-                        inline_token.token_type(),
-                        TokenType::UnorderedListItem
-                            | TokenType::OrderedListItem
-                            | TokenType::DescriptionListMarker
-                            | TokenType::NotePara
-                            | TokenType::TipPara
-                            | TokenType::ImportantPara
-                            | TokenType::CautionPara
-                            | TokenType::WarningPara
-                    ) {
-                        inline_token.token_type = TokenType::Text;
-                        inline_token.literal = Some(inline_token.lexeme.clone());
+                    // the cell is scanned as if it started a line, but its text is only text
+                    // (see `token_into`), a `|` that was escaped included
+                    if inline_token.token_type() == TokenType::TableCell {
+                        inline_token.make_text();
                     }
                     self.token_into(inline_token, asg)?;
                 }

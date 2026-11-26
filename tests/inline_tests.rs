@@ -364,3 +364,54 @@ fn test_crlf_line_endings() {
         "line one\nline two"
     );
 }
+
+/// As in Asciidoctor, a constrained mark after a space, or before a letter or digit, doesn't
+/// close a span, and a span left open inside one that closes is text
+#[rstest]
+#[case::strong("*a b *c", "*a b *c")]
+#[case::emphasis("_a b _c", "_a b _c")]
+#[case::monospace("`a b `c", "`a b `c")]
+#[case::mark("#a b #c", "#a b #c")]
+#[case::closed_later("*a *b* c", "<strong>a *b</strong> c")]
+#[case::open_inside_strong("mix *a _b* c", "mix <strong>a _b</strong> c")]
+#[case::open_inside_emphasis("mix _a *b_ c", "mix <em>a *b</em> c")]
+#[case::open_inside_unconstrained("**a _b** c", "<strong>a _b</strong> c")]
+#[case::two_spans("*a* and _b_", "<strong>a</strong> and <em>b</em>")]
+#[case::before_non_ascii_letter("*a *é* b", "<strong>a *é</strong> b")]
+fn test_spans_that_do_not_close(#[case] adoc: &str, #[case] expected: &str) {
+    let html = common::render_asciidoctor_embedded_from_str(adoc);
+    common::html::assert_html_eq(
+        &common::html::select(&html, "p"),
+        &format!("<p>{expected}</p>"),
+    );
+}
+
+/// A run of marks that never close is text, however long (it overflowed the stack), and quickly
+#[test]
+fn test_many_unclosed_marks() {
+    let adoc = format!("a{}\n", " *x".repeat(20_000));
+    let asg = common::parsed_asg_with_timeout(&adoc);
+    let inlines = &asg["blocks"][0]["inlines"];
+    assert_eq!(inlines.as_array().map(Vec::len), Some(1), "one literal");
+}
+
+/// A mark closes the span of its kind however deeply the spans in it are nested, and a mark
+/// that can't close one is text when a span of its kind is already open
+#[rstest]
+#[case::three_deep(
+    "*a _b `c` d_ e* f",
+    "<strong>a <em>b <code>c</code> d</em> e</strong> f"
+)]
+#[case::three_deep_unconstrained(
+    "**a _b `c` d_ e** f",
+    "<strong>a <em>b <code>c</code> d</em> e</strong> f"
+)]
+#[case::same_kind_again("_a *b _c* d_", "<em>a <strong>b _c</strong> d</em>")]
+#[case::file_globs("Files *.txt, *.md and *.rs", "Files *.txt, *.md and *.rs")]
+fn test_nested_spans(#[case] adoc: &str, #[case] expected: &str) {
+    let html = common::render_asciidoctor_embedded_from_str(adoc);
+    common::html::assert_html_eq(
+        &common::html::select(&html, "p"),
+        &format!("<p>{expected}</p>"),
+    );
+}

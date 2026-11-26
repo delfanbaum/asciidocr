@@ -139,7 +139,7 @@ impl Block {
             Block::LeafBlock(block) => block.inlines.push(inline),
             Block::ListItem(list_item) => list_item.add_inline(inline),
             Block::DListItem(list_item) => list_item.add_inline(inline),
-            Block::TableCell(table_cell) => table_cell.inlines.push(inline),
+            Block::TableCell(table_cell) => table_cell.push_inline(inline),
             _ => return Err(BlockError::NotImplemented(format!("{}", self))),
         }
         Ok(())
@@ -224,27 +224,68 @@ impl Block {
         let Some(first_cell) = table.blocks.first() else {
             return Ok(());
         };
-        let first_cell_line = first_cell.line()?;
-        let cells_on_first_line = table
-            .blocks
-            .iter()
-            .filter(|block| block.line().is_ok_and(|line| line == first_cell_line))
-            .count();
-        // an implicit header: a first row of several cells, directly under the delimiter
-        if cells_on_first_line >= 2 && first_cell_line == table.location[0].line + 1 {
+        let first_cell_start = first_cell.locations().first().cloned().unwrap_or_default();
+        let first_cell_line = first_cell_start.line;
+        // the first row is the cells on the first line, and on the lines a cell there runs onto
+        let mut first_row_end = first_cell_line;
+        let mut cells_in_first_row = 0;
+        for cell in &table.blocks {
+            let start = cell.locations().first().cloned().unwrap_or_default();
+            // (an included file counts its own lines)
+            if start.file != first_cell_start.file
+                || !(first_cell_line..=first_row_end).contains(&start.line)
+            {
+                break;
+            }
+            cells_in_first_row += 1;
+            first_row_end = cell
+                .inlines()
+                .iter()
+                .flat_map(|inline| inline.locations())
+                .map(|location| location.line)
+                .fold(first_row_end, usize::max);
+        }
+        let next_line = match table.blocks.get(cells_in_first_row) {
+            Some(cell) => Some(cell.line()?),
+            None => table.location.last().map(|end| end.line),
+        };
+        let asks_for = |wanted: &str| {
+            table.metadata.as_ref().is_some_and(|metadata| {
+                metadata
+                    .attributes
+                    .iter()
+                    .any(|(name, value)| match name.as_str() {
+                        "options" | "opts" => {
+                            value.split([',', ' ']).any(|option| option == wanted)
+                        }
+                        "positional_1" => value.split('%').skip(1).any(|option| option == wanted),
+                        _ => false,
+                    })
+            })
+        };
+        // an implicit header: a first row of several cells on one line, directly under the
+        // delimiter, with a blank line after it
+        let implicit_header = cells_in_first_row >= 2
+            && first_cell_line == table.location[0].line + 1
+            && first_row_end == first_cell_line
+            && next_line.is_some_and(|line| line != first_cell_line + 1)
+            && !asks_for("noheader");
+        // or one asked for: `[%header]` or `[options="header"]`
+        let explicit_header = asks_for("header");
+        if implicit_header || explicit_header {
             table
                 .metadata
                 .get_or_insert_with(ElementMetadata::default)
                 .options
                 .push("header".to_string());
         }
-        // as in Asciidoctor, unless `cols` says otherwise, the cells on the first line are the
-        // columns (one, if the first row has a cell per line)
+        // as in Asciidoctor, unless `cols` says otherwise, the first row's cells are the
+        // columns (one, if there is a cell per line)
         let metadata = table.metadata.get_or_insert_with(ElementMetadata::default);
         metadata
             .attributes
             .entry("cols".to_string())
-            .or_insert_with(|| format!("{cells_on_first_line}"));
+            .or_insert_with(|| format!("{cells_in_first_row}"));
         // FOR NOW, make the cols an integer for easier templating.
         metadata.simplify_cols();
         Ok(())
@@ -1242,6 +1283,19 @@ impl PartialEq for TableCell {
 }
 
 impl TableCell {
+    /// Adds an inline, joining text to the text before it (a cell's later lines, say)
+    fn push_inline(&mut self, inline: Inline) {
+        if let (Some(Inline::InlineLiteral(last)), Inline::InlineLiteral(literal)) =
+            (self.inlines.last_mut(), &inline)
+            && last.can_merge_with(literal)
+            && literal.value().starts_with('\n')
+        {
+            last.combine_literals(literal.clone());
+        } else {
+            self.inlines.push(inline)
+        }
+    }
+
     pub fn new_from_token(token: Token) -> Self {
         TableCell {
             name: "tableCell".to_string(),

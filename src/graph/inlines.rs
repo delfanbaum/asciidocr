@@ -330,7 +330,7 @@ impl Inline {
         match self {
             Inline::InlineSpan(span) => {
                 span.open = false;
-                span.open_links_to_text();
+                span.unclosed_children_to_text();
             }
             _ => panic!("Invalid action: this inline does not take metadata"),
         }
@@ -491,6 +491,44 @@ impl InlineSpan {
         }
     }
 
+    /// The span open directly inside this one, if any
+    fn open_child(&self) -> Option<&InlineSpan> {
+        match self.inlines.last() {
+            Some(Inline::InlineSpan(child)) if child.open => Some(child),
+            _ => None,
+        }
+    }
+
+    /// How deeply the open span that `mark` would close is nested (0 for this span), if there
+    /// is one. A mark inside a footnote doesn't close a span around the footnote
+    pub(crate) fn open_depth_of(&self, mark: &InlineSpan) -> Option<usize> {
+        let mut found = None;
+        let mut next = Some(self);
+        let mut depth = 0;
+        while let Some(span) = next {
+            if span.variant == InlineSpanVariant::Footnote {
+                found = None;
+            } else if span.variant == mark.variant && span.node_form == mark.node_form {
+                found = Some(depth);
+            }
+            next = span.open_child();
+            depth += 1;
+        }
+        found
+    }
+
+    /// Closes the span nested this deeply (see [`open_depth_of`](Self::open_depth_of)), with
+    /// the closing mark's location
+    pub(crate) fn close_at_depth(&mut self, depth: usize, mark_locations: Vec<Location>) {
+        self.location = Location::reconcile(self.location.clone(), mark_locations.clone());
+        if depth == 0 {
+            self.open = false;
+            self.unclosed_children_to_text();
+        } else if let Some(Inline::InlineSpan(child)) = self.inlines.last_mut() {
+            child.close_at_depth(depth - 1, mark_locations);
+        }
+    }
+
     pub fn add_inline(&mut self, inline: Inline) {
         // update the locations
         self.location = Location::reconcile(self.location.clone(), inline.locations());
@@ -520,13 +558,19 @@ impl InlineSpan {
         }
     }
 
-    /// A link macro still open when the span around it closes (`` `see link:x[y` ``) was never a
-    /// link: its markup and text are text, as in Asciidoctor
-    fn open_links_to_text(&mut self) {
+    /// A span or link macro still open when the span around it closes (`*a _b*`,
+    /// `` `see link:x[y` ``) was never closed: its markup and text are text, as in Asciidoctor
+    pub(crate) fn unclosed_children_to_text(&mut self) {
         let mut inlines: Vec<Inline> = vec![];
         for mut inline in std::mem::take(&mut self.inlines) {
             let pieces: VecDeque<Inline> = match &inline {
                 Inline::InlineRef(iref) if iref.open => inline.unclosed_as_text(),
+                // (a footnote waits for its `]`)
+                Inline::InlineSpan(span)
+                    if span.open && span.variant != InlineSpanVariant::Footnote =>
+                {
+                    inline.unclosed_as_text()
+                }
                 _ => VecDeque::from([inline]),
             };
             for piece in pieces {
@@ -939,6 +983,7 @@ mod tests {
             startcol: 1,
             endcol: 1,
             file_stack: vec![],
+            can_close: true,
         };
         let inline = InlineRef::new_xref_from_token(token);
         assert_eq!(inline.variant, InlineRefVariant::Xref);

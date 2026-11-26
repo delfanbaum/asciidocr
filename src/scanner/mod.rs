@@ -3,6 +3,8 @@
 pub mod tokens;
 use core::str;
 use log::{debug, warn};
+use once_cell::sync::Lazy;
+use regex::Regex;
 use std::borrow::Cow;
 use tokens::{Token, TokenType};
 
@@ -30,6 +32,11 @@ pub struct Scanner<'a> {
     scanning: bool,          // flag to let us know when we're done with a file
     expecting_tag_end: bool, // flag to avoid returning `<--` in lines like `<--end:foo[]-->`
     file_stack: Vec<String>,
+    /// between a table's delimiters, where every `|` starts a cell
+    in_table: bool,
+    /// the delimited verbatim or comment block being scanned, if any, whose `|===` lines are
+    /// only text
+    verbatim: Option<TokenType>,
 }
 
 impl Iterator for Scanner<'_> {
@@ -49,6 +56,15 @@ impl Iterator for Scanner<'_> {
     }
 }
 
+/// A table cell specifier and the `|` after it: a span or repeat (`2+`, `.3+`, `2*`),
+/// alignment (`^`, `.>`) and a style (`h`, `a`, ...), at least one of them
+static RE_CELL_SPECIFIER: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(
+        r"^(?:(?:\d+(?:\.\d+)?|\.\d+)[+*](?:[<^>])?(?:\.[<^>])?[adehlms]?|[<^>](?:\.[<^>])?[adehlms]?|\.[<^>][adehlms]?|[adehlms])\|",
+    )
+    .unwrap()
+});
+
 impl<'a> Scanner<'a> {
     pub fn new(source: &'a str) -> Self {
         Scanner {
@@ -59,6 +75,8 @@ impl<'a> Scanner<'a> {
             line: 1,
             scanning: true,
             expecting_tag_end: false,
+            in_table: false,
+            verbatim: None,
             file_stack: vec![],
         }
     }
@@ -72,11 +90,53 @@ impl<'a> Scanner<'a> {
             line: 1,
             scanning: true,
             expecting_tag_end: false,
+            in_table: false,
+            verbatim: None,
             file_stack,
         }
     }
 
+    /// Starts scanning as inside a table, or not (an included file's lines may be a table's
+    /// rows)
+    pub(crate) fn set_in_table(&mut self, in_table: bool) {
+        self.in_table = in_table;
+    }
+
+    fn track_verbatim_block(&mut self, delimiter: TokenType) {
+        if self.verbatim == Some(delimiter) {
+            self.verbatim = None;
+        } else if self.verbatim.is_none()
+            && matches!(
+                delimiter,
+                TokenType::SourceBlock
+                    | TokenType::LiteralBlock
+                    | TokenType::PassthroughBlock
+                    | TokenType::CommentBlock
+            )
+        {
+            self.verbatim = Some(delimiter);
+        }
+    }
+
+    /// Skips a cell specifier (`2+|`, `^|`, `h|`: spans, alignment and styles, none of which
+    /// are supported) in a table, so that the token starts at the cell's `|`
+    fn skip_cell_specifier(&mut self) {
+        let after_space = self.starts_new_line()
+            || matches!(self.source.as_bytes()[self.start - 1], b' ' | b'\t');
+        if self.in_table
+            && self.verbatim.is_none()
+            && after_space
+            && let Some(specifier) = RE_CELL_SPECIFIER.find(&self.source[self.start..])
+        {
+            let width = specifier.len() - 1;
+            self.start += width;
+            self.startcol += width;
+            self.current = self.start;
+        }
+    }
+
     fn scan_token(&mut self) -> Result<Token, ScannerError> {
+        self.skip_cell_specifier();
         let c = self.source.as_bytes()[self.current] as char;
         self.current += 1; // this instead of the "advance" function in "Crafting Interpreters"
 
@@ -138,7 +198,9 @@ impl<'a> Scanner<'a> {
                     self.add_tag()
                 } else if self.starts_new_line() && self.starts_repeated_char_line(c, 4) {
                     self.current += 3; // the remaining repeated chars
-                    self.add_token(TokenType::block_from_char(c)?, false, 0)
+                    let delimiter = TokenType::block_from_char(c)?;
+                    self.track_verbatim_block(delimiter);
+                    self.add_token(delimiter, false, 0)
                 } else {
                     match c {
                         '=' => {
@@ -193,9 +255,10 @@ impl<'a> Scanner<'a> {
                             }
                         }
                         '+' => {
-                            if self.starts_new_line() && self.peek() == '\n' {
+                            let ends_line = self.peek() == '\n' || self.is_at_end();
+                            if self.starts_new_line() && ends_line {
                                 self.add_token(TokenType::BlockContinuation, false, 0)
-                            } else if self.peek_back() == ' ' && self.peek() == '\n' {
+                            } else if self.peek_back() == ' ' && ends_line {
                                 self.add_token(TokenType::LineContinuation, false, 0)
                             } else {
                                 self.handle_inline_formatting(
@@ -435,12 +498,19 @@ impl<'a> Scanner<'a> {
                     self.current += 3; // don't consume the newline
                     // check to make sure the next char is a newline or EOF
                     if ['\n', '\0'].contains(&self.peek()) {
+                        if self.verbatim.is_none() {
+                            self.in_table = !self.in_table;
+                        }
                         self.add_token(TokenType::Table, false, 0)
                     } else {
                         self.add_text_until_next_markup()
                     }
-                } else if self.starts_new_line() || self.peek_back() == ' ' {
-                    // it's either a new line, or if on the same line, must have a space before it
+                } else if self.starts_new_line()
+                    || self.peek_back() == ' '
+                    || (self.in_table && self.peek_back() != '\\')
+                {
+                    // outside a table, it's either a new line, or if on the same line, must
+                    // have a space before it
                     self.add_table_cell()
                 } else {
                     self.add_text_until_next_markup()
@@ -492,6 +562,7 @@ impl<'a> Scanner<'a> {
                 startcol: token_start,
                 endcol: token_start + text.len() - 1, // to account for the start char
                 file_stack: self.file_stack.clone(),
+                can_close: true,
             }
         } else {
             self.startcol = token_start + text.len();
@@ -503,6 +574,7 @@ impl<'a> Scanner<'a> {
                 startcol: token_start,
                 endcol: token_start + text.len() - 1, // to account for the start char
                 file_stack: self.file_stack.clone(),
+                can_close: true,
             }
         }
         token.validate();
@@ -648,15 +720,27 @@ impl<'a> Scanner<'a> {
         self.add_token(TokenType::Include, true, 0)
     }
 
-    /// Adds contents into a TableCell token, regardless of other formatting (simpler to re-scan later)
+    /// Whether the next character is a `|` that isn't escaped
+    fn at_cell_separator(&self) -> bool {
+        self.peek() == '|' && self.source.as_bytes()[self.current - 1] != b'\\'
+    }
+
+    /// Adds contents into a TableCell token, regardless of other formatting (simpler to re-scan
+    /// later). The cell runs to the end of the line, or to the next `|` that isn't escaped
     fn add_table_cell(&mut self) -> Result<Token, ScannerError> {
-        while !['\n', '\0', '|'].contains(&self.peek()) {
+        while !['\n', '\0'].contains(&self.peek()) && !self.at_cell_separator() {
             self.current += 1
         }
-        // if the delimiter is |
-        if self.peek() == '|' && self.source.as_bytes()[self.current - 1] as char != ' ' {
-            self.current += 1;
-            return self.add_table_cell();
+        // the next cell's specifier isn't part of this one
+        if self.in_table
+            && self.at_cell_separator()
+            && let Some(space) = self.source[self.start..self.current].rfind([' ', '\t'])
+        {
+            let word = self.start + space + 1;
+            if word < self.current && RE_CELL_SPECIFIER.is_match(&self.source[word..=self.current])
+            {
+                self.current = word;
+            }
         }
         self.add_token(TokenType::TableCell, true, 0)
     }
@@ -794,6 +878,7 @@ impl<'a> Scanner<'a> {
         .contains(&self.peek())
             && !self.is_at_end()
             && !self.starts_link_macro(self.current)
+            && (!self.in_table || !self.at_cell_separator())
         {
             self.current += 1;
         }
@@ -941,10 +1026,23 @@ impl<'a> Scanner<'a> {
         // or we're at the beginning, or butted up against another inline marker
         beginning_of_inline_markers.contains(&self.peek_back()) && self.peek() != c
         {
-            self.add_token(constrained, false, 0)
+            // (`^` and `~` mark text inside words, so they can always close)
+            let can_close = matches!(c, '^' | '~') || self.mark_can_close();
+            let mut token = self.add_token(constrained, false, 0)?;
+            token.can_close = can_close;
+            Ok(token)
         } else {
             self.add_text_until_next_markup()
         }
+    }
+
+    /// Like Asciidoctor, whether the constrained mark just read can close a span: there is no
+    /// space before it, and no letter or digit (or `_`) after it
+    fn mark_can_close(&self) -> bool {
+        let before = self.source[..self.start].chars().next_back();
+        let after = self.source[self.current..].chars().next();
+        !before.is_some_and(char::is_whitespace)
+            && !after.is_some_and(|c| c.is_alphanumeric() || c == '_')
     }
 
     fn handle_text_symbol_replacement_parens(&mut self) -> Result<Token, ScannerError> {
@@ -1057,7 +1155,28 @@ mod tests {
             .filter_map(|result| result.as_ref().ok().cloned())
             .collect();
         let _ = scanned_tokens.pop();
+        // whether marks can close spans has a test of its own
+        for token in scanned_tokens.iter_mut() {
+            token.can_close = true;
+        }
         assert_eq!(scanned_tokens, expected_tokens);
+    }
+
+    #[rstest]
+    #[case::opening("*a", false)]
+    #[case::closing("a*", true)]
+    #[case::before_punctuation("a*.", true)]
+    #[case::after_space("a *", false)]
+    #[case::before_letter(" *a", false)]
+    #[case::before_non_ascii_letter(" *é", false)]
+    #[case::before_underscore("(*_", false)]
+    #[case::superscript(" ^a", true)]
+    fn marks_that_can_close(#[case] markup: &str, #[case] expected: bool) {
+        let mark = Scanner::new(markup)
+            .filter_map(Result::ok)
+            .find(|token| matches!(token.lexeme.as_str(), "*" | "^"))
+            .expect("No mark");
+        assert_eq!(mark.can_close, expected);
     }
 
     fn newline_token_at(line: usize, col: usize) -> Token {
@@ -2523,6 +2642,7 @@ mod tests {
                 startcol: 1,
                 endcol: 9,
                 file_stack: vec![],
+                can_close: true,
             },
             Token {
                 token_type: TokenType::Text,
@@ -2532,6 +2652,7 @@ mod tests {
                 startcol: 10,
                 endcol: 10,
                 file_stack: vec![],
+                can_close: true,
             },
             Token {
                 token_type: TokenType::Text,
@@ -2541,6 +2662,7 @@ mod tests {
                 startcol: 11,
                 endcol: 15,
                 file_stack: vec![],
+                can_close: true,
             },
             Token {
                 token_type: TokenType::NewLineChar,
@@ -2550,6 +2672,7 @@ mod tests {
                 startcol: 16,
                 endcol: 16,
                 file_stack: vec![],
+                can_close: true,
             },
         ];
         scan_and_assert_eq(markup, expected_tokens);

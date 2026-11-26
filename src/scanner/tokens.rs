@@ -15,6 +15,9 @@ pub struct Token {
     pub endcol: usize,
     /// The file's stack hierarchy if it's an include, otherwise stays empty
     pub file_stack: Vec<String>,
+    /// For a formatting mark, whether it can close a span (a constrained mark can't after a
+    /// space, or before a letter or digit)
+    pub can_close: bool,
 }
 
 impl Default for Token {
@@ -28,6 +31,7 @@ impl Default for Token {
             startcol: 1,
             endcol: 1,
             file_stack: vec![],
+            can_close: true,
         }
     }
 }
@@ -51,6 +55,7 @@ impl Token {
             startcol,
             endcol,
             file_stack,
+            can_close: true,
         }
     }
 
@@ -71,6 +76,7 @@ impl Token {
             startcol,
             endcol,
             file_stack: vec![],
+            can_close: true,
         }
     }
 
@@ -83,7 +89,36 @@ impl Token {
             startcol: 0,
             endcol: 0,
             file_stack,
+            can_close: true,
         }
+    }
+
+    /// Makes the token text, as written
+    pub(crate) fn make_text(&mut self) {
+        self.token_type = TokenType::Text;
+        self.literal = Some(self.lexeme.clone());
+    }
+
+    /// Markup that, in a table, is more of a cell's text: list markup and the like is only
+    /// parsed in AsciiDoc (`a|`) cells, which we don't support
+    pub(crate) fn is_text_in_table(&self) -> bool {
+        matches!(
+            self.token_type,
+            TokenType::Heading1
+                | TokenType::Heading2
+                | TokenType::Heading3
+                | TokenType::Heading4
+                | TokenType::Heading5
+                | TokenType::BlockLabel
+                | TokenType::UnorderedListItem
+                | TokenType::OrderedListItem
+                | TokenType::DescriptionListMarker
+                | TokenType::NotePara
+                | TokenType::TipPara
+                | TokenType::ImportantPara
+                | TokenType::CautionPara
+                | TokenType::WarningPara
+        )
     }
 
     /// Convince function to return the [`TokenType`] for matching

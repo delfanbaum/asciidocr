@@ -120,15 +120,19 @@ pub fn block_outline(adoc: &str) -> String {
 
 /// Like [`block_outline`], but for a file in tests/data (whose includes resolve from where it is)
 pub fn block_outline_from_file(adoc_fn: &str) -> String {
+    outline(&parsed_asg_from_file(adoc_fn))
+}
+
+/// The graph, as JSON, of a file in tests/data (whose includes resolve from where it is)
+pub fn parsed_asg_from_file(adoc_fn: &str) -> Value {
     let path = PathBuf::from("tests/data/").join(adoc_fn);
-    let asg = json!(
+    json!(
         Parser::new_no_target_resolution(path.clone())
             .parse(Scanner::new(
                 &fs::read_to_string(&path).expect("Unable to find adoc")
             ))
             .expect("Unable to parse input")
-    );
-    outline(&asg)
+    )
 }
 
 fn outline(asg: &Value) -> String {

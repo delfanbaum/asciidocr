@@ -388,3 +388,10 @@ fn generated_section_ids_and_xrefs() {
          <p>See <a href=\"#_my_section\">My Section</a>.</p></section>",
     );
 }
+
+/// A table with only a header has no body
+#[test]
+fn test_header_only_table() {
+    let html = common::render_htmlbook_embedded_from_str("|===\n|a |b\n\n|===\n");
+    assert!(!html.contains("<tbody>"), "{html}");
+}

@@ -512,8 +512,8 @@ fn test_markup_at_end_of_file(#[case] adoc: &str, #[case] expected: &str) {
 #[rstest]
 #[case::one_cell_per_line("|===\n|a\n|b\n|===\n", "table(tableCell \"a\", tableCell \"b\")")]
 #[case::first_line_one_cell(
-    "|===\n|Name|Value\n\n|a\n|1\n|===\n",
-    "table(tableCell \"Name|Value\", tableCell \"a\", tableCell \"1\")"
+    "|===\n|Name\n\n|a\n|1\n|===\n",
+    "table(tableCell \"Name\", tableCell \"a\", tableCell \"1\")"
 )]
 fn test_tables_with_one_cell_on_the_first_line(#[case] adoc: &str, #[case] expected: &str) {
     let asg = common::parsed_asg_with_timeout(adoc);
@@ -690,4 +690,197 @@ fn test_attribute_lists_that_used_to_panic(#[case] adoc: &str, #[case] expected:
 fn test_unclosed_quote_in_attribute_value() {
     let asg = common::parsed_asg("[role=\"foo]\ntext\n");
     assert_eq!(asg["blocks"][0]["metadata"]["roles"][0], "\"foo", "{asg}");
+}
+
+/// Like Asciidoctor, a `leveloffset` never stops the conversion: a signed value is relative, a
+/// value that isn't a number resets the offset, and a level out of range is brought into it
+#[rstest]
+#[case::below_zero_title(
+    "x\n\n:leveloffset: -1\n\n= One\n\na\n",
+    "paragraph \"x\" section \"One\"(paragraph \"a\")",
+    0
+)]
+#[case::to_zero(
+    "x\n\n:leveloffset: -1\n\n== One\n",
+    "paragraph \"x\" section \"One\"",
+    0
+)]
+#[case::too_high("x\n\n:leveloffset: 9\n\n== A\n", "paragraph \"x\" section \"A\"", 5)]
+#[case::huge("x\n\n:leveloffset: 200\n\n== A\n", "paragraph \"x\" section \"A\"", 5)]
+#[case::not_a_number(
+    "x\n\n:leveloffset: 2\n:leveloffset: y\n\n== A\n",
+    "paragraph \"x\" section \"A\"",
+    1
+)]
+#[case::empty(
+    "x\n\n:leveloffset: 2\n:leveloffset:\n\n== A\n",
+    "paragraph \"x\" section \"A\"",
+    1
+)]
+#[case::unset(
+    "x\n\n:leveloffset: 2\n:leveloffset!:\n\n== A\n",
+    "paragraph \"x\" section \"A\"",
+    1
+)]
+#[case::relative(
+    "x\n\n:leveloffset: +1\n:leveloffset: +1\n\n== A\n",
+    "paragraph \"x\" section \"A\"",
+    3
+)]
+fn test_level_offsets(#[case] adoc: &str, #[case] expected: &str, #[case] level: u64) {
+    assert_eq!(block_outline(adoc), expected);
+    assert_eq!(common::parsed_asg(adoc)["blocks"][1]["level"], level);
+}
+
+/// Newlines are only kept apart from the text around them in description lists; a paragraph after
+/// one is like any other
+#[test]
+fn test_paragraph_after_description_list() {
+    let asg = common::parsed_asg("A:: a\n\nPara one\nline two\n");
+    let inlines = &asg["blocks"][1]["inlines"];
+    assert_eq!(inlines.as_array().map(Vec::len), Some(1), "{inlines}");
+    assert_eq!(inlines[0]["value"], "Para one\nline two");
+}
+
+/// As in Asciidoctor, text on the lines after a cell is that cell's, every `|` in a table starts
+/// a cell, and `\|` is a pipe
+#[rstest]
+#[case::next_line(
+    "|===\n|a\nmore\n|b\n|===\n",
+    "table(tableCell \"a\nmore\", tableCell \"b\")"
+)]
+#[case::after_a_row(
+    "|===\n|a |b\nmore\n|c |d\n|===\n",
+    "table(tableCell \"a \", tableCell \"b\nmore\", tableCell \"c \", tableCell \"d\")"
+)]
+#[case::after_blank_line(
+    "|===\n|a\n\nmore\n|b\n|===\n",
+    "table(tableCell \"a\nmore\", tableCell \"b\")"
+)]
+#[case::mid_line(
+    "|===\n|a\nmore|b\n|===\n",
+    "table(tableCell \"a\nmore\", tableCell \"b\")"
+)]
+#[case::list_marker(
+    "|===\n|a\n* b\n|c\n|===\n",
+    "table(tableCell \"a\n* b\", tableCell \"c\")"
+)]
+#[case::heading(
+    "|===\n|a\n== b\n|c\n|===\n",
+    "table(tableCell \"a\n== b\", tableCell \"c\")"
+)]
+#[case::no_spaces(
+    "|===\n|Name|Value\n|a |b\n|===\n",
+    "table(tableCell \"Name\", tableCell \"Value\", tableCell \"a \", tableCell \"b\")"
+)]
+#[case::empty_cell(
+    "|===\n|a||c\n|===\n",
+    "table(tableCell \"a\", tableCell, tableCell \"c\")"
+)]
+#[case::escaped_pipe(
+    "|===\n|a\\|x |b\n|===\n",
+    "table(tableCell \"a|x \", tableCell \"b\")"
+)]
+#[case::pipe_after_table("|===\n|a\n|===\n\nx|y\n", "table(tableCell \"a\") paragraph \"x|y\"")]
+fn test_table_cells(#[case] adoc: &str, #[case] expected: &str) {
+    assert_eq!(block_outline(adoc), expected);
+}
+
+/// As in Asciidoctor, the first row is a header when it is directly under the delimiter and a
+/// blank line follows it
+#[rstest]
+#[case::blank_after_row("|===\n|a |b\n\n|c |d\n|===\n", true)]
+#[case::one_row_then_blank("|===\n|a |b\n\n|===\n", true)]
+#[case::one_row("|===\n|a |b\n|===\n", false)]
+#[case::no_blank_line("|===\n|a |b\n|c |d\n|===\n", false)]
+#[case::blank_before("|===\n\n|a |b\n\n|c |d\n|===\n", false)]
+#[case::row_continues("|===\n|a |b\nmore\n\n|c |d\n|===\n", false)]
+fn test_implicit_table_header(#[case] adoc: &str, #[case] header: bool) {
+    let asg = common::parsed_asg(adoc);
+    let options = &asg["blocks"][0]["metadata"]["options"];
+    let has_header = options
+        .as_array()
+        .is_some_and(|options| options.iter().any(|option| option == "header"));
+    assert_eq!(has_header, header, "{asg}");
+}
+
+/// An ID or role on an admonition is the admonition's, not its content's
+#[rstest]
+#[case::inline_form("[[i]]\nNOTE: text\n")]
+#[case::paragraph_form("[[i]]\n[NOTE]\ntext\n")]
+#[case::block_form("[[i]]\n[NOTE]\n====\ntext\n====\n")]
+#[case::anchor_below("[NOTE]\n[[i]]\n====\ntext\n====\n")]
+#[case::attribute_list("[id=i]\nNOTE: text\n")]
+fn test_admonition_ids(#[case] adoc: &str) {
+    let asg = common::parsed_asg(adoc);
+    let admonition = &asg["blocks"][0];
+    assert_eq!(admonition["name"], "admonition", "{asg}");
+    assert_eq!(admonition["metadata"]["attributes"]["id"], "i", "{asg}");
+    let content = &admonition["blocks"][0];
+    assert!(content.get("metadata").is_none(), "{asg}");
+}
+
+/// A `+` on the last line, with no newline after it, is still a continuation or a line break
+#[rstest]
+#[case::after_item("* a\n+", "list(* \"a\")")]
+#[case::after_paragraph("x\n+", "paragraph \"x\" paragraph \"+\"")]
+#[case::line_break("a +", "paragraph \"a \"")]
+fn test_plus_on_the_last_line(#[case] adoc: &str, #[case] expected: &str) {
+    assert_eq!(block_outline(adoc), expected);
+}
+
+/// A table delimiter inside a verbatim or comment block doesn't leave the text after it being
+/// read as if it were in a table
+#[rstest]
+#[case::listing("----\n|===\n----\n\nx | *b*\n")]
+#[case::literal("....\n|===\n....\n\nx | *b*\n")]
+#[case::comment("////\n|===\n////\n\nx | *b*\n")]
+#[case::pass("++++\n|===\n++++\n\nx | *b*\n")]
+fn test_table_delimiter_in_verbatim_block(#[case] adoc: &str) {
+    let html = common::render_asciidoctor_embedded_from_str(adoc);
+    assert!(html.contains("x | <strong>b</strong>"), "{html}");
+}
+
+/// Rows included into a table are split like the table's own
+#[test]
+fn test_table_rows_in_include() {
+    assert_eq!(
+        block_outline_from_file("blocks/include-table.adoc"),
+        "table(tableCell \"a \", tableCell \"b\", tableCell \"c \", tableCell \"d\", tableCell \"e \", tableCell \"f\")"
+    );
+}
+
+/// Cell specifiers (spans, alignment and styles) aren't supported, but they aren't text either
+#[rstest]
+#[case::span("|===\n|a\n2+|b\n|===\n", "table(tableCell \"a\", tableCell \"b\")")]
+#[case::row_span("|===\n|a .2+|b\n|===\n", "table(tableCell \"a \", tableCell \"b\")")]
+#[case::alignment(
+    "|===\n|a ^|b >.^|c\n|===\n",
+    "table(tableCell \"a \", tableCell \"b \", tableCell \"c\")"
+)]
+#[case::style(
+    "|===\n|a h|b\na|c\n|===\n",
+    "table(tableCell \"a \", tableCell \"b\", tableCell \"c\")"
+)]
+#[case::words(
+    "|===\n|plan a\n|vitamin|b\n|===\n",
+    "table(tableCell \"plan a\", tableCell \"vitamin\", tableCell \"b\")"
+)]
+fn test_cell_specifiers(#[case] adoc: &str, #[case] expected: &str) {
+    assert_eq!(block_outline(adoc), expected);
+}
+
+/// The first row goes on while its cells do, and `noheader` turns its header off
+#[rstest]
+#[case::first_row_runs_on("|===\n|a\nmore |b\n|c |d\n|===\n", "2", false)]
+#[case::noheader("[%noheader]\n|===\n|a |b\n\n|c |d\n|===\n", "2", false)]
+#[case::noheader_option("[options=\"noheader\"]\n|===\n|a |b\n\n|c |d\n|===\n", "2", false)]
+fn test_first_table_row(#[case] adoc: &str, #[case] cols: &str, #[case] header: bool) {
+    let asg = common::parsed_asg(adoc);
+    let metadata = &asg["blocks"][0]["metadata"];
+    assert_eq!(metadata["attributes"]["cols"], cols, "{asg}");
+    let has_header = metadata["options"]
+        .as_array()
+        .is_some_and(|options| options.iter().any(|option| option == "header"));
+    assert_eq!(has_header, header, "{asg}");
 }

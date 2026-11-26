@@ -25,8 +25,13 @@ impl Parser {
         Ok(())
     }
 
-    /// Generic parser for inline spans that close themselves
-    pub(super) fn parse_inline_span(&mut self, mut inline: Inline) -> Result<(), ParserError> {
+    /// Generic parser for inline spans that close themselves. A mark closes the open span of
+    /// its kind, however deeply the spans inside that one are nested. A mark that can't close
+    /// is text if a span of its kind is already open (so there is only ever one of each, and
+    /// they can't nest without limit)
+    pub(super) fn parse_inline_span(&mut self, token: Token) -> Result<(), ParserError> {
+        let can_close = token.can_close;
+        let mut inline = Inline::InlineSpan(InlineSpan::inline_span_from_token(token.clone()));
         // Only a span that is still open can be closed by, or contain, the incoming span. A newline
         // is held back as "dangling" rather than pushed as text, so after "*a*\n" the closed
         // strong span is still the last inline on the stack; treating it as open would swallow a
@@ -34,28 +39,30 @@ impl Parser {
         if let Some(last_inline) = self.inline_stack.back_mut()
             && last_inline.is_open()
         {
-            if inline == *last_inline {
+            if can_close && inline == *last_inline {
                 last_inline.reconcile_locations(inline.locations());
                 last_inline.close();
                 self.in_inline_span = false;
                 return Ok(());
-            } else if let Inline::InlineSpan(last_span) = last_inline {
-                if let Some(last_internal_inline) = last_span.inlines.last_mut()
-                    && last_internal_inline.is_open()
-                    && inline == *last_internal_inline
-                {
-                    last_internal_inline.reconcile_locations(inline.locations());
-                    last_internal_inline.close();
-                } else {
-                    // Like Asciidoctor, a newline ahead of a nested span is text in the
-                    // enclosing span, so flush it before the nested span starts
-                    if let Some(newline_token) = self.dangling_newline.take() {
-                        last_span.add_inline(Inline::InlineLiteral(
-                            InlineLiteral::new_text_from_token(&newline_token),
-                        ));
+            }
+            if let (Inline::InlineSpan(last_span), Inline::InlineSpan(mark)) =
+                (&mut *last_inline, &inline)
+            {
+                if let Some(depth) = last_span.open_depth_of(mark) {
+                    if !can_close {
+                        return self.parse_text(token);
                     }
-                    last_span.add_inline(inline);
+                    last_span.close_at_depth(depth, inline.locations());
+                    return Ok(());
                 }
+                // Like Asciidoctor, a newline ahead of a nested span is text in the
+                // enclosing span, so flush it before the nested span starts
+                if let Some(newline_token) = self.dangling_newline.take() {
+                    last_span.add_inline(Inline::InlineLiteral(
+                        InlineLiteral::new_text_from_token(&newline_token),
+                    ));
+                }
+                last_span.add_inline(inline);
                 return Ok(());
             }
         }
@@ -163,6 +170,10 @@ impl Parser {
             while self.inline_stack.len() > inline_macro_idx {
                 let subsequent_inline = self.inline_stack.remove(inline_macro_idx).unwrap();
                 inline_macro.push_inline(subsequent_inline);
+            }
+            // spans left open inside a footnote are text
+            if let Inline::InlineSpan(span) = &mut inline_macro {
+                span.unclosed_children_to_text();
             }
             // update the locations
             inline_macro.consolidate_locations_from_token(token);
@@ -276,7 +287,7 @@ impl Parser {
             }
         }
         if let Some(newline_token) = self.dangling_newline.clone() {
-            if self.preserve_newline_text {
+            if self.lists.in_description_list() {
                 // add the newline as such
                 self.inline_stack.push_back(Inline::InlineLiteral(
                     InlineLiteral::new_text_from_token(&newline_token),
@@ -299,7 +310,7 @@ impl Parser {
 
     pub(super) fn pass_text_through(&mut self, token: Token) -> Result<(), ParserError> {
         if let Some(newline_token) = self.dangling_newline.clone() {
-            if self.preserve_newline_text {
+            if self.lists.in_description_list() {
                 // add the newline as such
                 self.inline_stack.push_back(Inline::InlineLiteral(
                     InlineLiteral::new_text_from_token(&newline_token),
@@ -342,7 +353,7 @@ impl Parser {
         }
         let inline_literal = Inline::InlineLiteral(InlineLiteral::new_charref_from_token(&token));
         if let Some(newline_token) = self.dangling_newline.clone() {
-            if self.preserve_newline_text {
+            if self.lists.in_description_list() {
                 // add the newline as such
                 self.inline_stack.push_back(Inline::InlineLiteral(
                     InlineLiteral::new_text_from_token(&newline_token),
