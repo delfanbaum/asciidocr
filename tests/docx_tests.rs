@@ -245,6 +245,22 @@ mod docx_tests {
         assert_eq!(number_format(adoc, &id, level).as_deref(), Some(format));
     }
 
+    /// Word has nine numbering levels, so lists nested deeper than that stay at the last one
+    #[test]
+    fn deeply_nested_lists_stay_at_the_last_level() {
+        let markers = [
+            "*", "**", "***", "****", "*****", "-", ".", "..", "...", "....", ".....",
+        ];
+        let adoc: String = markers
+            .iter()
+            .enumerate()
+            .map(|(depth, marker)| format!("{marker} item{depth}\n"))
+            .collect();
+        let paragraphs = docx_paragraphs(&adoc);
+        assert_eq!(numbering_of(&paragraphs, "item8").1, "8");
+        assert_eq!(numbering_of(&paragraphs, "item10").1, "8");
+    }
+
     /// Blocks attached to an item are indented paragraphs, and the next item is still an item
     #[test]
     fn items_after_attached_blocks_stay_in_the_list() {
