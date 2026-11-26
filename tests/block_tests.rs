@@ -472,3 +472,12 @@ fn test_generated_section_ids_stay_out_of_the_graph() {
     assert_eq!(xref["target"], "_my_section");
     assert_eq!(xref["inlines"][0]["value"], "My Section", "{xref}");
 }
+
+/// An xref with its own text (`<<id,text>>`) keeps it, and its target is the id alone
+#[test]
+fn test_xref_custom_text() {
+    let asg = common::parsed_asg("== A\n\nSee <<_a,the A section>>.\n");
+    let xref = &asg["blocks"][0]["blocks"][0]["inlines"][1];
+    assert_eq!(xref["target"], "_a", "{xref}");
+    assert_eq!(xref["inlines"][0]["value"], "the A section", "{xref}");
+}

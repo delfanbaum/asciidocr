@@ -1,0 +1,5 @@
+== A Section
+
+See <<_a_section,the *A* section>> and <<_a_section,plain>>.
+And <<_a_section, spaced >>, and <<_a_section>>,
+and <<missing,text for a missing one>>.
