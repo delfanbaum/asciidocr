@@ -29,6 +29,7 @@ fn test_full_documents(#[case] fn_pattern: &str) {
 #[case::nested_lists("asciidoctor-html/embedded/nested-lists")]
 #[case::lettered_lists("asciidoctor-html/embedded/lettered-lists")]
 #[case::description_list_terms("asciidoctor-html/embedded/description-list-terms")]
+#[case::nested_description_lists("asciidoctor-html/embedded/nested-description-lists")]
 #[case::table("asciidoctor-html/embedded/table")]
 #[case::xrefs("asciidoctor-html/embedded/xrefs")]
 #[case::images("asciidoctor-html/embedded/images")]

@@ -1,0 +1,15 @@
+A:: a
+B;; nested with semicolons
+C;; again
+D:: back out
+E::: nested with three colons
+F:::: and four
+
+G:: after a blank line
+
+H;; still nested
+
+//-
+
+* item
+Term;; in the item

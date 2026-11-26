@@ -319,6 +319,55 @@ fn test_description_lists(#[case] adoc: &str, #[case] expected: &str) {
     assert_eq!(block_outline_with_timeout(adoc), expected);
 }
 
+/// Each description list marker (`::`, `:::`, `::::`, `;;`) is its own list, and they nest by
+/// marker like other lists
+#[rstest]
+#[case::semicolons(
+    "A:: a\nB;; b\nC;; c\nD:: d\n",
+    "dlist(\"A\":: \"a\"(dlist(\"B\":: \"b\", \"C\":: \"c\")), \"D\":: \"d\")"
+)]
+#[case::colons(
+    "A:: a\nB::: b\nC:::: c\nD:: d\n",
+    "dlist(\"A\":: \"a\"(dlist(\"B\":: \"b\"(dlist(\"C\":: \"c\")))), \"D\":: \"d\")"
+)]
+#[case::semicolons_first("A;; a\nB:: b\n", "dlist(\"A\":: \"a\"(dlist(\"B\":: \"b\")))")]
+#[case::triple_colon_alone("A::: a\n", "dlist(\"A\":: \"a\")")]
+#[case::after_blank_line("A:: a\n\nB;; b\n", "dlist(\"A\":: \"a\"(dlist(\"B\":: \"b\")))")]
+// a term with another marker nests, rather than being another term
+#[case::term_then_other_marker("A::\nB;; b\n", "dlist(\"A\":: \"\"(dlist(\"B\":: \"b\")))")]
+#[case::terms_same_marker("A;;\nB;; b\n", "dlist(\"A\" \"B\":: \"b\")")]
+#[case::in_list_item("* x\nT;; d\n", "list(* \"x\"(dlist(\"T\":: \"d\")))")]
+#[case::colons_in_text("a::b::c\n", "paragraph \"a::b::c\"")]
+// like Asciidoctor, a description on the line after its term loses its indentation
+#[case::description_on_next_line("Term::\n  desc\n", "dlist(\"Term\":: \"desc\")")]
+fn test_nested_description_lists(#[case] adoc: &str, #[case] expected: &str) {
+    assert_eq!(block_outline_with_timeout(adoc), expected);
+}
+
+/// The marker as written is in the graph, on the list and on its items
+#[test]
+fn test_description_list_markers_in_the_graph() {
+    let asg = parsed_asg("A:: a\nB;; b\n");
+    let outer = &asg["blocks"][0];
+    let inner = &outer["items"][0]["blocks"][0];
+    assert_eq!(outer["marker"], "::");
+    assert_eq!(outer["items"][0]["marker"], "::");
+    assert_eq!(inner["marker"], ";;");
+    assert_eq!(inner["items"][0]["marker"], ";;");
+}
+
+/// A term that ends its line (`Term::`) counts that line, so the blocks after it have the right
+/// line numbers
+#[test]
+fn test_lines_after_term_line() {
+    let asg = parsed_asg("Term::\ndesc\n\nPara\n");
+    assert_eq!(
+        asg["blocks"][1]["location"][0]["line"], 4,
+        "{}",
+        asg["blocks"][1]
+    );
+}
+
 /// A list item can't interrupt a paragraph, and a heading can't interrupt an item's text
 #[rstest]
 #[case::paragraph_then_marker("Text\n* a\n", "paragraph \"Text\n* a\"")]

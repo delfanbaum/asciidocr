@@ -265,6 +265,33 @@ mod docx_tests {
         assert_eq!(numbering_of(&paragraphs, "item10").1, "8");
     }
 
+    /// The left indent of each paragraph with this text, from document.xml
+    fn left_indent(adoc: &str, text: &str) -> Option<String> {
+        let document = rendered_docx_part(adoc, "word/document.xml");
+        let doc = roxmltree::Document::parse(&document).unwrap();
+        let para = doc.descendants().find(|p| {
+            p.is_element()
+                && p.tag_name().name() == "p"
+                && p.descendants()
+                    .filter(|n| n.is_element() && n.tag_name().name() == "t")
+                    .filter_map(|n| n.text())
+                    .collect::<String>()
+                    == text
+        })?;
+        para.descendants()
+            .find(|n| n.is_element() && n.tag_name().name() == "ind")
+            .and_then(|n| n.attributes().find(|a| a.name() == "left"))
+            .map(|a| a.value().to_string())
+    }
+
+    /// A nested description list is indented one level further than its parent's description
+    #[test]
+    fn nested_description_lists_are_indented() {
+        let adoc = "A:: a\nB;; b\n";
+        assert_eq!(left_indent(adoc, "B").as_deref(), Some("720"));
+        assert_eq!(left_indent(adoc, "b").as_deref(), Some("1440"));
+    }
+
     /// Blocks attached to an item are indented paragraphs, and the next item is still an item
     #[test]
     fn items_after_attached_blocks_stay_in_the_list() {

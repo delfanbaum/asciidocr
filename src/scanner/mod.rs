@@ -1645,24 +1645,62 @@ mod tests {
                 1,
                 4,
             ),
+            // the newline is its own token, so that the lines after it are counted
             Token::new_default(
                 TokenType::DescriptionListMarker,
-                "::\n".to_string(),
+                "::".to_string(),
                 None,
                 1,
                 5,
-                7,
+                6,
             ),
+            newline_token_at(1, 7),
             Token::new_default(
                 TokenType::Text,
                 "DS".to_string(),
                 Some("DS".to_string()),
+                2,
                 1,
-                8,
-                9,
+                2,
             ),
         ];
         scan_and_assert_eq(markup, expected_tokens);
+    }
+
+    /// The text before the marker, and the marker's lexeme. Like Asciidoctor, a run of more
+    /// colons (or semicolons) than a marker has ends with the marker, and the rest is the term's
+    #[rstest]
+    #[case::double_colon("Txrm:: DS", "Txrm", ":: ")]
+    #[case::triple_colon("Txrm::: DS", "Txrm", "::: ")]
+    #[case::quadruple_colon("Txrm:::: DS", "Txrm", ":::: ")]
+    #[case::double_semicolon("Txrm;; DS", "Txrm", ";; ")]
+    #[case::five_colons("Txrm::::: DS", "Txrm:", ":::: ")]
+    #[case::three_semicolons("Txrm;;; DS", "Txrm;", ";; ")]
+    #[case::end_of_line("Txrm:::\nDS", "Txrm", ":::")]
+    fn description_list_markers(#[case] markup: &str, #[case] term: &str, #[case] marker: &str) {
+        let tokens: Vec<Token> = Scanner::new(markup).filter_map(|t| t.ok()).collect();
+        let marker_idx = tokens
+            .iter()
+            .position(|t| t.token_type() == TokenType::DescriptionListMarker)
+            .unwrap_or_else(|| panic!("No marker in {tokens:?}"));
+        let text: String = tokens[..marker_idx]
+            .iter()
+            .map(|t| t.lexeme.clone())
+            .collect();
+        assert_eq!(text, term);
+        assert_eq!(tokens[marker_idx].lexeme, marker);
+    }
+
+    #[rstest]
+    #[case::colons_in_text("a::b::c\n")]
+    #[case::semicolons_in_text("a;;b\n")]
+    #[case::space_before_semicolons("Txrm ;; bar\n")]
+    fn not_description_list_markers(#[case] markup: &str) {
+        assert!(
+            Scanner::new(markup)
+                .filter_map(|t| t.ok())
+                .all(|t| t.token_type() != TokenType::DescriptionListMarker)
+        );
     }
 
     #[test]
