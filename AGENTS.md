@@ -9,7 +9,7 @@ The pipeline is `Scanner` → `Parser` → `Asg` → backend.
 
 - `src/scanner/`: turns source text into `Token`s (`tokens.rs` holds `Token`/`TokenType`).
   The scanner is an iterator of `Result<Token, ScannerError>`.
-- `src/parser.rs`: consumes tokens and builds the `Asg`. It uses stacks for blocks and inlines,
+- `src/parser/`: consumes tokens and builds the `Asg`. It uses stacks for blocks and inlines,
   and it resolves includes, attributes and targets. Lists (description lists too) stay off the
   block stack while they are open, in `src/parser/list_context.rs`; its module docs explain the
   scopes.

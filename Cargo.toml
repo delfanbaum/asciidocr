@@ -40,3 +40,7 @@ pretty_assertions = "1.4"
 [features]
 docx = ["dep:docx-rs"]
 json = []
+
+[lints.clippy]
+# directory modules use `foo/mod.rs`, not `foo.rs` next to `foo/`
+self_named_module_files = "warn"
