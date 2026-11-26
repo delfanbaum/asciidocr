@@ -117,8 +117,19 @@ impl ListScope {
         }
     }
 
-    /// A blank line ends the current item's text (and cancels a `+` with nothing attached yet)
+    /// A blank line ends the current item's text (and cancels a `+` with nothing attached yet).
+    /// Like Asciidoctor, a description list item with no description yet reads on past blank
+    /// lines: `Term::`, a blank line, then `def` is its description (or `B:: b` another term).
     pub fn blank_line(&mut self) {
+        if let Some(OpenList {
+            item: Block::DListItem(item),
+            ..
+        }) = self.lists.last()
+            && item.principal.is_empty()
+            && item.blocks.is_empty()
+        {
+            return;
+        }
         self.principal_open = false;
         self.attach_next = false;
         self.after_blank = true;

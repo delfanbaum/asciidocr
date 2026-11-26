@@ -197,6 +197,16 @@ API audit below.
   kept, where Asciidoctor strips it as it does for other lines of an item's text
 * [ ] `C++` in prose (`C++ uses a::b`) comes out as "C``"; Asciidoctor leaves
   it as written
+* [x] A bare URL stopped at `-`, `_`, `%`, `~` or `;` (`http://x.com/my-page`
+  linked to `http://x.com/my`), and a URL with a non-ASCII character stopped the
+  conversion with a panic
+* [ ] *Decide* whether a description list marker after a space is a marker:
+  Asciidoctor makes `Term :: def` (and `Term ;; def`) a description list, while
+  we keep it as text (`description_list_mark_not_if_space_before`)
+* [ ] A one-row table (`|===`, `|a |b`, `|===`) makes that row a header;
+  Asciidoctor only makes the first row a header when a blank line follows it
+* [ ] `[TIP]` (or another admonition label) above a listing or literal block
+  wraps it in an admonition; Asciidoctor ignores the label there
 * [ ] A listing's text in the ASG starts with the newline after the opening
   delimiter (`"\ncode\n"`); check against the ASG schema
 

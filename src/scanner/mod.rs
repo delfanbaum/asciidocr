@@ -267,18 +267,14 @@ impl<'a> Scanner<'a> {
                         self.current += 1
                     }
                     self.add_token(TokenType::Attribute, false, 0)
-                } else if self.peek_back() != ' '
-                    && let Some(token) = self.description_list_marker(b':', 4)
-                {
+                } else if let Some(token) = self.description_list_marker(b':', 4) {
                     token
                 } else {
                     self.add_text_until_next_markup()
                 }
             }
             ';' => {
-                if self.peek_back() != ' '
-                    && let Some(token) = self.description_list_marker(b';', 2)
-                {
+                if let Some(token) = self.description_list_marker(b';', 2) {
                     token
                 } else {
                     self.add_text_until_next_markup()
@@ -630,42 +626,33 @@ impl<'a> Scanner<'a> {
         self.add_token(TokenType::TableCell, true, 0)
     }
 
-    /// Adds the link, consuming the target but not any attributes
+    /// Adds the link, consuming the target but not any attributes. Like Asciidoctor, a bare URL
+    /// runs to whitespace, a bracket or a `<`, less the punctuation at its end that belongs to
+    /// the sentence (`,`, `.`, `?`, `!`, `)`, and here `:` and `;` too) or closes formatting
+    /// around it (`*`, `_`, `` ` ``, `#`).
     fn add_link(&mut self) -> Result<Token, ScannerError> {
-        let hyperlink_allowed_punctuation = ['.', '#', ':', '/', '?', '=', '&'];
-        // a bare link ends at whitespace (including the end of the line) or the end of input
-        let link_terminators = ['\0', ' ', '\t', '\r', '\n'];
-        while !link_terminators.contains(&self.peek()) && !self.peek().is_ascii_punctuation() {
-            self.current += 1
-        }
+        let url_length = self.source[self.current..]
+            .find(|c: char| c.is_whitespace() || matches!(c, '[' | ']' | '<'))
+            .unwrap_or(self.source.len() - self.current);
+        self.current += url_length;
         // it's an attribute-styled link
         if self.peek() == '[' {
             self.current += 1; // consume the '[' char
-            self.add_token(TokenType::LinkMacro, true, 0)
-        } else if link_terminators.contains(&self.peek()) {
-            self.add_token(TokenType::Hyperlink, true, 0)
-        } else if hyperlink_allowed_punctuation.contains(&self.peek()) {
-            // if it's at the end of a sentence
-            if let Some(second_char) = self.peeks_ahead(2).chars().last() {
-                if link_terminators.contains(&second_char) {
-                    // if it's not a possible sentence ender, we want that in the link
-                    if !['.', ':', '?'].contains(&self.peek()) {
-                        self.current += 1;
-                    }
-                    self.add_token(TokenType::Hyperlink, true, 0)
-                } else {
-                    // otherwise it contains an allowed url punctuation character
-                    self.current += 1; // consume the allowed character
-                    self.add_link()
-                }
-            } else {
-                // otherwise it contains an allowed url punctuation character
-                self.current += 1; // consume the allowed character
-                self.add_link()
-            }
-        } else {
-            self.add_token(TokenType::Hyperlink, true, 0)
+            return self.add_token(TokenType::LinkMacro, true, 0);
         }
+        let trailing = self.source[self.start..self.current]
+            .chars()
+            .rev()
+            .take_while(|c| {
+                matches!(
+                    c,
+                    ',' | '.' | '?' | '!' | ')' | ':' | ';' | '*' | '_' | '`' | '#'
+                )
+            })
+            .count();
+        // (the trailing characters are ASCII, so their count is their length in bytes)
+        self.current -= trailing.min(self.current - self.start - 1);
+        self.add_token(TokenType::Hyperlink, true, 0)
     }
 
     fn add_inline_style(&mut self) -> Result<Token, ScannerError> {
@@ -713,13 +700,24 @@ impl<'a> Scanner<'a> {
     /// A description list marker at the start of the token: a run of two to four colons, or of
     /// two semicolons, followed by a space, a newline or the end of the file. Like Asciidoctor, a
     /// longer run ends with the marker, and the colons (or semicolons) before it are the end of
-    /// the term, so they are text.
+    /// the term, so they are text. Unlike in Asciidoctor, a run after a space is not a marker
+    /// (`Term :: def` is text).
     fn description_list_marker(
         &mut self,
         mark: u8,
         max_len: usize,
     ) -> Option<Result<Token, ScannerError>> {
         let bytes = self.source.as_bytes();
+        // where the run started: before this token, if the start of the run was split off as text
+        let run_start = self.start
+            - bytes[..self.start]
+                .iter()
+                .rev()
+                .take_while(|b| **b == mark)
+                .count();
+        if run_start > 0 && matches!(bytes[run_start - 1], b' ' | b'\t') {
+            return None;
+        }
         let run = bytes[self.start..]
             .iter()
             .take_while(|b| **b == mark)

@@ -61,6 +61,9 @@ pub struct Parser {
     section_title_open: bool,
     /// an admonition (`NOTE: text`, or `[NOTE]`) waiting for its paragraph or block
     pending_admonition: Option<ParentBlock>,
+    /// admonitions (`[NOTE]`) around delimited blocks that are still open, with the depth of the
+    /// block stack where the block opened
+    admonitions_around_blocks: Vec<(usize, ParentBlock)>,
     /// the line the pending block title was declared on
     block_title_line: usize,
     /// holding ground for block metadata, to be applied to the subsequent block
@@ -133,6 +136,7 @@ impl Parser {
             block_title_open: false,
             section_title_open: false,
             pending_admonition: None,
+            admonitions_around_blocks: vec![],
             block_title_line: 0,
             metadata: None,
             open_delimited_block_lines: vec![],
@@ -859,6 +863,7 @@ impl Parser {
         }
 
         self.add_inlines_to_block_stack()?;
+        self.drop_admonition_above_list();
         // preserve newlines for now
         self.preserve_newline_text = true;
         // a term directly after a term is another term for the same description
@@ -976,6 +981,7 @@ impl Parser {
         // the previous item's text (or the paragraph attached to it), or whatever came before the
         // list (e.g., a section title), is complete
         self.add_inlines_to_block_stack()?;
+        self.drop_admonition_above_list();
         if let Some(scope) = self.lists.active(depth) {
             if let Some(item) = scope.add_item(&key, item)? {
                 let list = Block::List(self.new_list(&token, marker, asg)?);
@@ -1181,6 +1187,13 @@ impl Parser {
         Ok(())
     }
 
+    /// `[NOTE]` directly above a list has no paragraph to hold (its paragraph, if any, has just
+    /// been completed), so it is dropped; Asciidoctor makes it a role on the list, and we don't
+    /// support roles in that shorthand form (see LIMITATIONS)
+    fn drop_admonition_above_list(&mut self) {
+        self.pending_admonition = None;
+    }
+
     /// An admonition with nothing after it (`NOTE:` then a blank line) is empty
     fn add_empty_admonition(&mut self, asg: &mut Asg) -> Result<(), ParserError> {
         match self.pending_admonition.take() {
@@ -1191,11 +1204,29 @@ impl Parser {
         }
     }
 
-    /// `[NOTE]` above a delimited block: the admonition holds the block
+    /// `[NOTE]` above a delimited block: the admonition holds the block, once it is complete (see
+    /// `wrap_in_admonition`). It stays off the block stack, so that a list item the block is
+    /// attached to is still the open one when the block closes.
     fn open_pending_admonition(&mut self) {
         if let Some(admonition) = self.pending_admonition.take() {
-            self.block_stack.push(Block::ParentBlock(admonition));
-            self.close_parent_after_push = true;
+            self.admonitions_around_blocks
+                .push((self.block_stack.len(), admonition));
+        }
+    }
+
+    /// A delimited block that is complete goes into the admonition opened with it, if any (its
+    /// depth is the block stack's once the block is off it)
+    fn wrap_in_admonition(&mut self, block: Block) -> Result<Block, ParserError> {
+        match self.admonitions_around_blocks.last() {
+            Some((depth, _)) if *depth == self.block_stack.len() => {
+                let Some((_, admonition)) = self.admonitions_around_blocks.pop() else {
+                    return Ok(block);
+                };
+                let mut admonition = Block::ParentBlock(admonition);
+                admonition.push_block(block)?;
+                Ok(admonition)
+            }
+            _ => Ok(block),
         }
     }
 
@@ -1412,6 +1443,10 @@ impl Parser {
                 .get(self.block_stack.len())
                 .is_some_and(|scope| scope.principal_open)
         {
+            // nor does the text start with the newline before it
+            if self.inline_stack.is_empty() {
+                self.dangling_newline = None;
+            }
             let text = token.text();
             let indent = text.len() - text.trim_start().len();
             if indent == text.len() {
@@ -1635,10 +1670,18 @@ impl Parser {
                     // case my vague memory of multi-line cells is correct
                     inline_token.update_token_loc_offsets_by(cell_line, cell_col);
                     // the cell is scanned as if it started a line, but list markup is only
-                    // parsed in AsciiDoc ("a|") cells, which we don't support, so `| 1. b` is text
+                    // parsed in AsciiDoc ("a|") cells, which we don't support, so `| 1. b` is text,
+                    // and so are description list markers and admonition labels
                     if matches!(
                         inline_token.token_type(),
-                        TokenType::UnorderedListItem | TokenType::OrderedListItem
+                        TokenType::UnorderedListItem
+                            | TokenType::OrderedListItem
+                            | TokenType::DescriptionListMarker
+                            | TokenType::NotePara
+                            | TokenType::TipPara
+                            | TokenType::ImportantPara
+                            | TokenType::CautionPara
+                            | TokenType::WarningPara
                     ) {
                         inline_token.token_type = TokenType::Text;
                         inline_token.literal = Some(inline_token.lexeme.clone());
@@ -1683,6 +1726,7 @@ impl Parser {
     /// Puts a block that has just closed (a delimited block) where it belongs: in the current
     /// list item if a `+` attached it, otherwise where `push_block_to_stack` puts it
     fn complete_block(&mut self, block: Block) -> Result<(), ParserError> {
+        let block = self.wrap_in_admonition(block)?;
         match self.attach_to_list_item(block)? {
             Some(block) => self.push_block_to_stack(block),
             None => Ok(()),
@@ -1998,6 +2042,7 @@ impl Parser {
         // lists inside the block are complete before the block is
         self.close_lists(asg)?;
         if let Some(last_block) = self.block_stack.pop() {
+            let last_block = self.wrap_in_admonition(last_block)?;
             let Some(last_block) = self.attach_to_list_item(last_block)? else {
                 return Ok(());
             };
@@ -2022,6 +2067,7 @@ impl Parser {
                 block.add_metadata(self.metadata.as_ref().unwrap().clone())?;
                 self.metadata = None;
             }
+            let block = self.wrap_in_admonition(block)?;
             let Some(block) = self.attach_to_list_item(block)? else {
                 return Ok(());
             };
