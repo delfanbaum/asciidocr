@@ -545,6 +545,16 @@ impl Parser {
         if let Some(header) = &mut self.document_header
             && !header.is_empty()
         {
+            // without an author line, `:author:` (and `:email:`) entries name the author
+            if header.authors.is_none()
+                && let Some(author) = self.document_attributes.get("author")
+            {
+                let line = match self.document_attributes.get("email") {
+                    Some(email) => format!("{author} <{email}>"),
+                    None => author.clone(),
+                };
+                header.authors = Some(Author::from_line(&line));
+            }
             header.consolidate();
             asg.add_header(header.clone(), self.document_attributes.clone());
             implied_attributes = header.implied_attributes();
