@@ -63,7 +63,8 @@ Decisions:
   without leading whitespace. Lettered (`a.`, `A.`) and roman (`i)`, `I)`)
   markers came later in 0.3, numbered like the dot markers (`a.` like `..`).
 * Description lists join the same context, so lists can attach to their items.
-  Nested description lists (`;;`, `:::`) are optional.
+  Nested description lists (`;;`, `:::`, `::::`) came later in 0.3: each
+  marker is its own list, nested by marker like other lists.
 * `List.marker` in the ASG holds the marker as written (`+**+`, `..`, `-`).
 
 Order of work (each step its own commit or PR):
@@ -190,10 +191,12 @@ API audit below.
   inlines in the ASG
 * [ ] A single-column table with one cell per line (`|===`, `|a`, `|b`,
   `|===`) fails with "Error creating table"
-* [ ] A description list term ending its line (`Term::` with the description
+* [x] A description list term ending its line (`Term::` with the description
   on the next line) doesn't count that newline, so every later location in the
   document is a line too early. The indentation of that next line is also
   kept, where Asciidoctor strips it as it does for other lines of an item's text
+* [ ] `C++` in prose (`C++ uses a::b`) comes out as "C``"; Asciidoctor leaves
+  it as written
 * [ ] A listing's text in the ASG starts with the newline after the opening
   delimiter (`"\ncode\n"`); check against the ASG schema
 

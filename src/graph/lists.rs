@@ -227,11 +227,12 @@ impl PartialEq for DList {
 }
 
 impl DList {
-    pub fn new(location: Vec<Location>) -> Self {
+    /// Creates an empty description list; the marker is its first item's (`::`, `;;`, ...)
+    pub fn new(marker: String, location: Vec<Location>) -> Self {
         DList {
             name: "dlist".to_string(),
             node_type: NodeTypes::Block,
-            marker: "::".to_string(),
+            marker: marker.trim().to_string(),
             items: vec![],
             title: vec![],
             metadata: None,
@@ -273,7 +274,7 @@ impl DListItem {
         DListItem {
             name: "dlistItem".to_string(),
             node_type: NodeTypes::Block,
-            marker: "::".to_string(),
+            marker: token.lexeme.trim().to_string(),
             terms: vec![],
             principal: vec![],
             blocks: vec![],

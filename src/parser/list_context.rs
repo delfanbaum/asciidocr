@@ -100,13 +100,15 @@ impl ListScope {
 
     /// Adds a term to the current item, if it is a description list item with no description
     /// yet: like Asciidoctor, `A::` directly followed by `B:: b` (even after a blank line) is one
-    /// item with two terms. Otherwise the term is handed back, to start an item.
-    pub fn add_term(&mut self, term: Vec<Inline>) -> Option<Vec<Inline>> {
+    /// item with two terms (but `A::` then `B;; b` is a nested list). Otherwise the term is handed
+    /// back, to start an item.
+    pub fn add_term(&mut self, key: &str, term: Vec<Inline>) -> Option<Vec<Inline>> {
         match self.lists.last_mut() {
             Some(OpenList {
+                key: open_key,
                 item: Block::DListItem(item),
                 ..
-            }) if item.principal.is_empty() && item.blocks.is_empty() => {
+            }) if open_key == key && item.principal.is_empty() && item.blocks.is_empty() => {
                 item.add_term(term);
                 self.start_item();
                 None
@@ -221,10 +223,6 @@ impl ListContext {
         Ok(closed)
     }
 }
-
-/// The key of description lists. Only `::` is recognized for now, so they don't nest in each
-/// other (`;;` and `:::` would)
-pub(super) const DLIST_KEY: &str = "::";
 
 /// What a list item's marker must share with the list's other items. Numbered items (`1.`,
 /// `2.`), lettered ones (`a.`, `b.`), roman ones (`i)`, `ii)`) and callouts (`<1>`, `<2>`) belong

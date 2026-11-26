@@ -87,7 +87,6 @@ stylesheet. Known gaps:
 * Icons
 * Syntax highlighting for source blocks
 * Automatic Tables of Contents
-* Deeply nested description lists (in the meantime: just use an open block)
 * Discrete Headings
 
 == Language Features Not Currently Planned for Inclusion

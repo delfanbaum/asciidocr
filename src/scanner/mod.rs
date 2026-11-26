@@ -267,9 +267,19 @@ impl<'a> Scanner<'a> {
                         self.current += 1
                     }
                     self.add_token(TokenType::Attribute, false, 0)
-                } else if self.peek_back() != ' ' && [": ", ":\n"].contains(&self.peeks_ahead(2)) {
-                    self.current += 2;
-                    self.add_token(TokenType::DescriptionListMarker, false, 0)
+                } else if self.peek_back() != ' '
+                    && let Some(token) = self.description_list_marker(b':', 4)
+                {
+                    token
+                } else {
+                    self.add_text_until_next_markup()
+                }
+            }
+            ';' => {
+                if self.peek_back() != ' '
+                    && let Some(token) = self.description_list_marker(b';', 2)
+                {
+                    token
                 } else {
                     self.add_text_until_next_markup()
                 }
@@ -700,13 +710,41 @@ impl<'a> Scanner<'a> {
         self.add_token(TokenType::BlockAnchor, true, 0)
     }
 
+    /// A description list marker at the start of the token: a run of two to four colons, or of
+    /// two semicolons, followed by a space, a newline or the end of the file. Like Asciidoctor, a
+    /// longer run ends with the marker, and the colons (or semicolons) before it are the end of
+    /// the term, so they are text.
+    fn description_list_marker(
+        &mut self,
+        mark: u8,
+        max_len: usize,
+    ) -> Option<Result<Token, ScannerError>> {
+        let bytes = self.source.as_bytes();
+        let run = bytes[self.start..]
+            .iter()
+            .take_while(|b| **b == mark)
+            .count();
+        let after = bytes.get(self.start + run);
+        if run < 2 || !matches!(after, None | Some(b' ') | Some(b'\n')) {
+            return None;
+        }
+        if run > max_len {
+            self.current = self.start + run - max_len;
+            return Some(self.add_token(TokenType::Text, true, 0));
+        }
+        // the space after the marker is part of it, but a newline is its own token, so that the
+        // line is counted
+        self.current = self.start + run + usize::from(after == Some(&b' '));
+        Some(self.add_token(TokenType::DescriptionListMarker, false, 0))
+    }
+
     fn add_text_until_next_markup(&mut self) -> Result<Token, ScannerError> {
         // "inline" chars that could be markup; the newline condition prevents
         // capturing significant block markup chars
         // Chars: newline, bold, italic, code, super, subscript, footnote, pass, link, end inline macro, definition list marker, highlighted, inline admonition initial chars, inline images
         while ![
             '\n', '*', '_', '`', '^', '~', 'f', 'p', 'h', ']', '[', ':', '#', 'N', 'T', 'I', 'C',
-            'W', '&', '{', '+', 'i', '<', '\'', '\"', '-', 't', 'e',
+            'W', '&', '{', '+', 'i', '<', '\'', '\"', '-', 't', 'e', ';',
         ]
         .contains(&self.peek())
             && !self.is_at_end()

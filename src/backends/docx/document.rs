@@ -308,11 +308,22 @@ impl DocxWriter {
 
     fn add_dlist_item(&mut self, docx: &mut Docx, item: &DListItem) -> Result<(), DocxRenderError> {
         Self::update(docx, |mut d| {
+            // a nested description list (or one in a list item) is indented a level further
+            let depth = self.list_level();
+            let indent = |para: Paragraph, left: i32| match depth {
+                0 => para,
+                _ => para.indent(
+                    Some(left),
+                    Some(SpecialIndentType::FirstLine(0)),
+                    None,
+                    None,
+                ),
+            };
             // add terms, each in its own paragraph
             d = self.set_style(d, DocumentStyles::DefinitionTerm)?;
             for term in item.terms() {
                 let terms_para = self.add_inlines_to_para(Paragraph::new(), term);
-                d = self.add_paragraph(d, terms_para)?;
+                d = self.add_paragraph(d, indent(terms_para, level_indent(depth) - 720))?;
             }
 
             // add principal and anything else
@@ -320,7 +331,10 @@ impl DocxWriter {
             if item.principal.is_empty() {
                 return Ok(d);
             }
-            let mut para = Paragraph::new().style(&self.current_style.style_id());
+            let mut para = indent(
+                Paragraph::new().style(&self.current_style.style_id()),
+                level_indent(depth),
+            );
             para = self.add_inlines_to_para(para, item.principal());
             self.add_paragraph(d, para)
         })?;
@@ -328,7 +342,7 @@ impl DocxWriter {
         // add any children -- TODO style them as list continues
         for block in item.blocks.iter() {
             // a list in a definition is indented past the definition's text
-            if let Block::List(_) = block {
+            if let Block::List(_) | Block::DList(_) = block {
                 self.list_depth += 1;
                 self.write_block(docx, block)?;
                 self.list_depth -= 1;

@@ -330,6 +330,8 @@ impl TokenType {
             self,
             TokenType::ElementAttributes
                 | TokenType::BlockAnchor
+                // a term that ends its line: the description starts on the next
+                | TokenType::DescriptionListMarker
                 | TokenType::SidebarBlock
                 | TokenType::OpenBlock
                 | TokenType::QuoteVerseBlock

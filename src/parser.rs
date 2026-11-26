@@ -28,7 +28,7 @@ use crate::{
 };
 
 mod list_context;
-use list_context::{DLIST_KEY, ListContext, marker_key};
+use list_context::{ListContext, marker_key};
 
 /// Parses a stream of tokens into an [`Asg`] (Abstract Syntax Graph), returning the graph once all
 /// tokens have been parsed.
@@ -848,6 +848,8 @@ impl Parser {
         self.dangling_newline = None;
         // ensure we're not forcing a new block, given that all sorts of things can follow
         self.force_new_block = false;
+        // each marker (`::`, `:::`, `::::`, `;;`) is its own list, as with other lists
+        let key = token.lexeme.trim().to_string();
         let mut term = Vec::from(self.take_current_line_inlines());
         // like Asciidoctor, the term's indentation is not part of it
         if let Some(Inline::InlineLiteral(first)) = term.first_mut()
@@ -861,7 +863,7 @@ impl Parser {
         self.preserve_newline_text = true;
         // a term directly after a term is another term for the same description
         let term = match self.lists.active(depth) {
-            Some(scope) => match scope.add_term(term) {
+            Some(scope) => match scope.add_term(&key, term) {
                 Some(term) => term,
                 None => return Ok(()),
             },
@@ -871,11 +873,10 @@ impl Parser {
         dlist_item.add_term(term);
         let locations = dlist_item.locations();
         let item = Block::DListItem(dlist_item);
-        let key = DLIST_KEY.to_string();
 
         if let Some(scope) = self.lists.active(depth) {
             if let Some(item) = scope.add_item(&key, item)? {
-                let dlist = self.new_dlist(locations);
+                let dlist = self.new_dlist(key.clone(), locations);
                 if let Some(scope) = self.lists.active(depth) {
                     scope.nest(key, dlist, item);
                 }
@@ -884,7 +885,7 @@ impl Parser {
         }
 
         self.emit_completed_block(asg)?;
-        let dlist = self.new_dlist(locations);
+        let dlist = self.new_dlist(key.clone(), locations);
         self.lists
             .start_list(self.block_stack.len(), key, dlist, item);
         Ok(())
@@ -892,8 +893,8 @@ impl Parser {
 
     /// Makes a description list, which takes the block title and metadata that are waiting for
     /// a block
-    fn new_dlist(&mut self, locations: Vec<Location>) -> Block {
-        let mut dlist = DList::new(locations);
+    fn new_dlist(&mut self, marker: String, locations: Vec<Location>) -> Block {
+        let mut dlist = DList::new(marker, locations);
         if let Some(title) = self.block_title.take() {
             dlist.title = title;
         }
@@ -1402,9 +1403,10 @@ impl Parser {
     }
 
     fn parse_text(&mut self, mut token: Token) -> Result<(), ParserError> {
-        // like Asciidoctor, the indentation of a list item's lazy lines is not part of its text
-        // (a paragraph's, or an attached paragraph's, is)
-        if self.dangling_newline.is_some()
+        // like Asciidoctor, the indentation of a list item's lines is not part of its text (a
+        // paragraph's, or an attached paragraph's, is): its lazy lines, or the line after a term
+        // that ends its line
+        if (self.dangling_newline.is_some() || self.inline_stack.is_empty())
             && self
                 .lists
                 .get(self.block_stack.len())
@@ -1412,6 +1414,10 @@ impl Parser {
         {
             let text = token.text();
             let indent = text.len() - text.trim_start().len();
+            if indent == text.len() {
+                // nothing but indentation; the line's text is in the tokens that follow
+                return Ok(());
+            }
             if indent > 0 {
                 token.literal = Some(text[indent..].to_string());
                 token.startcol += indent;
