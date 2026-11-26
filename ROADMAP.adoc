@@ -220,16 +220,15 @@ removed (with the helpers only it used, `InlineError`, and the never-created
 
 === Cross references and section IDs (M)
 
-* [ ] *Decide* where section IDs are generated: in the parser and ASG (changes
-  the JSON/TCK output, but HTMLBook, xrefs and DOCX all get them for free) or
-  per backend (what the Asciidoctor-style backend does now). The ASG is the
-  likelier answer, since an xref to a generated ID can only show the section
-  title if the parser knows the ID
-* [ ] Xrefs to generated IDs show the section title (not `[_first_section]`) and
+* [x] *Decided*: section IDs are generated in the parser (`crate::graph::ids`),
+  as the processor step the spec describes, and kept out of the JSON/TCK output,
+  whose expected ASG has no ID for a section without an explicit one. The
+  backends get them from the parser (`Block::section_id`)
+* [x] Xrefs to generated IDs show the section title (not `[_first_section]`) and
   no longer log a warning
 * [ ] Custom xref text: `+<<id,custom text>>+`
-* [ ] The `idprefix` and `idseparator` attributes, if the IDs move into the
-  parser
+* [x] The `idprefix`, `idseparator` and `sectids` attributes (with the value
+  they have at the end of the document)
 
 === Quality and housekeeping (S)
 
