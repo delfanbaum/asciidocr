@@ -1,3 +1,5 @@
+pub mod html;
+
 use std::env;
 use std::{fs, path::PathBuf};
 

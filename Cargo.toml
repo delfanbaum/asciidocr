@@ -34,6 +34,8 @@ rstest = "0.29.0"
 tempfile = "3.14.0"
 zip = { version = "9.0.5", default-features = false, features = ["deflate"] }
 roxmltree = "0.21.2"
+scraper = "0.29"
+pretty_assertions = "1.4"
 
 [features]
 docx = ["dep:docx-rs"]
