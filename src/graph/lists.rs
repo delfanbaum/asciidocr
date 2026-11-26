@@ -49,6 +49,11 @@ impl List {
     pub fn add_item(&mut self, item: Block) {
         self.items.push(item)
     }
+
+    /// The marker of the list's first item, as written (`*`, `..`, `1.`, ...)
+    pub fn marker(&self) -> &str {
+        &self.marker
+    }
 }
 
 #[derive(Serialize, PartialEq, Eq, Clone, Debug)]

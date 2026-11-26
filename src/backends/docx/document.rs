@@ -2,8 +2,8 @@ use std::{fs::File, io::Read};
 
 use docx_rs::{
     AlignmentType, BreakType, Docx, Header, IndentLevel, LineSpacing, Numbering, NumberingId,
-    PageMargin, PageNum, Paragraph, Pic, Run, RunFonts, Style, Table, TableCell, TableRow,
-    VertAlignType,
+    PageMargin, PageNum, Paragraph, Pic, Run, RunFonts, SpecialIndentType, Style, Table, TableCell,
+    TableRow, VertAlignType,
 };
 use log::warn;
 use once_cell::sync::Lazy;
@@ -18,7 +18,7 @@ use crate::graph::{
     lists::{DListItem, List, ListItem, ListVariant},
 };
 
-use super::numbering::add_bullet_abstract_numbering;
+use super::numbering::{bullet_abstract_numbering, level_indent, ordered_abstract_numbering};
 use super::styles::DocumentStyles;
 use super::units::{DXA_INCH, inches};
 
@@ -67,8 +67,14 @@ pub enum DocxRenderError {
 pub struct DocxWriter {
     page_break_before: bool,
     line_break_before: bool,
-    abstract_numbering: usize,
+    /// the id for the next numbering definition (docx-rs writes a default one with id 1)
+    next_numbering_id: usize,
+    /// the definition all bulleted lists share, once there is one
+    bullet_numbering: Option<usize>,
+    /// the numbering of the list being written
     numbering: usize,
+    /// how deeply the list being written is nested (0 at the top level)
+    list_depth: usize,
     current_style: DocumentStyles,
 }
 
@@ -83,8 +89,10 @@ impl DocxWriter {
         DocxWriter {
             page_break_before: false,
             line_break_before: false,
-            abstract_numbering: 0,
+            next_numbering_id: 2,
+            bullet_numbering: None,
             numbering: 0,
+            list_depth: 0,
             current_style: DocumentStyles::Normal,
         }
     }
@@ -109,7 +117,9 @@ impl DocxWriter {
         match block {
             Block::Section(section) => docx = self.add_section(docx, section)?,
             Block::List(list) => docx = self.add_list(docx, list)?,
-            Block::ListItem(item) => docx = self.add_list_item(docx, item)?,
+            Block::ListItem(item) => {
+                docx = self.add_list_item(docx, item, DocumentStyles::ListParagraph)?
+            }
             Block::DList(list) => {
                 for item in list.items.iter() {
                     docx = self.add_block_to_doc(docx, item)?
@@ -169,60 +179,96 @@ impl DocxWriter {
         Ok(docx)
     }
 
+    /// Each list gets its own numbering, so that an ordered list starts at 1, and its items are
+    /// numbered at the list's depth
     fn add_list(&mut self, mut docx: Docx, list: &List) -> Result<Docx, DocxRenderError> {
-        self.numbering += 1;
-        match list.variant {
+        let numbering = self.next_numbering_id;
+        self.next_numbering_id += 1;
+        let abstract_numbering = match list.variant {
             ListVariant::Ordered | ListVariant::Callout => {
-                docx = self.set_style(docx, DocumentStyles::OrderedListParagraph(self.numbering))?
+                docx = docx
+                    .add_abstract_numbering(ordered_abstract_numbering(numbering, list.marker()));
+                numbering
             }
-            ListVariant::Unordered => {
-                docx = self.set_style(docx, DocumentStyles::ListParagraph)?;
-                if self.abstract_numbering == 0 {
-                    // really only do this once
-                    self.abstract_numbering += 1;
-                    docx = docx
-                        .add_abstract_numbering(add_bullet_abstract_numbering(
-                            self.abstract_numbering,
-                        ))
-                        .add_numbering(Numbering::new(self.numbering, self.abstract_numbering))
+            ListVariant::Unordered => match self.bullet_numbering {
+                Some(id) => id,
+                None => {
+                    docx = docx.add_abstract_numbering(bullet_abstract_numbering(numbering));
+                    self.bullet_numbering = Some(numbering);
+                    numbering
                 }
+            },
+        };
+        docx = docx.add_numbering(Numbering::new(numbering, abstract_numbering));
+
+        // a nested list is written in the middle of its parent's items
+        let parent_numbering = std::mem::replace(&mut self.numbering, numbering);
+        for item in list.items.iter() {
+            docx = match (item, &list.variant) {
+                (Block::ListItem(item), ListVariant::Unordered) => {
+                    self.add_list_item(docx, item, DocumentStyles::ListParagraph)?
+                }
+                (Block::ListItem(item), _) => {
+                    self.add_list_item(docx, item, DocumentStyles::OrderedListParagraph(numbering))?
+                }
+                _ => self.add_block_to_doc(docx, item)?,
             }
         }
-        for item in list.items.iter() {
-            docx = self.add_block_to_doc(docx, item)?
-        }
+        self.numbering = parent_numbering;
+        self.reset_style();
         Ok(docx)
     }
 
-    fn add_list_item(&mut self, mut docx: Docx, item: &ListItem) -> Result<Docx, DocxRenderError> {
-        // add principal with the correct variant match
-        let mut para = Paragraph::new();
-
-        para = para
-            .style(&self.current_style.style_id())
-            .numbering(NumberingId::new(self.numbering), IndentLevel::new(0));
+    fn add_list_item(
+        &mut self,
+        mut docx: Docx,
+        item: &ListItem,
+        style: DocumentStyles,
+    ) -> Result<Docx, DocxRenderError> {
+        // the style is set for each item, since the blocks of the item before may have changed it
+        docx = self.set_style(docx, style)?;
+        let mut para = Paragraph::new().numbering(
+            NumberingId::new(self.numbering),
+            IndentLevel::new(self.list_depth),
+        );
         para = self.add_inlines_to_para(para, item.principal());
         docx = self.add_paragraph(docx, para)?;
-        // add any children -- TODO style them as list continues
-        if !item.blocks.is_empty() {
-            docx = self.set_style(docx, DocumentStyles::ListParagraphContinue)?;
-            for block in item.blocks.iter() {
-                docx = self.add_block_to_list_item(docx, block)?
-            }
-            self.reset_style();
+        for block in item.blocks.iter() {
+            docx = self.add_block_to_list_item(docx, block)?
         }
         Ok(docx)
     }
 
-    /// For now, simply add any child inlines as such to a list continuation paragraph
+    /// Writes a block attached to a list item: a list nests one level deeper, and anything else
+    /// (for now) becomes paragraphs of its text, indented to the item's text
     fn add_block_to_list_item(
         &mut self,
         mut docx: Docx,
         block: &Block,
     ) -> Result<Docx, DocxRenderError> {
-        let mut para = Paragraph::new().style(&self.current_style.style_id());
-        para = self.add_inlines_to_para(para, block.inlines());
-        docx = self.add_paragraph(docx, para)?;
+        match block {
+            Block::List(_) | Block::DList(_) => {
+                self.list_depth += 1;
+                docx = self.add_block_to_doc(docx, block)?;
+                self.list_depth -= 1;
+            }
+            Block::ParentBlock(parent) if parent.name != ParentBlockName::Table => {
+                for child in parent.blocks.iter() {
+                    docx = self.add_block_to_list_item(docx, child)?
+                }
+            }
+            _ => {
+                docx = self.set_style(docx, DocumentStyles::ListParagraphContinue)?;
+                let mut para = Paragraph::new().indent(
+                    Some(level_indent(self.list_depth)),
+                    Some(SpecialIndentType::FirstLine(0)),
+                    None,
+                    None,
+                );
+                para = self.add_inlines_to_para(para, block.inlines());
+                docx = self.add_paragraph(docx, para)?;
+            }
+        }
         Ok(docx)
     }
 
@@ -244,8 +290,13 @@ impl DocxWriter {
         docx = self.add_paragraph(docx, para)?;
 
         // add any children -- TODO style them as list continues
-        if !item.blocks.is_empty() {
-            for block in item.blocks.iter() {
+        for block in item.blocks.iter() {
+            // a list in a definition is indented past the definition's text
+            if let Block::List(_) = block {
+                self.list_depth += 1;
+                docx = self.add_block_to_doc(docx, block)?;
+                self.list_depth -= 1;
+            } else {
                 docx = self.add_block_to_doc(docx, block)?
             }
         }

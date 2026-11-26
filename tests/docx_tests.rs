@@ -118,4 +118,145 @@ mod docx_tests {
         ids.dedup();
         assert_eq!(total, ids.len(), "duplicate styleIds in styles.xml");
     }
+
+    /// A paragraph of the document: its style, text, and list numbering (id and level)
+    #[derive(Debug, PartialEq)]
+    struct DocxParagraph {
+        style: Option<String>,
+        text: String,
+        numbering: Option<(String, String)>,
+    }
+
+    fn val(node: roxmltree::Node, tag: &str) -> Option<String> {
+        node.descendants()
+            .find(|n| n.is_element() && n.tag_name().name() == tag)
+            .and_then(|n| n.attributes().find(|a| a.name() == "val"))
+            .map(|a| a.value().to_string())
+    }
+
+    fn docx_paragraphs(adoc: &str) -> Vec<DocxParagraph> {
+        let document = rendered_docx_part(adoc, "word/document.xml");
+        let doc = roxmltree::Document::parse(&document).unwrap();
+        doc.descendants()
+            .filter(|n| n.is_element() && n.tag_name().name() == "p")
+            .map(|p| DocxParagraph {
+                style: val(p, "pStyle"),
+                text: p
+                    .descendants()
+                    .filter(|n| n.is_element() && n.tag_name().name() == "t")
+                    .filter_map(|n| n.text())
+                    .collect(),
+                numbering: val(p, "numId").zip(val(p, "ilvl")),
+            })
+            .filter(|p| !p.text.is_empty())
+            .collect()
+    }
+
+    /// The number format of a numbering's level, from numbering.xml
+    fn number_format(adoc: &str, num_id: &str, level: &str) -> Option<String> {
+        let numbering = rendered_docx_part(adoc, "word/numbering.xml");
+        let doc = roxmltree::Document::parse(&numbering).unwrap();
+        let attr = |n: roxmltree::Node, name: &str| {
+            n.attributes()
+                .find(|a| a.name() == name)
+                .map(|a| a.value().to_string())
+        };
+        let num = doc.descendants().find(|n| {
+            n.is_element()
+                && n.tag_name().name() == "num"
+                && attr(*n, "numId").as_deref() == Some(num_id)
+        })?;
+        let abstract_id = val(num, "abstractNumId")?;
+        let abstract_num = doc.descendants().find(|n| {
+            n.is_element()
+                && n.tag_name().name() == "abstractNum"
+                && attr(*n, "abstractNumId") == Some(abstract_id.clone())
+        })?;
+        let lvl = abstract_num.children().find(|n| {
+            n.is_element()
+                && n.tag_name().name() == "lvl"
+                && attr(*n, "ilvl").as_deref() == Some(level)
+        })?;
+        val(lvl, "numFmt")
+    }
+
+    fn numbering_of(paragraphs: &[DocxParagraph], text: &str) -> (String, String) {
+        paragraphs
+            .iter()
+            .find(|p| p.text == text)
+            .and_then(|p| p.numbering.clone())
+            .unwrap_or_else(|| panic!("\"{text}\" is not numbered: {paragraphs:?}"))
+    }
+
+    /// A nested list's items are numbered at its depth, and the outer list goes on after it
+    #[test]
+    fn nested_lists_are_numbered_at_their_depth() {
+        let paragraphs = docx_paragraphs("* a\n** b\n*** c\n* d\n");
+        let (a_id, a_level) = numbering_of(&paragraphs, "a");
+        let (b_id, b_level) = numbering_of(&paragraphs, "b");
+        let (_, c_level) = numbering_of(&paragraphs, "c");
+        assert_eq!(
+            (a_level.as_str(), b_level.as_str(), c_level.as_str()),
+            ("0", "1", "2")
+        );
+        assert_ne!(a_id, b_id);
+        assert_eq!(numbering_of(&paragraphs, "d"), (a_id, a_level));
+        assert_eq!(
+            number_format("* a\n** b\n", &b_id, "1").as_deref(),
+            Some("bullet")
+        );
+    }
+
+    /// Every list has its own numbering, so ordered lists start at 1 (docx-rs defines a
+    /// numbering of its own with id 1, so ours must not use it)
+    #[test]
+    fn every_list_has_its_own_numbering() {
+        let adoc = ". one\n. two\n\n//-\n\n. again\n\n//-\n\n* x\n\n//-\n\n* y\n";
+        let paragraphs = docx_paragraphs(adoc);
+        let ids: Vec<String> = ["one", "two", "again", "x", "y"]
+            .iter()
+            .map(|text| numbering_of(&paragraphs, text).0)
+            .collect();
+        assert_eq!(ids[0], ids[1]);
+        assert_ne!(ids[1], ids[2]);
+        assert!(!ids.contains(&"1".to_string()), "{ids:?}");
+        assert_eq!(
+            number_format(adoc, &ids[2], "0").as_deref(),
+            Some("decimal")
+        );
+        assert_eq!(number_format(adoc, &ids[3], "0").as_deref(), Some("bullet"));
+        assert_eq!(number_format(adoc, &ids[4], "0").as_deref(), Some("bullet"));
+    }
+
+    /// Like Asciidoctor, ordered lists are numbered by marker (`..` is lower alpha), not depth
+    #[rstest]
+    #[case::dot(". a\n", "a", "0", "decimal")]
+    #[case::double_dot_nested(". a\n.. b\n", "b", "1", "lowerLetter")]
+    #[case::triple_dot("... a\n", "a", "0", "lowerRoman")]
+    #[case::numbered_nested("* a\n1. b\n", "b", "1", "decimal")]
+    fn ordered_numbering_follows_the_marker(
+        #[case] adoc: &str,
+        #[case] text: &str,
+        #[case] level: &str,
+        #[case] format: &str,
+    ) {
+        let (id, item_level) = numbering_of(&docx_paragraphs(adoc), text);
+        assert_eq!(item_level, level);
+        assert_eq!(number_format(adoc, &id, level).as_deref(), Some(format));
+    }
+
+    /// Blocks attached to an item are indented paragraphs, and the next item is still an item
+    #[test]
+    fn items_after_attached_blocks_stay_in_the_list() {
+        let paragraphs = docx_paragraphs("* a\n+\nmore\n+\n--\nopen\n--\n* b\n");
+        let texts: Vec<&str> = paragraphs.iter().map(|p| p.text.as_str()).collect();
+        assert_eq!(texts, ["a", "more", "open", "b"]);
+        assert_eq!(paragraphs[1].numbering, None);
+        assert_eq!(
+            paragraphs[1].style.as_deref(),
+            Some("ListParagraphContinue")
+        );
+        assert_eq!(paragraphs[3].style.as_deref(), Some("ListParagraph"));
+        assert_eq!(paragraphs[3].numbering, paragraphs[0].numbering);
+    }
 }
