@@ -200,9 +200,6 @@ API audit below.
 * [x] A bare URL stopped at `-`, `_`, `%`, `~` or `;` (`http://x.com/my-page`
   linked to `http://x.com/my`), and a URL with a non-ASCII character stopped the
   conversion with a panic
-* [ ] *Decide* whether a description list marker after a space is a marker:
-  Asciidoctor makes `Term :: def` (and `Term ;; def`) a description list, while
-  we keep it as text (`description_list_mark_not_if_space_before`)
 * [ ] A one-row table (`|===`, `|a |b`, `|===`) makes that row a header;
   Asciidoctor only makes the first row a header when a blank line follows it
 * [ ] `[TIP]` (or another admonition label) above a listing or literal block
@@ -342,6 +339,9 @@ track.
 * [ ] `[source]` without a language: the ASG needs to keep the style, so the
   Asciidoctor-style backend can emit `<pre class="highlight"><code>`
 * [ ] Checklists (`+* [x]+`, `+* [ ]+`)
+* [ ] Description list markers after a space: Asciidoctor makes `Term :: def`
+  (and `Term ;; def`) a description list, while we keep it as text (see
+  `description_list_mark_not_if_space_before`)
 * [ ] Discrete headings (`[discrete]`)
 * [ ] The hardbreaks option (`[%hardbreaks]`, `:hardbreaks-option:`), for our
   poet friends who don't want to wrap everything in `[verse]`
