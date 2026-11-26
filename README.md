@@ -197,7 +197,7 @@ tools in Rust now, too. Here are at least a few I know about:
 Things that _should_ work, but are currently acting up:
 
 * A footnote in a list item, if an earlier footnote exists in the document
-* `+++inline passthroughs+++` (the `pass:[]` form works)
+* `+++inline passthroughs+++` (the `pass:[]` form works); deferred to 0.5
 
 See `LIMITATIONS.adoc` for more.
 
