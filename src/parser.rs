@@ -256,12 +256,24 @@ impl Parser {
         }
 
         let token = self.as_text_if_it_cannot_interrupt(token);
-        // like Asciidoctor, an attribute or anchor line ends a paragraph (and a list item's text,
-        // below); the attributes belong to the block after it
+        // like Asciidoctor, an attribute or anchor line, or a delimiter, ends a paragraph (and a
+        // list item's text, below); the attributes belong to the block after it. (Not inside a
+        // verbatim block, whose text is pending until its closing delimiter)
         if matches!(
             token.token_type(),
-            TokenType::BlockAnchor | TokenType::ElementAttributes
-        ) && self.lists.get(self.block_stack.len()).is_none()
+            TokenType::BlockAnchor
+                | TokenType::ElementAttributes
+                | TokenType::SidebarBlock
+                | TokenType::OpenBlock
+                | TokenType::ExampleBlock
+                | TokenType::QuoteVerseBlock
+                | TokenType::PassthroughBlock
+                | TokenType::LiteralBlock
+                | TokenType::SourceBlock
+                | TokenType::CommentBlock
+                | TokenType::Table
+        ) && self.open_parse_after_as_text_type.is_none()
+            && self.lists.get(self.block_stack.len()).is_none()
             && self.in_paragraph()
         {
             self.add_inlines_to_block_stack()?;
@@ -355,7 +367,7 @@ impl Parser {
             TokenType::SidebarBlock
             | TokenType::OpenBlock
             | TokenType::ExampleBlock
-            | TokenType::Table => self.parse_delimited_parent_block(token),
+            | TokenType::Table => self.parse_delimited_parent_block(token, asg),
 
             // table cells -- note that we just create the cells; up to the backend/template to handle the
             // column-making (for now, so we can just reuse ParentBlock)
@@ -365,23 +377,23 @@ impl Parser {
                 // check if it's verse
                 if let Some(metadata) = &self.metadata {
                     if metadata.declared_type == Some(AttributeType::Verse) {
-                        self.parse_delimited_leaf_block(token)?;
+                        self.parse_delimited_leaf_block(token, asg)?;
                         return Ok(());
                     }
                 } else if self.open_parse_after_as_text_type.is_some() {
-                    self.parse_delimited_leaf_block(token)?;
+                    self.parse_delimited_leaf_block(token, asg)?;
                     return Ok(());
                 }
 
-                self.parse_delimited_parent_block(token)?;
+                self.parse_delimited_parent_block(token, asg)?;
                 Ok(())
             }
 
             // the following should probably be consumed into the above
             TokenType::PassthroughBlock | TokenType::LiteralBlock => {
-                self.parse_delimited_leaf_block(token)
+                self.parse_delimited_leaf_block(token, asg)
             }
-            TokenType::SourceBlock => self.parse_delimited_leaf_block(token),
+            TokenType::SourceBlock => self.parse_delimited_leaf_block(token, asg),
             TokenType::CodeCallout => self.parse_code_callout(token),
 
             // block macros
@@ -418,7 +430,7 @@ impl Parser {
                     }
                     Ok(())
                 } else {
-                    self.parse_delimited_leaf_block(token)
+                    self.parse_delimited_leaf_block(token, asg)
                 }
             }
 
@@ -1576,14 +1588,18 @@ impl Parser {
         Ok(())
     }
 
-    fn parse_delimited_leaf_block(&mut self, token: Token) -> Result<(), ParserError> {
+    fn parse_delimited_leaf_block(
+        &mut self,
+        token: Token,
+        asg: &mut Asg,
+    ) -> Result<(), ParserError> {
         if self.open_parse_after_as_text_type.is_some() {
             // ensure inlines are added appropriately
             self.add_inlines_to_block_stack()?;
             match self.block_stack.pop() {
                 Some(mut open_leaf) => {
                     open_leaf.add_locations(token.locations().clone());
-                    self.complete_block(open_leaf)?;
+                    self.complete_block(open_leaf, asg)?;
                     self.open_parse_after_as_text_type = None;
                     Ok(())
                 }
@@ -1607,7 +1623,11 @@ impl Parser {
         }
     }
 
-    fn parse_delimited_parent_block(&mut self, token: Token) -> Result<(), ParserError> {
+    fn parse_delimited_parent_block(
+        &mut self,
+        token: Token,
+        asg: &mut Asg,
+    ) -> Result<(), ParserError> {
         let delimiter_line = token.first_location().line;
         let mut block = ParentBlock::new_from_token(token)?;
         // clear the dangling newline
@@ -1663,7 +1683,7 @@ impl Parser {
                 if delimited_block.is_table() {
                     delimited_block.consolidate_table_info()?;
                 }
-                self.complete_block(delimited_block)?;
+                self.complete_block(delimited_block, asg)?;
                 // close any continuations
                 self.in_block_continuation = false;
                 return Ok(());
@@ -1746,12 +1766,19 @@ impl Parser {
     }
 
     /// Puts a block that has just closed (a delimited block) where it belongs: in the current
-    /// list item if a `+` attached it, otherwise where `push_block_to_stack` puts it
-    fn complete_block(&mut self, block: Block) -> Result<(), ParserError> {
+    /// list item if a `+` attached it; inside a delimited block, on the stack, where the closing
+    /// delimiter collects it; and otherwise in its parent (or the graph) right away, so that the
+    /// text after it starts a new paragraph rather than joining the block
+    fn complete_block(&mut self, block: Block, asg: &mut Asg) -> Result<(), ParserError> {
         let block = self.wrap_in_admonition(block)?;
-        match self.attach_to_list_item(block)? {
-            Some(block) => self.push_block_to_stack(block),
-            None => Ok(()),
+        let Some(block) = self.attach_to_list_item(block)? else {
+            return Ok(());
+        };
+        if self.open_delimited_block_lines.is_empty() && !self.in_block_continuation {
+            self.force_new_block = true;
+            self.add_to_block_stack_or_graph(asg, block)
+        } else {
+            self.push_block_to_stack(block)
         }
     }
 
