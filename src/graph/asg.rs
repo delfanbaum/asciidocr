@@ -33,7 +33,8 @@ pub struct Asg {
     #[serde(skip)]
     /// Has of all IDs in the document, and the references they point to
     document_id_hash: HashMap<String, Vec<Inline>>,
-    /// Document contents
+    /// Document contents (none is no `blocks`, as in the AsciiDoc TCK)
+    #[serde(skip_serializing_if = "Vec::is_empty")]
     pub blocks: Vec<Block>,
     /// Marks the start and end of document
     pub location: Vec<Location>,

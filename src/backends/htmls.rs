@@ -213,7 +213,12 @@ fn render_from_templates(
         .expect("Error finding base template.");
 
     // do the rendering; since minijinja 3, serde types have to be wrapped in `Serde` explicitly
-    Ok(tmpl.render(context!(graph => Serde(graph), ..build_ctx))?)
+    // the revision line isn't part of the graph's serialized form (the ASG has no place for it)
+    let revision = graph
+        .header
+        .as_ref()
+        .and_then(|header| header.revision.clone());
+    Ok(tmpl.render(context!(graph => Serde(graph), revision => Serde(revision), ..build_ctx))?)
 }
 
 fn gather_htmlbook_templates(full_document: bool) -> Vec<(&'static str, &'static str)> {

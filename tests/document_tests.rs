@@ -161,10 +161,10 @@ fn test_author_and_revision_lines() {
         serde_json::json!({ "description": "About things" })
     );
     assert_eq!(
-        common::parsed_text(
+        body_text(
             "= T\nJane Q. Doe <jane@example.com>\nv1.2, 2026-01-15\n\nBy {author}, version {revnumber} of {revdate}.\n"
         ),
-        "TBy Jane Q. Doe, version 1.2 of 2026-01-15."
+        "By Jane Q. Doe, version 1.2 of 2026-01-15."
     );
 }
 
@@ -181,16 +181,27 @@ fn test_author_names(#[case] adoc: &str, #[case] fullname: &str, #[case] initial
 }
 
 #[rstest]
-#[case::number_only("= T\nJane Doe\nv1.0\n\n{revnumber}|{revdate}\n", "T1.0|{revdate}")]
+#[case::number_only("= T\nJane Doe\nv1.0\n\n{revnumber}|{revdate}\n", "1.0|{revdate}")]
 #[case::date_only(
     "= T\nJane Doe\n2026-01-15\n\n{revnumber}|{revdate}\n",
-    "T{revnumber}|2026-01-15"
+    "{revnumber}|2026-01-15"
 )]
 #[case::number_and_date(
     "= T\nJane Doe\nv1.0, 2026-01-15\n\n{revnumber}|{revdate}\n",
-    "T1.0|2026-01-15"
+    "1.0|2026-01-15"
 )]
-#[case::remark("= T\nJane Doe\nv1.0, 2026-01-15: Fixed\n\n{revremark}\n", "TFixed")]
+#[case::remark("= T\nJane Doe\nv1.0, 2026-01-15: Fixed\n\n{revremark}\n", "Fixed")]
 fn test_revision_line(#[case] adoc: &str, #[case] text: &str) {
-    assert_eq!(common::parsed_text(adoc), text);
+    assert_eq!(body_text(adoc), text);
+}
+
+/// The text of a document's first block (after its header)
+fn body_text(adoc: &str) -> String {
+    let asg = common::parsed_asg(adoc);
+    asg["blocks"][0]["inlines"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(|inline| inline["value"].as_str())
+        .collect()
 }

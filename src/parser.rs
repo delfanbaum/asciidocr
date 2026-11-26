@@ -22,13 +22,25 @@ use crate::{
         inlines::{Inline, InlineLiteral, InlineLiteralName, InlineRef, InlineSpan, LineBreak},
         lists::{DList, DListItem, List, ListItem, ListVariant},
         metadata::{AttributeType, ElementMetadata},
-        nodes::{Header, Location},
+        nodes::{Author, Header, Location, Revision},
     },
     utils::{extract_page_ranges, target_and_attrs_from_token},
 };
 
 mod list_context;
 use list_context::{ListContext, marker_key};
+
+/// The lines of the document header, in order
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum HeaderLine {
+    Title,
+    /// the line under the title, if it isn't an attribute entry
+    Author,
+    /// the line under the author line
+    Revision,
+    /// attribute entries (and anything else) to the end of the header
+    Rest,
+}
 
 /// Parses a stream of tokens into an [`Asg`] (Abstract Syntax Graph), returning the graph once all
 /// tokens have been parsed.
@@ -40,6 +52,10 @@ pub struct Parser {
     last_token_type: TokenType,
     /// optional document header
     document_header: Option<Header>,
+    /// which line of the document header is being read
+    header_line: HeaderLine,
+    /// the text of the author or revision line being read, as written
+    header_line_text: String,
     /// document-level attributes, used for replacements, etc.
     document_attributes: HashMap<String, String>,
     /// holding ground for graph blocks until it's time to push to the main graph
@@ -130,6 +146,8 @@ impl Parser {
             origin_directory,
             last_token_type: TokenType::Eof,
             document_header: None,
+            header_line: HeaderLine::Title,
+            header_line_text: String::new(),
             document_attributes: HashMap::new(),
             block_stack: vec![],
             lists: ListContext::default(),
@@ -214,6 +232,9 @@ impl Parser {
     }
 
     fn token_into(&mut self, token: Token, asg: &mut Asg) -> Result<(), ParserError> {
+        if self.document_header.is_some() && self.read_header_line(&token) {
+            return Ok(());
+        }
         // if we are not starting with a document-heading acceptable token, get out
         if self.document_header.is_some() && !token.can_be_in_document_header() {
             self.check_and_move_header(asg)?;
@@ -518,21 +539,91 @@ impl Parser {
 
     /// Handle document header
     fn check_and_move_header(&mut self, asg: &mut Asg) -> Result<(), ParserError> {
+        self.end_header_line()?;
         self.add_inlines_to_block_stack()?;
+        let mut implied_attributes = vec![];
         if let Some(header) = &mut self.document_header
             && !header.is_empty()
         {
             header.consolidate();
-            asg.add_header(header.clone(), self.document_attributes.clone())
+            asg.add_header(header.clone(), self.document_attributes.clone());
+            implied_attributes = header.implied_attributes();
         }
+        // the attributes the author and revision lines imply (`author`, `revnumber`, ...) work in
+        // references, but they aren't the document's own, so the graph doesn't list them (as the
+        // AsciiDoc TCK expects)
+        self.document_attributes.extend(implied_attributes);
 
         self.document_header = None;
+        Ok(())
+    }
+
+    /// The author line and the revision line under the document title are read as they are
+    /// written (not as markup), up to the end of their line. Returns whether the token was one of
+    /// theirs. Attribute entries extend the header too.
+    fn read_header_line(&mut self, token: &Token) -> bool {
+        let Some(header) = &mut self.document_header else {
+            return false;
+        };
+        match token.token_type() {
+            TokenType::NewLineChar | TokenType::Eof => false,
+            // an attribute entry: no author or revision line can follow
+            TokenType::Attribute => {
+                header.location = Location::reconcile(header.location.clone(), token.locations());
+                self.header_line = HeaderLine::Rest;
+                false
+            }
+            _ if matches!(self.header_line, HeaderLine::Author | HeaderLine::Revision) => {
+                header.location = Location::reconcile(header.location.clone(), token.locations());
+                self.header_line_text.push_str(&token.lexeme);
+                true
+            }
+            _ => false,
+        }
+    }
+
+    /// At the end of a header line: the title is complete, or the author or revision line is
+    /// read
+    fn end_header_line(&mut self) -> Result<(), ParserError> {
+        match self.header_line {
+            HeaderLine::Title => {
+                // (the title's inlines go to the header)
+                self.add_inlines_to_block_stack()?;
+                self.header_line = HeaderLine::Author;
+            }
+            HeaderLine::Author | HeaderLine::Revision => {
+                let text = std::mem::take(&mut self.header_line_text);
+                if let Some(header) = &mut self.document_header
+                    && !text.trim().is_empty()
+                {
+                    if self.header_line == HeaderLine::Author {
+                        header.authors = Some(Author::from_line(&text));
+                        self.header_line = HeaderLine::Revision;
+                    } else {
+                        header.revision = Some(Revision::from_line(&text));
+                        self.header_line = HeaderLine::Rest;
+                    }
+                }
+            }
+            HeaderLine::Rest => {}
+        }
         Ok(())
     }
 
     /// New line characters are arguably the most significant token "signal" we can get, and as
     /// such the parse function is a little complicated.
     fn parse_new_line_char(&mut self, token: Token, asg: &mut Asg) -> Result<(), ParserError> {
+        // a line of the document header ends (a blank line ends the header, below)
+        if self.document_header.is_some()
+            && !matches!(
+                self.last_token_type,
+                TokenType::NewLineChar | TokenType::Eof
+            )
+        {
+            self.in_block_line = false;
+            self.dangling_newline = None;
+            return self.end_header_line();
+        }
         // newline exits a title, TK line continuation
         self.in_block_line = false;
 
@@ -1121,6 +1212,8 @@ impl Parser {
 
         if token.first_location() == Location::default() {
             self.in_block_line = true;
+            self.header_line = HeaderLine::Title;
+            self.header_line_text.clear();
             let mut header = Header::new();
             header.location.extend(token.locations());
 
