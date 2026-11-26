@@ -364,6 +364,27 @@ pub struct RunSummary {
     pub line_break: bool,
 }
 
+#[cfg(feature = "docx")]
+impl RunSummary {
+    fn same_formatting(&self, other: &RunSummary) -> bool {
+        !self.line_break
+            && !other.line_break
+            && (
+                self.bold,
+                self.italic,
+                self.mono,
+                self.highlight,
+                &self.vert_align,
+            ) == (
+                other.bold,
+                other.italic,
+                other.mono,
+                other.highlight,
+                &other.vert_align,
+            )
+    }
+}
+
 /// Renders Asciidoc source to docx and summarizes the runs of every body paragraph.
 #[cfg(feature = "docx")]
 pub fn rendered_docx_runs(adoc: &str) -> Vec<Vec<RunSummary>> {
@@ -396,7 +417,15 @@ pub fn rendered_docx_runs(adoc: &str) -> Vec<Vec<RunSummary>> {
                     }
                     run
                 })
-                .collect()
+                // adjacent runs with the same formatting look the same, and how the writer splits
+                // text into runs (a typographic apostrophe is its own, e.g.) isn't what's tested
+                .fold(Vec::<RunSummary>::new(), |mut runs, run| {
+                    match runs.last_mut() {
+                        Some(last) if last.same_formatting(&run) => last.text.push_str(&run.text),
+                        _ => runs.push(run),
+                    }
+                    runs
+                })
         })
         .collect()
 }

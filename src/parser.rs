@@ -1518,7 +1518,20 @@ impl Parser {
         Ok(())
     }
 
-    fn parse_charref(&mut self, token: Token) -> Result<(), ParserError> {
+    fn parse_charref(&mut self, mut token: Token) -> Result<(), ParserError> {
+        // an apostrophe in code stays as written (unlike in Asciidoctor, which curls it): a curly
+        // quote in code changes the code
+        if token.lexeme == "'"
+            && let Some(Inline::InlineSpan(span)) = self
+                .inline_stack
+                .iter()
+                .rev()
+                .find(|inline| inline.is_open())
+            && span.variant == crate::graph::inlines::InlineSpanVariant::Code
+        {
+            token.literal = Some(token.lexeme.clone());
+            return self.parse_text(token);
+        }
         let inline_literal = Inline::InlineLiteral(InlineLiteral::new_charref_from_token(&token));
         if let Some(newline_token) = self.dangling_newline.clone() {
             if self.preserve_newline_text {

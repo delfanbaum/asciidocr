@@ -31,9 +31,13 @@ fn test_spans_with_chars_between(#[case] markup_char: &str, #[case] variant: &st
     let adoc_str = fs::read_to_string("tests/data/inlines/span-chars-between.adoc")
         .expect("Unable to read asciidoc test template")
         .replace("0", markup_char);
-    let asg_json_str = fs::read_to_string("tests/data/inlines/span-chars-between.json")
+    let mut asg_json_str = fs::read_to_string("tests/data/inlines/span-chars-between.json")
         .expect("Unable to read asg json test template")
         .replace("VARIANT", variant);
+    // an apostrophe in code stays as written (see the `literals-straight-squo` fixture)
+    if variant == "code" {
+        asg_json_str = asg_json_str.replace("&#8217;", "'");
+    }
     assert_parsed_doc_matches_expected_asg_from_str(&adoc_str, &asg_json_str)
 }
 

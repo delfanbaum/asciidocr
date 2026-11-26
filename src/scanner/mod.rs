@@ -90,6 +90,9 @@ impl<'a> Scanner<'a> {
                 } else if ["s ", "s\n"].contains(&self.peeks_ahead(2))
                 // edge at end case
                     || (self.peeks_ahead(2) == "\0" && self.peek() == 's')
+                    // like Asciidoctor, an apostrophe between a letter (or digit) and a letter
+                    // (`don't`, `rock'n'roll`)
+                    || (self.peek_back().is_alphanumeric() && self.peek().is_alphabetic())
                 {
                     self.add_token(TokenType::CharRef, false, 0)
                 } else {
