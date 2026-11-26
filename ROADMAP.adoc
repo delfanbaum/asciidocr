@@ -226,7 +226,7 @@ removed (with the helpers only it used, `InlineError`, and the never-created
   backends get them from the parser (`Block::section_id`)
 * [x] Xrefs to generated IDs show the section title (not `[_first_section]`) and
   no longer log a warning
-* [ ] Custom xref text: `+<<id,custom text>>+`
+* [x] Custom xref text: `+<<id,custom text>>+`
 * [x] The `idprefix`, `idseparator` and `sectids` attributes (with the value
   they have at the end of the document)
 

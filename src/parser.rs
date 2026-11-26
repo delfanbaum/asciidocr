@@ -348,7 +348,7 @@ impl Parser {
 
             // references
             TokenType::AttributeReference => self.parse_attribute_reference(token),
-            TokenType::CrossReference => self.parse_cross_reference(token),
+            TokenType::CrossReference => self.parse_cross_reference(token, asg),
             TokenType::Include => self.parse_include(token, asg),
             // we just check for the existence of these; we don't actually process them
             TokenType::StartTag | TokenType::EndTag => Ok(()),
@@ -1454,11 +1454,33 @@ impl Parser {
         Ok(())
     }
 
-    fn parse_cross_reference(&mut self, token: Token) -> Result<(), ParserError> {
-        self.inline_stack
-            .push_back(Inline::InlineRef(InlineRef::new_xref_from_token(token)));
-        self.close_parent_after_push = true;
-        Ok(())
+    fn parse_cross_reference(&mut self, token: Token, asg: &mut Asg) -> Result<(), ParserError> {
+        let Some(text) = InlineRef::xref_text(&token) else {
+            self.push_link(Inline::InlineRef(InlineRef::new_xref_from_token(token)));
+            self.close_parent_after_push = true;
+            return Ok(());
+        };
+        // an xref with its own text (`<<id,the *A* section>>`): the text is parsed like a link
+        // macro's, into the open xref, which then closes
+        let (line, col) = (token.line, token.startcol);
+        self.push_link(Inline::InlineRef(InlineRef::new_xref_from_token(
+            token.clone(),
+        )));
+        // (the text's tokens start at column 1, so this is one less than the text's column)
+        let offset = col + token.lexeme.len() - text.len() - 3;
+        for result in Scanner::new(&text) {
+            match result {
+                Ok(mut text_token) => {
+                    if text_token.token_type() == TokenType::Eof {
+                        continue;
+                    }
+                    text_token.update_token_loc_offsets_by(line, offset);
+                    self.token_into(text_token, asg)?;
+                }
+                Err(e) => return Err(ParserError::Scanner(e)),
+            }
+        }
+        self.parse_inline_macro_close(token)
     }
 
     fn parse_code_callout(&mut self, token: Token) -> Result<(), ParserError> {

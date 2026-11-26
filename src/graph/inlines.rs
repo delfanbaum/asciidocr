@@ -341,7 +341,10 @@ impl Inline {
             && matches!(iref.variant, InlineRefVariant::Xref)
         {
             if let Some(ref_text) = id_hash.get(&iref.target) {
-                iref.inlines = ref_text.clone()
+                // an xref's own text (`<<id,text>>`) is kept; the title is for those without one
+                if iref.inlines.is_empty() {
+                    iref.inlines = ref_text.clone()
+                }
             } else {
                 warn!("Unable to find xref: {}", iref.target)
             }
@@ -626,9 +629,28 @@ impl InlineRef {
         }
     }
 
+    /// An xref (`<<id>>`, or `<<id,text>>`): its target is the ID. One with text of its own is
+    /// open, for the parser to add the text to (see [`xref_text`](Self::xref_text)).
     pub fn new_xref_from_token(token: Token) -> Self {
-        let target = token.text()[2..token.text().len() - 2].to_string();
-        InlineRef::new(InlineRefVariant::Xref, target, token.locations())
+        let inner = token.text()[2..token.text().len() - 2].to_string();
+        let (target, text) = match inner.split_once(',') {
+            Some((target, text)) => (target.to_string(), Some(text)),
+            None => (inner.clone(), None),
+        };
+        InlineRef {
+            open: text.is_some(),
+            ..InlineRef::new(InlineRefVariant::Xref, target, token.locations())
+        }
+    }
+
+    /// The text an xref token gives its reference (`<<id,the text>>`), without the whitespace it
+    /// starts with, as in Asciidoctor; `None` if it gives none
+    pub fn xref_text(token: &Token) -> Option<String> {
+        let text = token.text();
+        let inner = &text[2..text.len() - 2];
+        inner
+            .split_once(',')
+            .map(|(_, text)| text.trim_start().to_string())
     }
 
     pub fn new_link_from_macro_token(token: Token) -> Self {

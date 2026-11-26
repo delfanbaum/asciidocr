@@ -164,9 +164,17 @@ impl Token {
     /// Charref entities, following asciidoctor
     pub fn validate(&mut self) {
         match self.token_type() {
-            TokenType::BlockAnchor | TokenType::CrossReference => {
+            TokenType::BlockAnchor => {
                 // no spaces or newlines inside
                 if self.lexeme.contains(' ') || self.lexeme.contains('\n') {
+                    self.token_type = TokenType::Text
+                }
+            }
+            TokenType::CrossReference => {
+                // no spaces or newlines in the ID; the text after a comma (`<<id,the text>>`) can
+                // have spaces
+                let id = self.lexeme.split(',').next().unwrap_or_default();
+                if id.contains(' ') || self.lexeme.contains('\n') {
                     self.token_type = TokenType::Text
                 }
             }

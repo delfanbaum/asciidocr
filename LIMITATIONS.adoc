@@ -11,8 +11,6 @@ non-features.
   changes partway through a document, its last value counts for every section.
   The generated IDs are not part of the `json` output, as the AsciiDoc TCK
   expects
-* Custom text for cross references: `+<<id,custom text>>+` is left as text
-  (`+<<id>>+` works, and uses the title of the target)
 * `[verse]` and literal (indented) paragraphs: only the delimited forms (`____`
   and `....`) are verse and literal blocks
 * `+pass:[]+` inline passthroughs work, but `+++text+++` does not (it is
