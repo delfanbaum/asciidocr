@@ -296,7 +296,7 @@ impl Parser {
             TokenType::CrossReference => self.parse_cross_reference(token),
             TokenType::Include => self.parse_include(token, asg),
             // we just check for the existence of these; we don't actually process them
-            TokenType::StartTag | TokenType::EndTag => {Ok(())}
+            TokenType::StartTag | TokenType::EndTag => Ok(()),
 
             // inline macros
             TokenType::FootnoteMacro => self.parse_footnote_macro(token),
@@ -309,9 +309,11 @@ impl Parser {
             // breaks
             TokenType::PageBreak => self.parse_page_break(token, asg),
             TokenType::ThematicBreak => self.parse_thematic_break(token, asg),
-            TokenType::LineContinuation => {self
-                .inline_stack
-                .push_back(Inline::InlineBreak(LineBreak::new_from_token(token)));Ok(())},
+            TokenType::LineContinuation => {
+                self.inline_stack
+                    .push_back(Inline::InlineBreak(LineBreak::new_from_token(token)));
+                Ok(())
+            }
             // delimited blocks
             TokenType::SidebarBlock
             | TokenType::OpenBlock
