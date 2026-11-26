@@ -530,3 +530,18 @@ fn test_unreadable_include_is_skipped() {
         "paragraph \"before\" paragraph \"after\""
     );
 }
+
+/// Found by the full fuzz run: inputs that made the parser panic, and what Asciidoctor makes of
+/// them
+#[rstest]
+#[case::lone_colon(":", "paragraph \":\"")]
+#[case::attribute_reference_at_end(":cat: George\n\n{", "paragraph \"{\"")]
+#[case::ampersand_at_end("bar &", "paragraph \"bar &\"")]
+#[case::include_without_brackets("include::x.adoc]\n", "paragraph \"include::x.adoc]\"")]
+#[case::stray_quote_in_attributes("[role=\"foo\"\"]\npara\n", "paragraph \"para\"")]
+#[case::pipe_in_list_item("* |s cool\n", "list(* \"|s cool\")")]
+#[case::pipe_outside_table("|not a table\n", "paragraph \"|not a table\"")]
+fn test_inputs_found_by_fuzzing(#[case] adoc: &str, #[case] expected: &str) {
+    common::parsed_asg_with_timeout(adoc);
+    assert_eq!(block_outline(adoc), expected);
+}
