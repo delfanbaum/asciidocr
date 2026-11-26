@@ -522,6 +522,10 @@ impl InlineRef {
     pub fn new_link_from_macro_token(token: Token) -> Self {
         let mut target = token.text();
         target.pop(); // remove trailing '['
+        // the `link:` macro name, when the target isn't a URL by itself
+        if let Some(stripped) = target.strip_prefix("link:") {
+            target = stripped.to_string();
+        }
         InlineRef {
             open: true,
             ..InlineRef::new(InlineRefVariant::Link, target, token.locations())

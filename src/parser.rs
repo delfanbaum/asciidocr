@@ -1304,8 +1304,15 @@ impl Parser {
     }
 
     fn parse_hyperlink(&mut self, token: Token) -> Result<(), ParserError> {
-        self.inline_stack
-            .push_back(Inline::InlineRef(InlineRef::new_link_from_token(token)));
+        let link = Inline::InlineRef(InlineRef::new_link_from_token(token));
+        // a bare URL inside an open span (`*see http://x.com*`) belongs to the span
+        if let Some(Inline::InlineSpan(span)) = self.inline_stack.back_mut()
+            && span.open
+        {
+            span.add_inline(link);
+        } else {
+            self.inline_stack.push_back(link);
+        }
         Ok(())
     }
 

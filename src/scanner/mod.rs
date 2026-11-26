@@ -304,6 +304,13 @@ impl<'a> Scanner<'a> {
                     self.add_text_until_next_markup()
                 }
             }
+            'l' if self.starts_link_macro(self.start) => {
+                // `link:` and the target, through the `[`
+                self.current = self.source[self.current..]
+                    .find('[')
+                    .map_or(self.source.len(), |idx| self.current + idx + 1);
+                self.add_token(TokenType::LinkMacro, true, 0)
+            }
             'h' => {
                 if self.peeks_ahead(3) == "ttp" {
                     self.add_link()
@@ -746,10 +753,27 @@ impl<'a> Scanner<'a> {
         ]
         .contains(&self.peek())
             && !self.is_at_end()
+            && !self.starts_link_macro(self.current)
         {
             self.current += 1;
         }
         self.add_token(TokenType::Text, true, 0)
+    }
+
+    /// Whether a `link:` macro starts here: `link:`, a target with no whitespace (which doesn't
+    /// start with a colon), then `[`
+    fn starts_link_macro(&self, at: usize) -> bool {
+        let Some(rest) = self
+            .source
+            .get(at..)
+            .and_then(|rest| rest.strip_prefix("link:"))
+        else {
+            return false;
+        };
+        !rest.starts_with(':')
+            && rest
+                .find(|c: char| c.is_whitespace() || c == '[')
+                .is_some_and(|idx| rest[idx..].starts_with('['))
     }
 
     fn add_tag(&mut self) -> Result<Token, ScannerError> {
