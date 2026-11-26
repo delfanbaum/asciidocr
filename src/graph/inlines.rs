@@ -104,7 +104,8 @@ impl Inline {
     pub fn is_open_macro(&self) -> bool {
         match self {
             Inline::InlineRef(iref) => iref.open,
-            _ => self.is_macro(),
+            Inline::InlineSpan(span) => span.variant == InlineSpanVariant::Footnote && span.open,
+            _ => false,
         }
     }
 

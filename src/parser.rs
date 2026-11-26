@@ -1369,8 +1369,11 @@ impl Parser {
         {
             // consolidate into the inline macro, which is then complete
             let mut inline_macro = self.inline_stack.remove(inline_macro_idx).unwrap();
-            if let Inline::InlineRef(iref) = &mut inline_macro {
-                iref.open = false;
+            // the macro is complete, so a later `]` (or span) is not its
+            match &mut inline_macro {
+                Inline::InlineRef(iref) => iref.open = false,
+                Inline::InlineSpan(span) => span.open = false,
+                _ => {}
             }
             while self.inline_stack.len() > inline_macro_idx {
                 let subsequent_inline = self.inline_stack.remove(inline_macro_idx).unwrap();
