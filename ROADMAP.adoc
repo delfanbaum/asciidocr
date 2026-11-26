@@ -219,6 +219,10 @@ removed (with the helpers only it used, `InlineError`, and the never-created
   wraps it in an admonition; Asciidoctor ignores the label there
 * [ ] A listing's text in the ASG starts with the newline after the opening
   delimiter (`"\ncode\n"`); check against the ASG schema
+* [ ] A named attribute whose value is a lone quote (`+[role="]+`, also in a
+  macro's brackets) panics in `key_values_from_named_attribute`; the fuzz run's
+  mutations don't reach it. And `target_and_attrs_from_token` panics on a token
+  that isn't an image or include macro (it should return an error)
 
 === Cross references and section IDs (M)
 
@@ -239,11 +243,17 @@ removed (with the helpers only it used, `InlineError`, and the never-created
   the fixtures cut off at each line in every test run, and cut off at character
   positions and mutated with `--ignored` (16,000 inputs, about 90 seconds). It
   found panics and hangs on markup left open at the end of a file, and three
-  `std::process::exit` calls in the library; all fixed, each with a test
+  `std::process::exit` calls in the library; all fixed, each with a test. CI
+  runs the full run for PRs into `main`
 * [ ] CLI-level tests of `-b asciidoctor` and `-e`
 * [ ] Compare a few more real documents against `asciidoctor -s` and file what
   differs
 * [x] Commit `Cargo.lock` (done in 0.2.1)
+* [x] Code organization: every directory module uses `mod.rs` (clippy's
+  `self_named_module_files` keeps it that way), the parser is split into a file
+  per area (`src/parser/`: header, includes, lists, blocks, inlines), and
+  `utils` is gone (its functions moved to `graph::metadata` and the parser's
+  includes)
 * [ ] Spec checks against the official AsciiDoc language specification and ASG
   schema, not just the Asciidoctor docs: which blocks may carry a `title`
   (lists, description lists, paragraphs?); whether a blank line may come
@@ -255,11 +265,18 @@ removed (with the helpers only it used, `InlineError`, and the never-created
 * [ ] Audit the public API in `src/lib.rs`: what's `pub` by accident, and what a
   library user actually needs. Tidy it before the 0.4 Python bindings freeze it.
   Known candidates: `Block::is_ordered_list_item` and
-  `Block::is_unordered_list_item`, unused since the list context
+  `Block::is_unordered_list_item`, unused since the list context. Path changes
+  are fine before 1.0 (nobody is known to use the library yet); candidates
+  from the code organization pass: `backends::htmls` as `backends::html`;
+  `graph::nodes`, which holds `Header`, `Author`, `Revision` and `Location`
+  (a `header` and a `location` module would say more); `backends::docx::units`,
+  one function
 * [x] Remove the unused footnote extraction (`Asg::standardize_footnotes`,
   `Block::extract_footnote_definitions` and the list items' `extract_footnotes`),
   and its `LIMITATIONS.adoc` entry
-* [ ] Docs on docs.rs good enough to use the crate without reading the source
+* [ ] Docs on docs.rs good enough to use the crate without reading the source.
+  `cargo doc` has two broken intra-doc links to start with (`attributes` in
+  `graph::metadata`, `Scanner` in the parser)
 
 === Document header (M)
 
