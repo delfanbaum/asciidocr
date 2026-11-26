@@ -12,10 +12,6 @@ non-features.
   than the section title, and logs a warning
 * Custom text for cross references: `+<<id,custom text>>+` is left as text
   (`+<<id>>+` works, and uses the title of the target)
-* A blank line ends a list, so items separated by blank lines become separate
-  lists, and a continuation after a blank line (`* a`, a blank line, `+`, `para`)
-  stops the conversion with an error ("invalid block continuation; no previous
-  block")
 * A list item marker directly after a paragraph line (`Text` then `* a`) starts
   a list, where Asciidoctor keeps it as paragraph text. Likewise, a heading
   directly after a list item ends the list, where Asciidoctor keeps it as the

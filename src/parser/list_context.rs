@@ -42,6 +42,9 @@ pub(super) struct ListScope {
     pub principal_open: bool,
     /// a `+` was seen, so the next block belongs to the current item
     pub attach_next: bool,
+    /// a blank line was seen. A blank line doesn't end a list by itself: the next line does,
+    /// unless it is an item or a `+`
+    pub after_blank: bool,
 }
 
 impl ListScope {
@@ -78,8 +81,7 @@ impl ListScope {
         let open = &mut self.lists[level];
         let finished = std::mem::replace(&mut open.item, item);
         open.list.push_block(Block::ListItem(finished))?;
-        self.principal_open = true;
-        self.attach_next = false;
+        self.start_item();
         Ok(None)
     }
 
@@ -90,8 +92,33 @@ impl ListScope {
             list: Block::List(list),
             item,
         });
+        self.start_item();
+    }
+
+    /// A new item takes the text that follows its marker
+    fn start_item(&mut self) {
         self.principal_open = true;
         self.attach_next = false;
+        self.after_blank = false;
+    }
+
+    /// A blank line ends the current item's text (and cancels a `+` with nothing attached yet)
+    pub fn blank_line(&mut self) {
+        self.principal_open = false;
+        self.attach_next = false;
+        self.after_blank = true;
+    }
+
+    /// A `+`: the next block belongs to the current item. After a blank line, it belongs to the
+    /// top-level item instead (as in Asciidoctor), so the nested lists are complete.
+    pub fn continuation(&mut self) -> Result<(), BlockError> {
+        if self.after_blank {
+            self.close_deeper_than(0)?;
+            self.after_blank = false;
+        }
+        self.principal_open = false;
+        self.attach_next = true;
+        Ok(())
     }
 
     /// Closes the lists nested deeper than `level`, innermost first, each into the current item
@@ -148,6 +175,7 @@ impl ListContext {
             }],
             principal_open: true,
             attach_next: false,
+            after_blank: false,
         })
     }
 

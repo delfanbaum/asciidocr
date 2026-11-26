@@ -76,7 +76,7 @@ Order of work (each step its own commit or PR):
   (all existing tests pass), and attach item text as soon as the item's
   paragraph ends. List scopes for delimited blocks came with it
 . (Done) Nesting by marker identity
-. Blank lines between items, and the ancestor (blank line, then `+`)
+. (Done) Blank lines between items, and the ancestor (blank line, then `+`)
   continuation
 . Description lists in the list context
 . Lists after headings and paragraphs, and headings after list items (`+* a+`
@@ -94,10 +94,10 @@ Order of work (each step its own commit or PR):
   `+* two+`) garbles the list
 * [x] A continuation that attaches a nested list (`+* parent+`, `+`, `. one`,
   `. two`)
-* [ ] A continuation, then a blank line, then an item was a hard error ("invalid
-  block continuation; no previous block"); since step 3 it gives two lists
-* [ ] Blank lines between items split the list into several lists
-* [ ] A blank line, then `+`, attaches to the top-level item (now a hard error)
+* [x] A continuation, then a blank line, then an item was a hard error ("invalid
+  block continuation; no previous block")
+* [x] Blank lines between items split the list into several lists
+* [x] A blank line, then `+`, attaches to the top-level item (it was a hard error)
 * [x] A block attached without `+` (`+* one+`, a `[source]` listing,
   `+* two+`) garbles the list; it should end the list (list, listing, list)
 * [x] A delimited block attached with `+` loses the item's text into the block

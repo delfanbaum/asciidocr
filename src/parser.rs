@@ -232,6 +232,7 @@ impl Parser {
             }
         }
 
+        self.end_list_after_blank_line(token.token_type(), asg)?;
         // the start of a block ends the current list item's text, and the list too, unless a `+`
         // attached the block to the item
         if token.token_type().ends_list_item() {
@@ -508,34 +509,17 @@ impl Parser {
             self.dangling_newline = None;
             if self.document_header.is_some() {
                 self.check_and_move_header(asg)?;
-            } else {
-                // a blank line ends the current list item's text and (for now: blank lines
-                // between items are not handled yet) the list
-                if self.lists.active(self.block_stack.len()).is_some() {
-                    self.add_inlines_to_block_stack()?;
-                    self.close_lists(asg)?;
-                }
-                // consolidate any dangling description list items
-                if let Some(Block::DListItem(_)) = self.block_stack.last() {
-                    self.add_last_list_item_to_list(asg)?;
-                }
-                // clear out any inlines
+            } else if self.lists.active(self.block_stack.len()).is_some() {
+                // a blank line ends the current list item's text, but not the list: the next
+                // line that isn't blank decides that (see `end_list_after_blank_line`)
                 self.in_inline_span = false;
                 self.add_inlines_to_block_stack()?;
-                // and then force a new block hereafter
+                if let Some(scope) = self.lists.active(self.block_stack.len()) {
+                    scope.blank_line();
+                }
                 self.force_new_block = true;
-                if let Some(last_block) = self.block_stack.pop() {
-                    // check for dangling list items
-                    if !last_block.is_section() && self.open_delimited_block_lines.is_empty() {
-                        self.add_to_block_stack_or_graph(asg, last_block)?;
-                        if self.close_parent_after_push && !self.block_stack.is_empty() {
-                            self.add_last_to_block_stack_or_graph(asg)?;
-                            self.close_parent_after_push = false;
-                        }
-                    } else {
-                        self.push_block_to_stack(last_block)?
-                    }
-                } // if Some(last_block)
+            } else {
+                self.end_blocks_at_blank_line(asg)?;
             }
         } else if closes_title
             || self.in_block_continuation
@@ -546,6 +530,67 @@ impl Parser {
             self.dangling_newline = None;
         } else {
             self.dangling_newline = Some(token);
+        }
+        Ok(())
+    }
+
+    /// A blank line completes the open paragraph, and whatever block on the stack it completes
+    /// (a description list item, say), and the text after it starts a new block
+    fn end_blocks_at_blank_line(&mut self, asg: &mut Asg) -> Result<(), ParserError> {
+        // consolidate any dangling description list items
+        if let Some(Block::DListItem(_)) = self.block_stack.last() {
+            self.add_last_list_item_to_list(asg)?;
+        }
+        // clear out any inlines
+        self.in_inline_span = false;
+        self.add_inlines_to_block_stack()?;
+        // and then force a new block hereafter
+        self.force_new_block = true;
+        if let Some(last_block) = self.block_stack.pop() {
+            // check for dangling list items
+            if !last_block.is_section() && self.open_delimited_block_lines.is_empty() {
+                self.add_to_block_stack_or_graph(asg, last_block)?;
+                if self.close_parent_after_push && !self.block_stack.is_empty() {
+                    self.add_last_to_block_stack_or_graph(asg)?;
+                    self.close_parent_after_push = false;
+                }
+            } else {
+                self.push_block_to_stack(last_block)?
+            }
+        }
+        Ok(())
+    }
+
+    /// After a blank line in a list, the next line that isn't blank decides whether the list
+    /// goes on: an item or a `+` continues it, and anything else ends it. Ending it then does
+    /// what the blank line would have done without a list.
+    fn end_list_after_blank_line(
+        &mut self,
+        token_type: TokenType,
+        asg: &mut Asg,
+    ) -> Result<(), ParserError> {
+        if self
+            .lists
+            .active(self.block_stack.len())
+            .is_none_or(|scope| !scope.after_blank)
+        {
+            return Ok(());
+        }
+        let continues_list = matches!(
+            token_type,
+            TokenType::NewLineChar
+                | TokenType::BlockContinuation
+                | TokenType::UnorderedListItem
+                | TokenType::OrderedListItem
+                | TokenType::CodeCalloutListItem
+                // an include decides nothing; the first line it includes does
+                | TokenType::Include
+                | TokenType::StartTag
+                | TokenType::EndTag
+        );
+        if !continues_list {
+            self.close_lists(asg)?;
+            self.end_blocks_at_blank_line(asg)?;
         }
         Ok(())
     }
@@ -963,8 +1008,7 @@ impl Parser {
         self.add_inlines_to_block_stack()?;
         if let Some(scope) = self.lists.active(self.block_stack.len()) {
             // the next block belongs to the current list item
-            scope.principal_open = false;
-            scope.attach_next = true;
+            scope.continuation()?;
         } else {
             // e.g., a description list item, which is still on the block stack
             self.in_block_continuation = true;

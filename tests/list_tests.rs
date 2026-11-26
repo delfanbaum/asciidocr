@@ -108,16 +108,6 @@ fn test_list_after_dlist_item() {
     );
 }
 
-/// Until step 5 (blank lines between items), the blank line ends the list; it used to be an
-/// error ("invalid block continuation; no previous block")
-#[test]
-fn test_list_continuation_then_blank_line() {
-    assert_eq!(
-        block_outline("* one\n+\npara\n\n* two\n"),
-        "list(* \"one\"(paragraph \"para\")) list(* \"two\")"
-    );
-}
-
 /// Lists nest by marker identity: a marker that isn't open yet starts a deeper list, and one
 /// that is open closes back to its level
 #[rstest]
@@ -187,7 +177,6 @@ fn test_nested_lists(#[case] adoc: &str, #[case] expected: &str) {
     "* a\n\n+\nsolo ancestor\n",
     "list(* \"a\"(paragraph \"solo ancestor\"))"
 )]
-#[ignore = "lists step 5: blank lines between items, ancestor continuation"]
 fn test_blank_lines_between_items(#[case] adoc: &str, #[case] expected: &str) {
     assert_eq!(block_outline_with_timeout(adoc), expected);
 }

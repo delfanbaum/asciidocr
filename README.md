@@ -192,7 +192,6 @@ tools in Rust now, too. Here are at least a few I know about:
 
 Things that _should_ work, but are currently acting up:
 
-* Blank lines between list items, and a `+` after a blank line in a list
 * A footnote in a list item, if an earlier footnote exists in the document
 * `+++inline passthroughs+++` (the `pass:[]` form works)
 
