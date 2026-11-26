@@ -1269,6 +1269,15 @@ impl Parser {
                     // update the line numbering for the token to match the table cell mathematically, in
                     // case my vague memory of multi-line cells is correct
                     inline_token.update_token_loc_offsets_by(cell_line, cell_col);
+                    // the cell is scanned as if it started a line, but list markup is only
+                    // parsed in AsciiDoc ("a|") cells, which we don't support, so `| 1. b` is text
+                    if matches!(
+                        inline_token.token_type(),
+                        TokenType::UnorderedListItem | TokenType::OrderedListItem
+                    ) {
+                        inline_token.token_type = TokenType::Text;
+                        inline_token.literal = Some(inline_token.lexeme.clone());
+                    }
                     self.token_into(inline_token, asg)?;
                 }
                 Err(e) => return Err(ParserError::Scanner(e)),

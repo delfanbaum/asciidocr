@@ -68,6 +68,14 @@ impl<'a> Scanner<'a> {
         let c = self.source.as_bytes()[self.current] as char;
         self.current += 1; // this instead of the "advance" function in "Crafting Interpreters"
 
+        // list item markers come first: at the start of a line, `.. ` is a list item and not an
+        // ellipsis, and `** ` is a list item and not a strong span
+        if matches!(c, ' ' | '\t' | '*' | '-' | '.' | '0'..='9')
+            && let Some((token_type, marker_len)) = self.list_item_marker_at_line_start()
+        {
+            return self.add_list_item(token_type, marker_len);
+        }
+
         match c {
             '\n' => self.add_token(TokenType::NewLineChar, false, 1),
             '\'' => {
@@ -147,18 +155,11 @@ impl<'a> Scanner<'a> {
                                 self.add_text_until_next_markup()
                             }
                         }
-                        '*' => {
-                            // check if it's a list item
-                            if self.starts_new_line() && self.peek() == ' ' {
-                                self.add_list_item(TokenType::UnorderedListItem)
-                            } else {
-                                self.handle_inline_formatting(
-                                    c,
-                                    TokenType::Strong,
-                                    TokenType::UnconstrainedStrong,
-                                )
-                            }
-                        }
+                        '*' => self.handle_inline_formatting(
+                            c,
+                            TokenType::Strong,
+                            TokenType::UnconstrainedStrong,
+                        ),
                         '/' => {
                             if self.starts_end_tag_line() {
                                 self.add_tag()
@@ -194,17 +195,13 @@ impl<'a> Scanner<'a> {
                             TokenType::Emphasis,
                             TokenType::UnconstrainedEmphasis,
                         ),
-                        // ordered list item or section title
+                        // ellipsis or block title (ordered list items are found above)
                         '.' => {
                             if self.peeks_ahead(2) == ".." {
                                 self.current += 2;
                                 self.add_token(TokenType::CharRef, false, 0)
                             } else if self.starts_new_line() {
-                                if self.peek() == ' ' {
-                                    self.add_list_item(TokenType::OrderedListItem)
-                                } else {
-                                    self.add_token(TokenType::BlockLabel, false, 0)
-                                }
+                                self.add_token(TokenType::BlockLabel, false, 0)
                             } else {
                                 self.add_text_until_next_markup()
                             }
@@ -503,11 +500,64 @@ impl<'a> Scanner<'a> {
         }
     }
 
-    /// adds the list item token, then includes the rest of the list item (until a new block or
-    /// another list item marker) in an Text
-    fn add_list_item(&mut self, list_item_token: TokenType) -> Result<Token, ScannerError> {
-        self.current += 1; // advance past the space, which we'll include in the token lexeme
+    /// Adds the list item token, whose lexeme is the marker with any indentation before it and
+    /// the space after it (the parser trims these)
+    fn add_list_item(
+        &mut self,
+        list_item_token: TokenType,
+        marker_len: usize,
+    ) -> Result<Token, ScannerError> {
+        self.current = self.start + marker_len;
         self.add_token(list_item_token, false, 0)
+    }
+
+    /// Checks for a list item marker at the start of a line: one to five `*`, a `-`, one to five
+    /// `.`, or a number followed by a `.`, then a space. The marker may be indented. Returns the
+    /// token type and the length of the marker, including the indentation and the space.
+    fn list_item_marker_at_line_start(&self) -> Option<(TokenType, usize)> {
+        if !self.starts_new_line() {
+            return None;
+        }
+        let line = &self.source.as_bytes()[self.start..];
+        let indent = line
+            .iter()
+            .take_while(|b| matches!(b, b' ' | b'\t'))
+            .count();
+        let rest = &line[indent..];
+        let first = *rest.first()?;
+        let (token_type, marker_len) = match first {
+            b'*' | b'.' => {
+                let repeated = rest.iter().take_while(|b| **b == first).count();
+                if repeated > 5 {
+                    return None;
+                }
+                let token_type = if first == b'*' {
+                    TokenType::UnorderedListItem
+                } else {
+                    TokenType::OrderedListItem
+                };
+                (token_type, repeated)
+            }
+            b'-' => (TokenType::UnorderedListItem, 1),
+            b'0'..=b'9' => {
+                let digits = rest.iter().take_while(|b| b.is_ascii_digit()).count();
+                if rest.get(digits) != Some(&b'.') {
+                    return None;
+                }
+                (TokenType::OrderedListItem, digits + 1)
+            }
+            _ => return None,
+        };
+        if rest.get(marker_len) != Some(&b' ') {
+            return None;
+        }
+        // like Asciidoctor (which strips trailing whitespace first), a marker with no text after
+        // it on the line is not a list item
+        let has_text = rest[marker_len..]
+            .iter()
+            .take_while(|b| **b != b'\n')
+            .any(|b| !b.is_ascii_whitespace());
+        has_text.then_some((token_type, indent + marker_len + 1))
     }
 
     /// Adds the block image, consuming the target as well as any attributes
@@ -1042,6 +1092,64 @@ mod tests {
             ),
         ];
         scan_and_assert_eq(&markup, expected_tokens);
+    }
+
+    /// The lexeme keeps any indentation and the space after the marker
+    #[rstest]
+    #[case::double_star("** Foo\n", "** ", TokenType::UnorderedListItem)]
+    #[case::five_stars("***** Foo\n", "***** ", TokenType::UnorderedListItem)]
+    #[case::dash("- Foo\n", "- ", TokenType::UnorderedListItem)]
+    #[case::double_dot(".. Foo\n", ".. ", TokenType::OrderedListItem)]
+    #[case::triple_dot("... Foo\n", "... ", TokenType::OrderedListItem)]
+    #[case::numbered("12. Foo\n", "12. ", TokenType::OrderedListItem)]
+    #[case::indented("  * Foo\n", "  * ", TokenType::UnorderedListItem)]
+    #[case::tab_indented("\t. Foo\n", "\t. ", TokenType::OrderedListItem)]
+    fn list_item_markers(
+        #[case] markup: &str,
+        #[case] marker: &str,
+        #[case] expected_token: TokenType,
+    ) {
+        let text_start = marker.len() + 1;
+        let expected_tokens = vec![
+            Token::new_default(expected_token, marker.to_string(), None, 1, 1, marker.len()),
+            Token::new_default(
+                TokenType::Text,
+                "Foo".to_string(),
+                Some("Foo".to_string()),
+                1,
+                text_start,
+                text_start + 2,
+            ),
+            Token::new_default(
+                TokenType::NewLineChar,
+                "\n".to_string(),
+                None,
+                1,
+                text_start + 3,
+                text_start + 3,
+            ),
+        ];
+        scan_and_assert_eq(markup, expected_tokens);
+    }
+
+    /// Markup that looks like a list item marker, but isn't one
+    #[rstest]
+    #[case::six_stars("****** Foo\n")]
+    #[case::six_dots("...... Foo\n")]
+    #[case::no_space_after_star("*Foo*\n")]
+    #[case::no_space_after_dash("-Foo\n")]
+    #[case::double_dash("-- Foo\n")]
+    #[case::number_without_dot("12 Foo\n")]
+    #[case::number_without_space("1.5 Foo\n")]
+    #[case::ellipsis("...Foo\n")]
+    #[case::mid_line("Foo * Bar\n")]
+    #[case::no_text_after_marker("* \n")]
+    #[case::only_whitespace_after_marker(" *  \t\nFoo\n")]
+    fn not_list_item_markers(#[case] markup: &str) {
+        assert!(Scanner::new(markup).all(|token| !matches!(
+            token.unwrap().token_type(),
+            TokenType::UnorderedListItem | TokenType::OrderedListItem
+        )));
     }
 
     #[test]

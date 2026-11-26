@@ -3,7 +3,7 @@ use std::fs;
 
 use common::{
     assert_parsed_doc_matches_expected_asg, assert_parsed_doc_matches_expected_asg_from_str,
-    block_tree, top_level_block_names,
+    block_outline, block_tree, top_level_block_names,
 };
 use rstest::rstest;
 
@@ -377,4 +377,14 @@ fn test_subsections_stay_nested() {
 )]
 fn test_subsection_after_block_is_not_nested(#[case] adoc: &str, #[case] expected: &str) {
     assert_eq!(block_tree(adoc), expected);
+}
+
+/// Like Asciidoctor, plain table cells don't parse list markup (only AsciiDoc `a|` cells would),
+/// so a cell that starts with a list marker is text; `|* a` used to fail the whole conversion
+#[test]
+fn test_list_markers_in_table_cells_are_text() {
+    assert_eq!(
+        block_outline("|===\n|* a | 1. b\n|===\n"),
+        "table(tableCell \"* a \", tableCell \" 1. b\")"
+    );
 }
