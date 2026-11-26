@@ -70,7 +70,7 @@ impl<'a> Scanner<'a> {
 
         // list item markers come first: at the start of a line, `.. ` is a list item and not an
         // ellipsis, and `** ` is a list item and not a strong span
-        if matches!(c, ' ' | '\t' | '*' | '-' | '.' | '0'..='9')
+        if matches!(c, ' ' | '\t' | '*' | '-' | '.' | '0'..='9' | 'a'..='z' | 'A'..='Z')
             && let Some((token_type, marker_len)) = self.list_item_marker_at_line_start()
         {
             return self.add_list_item(token_type, marker_len);
@@ -545,6 +545,22 @@ impl<'a> Scanner<'a> {
                     return None;
                 }
                 (TokenType::OrderedListItem, digits + 1)
+            }
+            // like Asciidoctor: one letter and a dot (`a.`, `B.`), or a roman numeral and a
+            // parenthesis (`iv)`, `IX)`)
+            b'a'..=b'z' | b'A'..=b'Z' => {
+                if rest.get(1) == Some(&b'.') {
+                    (TokenType::OrderedListItem, 2)
+                } else {
+                    let numeral = rest
+                        .iter()
+                        .take_while(|b| matches!(b, b'i' | b'v' | b'x' | b'I' | b'V' | b'X'))
+                        .count();
+                    if numeral == 0 || rest.get(numeral) != Some(&b')') {
+                        return None;
+                    }
+                    (TokenType::OrderedListItem, numeral + 1)
+                }
             }
             _ => return None,
         };

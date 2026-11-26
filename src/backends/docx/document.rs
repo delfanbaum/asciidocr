@@ -15,7 +15,7 @@ use crate::graph::{
         ParentBlockName, Section,
     },
     inlines::{Inline, InlineSpanVariant},
-    lists::{DListItem, List, ListItem, ListVariant},
+    lists::{DListItem, List, ListItem, ListVariant, NumeralStyle},
 };
 
 use super::numbering::{
@@ -206,7 +206,7 @@ impl DocxWriter {
                 Self::update(docx, |d| {
                     Ok(d.add_abstract_numbering(ordered_abstract_numbering(
                         numbering,
-                        list.marker(),
+                        NumeralStyle::from_marker(list.marker()),
                     )))
                 })?;
                 numbering

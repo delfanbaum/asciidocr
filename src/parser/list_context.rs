@@ -227,8 +227,9 @@ impl ListContext {
 pub(super) const DLIST_KEY: &str = "::";
 
 /// What a list item's marker must share with the list's other items. Numbered items (`1.`,
-/// `2.`) and callouts (`<1>`, `<2>`) belong together whatever their number; every other marker
-/// only matches itself, so `*` and `**`, or `.` and `1.`, are different lists.
+/// `2.`), lettered ones (`a.`, `b.`), roman ones (`i)`, `ii)`) and callouts (`<1>`, `<2>`) belong
+/// together whatever their number; every other marker only matches itself, so `*` and `**`, or
+/// `.` and `1.`, are different lists.
 pub(super) fn marker_key(marker: &str) -> String {
     if let Some(number) = marker.strip_suffix('.')
         && !number.is_empty()
@@ -242,6 +243,26 @@ pub(super) fn marker_key(marker: &str) -> String {
         && !number.is_empty()
     {
         return "<1>".to_string();
+    }
+    if let Some(letter) = marker.strip_suffix('.')
+        && letter.len() == 1
+        && letter.bytes().all(|b| b.is_ascii_alphabetic())
+    {
+        return if letter.bytes().all(|b| b.is_ascii_lowercase()) {
+            "a.".to_string()
+        } else {
+            "A.".to_string()
+        };
+    }
+    if let Some(numeral) = marker.strip_suffix(')')
+        && !numeral.is_empty()
+        && numeral.bytes().all(|b| b"ivxIVX".contains(&b))
+    {
+        return if numeral.starts_with(['i', 'v', 'x']) {
+            "i)".to_string()
+        } else {
+            "I)".to_string()
+        };
     }
     marker.to_string()
 }

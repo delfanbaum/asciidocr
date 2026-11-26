@@ -10,6 +10,7 @@ use std::{
 
 use crate::errors::ConversionError;
 use crate::graph::asg::Asg;
+use crate::graph::lists::NumeralStyle;
 
 // HTMLBook templates
 static HTMLBOOK_TEMPLATE: (&str, &str) = (
@@ -186,6 +187,10 @@ fn render_from_templates(
     env.add_filter("escape_text", |text: String| escape_text(&text));
     env.add_filter("escape_attr", |text: String| escape_attr(&text));
     env.add_function("image_alt", |target: String| asciidoctor_image_alt(&target));
+    // ordered lists are numbered by their marker (`a.` is `loweralpha`, ...)
+    env.add_function("numeral_style", |marker: String| {
+        NumeralStyle::from_marker(&marker).name()
+    });
     for (name, template) in templates {
         env.add_template(name, template)
             .unwrap_or_else(|_| panic!("Error loading template: {}", name))

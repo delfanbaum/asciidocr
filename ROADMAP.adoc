@@ -60,7 +60,8 @@ Decisions:
   block stack until they close, and an item's text is attached to that item as
   soon as its paragraph ends.
 * Markers in 0.3: `+*+` to `+*****+`, `-`, `.` to `.....` and `1.`, with or
-  without leading whitespace. `a.` and `i)` numbering waits.
+  without leading whitespace. Lettered (`a.`, `A.`) and roman (`i)`, `I)`)
+  markers came later in 0.3, numbered like the dot markers (`a.` like `..`).
 * Description lists join the same context, so lists can attach to their items.
   Nested description lists (`;;`, `:::`) are optional.
 * `List.marker` in the ASG holds the marker as written (`+**+`, `..`, `-`).

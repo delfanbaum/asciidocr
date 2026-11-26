@@ -54,6 +54,63 @@ impl List {
     pub fn marker(&self) -> &str {
         &self.marker
     }
+
+    /// How the list is numbered, if it is an ordered list
+    pub fn numeral_style(&self) -> Option<NumeralStyle> {
+        (self.variant == ListVariant::Ordered).then(|| NumeralStyle::from_marker(&self.marker))
+    }
+}
+
+/// How an ordered list is numbered. Like Asciidoctor, the style follows the marker, not the
+/// list's depth: `.` and `1.` are arabic, `..` and `a.` lower alpha, `...` and `i)` lower roman,
+/// `....` and `A.` upper alpha, `.....` and `I)` upper roman.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum NumeralStyle {
+    Arabic,
+    LowerAlpha,
+    LowerRoman,
+    UpperAlpha,
+    UpperRoman,
+}
+
+impl NumeralStyle {
+    pub fn from_marker(marker: &str) -> Self {
+        match marker {
+            ".." => Self::LowerAlpha,
+            "..." => Self::LowerRoman,
+            "...." => Self::UpperAlpha,
+            "....." => Self::UpperRoman,
+            _ if marker.len() == 2
+                && marker.ends_with('.')
+                && marker.starts_with(|c: char| c.is_ascii_alphabetic()) =>
+            {
+                if marker.starts_with(|c: char| c.is_ascii_lowercase()) {
+                    Self::LowerAlpha
+                } else {
+                    Self::UpperAlpha
+                }
+            }
+            _ if marker.ends_with(')') => {
+                if marker.starts_with(['i', 'v', 'x']) {
+                    Self::LowerRoman
+                } else {
+                    Self::UpperRoman
+                }
+            }
+            _ => Self::Arabic,
+        }
+    }
+
+    /// The name Asciidoctor (and its stylesheet) uses: `arabic`, `loweralpha`, ...
+    pub fn name(&self) -> &'static str {
+        match self {
+            Self::Arabic => "arabic",
+            Self::LowerAlpha => "loweralpha",
+            Self::LowerRoman => "lowerroman",
+            Self::UpperAlpha => "upperalpha",
+            Self::UpperRoman => "upperroman",
+        }
+    }
 }
 
 #[derive(Serialize, PartialEq, Eq, Clone, Debug)]

@@ -80,8 +80,9 @@ HTMLBook's.
 {#- Like Asciidoctor, an ordered list is numbered by its marker, not by its depth -#}
 {%- macro render_list(block) %}
 {%- set ordered = block.variant == "ordered" -%}
-{%- set numeral_style = {"..": "loweralpha", "...": "lowerroman", "....": "upperalpha", ".....": "upperroman"}[block.marker] | default("arabic") -%}
-{%- set numeral_type = {"loweralpha": "a", "lowerroman": "i", "upperalpha": "A", "upperroman": "I"}[numeral_style] -%}
+{%- set numeral_style = numeral_style(block.marker) -%}
+{#- Asciidoctor adds a `type` only for the dot markers (`..`), not the lettered ones (`a.`) -#}
+{%- set numeral_type = {"loweralpha": "a", "lowerroman": "i", "upperalpha": "A", "upperroman": "I"}[numeral_style] if block.marker[:1] == "." -%}
 <div{{ wrapper_attrs(block, 'olist ' ~ numeral_style if ordered else 'ulist') }}>
 {{- render_title(block) }}
 {%- if ordered %}
