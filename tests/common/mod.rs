@@ -106,6 +106,88 @@ pub fn block_tree(adoc: &str) -> String {
         .join(" ")
 }
 
+/// Parses the Asciidoc source and outlines its blocks with their text, descending into lists,
+/// e.g., `list(* "one"(paragraph "more"), * "two")`; top-level blocks are separated by spaces.
+/// List items show their marker and principal text, description list items their terms and
+/// principal text (`"Term":: "def"`), sections their title, and other blocks their name and inline
+/// text, if any (as it is in the graph: a listing's text starts with a newline, e.g.). This is
+/// for tests of where text and blocks end up, without hand-writing JSON with locations.
+pub fn block_outline(adoc: &str) -> String {
+    fn text(inlines: &Value) -> String {
+        let mut collected = String::new();
+        for inline in inlines.as_array().into_iter().flatten() {
+            if let Some(Value::String(value)) = inline.get("value") {
+                collected.push_str(value);
+            }
+            collected.push_str(&text(&inline["inlines"]));
+        }
+        collected
+    }
+    fn children(block: &Value, key: &str) -> Vec<String> {
+        block[key]
+            .as_array()
+            .map(|blocks| blocks.iter().map(describe).collect())
+            .unwrap_or_default()
+    }
+    fn describe(block: &Value) -> String {
+        let name = block["name"].as_str().unwrap_or_default();
+        let mut outline = match name {
+            "list" | "dlist" => {
+                return format!("{}({})", name, children(block, "items").join(", "));
+            }
+            "listItem" => format!(
+                "{} \"{}\"",
+                block["marker"].as_str().unwrap_or_default(),
+                text(&block["principal"])
+            ),
+            "dlistItem" => format!(
+                "\"{}\":: \"{}\"",
+                text(&block["terms"]),
+                text(&block["principal"])
+            ),
+            // a section's text is its title
+            "section" => match text(&block["title"]) {
+                title if title.is_empty() => name.to_string(),
+                title => format!("{} \"{}\"", name, title),
+            },
+            _ => match text(&block["inlines"]) {
+                inline_text if inline_text.is_empty() => name.to_string(),
+                inline_text => format!("{} \"{}\"", name, inline_text),
+            },
+        };
+        let blocks = children(block, "blocks");
+        if !blocks.is_empty() {
+            outline.push_str(&format!("({})", blocks.join(", ")));
+        }
+        outline
+    }
+    let asg = json!(
+        Parser::new_no_target_resolution(env::current_dir().unwrap())
+            .parse(Scanner::new(adoc))
+            .expect("Unable to parse input")
+    );
+    asg["blocks"]
+        .as_array()
+        .expect("Document has no blocks")
+        .iter()
+        .map(describe)
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+/// Like [`block_outline`], but parses on its own thread and panics if parsing takes longer than
+/// a few seconds, so that a parser that loops forever fails the test instead of hanging the run
+pub fn block_outline_with_timeout(adoc: &str) -> String {
+    let (sender, receiver) = std::sync::mpsc::channel();
+    let adoc = adoc.to_string();
+    std::thread::spawn(move || {
+        let _ = sender.send(block_outline(&adoc));
+    });
+    receiver
+        .recv_timeout(std::time::Duration::from_secs(5))
+        .expect("Parsing timed out (or panicked)")
+}
+
 /// Given an asciidoc string and an expected abstract syntax graph json string, assert that the
 /// parser produces the correct json from the asciidoc
 pub fn assert_parsed_doc_matches_expected_asg_from_str(adoc_str: &str, asg_json_str: &str) {

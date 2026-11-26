@@ -72,8 +72,8 @@ cargo clippy --all-features --all-targets
 
 - **Unit tests** live inline at the bottom of the file, in `#[cfg(test)] mod tests { use super::*; ... }`.
   Use small local helpers (for example `scan_and_assert_eq`, `newline_token_at`).
-- **Integration tests** live in `tests/*_tests.rs`, named by area: `block_tests`, `inline_tests`,
-  `document_tests`, `htmlbook_tests`, `asciidoctor_html_tests`, `docx_tests`, `log_tests`,
+- **Integration tests** live in `tests/*_tests.rs`, named by area: `block_tests`, `list_tests`,
+  `inline_tests`, `document_tests`, `htmlbook_tests`, `asciidoctor_html_tests`, `docx_tests`, `log_tests`,
   `offset_tests`, and `cli_tests` (which runs the `asciidocr` binary itself). Each one starts
   with `pub mod common;` (except `cli_tests`) and uses the shared helpers in `tests/common/mod.rs`:
   - `assert_parsed_doc_matches_expected_asg(adoc_fn, json_fn)`
@@ -86,6 +86,9 @@ cargo clippy --all-features --all-targets
   - `parsed_text(adoc)`, `top_level_block_names(adoc)` and `block_tree(adoc)` for tests that
     only care about a document's text or how its blocks nest, without hand-writing JSON with
     locations
+  - `block_outline(adoc)` (and `block_outline_with_timeout`, for inputs that could hang): like
+    `block_tree`, but it descends into lists and shows each block's text, e.g.
+    `list(* "one"(paragraph "more"), * "two")`. Use it for list tests
   - `rendered_docx_part(adoc, part)`, `rendered_docx_runs(adoc)` and
     `assert_rendered_docx_runs_match_expected(adoc_fn, json_fn)` for docx: the runs of each
     paragraph (text, bold, italic, ...) are compared against a `.json` fixture in `tests/data/docx/`
