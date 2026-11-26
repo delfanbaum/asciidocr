@@ -84,6 +84,8 @@ pub enum AsgError {
 pub enum BlockError {
     #[error("Attempted to push dangling ListItem to parent block")]
     DanglingList,
+    #[error("Attempted to add to a list item when no list is open")]
+    NoOpenList,
     #[error("Attempted to add something other than a TableCell to a Table")]
     TableCell,
     #[error("push_block not implemented for {0}")]

@@ -48,24 +48,24 @@ pub(super) struct ListScope {
 }
 
 impl ListScope {
-    fn current_item(&mut self) -> &mut Block {
-        // a scope is only created with a list in it, and is dropped when it closes
-        &mut self
-            .lists
+    /// A scope is only created with a list in it, and is dropped when it closes, so there is
+    /// always a current item
+    fn current_item(&mut self) -> Result<&mut Block, BlockError> {
+        self.lists
             .last_mut()
-            .expect("A list scope always has an open list")
-            .item
+            .map(|open| &mut open.item)
+            .ok_or(BlockError::NoOpenList)
     }
 
     /// Adds an inline to the current item's principal text
     pub fn push_principal(&mut self, inline: Inline) -> Result<(), BlockError> {
-        self.current_item().push_inline(inline)
+        self.current_item()?.push_inline(inline)
     }
 
     /// Attaches a block to the current item (a block that followed a `+`)
     pub fn attach_block(&mut self, block: Block) -> Result<(), BlockError> {
         self.attach_next = false;
-        self.current_item().push_block(block)
+        self.current_item()?.push_block(block)
     }
 
     /// Adds an item to the open list with its key, closing the lists nested deeper than that one.
@@ -120,14 +120,14 @@ impl ListScope {
     /// Closes the lists nested deeper than `level`, innermost first, each into the current item
     /// of the list it is nested in
     fn close_deeper_than(&mut self, level: usize) -> Result<(), BlockError> {
-        while self.lists.len() > level + 1 {
-            let mut open = self.lists.pop().expect("Checked by the loop condition");
+        while self.lists.len() > level + 1
+            && let Some(mut open) = self.lists.pop()
+        {
             open.list.push_block(open.item)?;
-            self.lists
-                .last_mut()
-                .expect("Checked by the loop condition")
-                .item
-                .push_block(open.list)?;
+            let Some(parent) = self.lists.last_mut() else {
+                return Err(BlockError::NoOpenList);
+            };
+            parent.item.push_block(open.list)?;
         }
         Ok(())
     }
@@ -157,6 +157,11 @@ impl ListContext {
         self.scopes.last_mut().filter(|scope| scope.depth == depth)
     }
 
+    /// Whether no list is open
+    pub fn is_empty(&self) -> bool {
+        self.scopes.is_empty()
+    }
+
     /// Like [`active`](Self::active), but only to look
     pub fn get(&self, depth: usize) -> Option<&ListScope> {
         self.scopes.last().filter(|scope| scope.depth == depth)
@@ -177,8 +182,11 @@ impl ListContext {
 
     /// Closes the lists at this depth of the block stack, returning the (outermost) list
     pub fn close_active(&mut self, depth: usize) -> Result<Option<Block>, BlockError> {
-        match self.active(depth) {
-            Some(_) => self.scopes.pop().unwrap().close(),
+        if self.active(depth).is_none() {
+            return Ok(None);
+        }
+        match self.scopes.pop() {
+            Some(scope) => scope.close(),
             None => Ok(None),
         }
     }

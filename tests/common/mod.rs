@@ -161,18 +161,22 @@ pub fn block_outline(adoc: &str) -> String {
         }
         outline
     }
-    let asg = json!(
-        Parser::new_no_target_resolution(env::current_dir().unwrap())
-            .parse(Scanner::new(adoc))
-            .expect("Unable to parse input")
-    );
-    asg["blocks"]
+    parsed_asg(adoc)["blocks"]
         .as_array()
         .expect("Document has no blocks")
         .iter()
         .map(describe)
         .collect::<Vec<_>>()
         .join(" ")
+}
+
+/// Parses the Asciidoc source into its graph, as JSON
+pub fn parsed_asg(adoc: &str) -> Value {
+    json!(
+        Parser::new_no_target_resolution(env::current_dir().unwrap())
+            .parse(Scanner::new(adoc))
+            .expect("Unable to parse input")
+    )
 }
 
 /// Like [`block_outline`], but parses on its own thread and panics if parsing takes longer than

@@ -3,7 +3,7 @@
 //! later steps of the lists rework will add are ignored until that step lands.
 pub mod common;
 
-use common::{block_outline, block_outline_with_timeout};
+use common::{block_outline, block_outline_with_timeout, parsed_asg};
 use rstest::rstest;
 
 #[rstest]
@@ -111,6 +111,65 @@ fn test_list_after_dlist_item() {
         block_outline("Term:: def\n* item\n* item2\nTerm2:: def2\n"),
         "dlist(\"Term\":: \"def\"(list(* \"item\", * \"item2\")), \"Term2\":: \"def2\")"
     );
+}
+
+/// Any kind of block can be attached to an item, and it stays in the item, even when the document
+/// ends before the block does
+#[rstest]
+#[case::admonition_paragraph("* a\n+\nNOTE: hi\n", "list(* \"a\"(admonition(paragraph \"hi\")))")]
+#[case::admonition_paragraph_then_item(
+    "* a\n+\nNOTE: hi\n* b\n",
+    "list(* \"a\"(admonition(paragraph \"hi\")), * \"b\")"
+)]
+#[case::admonition_paragraph_blank_line_item(
+    "* a\n+\nNOTE: hi\n\n* b\n",
+    "list(* \"a\"(admonition(paragraph \"hi\")), * \"b\")"
+)]
+#[case::admonition_block(
+    "* a\n* b\n+\n[NOTE]\n====\ntext\n====\n",
+    "list(* \"a\", * \"b\"(admonition(example(paragraph \"text\"))))"
+)]
+#[case::unterminated_listing("* a\n+\n----\n", "list(* \"a\"(listing \"\n\"))")]
+#[case::unterminated_example_with_list(
+    "* a\n+\n====\n* x\n",
+    "list(* \"a\"(example(list(* \"x\"))))"
+)]
+#[case::image("* a\n+\nimage::x.png[]\n* b\n", "list(* \"a\"(image), * \"b\")")]
+#[case::thematic_break("* a\n+\n'''\n* b\n", "list(* \"a\"(break), * \"b\")")]
+#[case::page_break("* a\n+\n<<<\n* b\n", "list(* \"a\"(break), * \"b\")")]
+fn test_attached_blocks(#[case] adoc: &str, #[case] expected: &str) {
+    assert_eq!(block_outline_with_timeout(adoc), expected);
+}
+
+/// An attached paragraph takes the attributes above it, like any other paragraph
+#[rstest]
+#[case::role("* a\n+\n[role=special]\npara\n", "roles", "[\"special\"]")]
+#[case::id("* a\n+\n[[para-id]]\npara\n", "attributes", "{\"id\":\"para-id\"}")]
+fn test_attached_paragraph_metadata(#[case] adoc: &str, #[case] key: &str, #[case] expected: &str) {
+    let asg = parsed_asg(adoc);
+    let attached = &asg["blocks"][0]["items"][0]["blocks"][0];
+    assert_eq!(
+        attached["metadata"][key].to_string(),
+        expected,
+        "{attached}"
+    );
+}
+
+/// A styled paragraph attached to an item keeps its style (`[verse]` paragraphs aren't
+/// supported yet; see the roadmap)
+#[rstest]
+#[case::quote("* a\n+\n[quote]\nfoo\n", "list(* \"a\"(quote(paragraph \"foo\")))")]
+fn test_attached_styled_paragraphs(#[case] adoc: &str, #[case] expected: &str) {
+    assert_eq!(block_outline(adoc), expected);
+}
+
+/// An attribute or anchor line ends a paragraph, so a list after it is a list
+#[rstest]
+#[case::anchor("text\n[[id]]\n* a\n", "paragraph \"text\" list(* \"a\")")]
+#[case::attributes("text\n[.role]\n* a\n", "paragraph \"text\" list(* \"a\")")]
+#[case::paragraph("text\n[[id]]\nmore\n", "paragraph \"text\" paragraph \"more\"")]
+fn test_attribute_lines_end_paragraphs(#[case] adoc: &str, #[case] expected: &str) {
+    assert_eq!(block_outline(adoc), expected);
 }
 
 /// Lists nest by marker identity: a marker that isn't open yet starts a deeper list, and one
@@ -228,6 +287,11 @@ fn test_list_after_dlist_item_and_blank_line() {
     "A:: a\n....\nlit\n....\n",
     "dlist(\"A\":: \"a\") literal \"\nlit\n\""
 )]
+#[case::indented_term("  A:: a\n", "dlist(\"A\":: \"a\")")]
+#[case::indented_term_after_paragraph(
+    "Intro\n\n  A:: a\n",
+    "paragraph \"Intro\" dlist(\"A\":: \"a\")"
+)]
 #[case::in_list_item("* x\nA:: a\n", "list(* \"x\"(dlist(\"A\":: \"a\")))")]
 #[case::list_item_after_term(
     "A:: a\n* x\nB:: b\n** y\n",
@@ -240,6 +304,7 @@ fn test_description_lists(#[case] adoc: &str, #[case] expected: &str) {
 /// A list item can't interrupt a paragraph, and a heading can't interrupt an item's text
 #[rstest]
 #[case::paragraph_then_marker("Text\n* a\n", "paragraph \"Text\n* a\"")]
+#[case::block_title_line("text\n.Title\n* a\n", "paragraph \"text\n.Title\n* a\"")]
 #[case::item_then_heading("* a\n== B\n\ntext\n", "list(* \"a\n== B\") paragraph \"text\"")]
 fn test_list_interrupting_paragraph(#[case] adoc: &str, #[case] expected: &str) {
     assert_eq!(block_outline_with_timeout(adoc), expected);

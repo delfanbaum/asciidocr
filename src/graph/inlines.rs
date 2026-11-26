@@ -808,6 +808,18 @@ impl InlineLiteral {
         ))
     }
 
+    /// Drops the whitespace the text starts with (the indentation of its line), and moves its
+    /// start location past it
+    pub fn trim_start(&mut self) {
+        let indent = self.value.len() - self.value.trim_start().len();
+        if indent > 0 {
+            self.value.drain(..indent);
+            if let Some(start) = self.location.first_mut() {
+                start.col += indent;
+            }
+        }
+    }
+
     pub fn combine_literals(&mut self, inline: InlineLiteral) {
         self.value.push_str(&inline.value());
         self.location = Location::reconcile(self.location.clone(), inline.location.clone());

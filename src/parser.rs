@@ -59,6 +59,8 @@ pub struct Parser {
     /// true while we are reading a section heading's line; its newline completes the title, so
     /// that the next line starts the section's first block
     section_title_open: bool,
+    /// an admonition (`NOTE: text`, or `[NOTE]`) waiting for its paragraph or block
+    pending_admonition: Option<ParentBlock>,
     /// the line the pending block title was declared on
     block_title_line: usize,
     /// holding ground for block metadata, to be applied to the subsequent block
@@ -130,6 +132,7 @@ impl Parser {
             block_title: None,
             block_title_open: false,
             section_title_open: false,
+            pending_admonition: None,
             block_title_line: 0,
             metadata: None,
             open_delimited_block_lines: vec![],
@@ -177,12 +180,24 @@ impl Parser {
 
         // add any dangling inlines
         self.add_inlines_to_block_stack()?;
+        self.add_empty_admonition(&mut asg)?;
         // and any open lists
         self.close_lists(&mut asg)?;
-        // add any dangling blocks (most often sections)
+        // add any dangling blocks (most often sections); a block left open in a list item (an
+        // unclosed delimited block, say) goes to its item
         while !self.block_stack.is_empty() {
             self.add_last_block_to_graph(&mut asg)?;
         }
+        // which leaves the lists at the top level open (inside an unclosed delimited block, a
+        // closed list goes onto the stack, so it is drained again)
+        self.close_lists(&mut asg)?;
+        while !self.block_stack.is_empty() {
+            self.add_last_block_to_graph(&mut asg)?;
+        }
+        debug_assert!(
+            self.lists.is_empty(),
+            "Lists left open inside closed blocks"
+        );
         // cleanup the final tree locations and xrefs
         asg.consolidate();
         Ok(asg)
@@ -237,6 +252,18 @@ impl Parser {
         }
 
         let token = self.as_text_if_it_cannot_interrupt(token);
+        // like Asciidoctor, an attribute or anchor line ends a paragraph (and a list item's text,
+        // below); the attributes belong to the block after it
+        if matches!(
+            token.token_type(),
+            TokenType::BlockAnchor | TokenType::ElementAttributes
+        ) && self.lists.get(self.block_stack.len()).is_none()
+            && self.in_paragraph()
+        {
+            self.add_inlines_to_block_stack()?;
+            self.emit_completed_block(asg)?;
+            self.dangling_newline = None;
+        }
         self.end_list_after_blank_line(token.token_type(), asg)?;
         // the start of a block ends the current list item's text, and the list too, unless a `+`
         // attached the block to the item
@@ -551,6 +578,7 @@ impl Parser {
         // clear out any inlines
         self.in_inline_span = false;
         self.add_inlines_to_block_stack()?;
+        self.add_empty_admonition(asg)?;
         // and then force a new block hereafter
         self.force_new_block = true;
         if let Some(last_block) = self.block_stack.pop() {
@@ -568,8 +596,8 @@ impl Parser {
         Ok(())
     }
 
-    /// Like Asciidoctor, a list item or a section heading can't interrupt a line of text, so it is
-    /// text if it directly follows a paragraph line. Nor can a heading interrupt a list, unless a
+    /// Like Asciidoctor, a list item, a section heading or a block title can't interrupt a line of
+    /// text, so it is text if it directly follows a paragraph line. Nor can a heading interrupt a list, unless a
     /// blank line came before it: it is text in the item (a list item can't contain a section).
     fn as_text_if_it_cannot_interrupt(&self, mut token: Token) -> Token {
         let is_heading = matches!(
@@ -584,7 +612,8 @@ impl Parser {
             token.token_type(),
             TokenType::UnorderedListItem | TokenType::OrderedListItem
         );
-        if !is_heading && !is_list_item {
+        let is_block_title = token.token_type() == TokenType::BlockLabel;
+        if !is_heading && !is_list_item && !is_block_title {
             return token;
         }
         let as_text = match self.lists.get(self.block_stack.len()) {
@@ -820,7 +849,14 @@ impl Parser {
         // ensure we're not forcing a new block, given that all sorts of things can follow
         self.force_new_block = false;
         let mut dlist_item = DListItem::new_from_token(token);
-        for inline in self.take_current_line_inlines() {
+        let mut terms = self.take_current_line_inlines();
+        // like Asciidoctor, the term's indentation is not part of it
+        if let Some(Inline::InlineLiteral(first)) = terms.front_mut()
+            && matches!(first.name, InlineLiteralName::Text)
+        {
+            first.trim_start();
+        }
+        for inline in terms {
             dlist_item.push_term(inline);
         }
         let locations = dlist_item.locations();
@@ -840,7 +876,7 @@ impl Parser {
             return Ok(());
         }
 
-        self.emit_completed_block_before_list(asg)?;
+        self.emit_completed_block(asg)?;
         let dlist = self.new_dlist(locations);
         self.lists
             .start_list(self.block_stack.len(), key, dlist, item);
@@ -942,7 +978,7 @@ impl Parser {
             return Ok(());
         }
 
-        self.emit_completed_block_before_list(asg)?;
+        self.emit_completed_block(asg)?;
         let list = Block::List(self.new_list(&token, marker, asg)?);
         self.lists
             .start_list(self.block_stack.len(), key, list, item);
@@ -988,11 +1024,11 @@ impl Parser {
     }
 
     /// Outside a delimited block, a block left complete on top of the stack (a paragraph, say,
-    /// or a closed listing) goes to its parent before a list starts, so that the list comes after
-    /// it rather than inside it. Sections stay, since they hold the list. (Inside a delimited
+    /// or a closed listing) goes to its parent before the next block (a list, say) starts, so that
+    /// the next block comes after it rather than inside it. Sections stay, since they hold the list. (Inside a delimited
     /// block, completed blocks wait on the stack for the closing delimiter, which collects them
     /// in order.)
-    fn emit_completed_block_before_list(&mut self, asg: &mut Asg) -> Result<(), ParserError> {
+    fn emit_completed_block(&mut self, asg: &mut Asg) -> Result<(), ParserError> {
         if self.open_delimited_block_lines.is_empty()
             && self
                 .block_stack
@@ -1130,9 +1166,29 @@ impl Parser {
         if let Some(title) = self.block_title.take() {
             admonition.title = title;
         }
-        self.block_stack.push(Block::ParentBlock(admonition));
-        self.close_parent_after_push = true;
+        // the admonition holds the paragraph that follows (see `add_inlines_to_block_stack`), or
+        // the delimited block (see `open_pending_admonition`). It isn't pushed onto the block
+        // stack yet, so that a paragraph in a list item is still the item's
+        self.pending_admonition = Some(admonition);
         Ok(())
+    }
+
+    /// An admonition with nothing after it (`NOTE:` then a blank line) is empty
+    fn add_empty_admonition(&mut self, asg: &mut Asg) -> Result<(), ParserError> {
+        match self.pending_admonition.take() {
+            Some(admonition) => {
+                self.add_to_block_stack_or_graph(asg, Block::ParentBlock(admonition))
+            }
+            None => Ok(()),
+        }
+    }
+
+    /// `[NOTE]` above a delimited block: the admonition holds the block
+    fn open_pending_admonition(&mut self) {
+        if let Some(admonition) = self.pending_admonition.take() {
+            self.block_stack.push(Block::ParentBlock(admonition));
+            self.close_parent_after_push = true;
+        }
     }
 
     fn parse_block_continuation(&mut self, _token: Token) -> Result<(), ParserError> {
@@ -1473,6 +1529,7 @@ impl Parser {
             }
             // the block is open (it takes the text that follows), so even after a `+` it stays
             // on the stack until it closes; only then is it attached
+            self.open_pending_admonition();
             self.open_block(Block::LeafBlock(block))?;
             // note that we're to just add
             self.force_new_block = false;
@@ -1544,6 +1601,7 @@ impl Parser {
         }
         // note the open block line
         self.open_delimited_block_lines.push(delimiter_line);
+        self.open_pending_admonition();
         self.push_block_to_stack(Block::ParentBlock(block))
     }
 
@@ -1612,13 +1670,22 @@ impl Parser {
     /// Puts a block that has just closed (a delimited block) where it belongs: in the current
     /// list item if a `+` attached it, otherwise where `push_block_to_stack` puts it
     fn complete_block(&mut self, block: Block) -> Result<(), ParserError> {
-        if let Some(scope) = self.lists.active(self.block_stack.len())
-            && scope.attach_next
-        {
-            scope.attach_block(block)?;
-            return Ok(());
+        match self.attach_to_list_item(block)? {
+            Some(block) => self.push_block_to_stack(block),
+            None => Ok(()),
         }
-        self.push_block_to_stack(block)
+    }
+
+    /// A block that is complete while a `+` waits for one belongs to the current list item.
+    /// Returns the block if no item is waiting for it.
+    fn attach_to_list_item(&mut self, block: Block) -> Result<Option<Block>, ParserError> {
+        match self.lists.active(self.block_stack.len()) {
+            Some(scope) if scope.attach_next => {
+                scope.attach_block(block)?;
+                Ok(None)
+            }
+            _ => Ok(Some(block)),
+        }
     }
 
     fn add_text_to_last_inline(&mut self, token: Token) {
@@ -1798,50 +1865,63 @@ impl Parser {
                 para_block.push_inline(inline)?
             }
         }
-        // past its principal text, a paragraph in a list belongs to the current item: it follows
-        // a `+`, or a block that a `+` attached
-        if self.lists.active(depth).is_some() {
-            self.warn_paragraph_title_dropped(pending_title.as_deref(), &para_block);
-            if let Some(scope) = self.lists.active(depth) {
-                scope.attach_block(para_block)?;
+        // a styled paragraph: an admonition (`NOTE: text`), or a quote
+        let mut block = para_block;
+        let mut title_dropped = pending_title.clone();
+        if let Some(admonition) = self.pending_admonition.take() {
+            // the attributes above stay with the paragraph, as they always have (see the roadmap)
+            if let Some(metadata) = self.metadata.take() {
+                block.add_metadata(metadata)?;
             }
-            return Ok(());
-        }
-        if self.in_block_continuation && self.open_delimited_block_lines.is_empty() {
-            self.warn_paragraph_title_dropped(pending_title.as_deref(), &para_block);
-            let Some(last_block) = self.block_stack.last_mut() else {
-                return Err(ParserError::BlockContinuation(self.line));
-            };
-            last_block.push_block(para_block)?;
-            return Ok(());
-        }
-
-        if let Some(ref block_metadata) = self.metadata {
+            let mut admonition = Block::ParentBlock(admonition);
+            admonition.push_block(block)?;
+            block = admonition;
+        } else if let Some(ref block_metadata) = self.metadata {
             // check to see if we need to apply metadata to the para block
-            let line_above = para_block.locations().first().unwrap().line + 1;
+            let line_above = block.locations().first().map_or(0, |loc| loc.line) + 1;
             if self.open_delimited_block_lines.last() == Some(&line_above)
                 || self.open_delimited_block_lines.is_empty()
                     && block_metadata.declared_type == Some(AttributeType::Quote)
             {
-                let mut quote_block = Block::ParentBlock(ParentBlock::new(
+                let mut quote = ParentBlock::new(
                     crate::graph::blocks::ParentBlockName::Quote,
                     None,
                     "".to_string(),
                     vec![],
                     vec![],
-                ));
+                );
                 // the title belongs to the quote, not the paragraph inside it
-                if let (Block::ParentBlock(quote), Some(title)) = (&mut quote_block, &pending_title)
-                {
-                    quote.title = title.clone();
+                if let Some(title) = title_dropped.take() {
+                    quote.title = title;
                 }
-                quote_block.push_block(para_block)?;
-                self.push_block_to_stack(quote_block)?;
-                return Ok(());
+                let mut quote = Block::ParentBlock(quote);
+                quote.push_block(block)?;
+                block = quote;
             }
         }
-        self.warn_paragraph_title_dropped(pending_title.as_deref(), &para_block);
-        self.push_block_to_stack(para_block)
+        if let Block::LeafBlock(_) = block {
+            self.warn_paragraph_title_dropped(title_dropped.as_deref(), &block);
+        }
+
+        // past its principal text, a paragraph in a list belongs to the current item: it follows
+        // a `+`, or a block that a `+` attached
+        if self.lists.active(depth).is_some() {
+            if let Some(metadata) = self.metadata.take() {
+                block.add_metadata(metadata)?;
+            }
+            if let Some(scope) = self.lists.active(depth) {
+                scope.attach_block(block)?;
+            }
+            return Ok(());
+        }
+        if self.in_block_continuation && self.open_delimited_block_lines.is_empty() {
+            let Some(last_block) = self.block_stack.last_mut() else {
+                return Err(ParserError::BlockContinuation(self.line));
+            };
+            last_block.push_block(block)?;
+            return Ok(());
+        }
+        self.push_block_to_stack(block)
     }
 
     /// Titles on regular paragraphs are not supported, so we drop them (keeping the paragraph),
@@ -1877,6 +1957,16 @@ impl Parser {
         asg: &mut Asg,
         mut block: Block,
     ) -> Result<(), ParserError> {
+        if self
+            .lists
+            .get(self.block_stack.len())
+            .is_some_and(|scope| scope.attach_next)
+        {
+            if let Some(metadata) = self.metadata.take() {
+                block.add_metadata(metadata)?;
+            }
+            return self.attach_to_list_item(block).map(|_| ());
+        }
         if let Some(last_block) = self.block_stack.last_mut()
             && last_block.takes_block_of_type(&block)
         {
@@ -1895,6 +1985,9 @@ impl Parser {
         // lists inside the block are complete before the block is
         self.close_lists(asg)?;
         if let Some(last_block) = self.block_stack.pop() {
+            let Some(last_block) = self.attach_to_list_item(last_block)? else {
+                return Ok(());
+            };
             if let Some(prior_block) = self.block_stack.last_mut()
                 && prior_block.takes_block_of_type(&last_block)
             {
@@ -1916,6 +2009,9 @@ impl Parser {
                 block.add_metadata(self.metadata.as_ref().unwrap().clone())?;
                 self.metadata = None;
             }
+            let Some(block) = self.attach_to_list_item(block)? else {
+                return Ok(());
+            };
             if let Some(next_last_block) = self.block_stack.last_mut() {
                 if next_last_block.takes_block_of_type(&block) {
                     next_last_block.push_block(block)?;

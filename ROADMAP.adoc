@@ -152,7 +152,7 @@ API audit below.
   scanner
 * [ ] An ID on an admonition lands on its content, in both the `NOTE: text` and
   the `[NOTE]` + `====` forms
-* [ ] A paragraph after a `+[[anchor]]+` line gets a leading space
+* [x] A paragraph after a `+[[anchor]]+` line gets a leading space
 * [ ] A warning for the block macros we don't support (`toc::`, `audio::`,
   `video::`, `[stem]`), which are currently output as plain text without one
 * [x] A line of text directly after a section heading (`== Head`, `Text`) is
@@ -165,6 +165,23 @@ API audit below.
   not implemented for LeafBlock") and is dropped after a heading; Asciidoctor
   keeps it as text. `Parser::in_block_continuation` is only reached outside
   lists now, so this can replace it
+* [ ] `[verse]` above a paragraph (without a delimited block) is ignored: the
+  paragraph stays a paragraph. In the Asciidoctor-style backend, a `[quote]`
+  paragraph's text is wrapped in a paragraph `div`, where Asciidoctor has the
+  text directly in the `blockquote`
+* [ ] Literal paragraphs (a paragraph whose first line is indented) aren't
+  recognized; Asciidoctor makes them literal blocks, and attaches one to a list
+  item after a blank line (`+* a+`, a blank line, `  literal`)
+* [ ] List marker edge cases that differ from Asciidoctor: a tab after the
+  marker (`+*<TAB>a+`) isn't an item; six or more dots (`......`) are an
+  ellipsis rather than a marker; `+* +` with no text, then `+* b+`, gives
+  "* * b" (Asciidoctor: "** b")
+* [ ] A `::` line directly after a list item (`+* a+`, `:: b`) drops the text
+  after it; Asciidoctor keeps "a:: b" as the item's text
+* [ ] A `+` on the last line, with no newline after it, comes out as a backtick
+  at the end of the paragraph before it
+* [ ] `= Title` after content (`+* a+`, a blank line, `= Title`) stops the
+  conversion with an error; Asciidoctor warns and makes it a level 0 section
 * [ ] `Parser::preserve_newline_text` is set by the first description list item
   and never unset, so every paragraph after it has its newlines as separate
   inlines in the ASG

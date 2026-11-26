@@ -329,6 +329,7 @@ impl TokenType {
         matches!(
             self,
             TokenType::ElementAttributes
+                | TokenType::BlockAnchor
                 | TokenType::SidebarBlock
                 | TokenType::OpenBlock
                 | TokenType::QuoteVerseBlock

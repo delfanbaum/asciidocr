@@ -14,6 +14,8 @@ non-features.
   (`+<<id>>+` works, and uses the title of the target)
 * A footnote in a list item moves the item's text out of the item's principal
   text if an earlier footnote exists in the document
+* `[verse]` and literal (indented) paragraphs: only the delimited forms (`____`
+  and `....`) are verse and literal blocks
 * `+pass:[]+` inline passthroughs work, but `+++text+++` does not (it is
   treated as a code span), and `[pass]` is not recognized as a paragraph style
 * Typographic replacements are not complete: ` -- ` becomes a plain em dash
