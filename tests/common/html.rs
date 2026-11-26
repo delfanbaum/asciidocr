@@ -252,14 +252,78 @@ pub fn assert_html_eq(actual: &str, expected: &str) {
 
 /// The HTML of the elements that match a CSS selector, one after another (separated by a
 /// newline), for tests that check part of a page:
-/// `assert_html_eq(&select(&html, "dl dl"), "<dl>...</dl>")`. Select whole tables rather than rows
-/// or cells: HTML parsing drops a `<tr>` or `<td>` outside a table.
+/// `assert_html_eq(&select(&html, "dl dl"), "<dl>...</dl>")`. A match inside another match is
+/// part of that one. Select whole tables rather than rows or cells: HTML parsing drops a `<tr>` or
+/// `<td>` outside a table.
 #[track_caller]
 pub fn select(html: &str, css: &str) -> String {
     let selector = Selector::parse(css).unwrap_or_else(|e| panic!("Bad selector {css:?}: {e}"));
-    parse(html)
-        .select(&selector)
-        .map(|element| element.html())
+    let parsed = parse(html);
+    let matches: Vec<ElementRef> = parsed.select(&selector).collect();
+    let ids: Vec<_> = matches.iter().map(|element| element.id()).collect();
+    matches
+        .iter()
+        .filter(|element| {
+            !element
+                .ancestors()
+                .any(|ancestor| ids.contains(&ancestor.id()))
+        })
+        .map(|element| {
+            let mut out = String::new();
+            serialize(*element, &mut out);
+            out
+        })
         .collect::<Vec<_>>()
         .join("\n")
+}
+
+const VOID_ELEMENTS: &[&str] = &[
+    "area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "source", "track",
+    "wbr",
+];
+
+/// Serializes an element as HTML that parses back to the same tree: unlike scraper's own
+/// serializer, it doubles the newline at the start of a `<pre>`'s text, which parsing drops
+fn serialize(element: ElementRef, out: &mut String) {
+    let name = element.value().name();
+    out.push('<');
+    out.push_str(name);
+    for (attr, value) in element.value().attrs() {
+        let value = value.replace('&', "&amp;").replace('"', "&quot;");
+        out.push_str(&format!(" {attr}=\"{value}\""));
+    }
+    out.push('>');
+    if VOID_ELEMENTS.contains(&name) {
+        return;
+    }
+    let raw = matches!(name, "script" | "style");
+    for (idx, child) in element.children().enumerate() {
+        match child.value() {
+            Node::Text(text) => {
+                if idx == 0
+                    && matches!(name, "pre" | "textarea" | "listing")
+                    && text.starts_with('\n')
+                {
+                    out.push('\n');
+                }
+                if raw {
+                    out.push_str(text);
+                } else {
+                    out.push_str(
+                        &text
+                            .replace('&', "&amp;")
+                            .replace('<', "&lt;")
+                            .replace('>', "&gt;"),
+                    );
+                }
+            }
+            Node::Element(_) => {
+                if let Some(child_element) = ElementRef::wrap(child) {
+                    serialize(child_element, out);
+                }
+            }
+            _ => {}
+        }
+    }
+    out.push_str(&format!("</{name}>"));
 }
