@@ -1733,6 +1733,8 @@ mod tests {
     #[case::colons_in_text("a::b::c\n")]
     #[case::semicolons_in_text("a;;b\n")]
     #[case::space_before_semicolons("Txrm ;; bar\n")]
+    #[case::space_before_three_colons("Txrm ::: bar\n")]
+    #[case::space_before_four_colons("Txrm :::: bar\n")]
     fn not_description_list_markers(#[case] markup: &str) {
         assert!(
             Scanner::new(markup)

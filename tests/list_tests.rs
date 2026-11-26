@@ -3,7 +3,9 @@
 //! later steps of the lists rework will add are ignored until that step lands.
 pub mod common;
 
-use common::{block_outline, block_outline_with_timeout, parsed_asg};
+use common::{
+    block_outline, block_outline_with_timeout, parsed_asg, render_asciidoctor_embedded_from_str,
+};
 use rstest::rstest;
 
 #[rstest]
@@ -144,6 +146,18 @@ fn test_list_after_dlist_item() {
     "* a\n+\n====\n* x\n",
     "list(* \"a\"(example(list(* \"x\"))))"
 )]
+#[case::admonition_block_then_paragraph(
+    "* item\n+\n[NOTE]\n====\nin\n====\n\nplain\n",
+    "list(* \"item\"(admonition(example(paragraph \"in\")))) paragraph \"plain\""
+)]
+#[case::admonition_block_then_item(
+    "* item\n+\n[NOTE]\n====\nin\n====\n* two\n",
+    "list(* \"item\"(admonition(example(paragraph \"in\"))), * \"two\")"
+)]
+#[case::unterminated_admonition_block(
+    "* a\n+\n[NOTE]\n====\nx\n",
+    "list(* \"a\"(admonition(example(paragraph \"x\"))))"
+)]
 #[case::image("* a\n+\nimage::x.png[]\n* b\n", "list(* \"a\"(image), * \"b\")")]
 #[case::thematic_break("* a\n+\n'''\n* b\n", "list(* \"a\"(break), * \"b\")")]
 #[case::page_break("* a\n+\n<<<\n* b\n", "list(* \"a\"(break), * \"b\")")]
@@ -171,6 +185,54 @@ fn test_attached_paragraph_metadata(#[case] adoc: &str, #[case] key: &str, #[cas
 #[case::quote("* a\n+\n[quote]\nfoo\n", "list(* \"a\"(quote(paragraph \"foo\")))")]
 fn test_attached_styled_paragraphs(#[case] adoc: &str, #[case] expected: &str) {
     assert_eq!(block_outline(adoc), expected);
+}
+
+/// Like Asciidoctor (which makes it a role), `[NOTE]` above a list doesn't make an admonition
+#[test]
+fn test_admonition_label_above_list() {
+    assert_eq!(
+        block_outline("[NOTE]\n* a\n* b\n\nplain\n"),
+        "list(* \"a\", * \"b\") paragraph \"plain\""
+    );
+}
+
+/// Like Asciidoctor, a bare URL runs to whitespace (or a bracket), less the punctuation that ends
+/// a sentence or closes formatting
+#[rstest]
+#[case::dash("see http://x.com/my-page now", "http://x.com/my-page")]
+#[case::underscore("see http://x.com/a_b now", "http://x.com/a_b")]
+#[case::percent("see http://x.com/a%20b now", "http://x.com/a%20b")]
+#[case::semicolons("see http://x.com/a;;b now", "http://x.com/a;;b")]
+#[case::tilde("see http://x.com/a~b!", "http://x.com/a~b")]
+#[case::comma_after("see http://x.com/a;b, then", "http://x.com/a;b")]
+#[case::parenthesis_after("(see http://x.com/a)", "http://x.com/a")]
+#[case::strong("*see http://x.com/a* now", "http://x.com/a")]
+#[case::non_ascii("see http://x.com/caf\u{e9} now", "http://x.com/caf\u{e9}")]
+fn test_bare_urls(#[case] adoc: &str, #[case] url: &str) {
+    let html = render_asciidoctor_embedded_from_str(adoc);
+    assert!(html.contains(&format!("href=\"{url}\"")), "{html}");
+}
+
+/// A URL in a term doesn't stop the term at the semicolons in it
+#[test]
+fn test_url_in_term() {
+    let html = render_asciidoctor_embedded_from_str("see http://x.com/a;;b and foo;; bar\n");
+    assert!(
+        html.contains("<dt class=\"hdlist1\">see <a href=\"http://x.com/a;;b\""),
+        "{html}"
+    );
+}
+
+/// A run of colons after a space isn't a marker, any more than `::` is (`Term :: def`)
+#[rstest]
+#[case::two("foo :: bar\n")]
+#[case::three("foo ::: bar\n")]
+#[case::four("foo :::: bar\n")]
+fn test_marker_after_space_is_text(#[case] adoc: &str) {
+    assert_eq!(
+        block_outline(adoc),
+        format!("paragraph \"{}\"", adoc.trim_end())
+    );
 }
 
 /// An attribute or anchor line ends a paragraph, so a list after it is a list
@@ -340,6 +402,8 @@ fn test_description_lists(#[case] adoc: &str, #[case] expected: &str) {
 #[case::colons_in_text("a::b::c\n", "paragraph \"a::b::c\"")]
 // like Asciidoctor, a description on the line after its term loses its indentation
 #[case::description_on_next_line("Term::\n  desc\n", "dlist(\"Term\":: \"desc\")")]
+#[case::description_after_blank_line("Term::\n\nfoo\n", "dlist(\"Term\":: \"foo\")")]
+#[case::description_after_whitespace_line("Term::\n   \nfoo\n", "dlist(\"Term\":: \"foo\")")]
 fn test_nested_description_lists(#[case] adoc: &str, #[case] expected: &str) {
     assert_eq!(block_outline_with_timeout(adoc), expected);
 }

@@ -380,13 +380,23 @@ fn test_subsection_after_block_is_not_nested(#[case] adoc: &str, #[case] expecte
 }
 
 /// Like Asciidoctor, plain table cells don't parse list markup (only AsciiDoc `a|` cells would),
-/// so a cell that starts with a list marker is text; `|* a` used to fail the whole conversion
-#[test]
-fn test_list_markers_in_table_cells_are_text() {
-    assert_eq!(
-        block_outline("|===\n|* a | 1. b\n|===\n"),
-        "table(tableCell \"* a \", tableCell \" 1. b\")"
-    );
+/// so a cell that starts with a list marker is text; `|* a` used to fail the whole conversion.
+/// So are description list markers and admonition labels (`|x:: y`, `|NOTE: x`)
+#[rstest]
+#[case::list_markers(
+    "|===\n|* a | 1. b\n|===\n",
+    "table(tableCell \"* a \", tableCell \" 1. b\")"
+)]
+#[case::description_list_markers(
+    "|===\n|c;; d |x:: y\n|===\n",
+    "table(tableCell \"c;; d \", tableCell \"x:: y\")"
+)]
+#[case::admonition_label(
+    "|===\n|NOTE: x |b\n|===\n",
+    "table(tableCell \"NOTE: x \", tableCell \"b\")"
+)]
+fn test_list_markers_in_table_cells_are_text(#[case] adoc: &str, #[case] expected: &str) {
+    assert_eq!(block_outline(adoc), expected);
 }
 
 /// A heading's title is its own line, and like Asciidoctor, a heading can't interrupt a
