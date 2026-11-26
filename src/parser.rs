@@ -71,6 +71,9 @@ pub struct Parser {
     /// counts in/out delimited blocks by line reference; allows us to warn/error if they are
     /// unclosed at the end of the document
     open_delimited_block_lines: Vec<usize>,
+    /// the files (as file stacks) those delimited blocks opened in: an included file's lines are
+    /// counted from 1 too, so a line alone doesn't identify a block
+    open_delimited_block_files: Vec<Vec<String>>,
     /// appends text to block or inline regardless of markup, token, etc. (will need to change
     /// if/when we handle code callouts)
     open_parse_after_as_text_type: Option<TokenType>,
@@ -140,6 +143,7 @@ impl Parser {
             block_title_line: 0,
             metadata: None,
             open_delimited_block_lines: vec![],
+            open_delimited_block_files: vec![],
             level_offset: 0,
             in_block_line: false,
             in_inline_span: false,
@@ -837,8 +841,11 @@ impl Parser {
         // clean up inlines
         self.add_inlines_to_block_stack()?;
 
-        // get the blocks stack back to where it was
-        while self.block_stack.len() > current_block_stack_len {
+        // get the blocks stack back to where it was; inside a delimited block, though, the blocks
+        // from the include wait on the stack, in order, for its closing delimiter to collect them
+        while self.block_stack.len() > current_block_stack_len
+            && self.open_delimited_block_lines.is_empty()
+        {
             self.add_last_block_to_graph(asg)?
         }
         // ...then pop the file off the stack
@@ -1651,14 +1658,18 @@ impl Parser {
             self.block_title = None;
         }
 
-        // the innermost delimited block that is still open: the one that opened on the line
-        // `open_delimited_block_lines` ends with (other parent blocks on the stack, a sidebar that
-        // has closed inside an example, say, are complete, and waiting for the example to close)
+        // the innermost delimited block that is still open: the one that opened on the line (in
+        // the file) `open_delimited_block_lines` ends with (other parent blocks on the stack, a
+        // sidebar that has closed inside an example, say, are complete, and waiting for the
+        // example to close)
         let open_line = self.open_delimited_block_lines.last().copied();
+        let open_file = self.open_delimited_block_files.last().cloned();
         if let Some(parent_block_idx) = open_line.and_then(|line| {
             self.block_stack.iter().rposition(|parent_block| {
                 matches!(parent_block, Block::ParentBlock(open)
-                    if open.opening_line().ok() == Some(line))
+                if open.location.first().is_some_and(|start| {
+                    start.line == line && Some(&start.file) == open_file.as_ref()
+                }))
             })
         }) {
             let closes_open_block = matches!(
@@ -1684,6 +1695,7 @@ impl Parser {
                 let Some(line) = self.open_delimited_block_lines.pop() else {
                     return Err(ParserError::DelimitedBlock(matched.opening_line()?));
                 };
+                self.open_delimited_block_files.pop();
                 if line != matched.opening_line()? {
                     warn!("Error nesting delimited blocks, see line {}", line)
                 }
@@ -1708,6 +1720,13 @@ impl Parser {
         }
         // note the open block line
         self.open_delimited_block_lines.push(delimiter_line);
+        self.open_delimited_block_files.push(
+            block
+                .location
+                .first()
+                .map(|start| start.file.clone())
+                .unwrap_or_default(),
+        );
         self.open_pending_admonition();
         self.push_block_to_stack(Block::ParentBlock(block))
     }

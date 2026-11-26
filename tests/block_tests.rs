@@ -3,7 +3,7 @@ use std::fs;
 
 use common::{
     assert_parsed_doc_matches_expected_asg, assert_parsed_doc_matches_expected_asg_from_str,
-    block_outline, block_tree, top_level_block_names,
+    block_outline, block_outline_from_file, block_tree, top_level_block_names,
 };
 use rstest::rstest;
 
@@ -452,9 +452,7 @@ fn test_nested_delimited_blocks(#[case] adoc: &str, #[case] expected: &str) {
 #[test]
 fn test_delimited_block_in_include() {
     assert_eq!(
-        block_outline(
-            "x\n\n====\nfirst\n\ninclude::tests/data/blocks/included-sidebar.adoc[]\n\nlast\n====\nafter\n"
-        ),
+        block_outline_from_file("blocks/include-delimited.adoc"),
         "paragraph \"x\" example(paragraph \"first\", paragraph \"a\", sidebar(paragraph \"sidebar in the include\"), paragraph \"last\") paragraph \"after\""
     );
 }

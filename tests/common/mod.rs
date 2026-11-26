@@ -115,6 +115,23 @@ pub fn block_tree(adoc: &str) -> String {
 /// text, if any (as it is in the graph: a listing's text starts with a newline, e.g.). This is
 /// for tests of where text and blocks end up, without hand-writing JSON with locations.
 pub fn block_outline(adoc: &str) -> String {
+    outline(&parsed_asg(adoc))
+}
+
+/// Like [`block_outline`], but for a file in tests/data (whose includes resolve from where it is)
+pub fn block_outline_from_file(adoc_fn: &str) -> String {
+    let path = PathBuf::from("tests/data/").join(adoc_fn);
+    let asg = json!(
+        Parser::new_no_target_resolution(path.clone())
+            .parse(Scanner::new(
+                &fs::read_to_string(&path).expect("Unable to find adoc")
+            ))
+            .expect("Unable to parse input")
+    );
+    outline(&asg)
+}
+
+fn outline(asg: &Value) -> String {
     fn text(inlines: &Value) -> String {
         let mut collected = String::new();
         for inline in inlines.as_array().into_iter().flatten() {
@@ -169,7 +186,7 @@ pub fn block_outline(adoc: &str) -> String {
         }
         outline
     }
-    parsed_asg(adoc)["blocks"]
+    asg["blocks"]
         .as_array()
         .expect("Document has no blocks")
         .iter()
