@@ -12,21 +12,23 @@
           "type": "block",
           "marker": "::",
           "terms": [
-            {
-              "name": "text",
-              "type": "string",
-              "value": "Term",
-              "location": [
-                {
-                  "line": 2,
-                  "col": 1
-                },
-                {
-                  "line": 2,
-                  "col": 4
-                }
-              ]
-            }
+            [
+              {
+                "name": "text",
+                "type": "string",
+                "value": "Term",
+                "location": [
+                  {
+                    "line": 2,
+                    "col": 1
+                  },
+                  {
+                    "line": 2,
+                    "col": 4
+                  }
+                ]
+              }
+            ]
           ],
           "principal": [
             {

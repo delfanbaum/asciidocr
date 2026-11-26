@@ -287,6 +287,14 @@ fn test_list_after_dlist_item_and_blank_line() {
     "A:: a\n....\nlit\n....\n",
     "dlist(\"A\":: \"a\") literal \"\nlit\n\""
 )]
+#[case::two_terms("A::\nB:: b\n", "dlist(\"A\" \"B\":: \"b\")")]
+#[case::two_terms_blank_line("A::\n\nB:: b\n", "dlist(\"A\" \"B\":: \"b\")")]
+#[case::three_terms("A::\nB::\nC:: c\n", "dlist(\"A\" \"B\" \"C\":: \"c\")")]
+#[case::terms_after_described_item(
+    "A:: a\nB::\nC:: c\n",
+    "dlist(\"A\":: \"a\", \"B\" \"C\":: \"c\")"
+)]
+#[case::terms_in_list_item("* x\nA::\nB:: b\n", "list(* \"x\"(dlist(\"A\" \"B\":: \"b\")))")]
 #[case::indented_term("  A:: a\n", "dlist(\"A\":: \"a\")")]
 #[case::indented_term_after_paragraph(
     "Intro\n\n  A:: a\n",

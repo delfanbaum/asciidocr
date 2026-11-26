@@ -848,24 +848,31 @@ impl Parser {
         self.dangling_newline = None;
         // ensure we're not forcing a new block, given that all sorts of things can follow
         self.force_new_block = false;
-        let mut dlist_item = DListItem::new_from_token(token);
-        let mut terms = self.take_current_line_inlines();
+        let mut term = Vec::from(self.take_current_line_inlines());
         // like Asciidoctor, the term's indentation is not part of it
-        if let Some(Inline::InlineLiteral(first)) = terms.front_mut()
+        if let Some(Inline::InlineLiteral(first)) = term.first_mut()
             && matches!(first.name, InlineLiteralName::Text)
         {
             first.trim_start();
         }
-        for inline in terms {
-            dlist_item.push_term(inline);
-        }
-        let locations = dlist_item.locations();
-        let item = Block::DListItem(dlist_item);
-        let key = DLIST_KEY.to_string();
 
         self.add_inlines_to_block_stack()?;
         // preserve newlines for now
         self.preserve_newline_text = true;
+        // a term directly after a term is another term for the same description
+        let term = match self.lists.active(depth) {
+            Some(scope) => match scope.add_term(term) {
+                Some(term) => term,
+                None => return Ok(()),
+            },
+            None => term,
+        };
+        let mut dlist_item = DListItem::new_from_token(token);
+        dlist_item.add_term(term);
+        let locations = dlist_item.locations();
+        let item = Block::DListItem(dlist_item);
+        let key = DLIST_KEY.to_string();
+
         if let Some(scope) = self.lists.active(depth) {
             if let Some(item) = scope.add_item(&key, item)? {
                 let dlist = self.new_dlist(locations);

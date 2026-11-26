@@ -139,17 +139,20 @@ loading code simple.
 {%- endmacro -%}
 
 {%- macro render_dlist_item(block) -%}
-    {%- if block.terms -%}
-    <dt>{%- for inline in block.terms -%}
+    {%- for term in block.terms -%}
+    <dt>{%- for inline in term -%}
         {{- render_inline(inline) -}}
     {%- endfor -%}</dt>
-    {%- endif -%}
+    {%- endfor -%}
+    {#- a term with no description (one of several terms) has no <dd> -#}
+    {%- if block.principal or block.blocks -%}
     <dd>
     {{- render_principal(block) -}}
     {%- for child in block.blocks -%}
         {{- render_block(child) -}}
     {%- endfor -%}
     </dd>
+    {%- endif -%}
 {%- endmacro -%}
 
 {#- Admonitions, examples, open blocks, quotes and sidebars all share the same shape:

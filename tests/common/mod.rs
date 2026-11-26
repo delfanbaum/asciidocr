@@ -109,7 +109,7 @@ pub fn block_tree(adoc: &str) -> String {
 /// Parses the Asciidoc source and outlines its blocks with their text, descending into lists,
 /// e.g., `list(* "one"(paragraph "more"), * "two")`; top-level blocks are separated by spaces.
 /// List items show their marker and principal text, description list items their terms and
-/// principal text (`"Term":: "def"`), sections their title, and other blocks their name and inline
+/// principal text (`"Term":: "def"`, or `"A" "B":: "def"` for two terms), sections their title, and other blocks their name and inline
 /// text, if any (as it is in the graph: a listing's text starts with a newline, e.g.). This is
 /// for tests of where text and blocks end up, without hand-writing JSON with locations.
 pub fn block_outline(adoc: &str) -> String {
@@ -141,8 +141,14 @@ pub fn block_outline(adoc: &str) -> String {
                 text(&block["principal"])
             ),
             "dlistItem" => format!(
-                "\"{}\":: \"{}\"",
-                text(&block["terms"]),
+                "{}:: \"{}\"",
+                block["terms"]
+                    .as_array()
+                    .into_iter()
+                    .flatten()
+                    .map(|term| format!("\"{}\"", text(term)))
+                    .collect::<Vec<_>>()
+                    .join(" "),
                 text(&block["principal"])
             ),
             // a section's text is its title

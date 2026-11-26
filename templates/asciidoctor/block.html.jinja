@@ -237,7 +237,11 @@ HTMLBook's.
 {{- render_title(block) }}
 <dl>
 {%- for item in block.items %}
-<dt class="hdlist1">{{ render_inlines(item.terms) }}</dt>
+{%- for term in item.terms %}
+<dt class="hdlist1">{{ render_inlines(term) }}</dt>
+{%- endfor %}
+{#- like Asciidoctor, a term with no description (one of several terms) has no <dd> -#}
+{%- if item.principal or item.blocks %}
 <dd>
 {%- if item.principal %}
 <p>{{ render_inlines(item.principal) }}</p>
@@ -246,6 +250,7 @@ HTMLBook's.
 {{ render_block(child) }}
 {%- endfor %}
 </dd>
+{%- endif %}
 {%- endfor %}
 </dl>
 </div>

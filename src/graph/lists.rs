@@ -192,7 +192,9 @@ pub struct DListItem {
     #[serde(rename = "type")]
     node_type: NodeTypes,
     marker: String, // the lexeme with no space
-    pub terms: Vec<Inline>,
+    /// each term is its own list of inlines, as in the ASG schema: a description can have
+    /// several terms (`A::` directly followed by `B:: description`)
+    pub terms: Vec<Vec<Inline>>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub principal: Vec<Inline>, // apparently this can also be optional!
     #[serde(skip_serializing_if = "Vec::is_empty")]
@@ -223,13 +225,15 @@ impl DListItem {
         }
     }
 
-    /// adds inlines to the "terms", and reconciling the locations.
-    pub fn push_term(&mut self, inline: Inline) {
-        self.location = Location::reconcile(self.location.clone(), inline.locations().clone());
-        self.terms.push(inline)
+    /// Adds a term, and reconciles the item's location with it
+    pub fn add_term(&mut self, term: Vec<Inline>) {
+        for inline in &term {
+            self.location = Location::reconcile(self.location.clone(), inline.locations().clone());
+        }
+        self.terms.push(term)
     }
 
-    pub fn terms(&self) -> Vec<Inline> {
+    pub fn terms(&self) -> Vec<Vec<Inline>> {
         self.terms.clone()
     }
 

@@ -98,6 +98,23 @@ impl ListScope {
         self.after_blank = false;
     }
 
+    /// Adds a term to the current item, if it is a description list item with no description
+    /// yet: like Asciidoctor, `A::` directly followed by `B:: b` (even after a blank line) is one
+    /// item with two terms. Otherwise the term is handed back, to start an item.
+    pub fn add_term(&mut self, term: Vec<Inline>) -> Option<Vec<Inline>> {
+        match self.lists.last_mut() {
+            Some(OpenList {
+                item: Block::DListItem(item),
+                ..
+            }) if item.principal.is_empty() && item.blocks.is_empty() => {
+                item.add_term(term);
+                self.start_item();
+                None
+            }
+            _ => Some(term),
+        }
+    }
+
     /// A blank line ends the current item's text (and cancels a `+` with nothing attached yet)
     pub fn blank_line(&mut self) {
         self.principal_open = false;

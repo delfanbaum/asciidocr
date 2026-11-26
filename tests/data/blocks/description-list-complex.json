@@ -12,21 +12,23 @@
           "type": "block",
           "marker": "::",
           "terms": [
-            {
-              "name": "text",
-              "type": "string",
-              "value": "Term",
-              "location": [
-                {
-                  "line": 1,
-                  "col": 1
-                },
-                {
-                  "line": 1,
-                  "col": 4
-                }
-              ]
-            }
+            [
+              {
+                "name": "text",
+                "type": "string",
+                "value": "Term",
+                "location": [
+                  {
+                    "line": 1,
+                    "col": 1
+                  },
+                  {
+                    "line": 1,
+                    "col": 4
+                  }
+                ]
+              }
+            ]
           ],
           "principal": [
             {
@@ -61,21 +63,23 @@
           "type": "block",
           "marker": "::",
           "terms": [
-            {
-              "name": "text",
-              "type": "string",
-              "value": "Another Term",
-              "location": [
-                {
-                  "line": 2,
-                  "col": 1
-                },
-                {
-                  "line": 2,
-                  "col": 12
-                }
-              ]
-            }
+            [
+              {
+                "name": "text",
+                "type": "string",
+                "value": "Another Term",
+                "location": [
+                  {
+                    "line": 2,
+                    "col": 1
+                  },
+                  {
+                    "line": 2,
+                    "col": 12
+                  }
+                ]
+              }
+            ]
           ],
           "principal": [
             {
@@ -110,21 +114,23 @@
           "type": "block",
           "marker": "::",
           "terms": [
-            {
-              "name": "text",
-              "type": "string",
-              "value": "Another term",
-              "location": [
-                {
-                  "line": 3,
-                  "col": 1
-                },
-                {
-                  "line": 3,
-                  "col": 12
-                }
-              ]
-            }
+            [
+              {
+                "name": "text",
+                "type": "string",
+                "value": "Another term",
+                "location": [
+                  {
+                    "line": 3,
+                    "col": 1
+                  },
+                  {
+                    "line": 3,
+                    "col": 12
+                  }
+                ]
+              }
+            ]
           ],
           "blocks": [
             {
@@ -275,21 +281,23 @@
           "type": "block",
           "marker": "::",
           "terms": [
-            {
-              "name": "text",
-              "type": "string",
-              "value": "And then a term with a list",
-              "location": [
-                {
-                  "line": 10,
-                  "col": 1
-                },
-                {
-                  "line": 10,
-                  "col": 27
-                }
-              ]
-            }
+            [
+              {
+                "name": "text",
+                "type": "string",
+                "value": "And then a term with a list",
+                "location": [
+                  {
+                    "line": 10,
+                    "col": 1
+                  },
+                  {
+                    "line": 10,
+                    "col": 27
+                  }
+                ]
+              }
+            ]
           ],
           "blocks": [
             {

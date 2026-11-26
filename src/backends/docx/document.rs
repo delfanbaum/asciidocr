@@ -308,13 +308,18 @@ impl DocxWriter {
 
     fn add_dlist_item(&mut self, docx: &mut Docx, item: &DListItem) -> Result<(), DocxRenderError> {
         Self::update(docx, |mut d| {
-            // add terms
+            // add terms, each in its own paragraph
             d = self.set_style(d, DocumentStyles::DefinitionTerm)?;
-            let terms_para = self.add_inlines_to_para(Paragraph::new(), item.terms());
-            d = self.add_paragraph(d, terms_para)?;
+            for term in item.terms() {
+                let terms_para = self.add_inlines_to_para(Paragraph::new(), term);
+                d = self.add_paragraph(d, terms_para)?;
+            }
 
             // add principal and anything else
             d = self.set_style(d, DocumentStyles::Definition)?;
+            if item.principal.is_empty() {
+                return Ok(d);
+            }
             let mut para = Paragraph::new().style(&self.current_style.style_id());
             para = self.add_inlines_to_para(para, item.principal());
             self.add_paragraph(d, para)

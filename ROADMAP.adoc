@@ -117,8 +117,10 @@ Order of work (each step its own commit or PR):
   lazy line after an item garbles the next term (`A:: a`, `more a`, `B:: b` gave
   the term "more aB"); a delimited block without `+` swallows the item's text;
   and a description list after a list item merges into the item's text
-* [ ] Several terms for one description (`A::` directly followed by `B:: b`):
-  Asciidoctor gives one item with two terms, we give `A` an empty description
+* [x] Several terms for one description (`A::` directly followed by `B:: b`):
+  Asciidoctor gives one item with two terms, we gave `A` an empty description.
+  `DListItem.terms` is now a list of terms (each a list of inlines), as in the
+  ASG schema, which changes the JSON output of every description list
 * [x] The indentation of a lazy continuation line (`+* one+`, `  more`) is kept
   in the item's text; Asciidoctor strips it
 * [x] Asciidoctor-style backend: the ordered numeral style (`arabic`,
