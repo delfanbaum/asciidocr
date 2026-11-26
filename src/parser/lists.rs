@@ -318,14 +318,12 @@ impl Parser {
         Ok(())
     }
 
-    pub(super) fn parse_block_continuation(&mut self, _token: Token) -> Result<(), ParserError> {
+    /// A `+` in a list: the next block belongs to the current item
+    pub(super) fn parse_block_continuation(&mut self, line: usize) -> Result<(), ParserError> {
+        self.continuation_line = Some(line);
         self.add_inlines_to_block_stack()?;
         if let Some(scope) = self.lists.active(self.block_stack.len()) {
-            // the next block belongs to the current list item
             scope.continuation()?;
-        } else {
-            // outside a list, where Asciidoctor keeps a `+` as text; see the roadmap
-            self.in_block_continuation = true;
         }
         self.force_new_block = true;
         Ok(())

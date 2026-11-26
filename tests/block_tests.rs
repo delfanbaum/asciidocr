@@ -545,3 +545,149 @@ fn test_inputs_found_by_fuzzing(#[case] adoc: &str, #[case] expected: &str) {
     common::parsed_asg_with_timeout(adoc);
     assert_eq!(block_outline(adoc), expected);
 }
+
+/// Like Asciidoctor, a `+` line outside a list is text: it starts a paragraph of its own, which
+/// takes the lines after it (it used to stop the conversion, or be dropped)
+#[rstest]
+#[case::after_paragraph("Para\n+\nafter\n", "paragraph \"Para\" paragraph \"+\nafter\"")]
+#[case::after_blank_line("Para\n\n+\nafter\n", "paragraph \"Para\" paragraph \"+\nafter\"")]
+#[case::alone(
+    "Para\n\n+\n\nafter\n",
+    "paragraph \"Para\" paragraph \"+\" paragraph \"after\""
+)]
+#[case::first_line("+\nafter\n", "paragraph \"+\nafter\"")]
+#[case::twice("+\n+\nx\n", "paragraph \"+\" paragraph \"+\nx\"")]
+#[case::after_heading("== Head\n+\nafter\n", "section \"Head\"(paragraph \"+\nafter\")")]
+#[case::after_listing(
+    "----\nx\n----\n+\nafter\n",
+    "listing \"\nx\n\" paragraph \"+\nafter\""
+)]
+#[case::in_example(
+    "====\na\n+\nb\n====\n",
+    "example(paragraph \"a\", paragraph \"+\nb\")"
+)]
+#[case::in_block_in_list(
+    "* x\n+\n====\na\n+\nb\n====\n",
+    "list(* \"x\"(example(paragraph \"a\", paragraph \"+\nb\")))"
+)]
+#[case::after_header("= T\n\n+\nafter\n", "paragraph \"+\nafter\"")]
+#[case::second_in_list("* a\n+\n+\nb\n", "list(* \"a\"(paragraph \"+\nb\"))")]
+#[case::in_listing("----\na\n+\nb\n----\n", "listing \"\na\n+\nb\n\"")]
+#[case::author_line("= T\n+\n\ny\n", "paragraph \"y\"")]
+#[case::revision_line("= T\nJane Doe\n+\n\ny\n", "paragraph \"y\"")]
+#[case::in_verse("[verse]\n____\na\n+\nb\n____\n", "verse \"a\n+\nb\"")]
+#[case::title_between_in_list("* a\n+\n.T\n+\nb\n", "list(* \"a\"(paragraph \"b\"))")]
+#[case::anchor_between_in_list("* a\n+\n[[x]]\n+\nb\n", "list(* \"a\"(paragraph \"b\"))")]
+#[case::comment_between_in_list("* a\n+\n// c\n+\nb\n", "list(* \"a\"(paragraph \"b\"))")]
+#[case::attribute_between_in_list("* a\n+\n:foo: bar\n+\nb\n", "list(* \"a\"(paragraph \"b\"))")]
+fn test_plus_line_outside_list_is_text(#[case] adoc: &str, #[case] expected: &str) {
+    assert_eq!(block_outline(adoc), expected);
+}
+
+/// A `+` in an included file is treated like one in the document
+#[test]
+fn test_plus_line_in_include() {
+    assert_eq!(
+        block_outline_from_file("blocks/include-plus.adoc"),
+        "section \"H\"(paragraph \"Para\", paragraph \"+\nafter\", list(* \"a\"(paragraph \"+\nb\")))"
+    );
+}
+
+/// A `+` line in a table doesn't stop the conversion either (which cell its text lands in is
+/// another matter; see the roadmap)
+#[test]
+fn test_plus_line_in_table() {
+    let adoc = "|===\n|a\n+\n|b\n|===\n";
+    assert_eq!(top_level_block_names(adoc), ["table"]);
+    assert!(common::parsed_text(adoc).contains('+'));
+}
+
+/// A `= Title` after content is a level 0 section, as in Asciidoctor (it used to stop the
+/// conversion)
+#[rstest]
+#[case::after_paragraph(
+    "x\n\n= One\n\na\n",
+    "paragraph \"x\" section \"One\"(paragraph \"a\")"
+)]
+#[case::after_list(
+    "* a\n\n= One\n\nmore\n",
+    "list(* \"a\") section \"One\"(paragraph \"more\")"
+)]
+#[case::holds_sections(
+    "x\n\n= One\n\n== Two\n\nb\n\n= Three\n\nc\n",
+    "paragraph \"x\" section \"One\"(section \"Two\"(paragraph \"b\")) section \"Three\"(paragraph \"c\")"
+)]
+#[case::after_section(
+    "== A\n\n=== B\n\n= One\n\na\n",
+    "section \"A\"(section \"B\") section \"One\"(paragraph \"a\")"
+)]
+#[case::second_title("= T\n\n= One\n\na\n", "section \"One\"(paragraph \"a\")")]
+fn test_level_zero_sections(#[case] adoc: &str, #[case] expected: &str) {
+    assert_eq!(block_outline(adoc), expected);
+}
+
+/// Comments, attribute entries and blank lines can come before the document title
+#[rstest]
+#[case::comment("// c\n= Title\n\ntext\n")]
+#[case::comment_block("////\nc\n////\n= Title\n\ntext\n")]
+#[case::attribute(":a: b\n= Title\n\ntext\n")]
+#[case::blank_lines("\n\n= Title\n\ntext\n")]
+fn test_title_below_the_first_line(#[case] adoc: &str) {
+    let asg = common::parsed_asg(adoc);
+    assert_eq!(asg["header"]["title"][0]["value"], "Title", "{asg}");
+    assert_eq!(block_outline(adoc), "paragraph \"text\"");
+}
+
+/// A title can use the attributes set above it
+#[test]
+fn test_attribute_reference_in_title() {
+    let adoc = ":product: Widget\n= {product} Guide\nJane Doe\n\ntext\n";
+    let asg = common::parsed_asg(adoc);
+    let title = asg["header"]["title"].to_string();
+    assert!(title.contains("Widget") && title.contains("Guide"), "{asg}");
+    assert_eq!(asg["header"]["authors"][0]["fullname"], "Jane Doe", "{asg}");
+    assert_eq!(block_outline(adoc), "paragraph \"text\"");
+}
+
+/// Attributes above a title that isn't on the first line don't move to the first paragraph
+#[test]
+fn test_attributes_above_the_title_are_ignored() {
+    let asg = common::parsed_asg("[[top]]\n= Title\n\ntext\n");
+    assert_eq!(asg["header"]["title"][0]["value"], "Title", "{asg}");
+    assert!(asg["blocks"][0].get("metadata").is_none(), "{asg}");
+}
+
+/// Like Asciidoctor, `::` (or `;;`) with no term before it is text (the text after it used to be
+/// lost)
+#[rstest]
+#[case::after_list_item("* a\n:: b\n", "list(* \"a\n:: b\")")]
+#[case::after_description("A:: a\n:: b\n", "dlist(\"A\":: \"a\n:: b\")")]
+#[case::after_list_and_blank_line("* a\n\n:: b\n", "list(* \"a\") paragraph \":: b\"")]
+#[case::after_paragraph("text\n:: b\n", "paragraph \"text\n:: b\"")]
+#[case::alone(":: b\n", "paragraph \":: b\"")]
+#[case::semicolons("* a\n;; b\n", "list(* \"a\n;; b\")")]
+#[case::colon_term("::::: b\n", "dlist(\":\":: \"b\")")]
+fn test_description_marker_without_a_term_is_text(#[case] adoc: &str, #[case] expected: &str) {
+    assert_eq!(block_outline(adoc), expected);
+}
+
+/// Attribute lists that used to make the parser panic: a lone quote as a value, and non-ASCII
+/// text
+#[rstest]
+#[case::lone_role_quote("[role=\"]\ntext\n", "paragraph \"text\"")]
+#[case::lone_quote("[foo=\"]\ntext\n", "paragraph \"text\"")]
+#[case::unclosed_quote("[role=\"é]\ntext\n", "paragraph \"text\"")]
+#[case::non_ascii("[aé]\ntext\n", "paragraph \"text\"")]
+#[case::non_ascii_cols("[cols=\"é\"]\n|===\n|a\n|===\n", "table(tableCell \"a\")")]
+#[case::in_macro("a image:x.png[role=\"] b\n", "paragraph \"a  b\"")]
+fn test_attribute_lists_that_used_to_panic(#[case] adoc: &str, #[case] expected: &str) {
+    assert_eq!(block_outline(adoc), expected);
+}
+
+/// An unclosed quote is part of the value, as in Asciidoctor, rather than costing it its last
+/// character
+#[test]
+fn test_unclosed_quote_in_attribute_value() {
+    let asg = common::parsed_asg("[role=\"foo]\ntext\n");
+    assert_eq!(asg["blocks"][0]["metadata"]["roles"][0], "\"foo", "{asg}");
+}

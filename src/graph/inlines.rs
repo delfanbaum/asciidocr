@@ -955,7 +955,7 @@ mod tests {
             1,
             23,
         );
-        let (target, metadata) = target_and_attrs_from_token(&token);
+        let (target, metadata) = target_and_attrs_from_token(&token).unwrap();
         let img_ref = InlineRef::new_inline_image(target, metadata, token.locations());
         assert_eq!(img_ref.target, "path/to/img.png".to_string())
     }
@@ -970,7 +970,7 @@ mod tests {
             1,
             23,
         );
-        let (target, metadata) = target_and_attrs_from_token(&token);
+        let (target, metadata) = target_and_attrs_from_token(&token).unwrap();
         let img_ref = InlineRef::new_inline_image(target, metadata, token.locations());
         assert_eq!(img_ref.target, "path/to/img.png".to_string());
         assert!(img_ref.metadata.is_some());

@@ -59,11 +59,18 @@ HTMLBook's.
 </div>
 {%- endmacro -%}
 
-{#- Asciidoctor wraps the contents of top-level sections (only) in a "sectionbody" -#}
+{#- Asciidoctor wraps the contents of top-level sections (only) in a "sectionbody". A level 0
+    section has no wrapper at all: its contents follow its heading -#}
 {%- macro render_section(block) %}
 {%- set title_html = render_inlines(block.title) %}
-<div{{ wrapper_attrs(block, "sect" ~ block.level, false) }}>
 {%- set id = section_id(block) %}
+{%- if block.level == 0 %}
+<h1{% if id %} id="{{ id | escape_attr }}"{% endif %}{{ wrapper_attrs(block, "sect0", false) }}>{{ title_html }}</h1>
+{%- for child in block.blocks %}
+{{ render_block(child) }}
+{%- endfor -%}
+{%- else %}
+<div{{ wrapper_attrs(block, "sect" ~ block.level, false) }}>
 <h{{ block.level + 1 }}{% if id %} id="{{ id | escape_attr }}"{% endif %}>{{ title_html }}</h{{ block.level + 1 }}>
 {%- if block.level == 1 %}
 <div class="sectionbody">
@@ -75,6 +82,7 @@ HTMLBook's.
 </div>
 {%- endif %}
 </div>
+{%- endif %}
 {%- endmacro -%}
 
 {#- Like Asciidoctor, an ordered list is numbered by its marker, not by its depth -#}

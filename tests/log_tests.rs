@@ -4,6 +4,7 @@ use std::sync::{Mutex, MutexGuard, OnceLock};
 use asciidocr::{parser::Parser, scanner::Scanner};
 use common::{assert_parsed_doc_matches_expected_asg, assert_rendered_htmlbook_matches_expected};
 use logtest::Logger;
+use rstest::rstest;
 
 /// `Logger::start` can only be called once per process, so the tests share one logger, and the
 /// lock keeps them from running at the same time. Anything logged by earlier tests is discarded.
@@ -40,6 +41,45 @@ fn test_xref_to_generated_id_does_not_warn() {
     }
     assert!(
         !warnings.iter().any(|w| w.contains("Unable to find xref")),
+        "{warnings:?}"
+    );
+}
+
+/// A `= Title` after content is kept, and reported; so are attributes above the document title,
+/// which are ignored
+#[rstest]
+#[case::level_zero_section(
+    "text\n\n= One\n",
+    "Line 3: Level 0 headings are only allowed at the top of a document"
+)]
+#[case::attributes_above_title(
+    "[[top]]\n= Title\n",
+    "Line 2: Attributes above the document title are not supported"
+)]
+fn test_title_problems_warn(#[case] adoc: &str, #[case] expected: &str) {
+    let mut logger = logger();
+    common::parsed_asg(adoc);
+    let mut warnings = vec![];
+    while let Some(record) = logger.pop() {
+        warnings.push(record.args().to_owned());
+    }
+    assert!(
+        warnings.iter().any(|w| w.contains(expected)),
+        "{warnings:?}"
+    );
+}
+
+/// A book's parts are level 0 sections, so they aren't reported
+#[test]
+fn test_book_part_does_not_warn() {
+    let mut logger = logger();
+    common::parsed_asg("= Book\n:doctype: book\n\n= Part\n\ntext\n");
+    let mut warnings = vec![];
+    while let Some(record) = logger.pop() {
+        warnings.push(record.args().to_owned());
+    }
+    assert!(
+        !warnings.iter().any(|w| w.contains("Level 0")),
         "{warnings:?}"
     );
 }

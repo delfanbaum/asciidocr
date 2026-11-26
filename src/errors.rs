@@ -38,8 +38,6 @@ pub enum ParserError {
     Block(#[from] BlockError),
     #[error(transparent)]
     Asg(#[from] AsgError),
-    #[error("Line {0}: Level 0 headings are only allowed at the top of a document")]
-    TopLevelHeading(usize),
     #[error("Line {0}: Unexpected token: {1}")]
     UnexpectedToken(usize, String),
     #[error("Line {0}: Invalid open_parse_after_as_text_type occurance")]
@@ -54,8 +52,6 @@ pub enum ParserError {
     TargetResolution(usize, String),
     #[error("Line {0}: Tried to add last block when block stack was empty.")]
     BlockStack(usize),
-    #[error("Line {0}: invalid block continuation; no previous block")]
-    BlockContinuation(usize),
     #[error("Line {0}: error: {1}")]
     InternalError(usize, String),
     #[error("Line {0}: Attribute error: {1}")]

@@ -48,6 +48,7 @@ fn test_full_documents(#[case] fn_pattern: &str) {
 #[case::section_id_attributes("asciidoctor-html/embedded/section-id-attributes")]
 #[case::section_ids_off("asciidoctor-html/embedded/section-ids-off")]
 #[case::xref_text("asciidoctor-html/embedded/xref-text")]
+#[case::level_zero_sections("asciidoctor-html/embedded/level-zero-sections")]
 fn test_embedded(#[case] fn_pattern: &str) {
     let adoc_fn = format!("{}.adoc", fn_pattern);
     let html_fn = format!("{}.html", fn_pattern);

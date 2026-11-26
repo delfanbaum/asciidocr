@@ -66,6 +66,8 @@ stylesheet. Known gaps:
 * A `[source]` block without a language is rendered like any other listing
   (as `<pre>`, not `<pre class="highlight"><code>`)
 * Checklists and admonition icons
+* Attributes (an ID, say) above a document title that isn't on the first line
+  are ignored, with a warning
 
 == Language Features Planned for Inclusion Later
 

@@ -80,17 +80,44 @@ impl Parser {
             return self.parse_section_headings(token, asg);
         }
 
-        if token.first_location() == Location::default() {
+        // the title can have comments, attribute entries and blank lines above it, but no content
+        if self.document_header.is_none()
+            && asg.header.is_none()
+            && asg.blocks.is_empty()
+            && self.block_stack.is_empty()
+            && self.lists.is_empty()
+            && self.inline_stack.is_empty()
+        {
             self.in_block_line = true;
+            // the newlines above the title aren't part of it
+            self.dangling_newline = None;
             self.header_line = HeaderLine::Title;
             self.header_line_text.clear();
+            // (they would otherwise end up on the first block)
+            if self.metadata.take().is_some() {
+                warn!(
+                    "Line {}: Attributes above the document title are not supported; ignoring them",
+                    token.line
+                );
+            }
             let mut header = Header::new();
             header.location.extend(token.locations());
 
             self.document_header = Some(header);
             Ok(())
         } else {
-            Err(ParserError::TopLevelHeading(token.line))
+            // like Asciidoctor, report it and carry on (only a book may have these, as parts)
+            if self
+                .document_attributes
+                .get("doctype")
+                .is_none_or(|doctype| doctype != "book")
+            {
+                warn!(
+                    "Line {}: Level 0 headings are only allowed at the top of a document",
+                    token.line
+                );
+            }
+            self.parse_section_headings(token, asg)
         }
     }
 
@@ -143,9 +170,15 @@ impl Parser {
             }
         };
 
+        // level 0 is only what a `= Title` below the top of the document is (see `parse_title`)
+        let lowest = if token.token_type() == TokenType::Heading1 && self.level_offset == 0 {
+            0
+        } else {
+            1
+        };
         match level.try_into() {
             Ok(value) => {
-                if !(1..=4).contains(&value) {
+                if !(lowest..=4).contains(&value) {
                     Err(ParserError::HeadingOffsetError(
                         token.line,
                         self.level_offset,
@@ -222,7 +255,7 @@ impl Parser {
         token: Token,
         asg: &mut Asg,
     ) -> Result<(), ParserError> {
-        let (target, metadata) = target_and_attrs_from_token(&token);
+        let (target, metadata) = target_and_attrs_from_token(&token)?;
         // like Asciidoctor, a missing image is a problem to report, not a reason to stop: the
         // block is still rendered with the target as written
         if let Err(e) = self.check_target(token.line, &target) {
@@ -269,7 +302,7 @@ impl Parser {
             // the block is open (it takes the text that follows), so even after a `+` it stays
             // on the stack until it closes; only then is it attached
             self.open_pending_admonition();
-            self.open_block(Block::LeafBlock(block))?;
+            self.push_block_to_stack(Block::LeafBlock(block))?;
             // note that we're to just add
             self.force_new_block = false;
             Ok(())
@@ -346,8 +379,6 @@ impl Parser {
                     delimited_block.consolidate_table_info()?;
                 }
                 self.complete_block(delimited_block, asg)?;
-                // close any continuations
-                self.in_block_continuation = false;
                 return Ok(());
             }
         }

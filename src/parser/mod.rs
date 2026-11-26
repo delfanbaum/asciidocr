@@ -85,9 +85,8 @@ pub struct Parser {
     in_block_line: bool,
     /// designates whether new literal text should be added to the last span
     in_inline_span: bool,
-    /// designates whether, despite newline last_tokens_types, we should append the current block
-    /// to the next
-    in_block_continuation: bool,
+    /// the line of the last `+` that continued a list item
+    continuation_line: Option<usize>,
     /// forces a new block when we add inlines; helps distinguish between adding to section.title
     /// and section.blocks
     force_new_block: bool,
@@ -145,8 +144,8 @@ impl Parser {
             level_offset: 0,
             in_block_line: false,
             in_inline_span: false,
-            in_block_continuation: false,
             preserve_newline_text: false,
+            continuation_line: None,
             open_parse_after_as_text_type: None,
             force_new_block: false,
             close_parent_after_push: false,
@@ -174,11 +173,8 @@ impl Parser {
         for result in tokens {
             match result {
                 Ok(token) => {
-                    let token_type = token.token_type();
                     self.line = token.line;
                     self.token_into(token, &mut asg)?;
-
-                    self.last_token_type = token_type;
                 }
                 Err(e) => return Err(ParserError::Scanner(e)),
             }
@@ -211,15 +207,27 @@ impl Parser {
         Ok(asg)
     }
 
-    fn token_into(&mut self, token: Token, asg: &mut Asg) -> Result<(), ParserError> {
+    /// Parses one token, from the document itself or from an included file, and remembers its
+    /// type for the next one
+    fn token_into(&mut self, mut token: Token, asg: &mut Asg) -> Result<(), ParserError> {
         if self.document_header.is_some() && self.read_header_line(&token) {
+            self.last_token_type = token.token_type();
             return Ok(());
         }
         // if we are not starting with a document-heading acceptable token, get out
         if self.document_header.is_some() && !token.can_be_in_document_header() {
             self.check_and_move_header(asg)?;
         }
+        if token.token_type() == TokenType::BlockContinuation {
+            self.make_text_if_not_a_continuation(&mut token, asg)?;
+        }
+        let token_type = token.token_type();
+        self.parse_token(token, asg)?;
+        self.last_token_type = token_type;
+        Ok(())
+    }
 
+    fn parse_token(&mut self, token: Token, asg: &mut Asg) -> Result<(), ParserError> {
         if let Some(token_type) = self.open_parse_after_as_text_type {
             match token_type {
                 TokenType::QuoteVerseBlock => {
@@ -421,9 +429,9 @@ impl Parser {
             | TokenType::CautionPara
             | TokenType::WarningPara => self.parse_admonition_para_syntax(token),
 
-            // block continuation... I think does nothing, parser-wise, since it simply prevents
-            // the double newline
-            TokenType::BlockContinuation => self.parse_block_continuation(token),
+            // a `+` that continues a list item (any other has been made text; see
+            // `make_text_if_not_a_continuation`)
+            TokenType::BlockContinuation => self.parse_block_continuation(token.line),
 
             // comments
             TokenType::Comment => self.parse_comment(),
@@ -520,7 +528,6 @@ impl Parser {
             }
         } else if closes_title
             || closes_section_title
-            || self.in_block_continuation
             || self.last_token_type.clears_newline_after()
         {
             // don't add a newline ahead of text in these cases (including the newline that ends
@@ -586,6 +593,45 @@ impl Parser {
         token
     }
 
+    /// A `+` line only continues a list item. Elsewhere (directly after another `+` included),
+    /// like Asciidoctor, it is text: it ends the paragraph before it, and starts one that takes
+    /// the lines after it. (In a table or a verse it is more of the text.)
+    fn make_text_if_not_a_continuation(
+        &mut self,
+        token: &mut Token,
+        asg: &mut Asg,
+    ) -> Result<(), ParserError> {
+        match self.open_parse_after_as_text_type {
+            None => {
+                let waiting_for_block = self.inline_stack.is_empty();
+                let follows_continuation =
+                    self.continuation_line.map(|line| line + 1) == Some(token.line);
+                let in_list = match self.lists.get(self.block_stack.len()) {
+                    // a `+` directly after one that is still waiting for its block is that
+                    // block's text
+                    Some(scope)
+                        if !(scope.attach_next && waiting_for_block && follows_continuation) =>
+                    {
+                        return Ok(());
+                    }
+                    scope => scope.is_some(),
+                };
+                if !in_list && !self.in_open_table() {
+                    self.add_inlines_to_block_stack()?;
+                    self.emit_completed_block(asg)?;
+                    self.dangling_newline = None;
+                    self.force_new_block = true;
+                }
+            }
+            Some(TokenType::QuoteVerseBlock) => {}
+            // inside a verbatim block, `parse_token` passes it through
+            Some(_) => return Ok(()),
+        }
+        token.token_type = TokenType::Text;
+        token.literal = Some(token.lexeme.clone());
+        Ok(())
+    }
+
     /// Whether a paragraph's text is waiting on the inline stack (section and block titles are
     /// complete at the end of their lines, so pending text at the start of a line is a paragraph's)
     fn in_paragraph(&self) -> bool {
@@ -609,23 +655,8 @@ impl Parser {
         Ok(())
     }
 
-    fn push_block_to_stack(&mut self, block: Block) -> Result<(), ParserError> {
-        // we only want to push on continue if we're not in an open delimited block (which will
-        // close itself, emptying the open_delimited_block_lines)
-        if self.in_block_continuation && self.open_delimited_block_lines.is_empty() {
-            let Some(last_block) = self.block_stack.last_mut() else {
-                return Err(ParserError::BlockContinuation(self.line));
-            };
-            last_block.push_block(block)?;
-            self.in_block_continuation = false;
-            Ok(())
-        } else {
-            self.open_block(block)
-        }
-    }
-
     /// Pushes a block onto the stack, with any pending metadata
-    fn open_block(&mut self, mut block: Block) -> Result<(), ParserError> {
+    fn push_block_to_stack(&mut self, mut block: Block) -> Result<(), ParserError> {
         if let Some(metadata) = self.metadata.take() {
             block.add_metadata(metadata)?;
         }
@@ -642,7 +673,7 @@ impl Parser {
         let Some(block) = self.attach_to_list_item(block)? else {
             return Ok(());
         };
-        if self.open_delimited_block_lines.is_empty() && !self.in_block_continuation {
+        if self.open_delimited_block_lines.is_empty() {
             self.force_new_block = true;
             self.add_to_block_stack_or_graph(asg, block)
         } else {
@@ -758,13 +789,6 @@ impl Parser {
             if let Some(scope) = self.lists.active(depth) {
                 scope.attach_block(block)?;
             }
-            return Ok(());
-        }
-        if self.in_block_continuation && self.open_delimited_block_lines.is_empty() {
-            let Some(last_block) = self.block_stack.last_mut() else {
-                return Err(ParserError::BlockContinuation(self.line));
-            };
-            last_block.push_block(block)?;
             return Ok(());
         }
         self.push_block_to_stack(block)

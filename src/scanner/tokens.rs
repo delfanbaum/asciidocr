@@ -146,7 +146,7 @@ impl Token {
     pub fn can_be_in_document_header(&self) -> bool {
         matches!(
             self.token_type(),
-            TokenType::Heading1 | TokenType::Attribute
+            TokenType::Heading1 | TokenType::Attribute | TokenType::AttributeReference
         ) || self.is_inline()
     }
 

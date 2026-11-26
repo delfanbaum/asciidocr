@@ -204,14 +204,9 @@ impl ElementMetadata {
                     }
                 }
                 Err(_) => {
-                    if idx == 0 && attribute.len() >= 2 {
-                        match &attribute[..2] {
-                            "so" | "qu" | "ve" => {
-                                self.declared_type = AttributeType::from_str(attribute);
-                                continue;
-                            }
-                            _ => self.process_attribute(idx, attribute),
-                        }
+                    // (`get`, since the second byte may be in the middle of a character)
+                    if idx == 0 && matches!(attribute.get(..2), Some("so" | "qu" | "ve")) {
+                        self.declared_type = AttributeType::from_str(attribute);
                     } else if !attribute.is_empty() {
                         self.process_attribute(idx, attribute);
                     }
@@ -275,9 +270,11 @@ impl ElementMetadata {
                     "cols".to_string(),
                     format!("{}", cols_value.split(',').collect::<Vec<&str>>().len()),
                 );
-            } else if cols_value.len() == 2 && cols_value[1..] == *"*" {
+            } else if cols_value.len() == 2
+                && let Some(count) = cols_value.strip_suffix('*')
+            {
                 self.attributes
-                    .insert("cols".to_string(), cols_value[..1].to_string());
+                    .insert("cols".to_string(), count.to_string());
             }
         }
     }
@@ -306,9 +303,12 @@ pub fn key_values_from_named_attribute(
     match RE_NAMED.captures(attribute) {
         Some(captures) => {
             let (_, [named, mut values_str]) = captures.extract();
-            // remove quotes values
-            if values_str.starts_with('"') {
-                values_str = &values_str[1..values_str.len() - 1]
+            // a quoted value loses its quotes (a quote without its pair is part of the value)
+            if let Some(unquoted) = values_str
+                .strip_prefix('"')
+                .and_then(|rest| rest.strip_suffix('"'))
+            {
+                values_str = unquoted
             }
             Ok((
                 named.to_string(),
@@ -322,20 +322,24 @@ pub fn key_values_from_named_attribute(
     }
 }
 
-/// Given a foo:target.foo[attributes] token, return the target and metadata
-pub fn target_and_attrs_from_token(token: &Token) -> (String, Option<ElementMetadata>) {
-    let target_and_attrs = match token.token_type() {
-        TokenType::BlockImageMacro => {
-            token.text()[7..].to_string() // after image::
+/// Given a foo:target.foo[attributes] token, return the target and metadata. Only image and
+/// include macro tokens have these; any other token is an error
+pub fn target_and_attrs_from_token(
+    token: &Token,
+) -> Result<(String, Option<ElementMetadata>), ParserError> {
+    let prefix = match token.token_type() {
+        TokenType::BlockImageMacro => "image::",
+        TokenType::InlineImageMacro => "image:",
+        TokenType::Include => "include::",
+        other => {
+            return Err(ParserError::InternalError(
+                token.line,
+                format!("{other:?} token has no target"),
+            ));
         }
-        TokenType::InlineImageMacro => {
-            token.text()[6..].to_string() // after image:
-        }
-        TokenType::Include => {
-            token.text()[9..].to_string() // after include::
-        }
-        _ => panic!("Invalid token provided to target_and_attrs_from_token"),
     };
+    let text = token.text();
+    let target_and_attrs = text.get(prefix.len()..).unwrap_or_default();
 
     let target: String = target_and_attrs.chars().take_while(|c| c != &'[').collect();
     // get rid of the "[]" chars (there are none if the target runs to the end)
@@ -357,7 +361,7 @@ pub fn target_and_attrs_from_token(token: &Token) -> (String, Option<ElementMeta
         token_metadata.process_attributes(extract_attributes(&attributes));
         metadata = Some(token_metadata);
     }
-    (target, metadata)
+    Ok((target, metadata))
 }
 
 #[cfg(test)]
@@ -370,6 +374,12 @@ mod tests {
             ("role".to_string(), vec!["foo", "bar"]),
             key_values_from_named_attribute("role=\"foo bar\"", 1).unwrap()
         )
+    }
+
+    #[test]
+    fn target_from_a_token_without_one_is_an_error() {
+        let token = Token::new_default(TokenType::Text, "text".to_string(), None, 1, 1, 4);
+        assert!(target_and_attrs_from_token(&token).is_err());
     }
 
     #[test]

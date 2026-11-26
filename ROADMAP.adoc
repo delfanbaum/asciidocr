@@ -168,10 +168,9 @@ removed (with the helpers only it used, `InlineError`, and the never-created
   section title, which we don't support)
 * [ ] A table cell scanned as `|Name|Value` (no space before the second `|`)
   is one cell; Asciidoctor splits it in two
-* [ ] A `+` line outside a list stops the conversion after a paragraph ("push_block
-  not implemented for LeafBlock") and is dropped after a heading; Asciidoctor
-  keeps it as text. `Parser::in_block_continuation` is only reached outside
-  lists now, so this can replace it
+* [x] A `+` line outside a list (or a second one in a row) stopped the conversion
+  after a paragraph ("push_block not implemented for LeafBlock") and was dropped
+  after a heading; Asciidoctor keeps it as text
 * [ ] `[verse]` above a paragraph (without a delimited block) is ignored: the
   paragraph stays a paragraph. In the Asciidoctor-style backend, a `[quote]`
   paragraph's text is wrapped in a paragraph `div`, where Asciidoctor has the
@@ -183,12 +182,27 @@ removed (with the helpers only it used, `InlineError`, and the never-created
   marker (`+*<TAB>a+`) isn't an item; six or more dots (`......`) are an
   ellipsis rather than a marker; `+* +` with no text, then `+* b+`, gives
   "* * b" (Asciidoctor: "** b")
-* [ ] A `::` line directly after a list item (`+* a+`, `:: b`) drops the text
-  after it; Asciidoctor keeps "a:: b" as the item's text
+* [x] A `::` line directly after a list item (`+* a+`, `:: b`) dropped the text
+  after it; Asciidoctor keeps "a:: b" as the item's text. (A line starting `::`
+  was read as an attribute entry with no name)
 * [ ] A `+` on the last line, with no newline after it, comes out as a backtick
   at the end of the paragraph before it
-* [ ] `= Title` after content (`+* a+`, a blank line, `= Title`) stops the
-  conversion with an error; Asciidoctor warns and makes it a level 0 section
+* [x] `= Title` after content (`+* a+`, a blank line, `= Title`) stopped the
+  conversion with an error; Asciidoctor warns and makes it a level 0 section. So
+  did a title below a comment, an attribute entry or a blank line, which is the
+  document title
+* [ ] With `:leveloffset: -1`, a `= Title` or `== Title` after content still
+  stops the conversion
+* [ ] A `leveloffset` that isn't a number (in an attribute entry or an include)
+  stops the conversion; Asciidoctor ignores it
+* [ ] A heading inside a delimited block is a section; Asciidoctor keeps it as
+  text
+* [ ] Three or more `+` lines in a row in a list item make two paragraphs;
+  Asciidoctor makes one ("+ b")
+* [ ] DOCX: a level 0 section gets a made-up "Heading 0" style, which Word
+  doesn't treat as a heading
+* [ ] A table cell's text on a following line (`|a`, `more`, `|b`) goes to the
+  next cell
 * [ ] `Parser::preserve_newline_text` is set by the first description list item
   and never unset, so every paragraph after it has its newlines as separate
   inlines in the ASG
@@ -219,10 +233,11 @@ removed (with the helpers only it used, `InlineError`, and the never-created
   wraps it in an admonition; Asciidoctor ignores the label there
 * [ ] A listing's text in the ASG starts with the newline after the opening
   delimiter (`"\ncode\n"`); check against the ASG schema
-* [ ] A named attribute whose value is a lone quote (`+[role="]+`, also in a
-  macro's brackets) panics in `key_values_from_named_attribute`; the fuzz run's
-  mutations don't reach it. And `target_and_attrs_from_token` panics on a token
-  that isn't an image or include macro (it should return an error)
+* [x] A named attribute whose value is a lone quote (`+[role="]+`, also in a
+  macro's brackets) panicked in `key_values_from_named_attribute`, as did
+  non-ASCII text (`[aé]`); the fuzz run's mutations don't reach these. And
+  `target_and_attrs_from_token` panicked on a token that isn't an image or
+  include macro (it returns an error now)
 
 === Cross references and section IDs (M)
 

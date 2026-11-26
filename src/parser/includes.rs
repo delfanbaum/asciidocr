@@ -28,7 +28,7 @@ impl Parser {
         let mut asciidoc_include: bool = false;
         let mut current_tag: Option<String> = None;
 
-        let (target, meta) = target_and_attrs_from_token(&token);
+        let (target, meta) = target_and_attrs_from_token(&token)?;
         info!("Parsing included file: {}", &target);
         // check for level offsets in the include
         if let Some(metadata) = meta {
@@ -109,9 +109,7 @@ impl Parser {
                         }
                     }
                     if asciidoc_include {
-                        let token_type = token.token_type();
                         self.token_into(token, asg)?;
-                        self.last_token_type = token_type;
                     } else {
                         // allow EOFs to pass through; otherwise just parse as text
                         if matches!(token.token_type(), TokenType::Eof) {

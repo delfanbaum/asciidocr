@@ -772,6 +772,11 @@ impl<'a> Scanner<'a> {
             self.current = self.start + run - max_len;
             return Some(self.add_token(TokenType::Text, true, 0));
         }
+        // a marker needs a term before it: at the start of a line (indented, it was turned down
+        // above), it is text
+        if self.starts_new_line() {
+            return None;
+        }
         // the space after the marker is part of it, but a newline is its own token, so that the
         // line is counted
         self.current = self.start + run + usize::from(after == Some(&b' '));
@@ -864,6 +869,10 @@ impl<'a> Scanner<'a> {
 
     /// Checks for document attribute lines, e.g., ":foo: bar" or ":foo:"
     fn starts_attr(&mut self) -> bool {
+        // an attribute has a name: `::` isn't one
+        if self.peek() == ':' {
+            return false;
+        }
         let current_placeholder = self.current;
         while ![' ', '\n', ':'].contains(&self.peek()) && !self.is_at_end() {
             self.current += 1
