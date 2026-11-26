@@ -260,6 +260,10 @@ mod tests {
     #[case::numbered("12.", "1.")]
     #[case::callout("<3>", "<1>")]
     #[case::dots_are_not_numbers("..", "..")]
+    #[case::lower_alpha("c.", "a.")]
+    #[case::upper_alpha("C.", "A.")]
+    #[case::lower_roman("iv)", "i)")]
+    #[case::upper_roman("IX)", "I)")]
     fn marker_keys(#[case] marker: &str, #[case] expected: &str) {
         assert_eq!(marker_key(marker), expected);
     }

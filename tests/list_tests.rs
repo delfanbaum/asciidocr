@@ -17,6 +17,16 @@ use rstest::rstest;
 #[case::double_dot(".. a\n.. b\n", "list(.. \"a\", .. \"b\")")]
 #[case::triple_dot("... a\n", "list(... \"a\")")]
 #[case::five_stars("***** a\n", "list(***** \"a\")")]
+#[case::lower_alpha("a. x\nb. y\n", "list(a. \"x\", b. \"y\")")]
+#[case::upper_alpha("A. x\nB. y\n", "list(A. \"x\", B. \"y\")")]
+#[case::lower_roman("i) x\nii) y\niii) z\n", "list(i) \"x\", ii) \"y\", iii) \"z\")")]
+#[case::upper_roman("I) x\nII) y\n", "list(I) \"x\", II) \"y\")")]
+#[case::letter_after_dot(". x\na. y\n. z\n", "list(. \"x\"(list(a. \"y\")), . \"z\")")]
+#[case::roman_after_letter("a. x\ni) y\nb. z\n", "list(a. \"x\"(list(i) \"y\")), b. \"z\")")]
+// like Asciidoctor: a line that starts with an initial is a list item
+#[case::initial("A. Lincoln was president.\n", "list(A. \"Lincoln was president.\")")]
+// `i.` is a letter, and `ii.` is no marker at all
+#[case::roman_with_dot("i. x\nii. y\n", "list(i. \"x\nii. y\")")]
 fn test_list_markers(#[case] adoc: &str, #[case] expected: &str) {
     assert_eq!(block_outline(adoc), expected);
 }

@@ -1104,6 +1104,10 @@ mod tests {
     #[case::numbered("12. Foo\n", "12. ", TokenType::OrderedListItem)]
     #[case::indented("  * Foo\n", "  * ", TokenType::UnorderedListItem)]
     #[case::tab_indented("\t. Foo\n", "\t. ", TokenType::OrderedListItem)]
+    #[case::lower_alpha("a. Foo\n", "a. ", TokenType::OrderedListItem)]
+    #[case::upper_alpha("B. Foo\n", "B. ", TokenType::OrderedListItem)]
+    #[case::lower_roman("iv) Foo\n", "iv) ", TokenType::OrderedListItem)]
+    #[case::upper_roman("IX) Foo\n", "IX) ", TokenType::OrderedListItem)]
     fn list_item_markers(
         #[case] markup: &str,
         #[case] marker: &str,
@@ -1145,6 +1149,12 @@ mod tests {
     #[case::mid_line("Foo * Bar\n")]
     #[case::no_text_after_marker("* \n")]
     #[case::only_whitespace_after_marker(" *  \t\nFoo\n")]
+    #[case::two_letters("ab. Foo\n")]
+    #[case::letter_without_space("a.Foo\n")]
+    #[case::letter_with_parenthesis("a) Foo\n")]
+    #[case::number_with_parenthesis("1) Foo\n")]
+    #[case::not_roman("q) Foo\n")]
+    #[case::roman_with_dot("ii. Foo\n")]
     fn not_list_item_markers(#[case] markup: &str) {
         assert!(Scanner::new(markup).all(|token| !matches!(
             token.unwrap().token_type(),

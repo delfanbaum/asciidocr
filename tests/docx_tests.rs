@@ -234,6 +234,10 @@ mod docx_tests {
     #[case::double_dot_nested(". a\n.. b\n", "b", "1", "lowerLetter")]
     #[case::triple_dot("... a\n", "a", "0", "lowerRoman")]
     #[case::numbered_nested("* a\n1. b\n", "b", "1", "decimal")]
+    #[case::lower_alpha("a. a\n", "a", "0", "lowerLetter")]
+    #[case::upper_alpha("A. a\n", "a", "0", "upperLetter")]
+    #[case::lower_roman("i) a\n", "a", "0", "lowerRoman")]
+    #[case::upper_roman("I) a\n", "a", "0", "upperRoman")]
     fn ordered_numbering_follows_the_marker(
         #[case] adoc: &str,
         #[case] text: &str,
