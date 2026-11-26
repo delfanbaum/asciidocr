@@ -17,8 +17,14 @@ use asciidocr::backends::htmls::{render_asciidoctor_html, render_htmlbook};
 use asciidocr::parser::Parser;
 use asciidocr::scanner::Scanner;
 
-/// How long one input may take before it counts as a hang (generous, for debug builds)
-const TIMEOUT: Duration = Duration::from_secs(5);
+/// How long one input may take before it counts as a hang. The fixtures are small: each parses
+/// and renders in a few milliseconds, even in a debug build, so this is hundreds of times longer
+/// than any of them needs
+const TIMEOUT: Duration = Duration::from_secs(2);
+
+/// A thread that hangs can't be stopped, and keeps a core busy, which slows (and eventually
+/// spoils) the rest of the run; so the run stops after this many hangs
+const MAX_HANGS: usize = 5;
 
 /// Characters that start or end markup, for the mutations
 const MARKUP: &[char] = &[
@@ -121,15 +127,24 @@ fn fuzz(variants: impl Fn(&str) -> Vec<String>) {
     let default_hook = std::panic::take_hook();
     std::panic::set_hook(Box::new(|_| {}));
     let mut failures = vec![];
+    let mut hangs = 0;
     let mut count = 0;
-    for path in fixtures() {
-        // (shown with --nocapture, to see how far a run that dies got)
-        eprintln!("{}", path.display());
+    'fixtures: for path in fixtures() {
         let source = std::fs::read_to_string(&path).expect("Unable to read a fixture");
         for input in variants(&source) {
             count += 1;
             if let Err(problem) = check(&path, input.clone()) {
-                failures.push(format!("{} {problem}:\n{input:?}", path.display()));
+                let failure = format!("{} {problem}:\n{input:?}", path.display());
+                // (shown as they happen with --nocapture, in case the run is stopped)
+                eprintln!("{failure}\n");
+                failures.push(failure);
+                if problem == "hung" {
+                    hangs += 1;
+                    if hangs == MAX_HANGS {
+                        failures.push(format!("(stopped after {MAX_HANGS} hangs)"));
+                        break 'fixtures;
+                    }
+                }
             }
         }
     }
