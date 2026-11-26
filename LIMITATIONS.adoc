@@ -55,8 +55,6 @@ classes Asciidoctor produces (checked against Asciidoctor 2.0.17), without its
 stylesheet. Known gaps:
 
 * Callout lists
-* Nested ordered lists are all numbered `arabic`, where Asciidoctor numbers
-  them by marker (`..` is `loweralpha`, `...` is `lowerroman`, and so on)
 * Table column widths are always shared out evenly, and table cell alignment and
   styles are not supported
 * A `[source]` block without a language is rendered like any other listing
@@ -130,8 +128,8 @@ moment, we're targeting document creation.
 
 The DOCX backend is experimental.
 
-* List continuations
-* Nested lists are all at the first indent level
+* Blocks attached to list items (with `+`) are written as indented paragraphs
+  of plain text, so an attached listing loses its monospace font, for example
 * Titles on lists
 * Headers on tables
 * Footnotes are included in-line and highlighted, not as footnotes

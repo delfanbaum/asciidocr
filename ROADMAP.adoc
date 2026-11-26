@@ -81,7 +81,7 @@ Order of work (each step its own commit or PR):
 . (Done) Description lists in the list context
 . (Done) Lists after headings and paragraphs, and headings after list items (`+* a+`
   then `== B` is one item, "a == B", in Asciidoctor)
-. Backends and docs
+. (Done) Backends and docs
 
 ==== Cases
 
@@ -121,9 +121,12 @@ Order of work (each step its own commit or PR):
   Asciidoctor gives one item with two terms, we give `A` an empty description
 * [x] The indentation of a lazy continuation line (`+* one+`, `  more`) is kept
   in the item's text; Asciidoctor strips it
-* [ ] Asciidoctor-style backend: the ordered numeral style (`arabic`,
+* [x] Asciidoctor-style backend: the ordered numeral style (`arabic`,
   `loweralpha`, ...) from the list's marker
-* [ ] DOCX: nested lists at their indent level (they are all at level 0 now)
+* [x] DOCX: nested lists at their indent level (they were flattened into one
+  paragraph). Only the first list in a document had a numbering of its own (and
+  it collided with the default one docx-rs writes, so its bullets showed as
+  numbers); every list now has its own, ordered ones numbered by marker
 
 The footnote bug that used to be listed here ("a footnote in a list item, when
 an earlier footnote exists, moves the item's text") doesn't reproduce in any

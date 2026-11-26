@@ -96,8 +96,9 @@ Options:
 
 `asciidocr` currently produces "Htmlbook"-style or Asciidoctor-style HTML for
 all handled blocks/inlines, and has _experimental_ support for producing `docx`
-files: prose, headings, most lists, tables and images work, but list
-continuations, list titles, table headers and real footnotes do not (_yet_).
+files: prose, headings, lists, tables and images work, but list titles, table
+headers and real footnotes do not (_yet_), and blocks attached to list items
+are written as plain paragraphs.
 The output has only been mostly checked in LibreOffice. *Fair warning*: content may
 be dropped while creating `docx` files until that feature stabilizes a little
 more. It should, however, be good to go for your next great short story.
@@ -120,6 +121,9 @@ capabilities with each release -- if there's something you want but don't
 have, please open an issue. The most up-to-date information will be found on
 each release's page, but some language features recently introduced include:
 
+* Lists that follow Asciidoctor's rules: nested lists (`**`, `..`, `-`, `1.`),
+  blank lines between items, and list continuations (`+`), in description lists
+  too, with nested lists at their indent level in `docx` files
 * An Asciidoctor-style HTML backend (`-b asciidoctor`), checked against
   Asciidoctor's own output, and an "embedded" mode (`-e`) for both HTML backends
 * Escaping of special characters (`<`, `>`, `&`) in the HTML backends
