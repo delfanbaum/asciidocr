@@ -742,9 +742,9 @@ impl Parser {
         Ok(())
     }
 
-    /// Starts a list item: a new item in the open list if the marker matches, otherwise a new
-    /// list. Whatever text came before (the previous item's, or a section title) is finished
-    /// first, so that it stays where it belongs.
+    /// Starts a list item: a new item in the open list with the same marker, or else a new list,
+    /// nested in the current item if a list is open. Whatever text came before (the previous
+    /// item's, or a section title) is finished first, so that it stays where it belongs.
     fn parse_list_item(&mut self, token: Token, asg: &mut Asg) -> Result<(), ParserError> {
         // clear any dangling newlines
         self.dangling_newline = None;
@@ -756,24 +756,34 @@ impl Parser {
         // asked for a new block
         self.force_new_block = false;
 
-        if self.lists.active(depth).is_some() {
-            // the previous item's text (or the paragraph attached to it) ends here
-            self.add_inlines_to_block_stack()?;
-            if let Some(scope) = self.lists.active(depth)
-                && scope.key() == Some(key.as_str())
-            {
-                scope.add_item(item)?;
-                return Ok(());
+        // the previous item's text (or the paragraph attached to it), or whatever came before the
+        // list (e.g., a section title), is complete
+        self.add_inlines_to_block_stack()?;
+        if let Some(scope) = self.lists.active(depth) {
+            if let Some(item) = scope.add_item(&key, item)? {
+                let list = self.new_list(&token, marker, asg)?;
+                if let Some(scope) = self.lists.active(depth) {
+                    scope.nest(key, list, item);
+                }
             }
-            // a different marker starts a new list; for now (until nested lists are handled)
-            // it follows this one
-            self.close_lists(asg)?;
-        } else {
-            // whatever came before the list (e.g., a section title) is complete
-            self.add_inlines_to_block_stack()?;
-            self.emit_completed_block_before_list(asg)?;
+            return Ok(());
         }
 
+        self.emit_completed_block_before_list(asg)?;
+        let list = self.new_list(&token, marker, asg)?;
+        self.lists
+            .start_list(self.block_stack.len(), key, list, item);
+        Ok(())
+    }
+
+    /// Makes the list that the item `token` starts. The list takes the block title and metadata
+    /// that are waiting for a block
+    fn new_list(
+        &mut self,
+        token: &Token,
+        marker: String,
+        asg: &mut Asg,
+    ) -> Result<List, ParserError> {
         let variant = match token.token_type() {
             TokenType::UnorderedListItem => ListVariant::Unordered,
             _ => ListVariant::Ordered,
@@ -801,9 +811,7 @@ impl Parser {
         {
             list.metadata = Some(metadata);
         }
-        self.lists
-            .start_list(self.block_stack.len(), key, list, item);
-        Ok(())
+        Ok(list)
     }
 
     /// Outside a delimited block, a block left complete on top of the stack (a paragraph, say,

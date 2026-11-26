@@ -34,7 +34,8 @@ struct OpenList {
 pub(super) struct ListScope {
     /// the length of the parser's block stack when the list started
     depth: usize,
-    /// outermost first. For now there is only ever one; nested lists will add more
+    /// outermost first: each list after the first is nested in the current item of the one
+    /// before it
     lists: Vec<OpenList>,
     /// the current item still takes lines of text: its principal text runs until the next item,
     /// a `+`, a blank line or the start of another block
@@ -64,35 +65,60 @@ impl ListScope {
         self.attach_next = false;
     }
 
-    /// The key of the innermost open list
-    pub fn key(&self) -> Option<&str> {
-        self.lists.last().map(|open| open.key.as_str())
-    }
-
-    /// Starts a new item in the innermost list, adding the current item to that list
-    pub fn add_item(&mut self, item: ListItem) -> Result<(), BlockError> {
-        let open = self
-            .lists
-            .last_mut()
-            .expect("A list scope always has an open list");
+    /// Adds an item to the open list with its key, closing the lists nested deeper than that one.
+    /// If no open list has the key, the item is handed back, to start a list nested in the
+    /// current item (see [`nest`](Self::nest)). Lists nest by marker, not by marker length: after
+    /// `**`, a `*` item closes back to the `*` list only if one is open, and otherwise nests
+    /// deeper.
+    pub fn add_item(&mut self, key: &str, item: ListItem) -> Result<Option<ListItem>, BlockError> {
+        let Some(level) = self.lists.iter().position(|open| open.key == key) else {
+            return Ok(Some(item));
+        };
+        self.close_deeper_than(level)?;
+        let open = &mut self.lists[level];
         let finished = std::mem::replace(&mut open.item, item);
         open.list.push_block(Block::ListItem(finished))?;
         self.principal_open = true;
         self.attach_next = false;
+        Ok(None)
+    }
+
+    /// Starts a list, with its first item, nested in the current item
+    pub fn nest(&mut self, key: String, list: List, item: ListItem) {
+        self.lists.push(OpenList {
+            key,
+            list: Block::List(list),
+            item,
+        });
+        self.principal_open = true;
+        self.attach_next = false;
+    }
+
+    /// Closes the lists nested deeper than `level`, innermost first, each into the current item
+    /// of the list it is nested in
+    fn close_deeper_than(&mut self, level: usize) -> Result<(), BlockError> {
+        while self.lists.len() > level + 1 {
+            let mut open = self.lists.pop().expect("Checked by the loop condition");
+            open.list.push_block(Block::ListItem(open.item))?;
+            self.lists
+                .last_mut()
+                .expect("Checked by the loop condition")
+                .item
+                .blocks
+                .push(open.list);
+        }
         Ok(())
     }
 
-    /// Folds the open lists, innermost first, into the outermost one, and returns it
+    /// Closes every open list, and returns the outermost one
     fn close(mut self) -> Result<Option<Block>, BlockError> {
-        let mut finished: Option<Block> = None;
-        while let Some(mut open) = self.lists.pop() {
-            if let Some(child_list) = finished.take() {
-                open.item.blocks.push(child_list);
-            }
-            open.list.push_block(Block::ListItem(open.item))?;
-            finished = Some(open.list);
-        }
-        Ok(finished)
+        self.close_deeper_than(0)?;
+        let Some(open) = self.lists.pop() else {
+            return Ok(None);
+        };
+        let mut list = open.list;
+        list.push_block(Block::ListItem(open.item))?;
+        Ok(Some(list))
     }
 }
 
@@ -212,11 +238,49 @@ mod tests {
         let mut lists = ListContext::default();
         let list = List::new(ListVariant::Unordered, "*".to_string(), vec![]);
         lists.start_list(0, "*".to_string(), list, item("*", "a"));
-        lists.active(0).unwrap().add_item(item("*", "b")).unwrap();
+        let handed_back = lists.active(0).unwrap().add_item("*", item("*", "b"));
+        assert!(handed_back.unwrap().is_none());
         let Some(Block::List(list)) = lists.close_active(0).unwrap() else {
             panic!("Expected a list")
         };
         assert_eq!(list.items.len(), 2);
         assert!(lists.active(0).is_none());
+    }
+
+    #[test]
+    fn an_item_with_an_unopened_marker_is_handed_back() {
+        let mut lists = ListContext::default();
+        let list = List::new(ListVariant::Unordered, "*".to_string(), vec![]);
+        lists.start_list(0, "*".to_string(), list, item("*", "a"));
+        let scope = lists.active(0).unwrap();
+        assert!(scope.add_item("**", item("**", "b")).unwrap().is_some());
+    }
+
+    /// `* a`, `** b`, `*** c`, `* d`: the `*` item closes both nested lists into "a"
+    #[test]
+    fn an_open_marker_closes_the_lists_nested_deeper() {
+        let mut lists = ListContext::default();
+        let new_list = |marker: &str| List::new(ListVariant::Unordered, marker.to_string(), vec![]);
+        lists.start_list(0, "*".to_string(), new_list("*"), item("*", "a"));
+        let scope = lists.active(0).unwrap();
+        scope.nest("**".to_string(), new_list("**"), item("**", "b"));
+        scope.nest("***".to_string(), new_list("***"), item("***", "c"));
+        assert!(scope.add_item("*", item("*", "d")).unwrap().is_none());
+        assert_eq!(scope.lists.len(), 1);
+
+        let Some(Block::List(list)) = lists.close_active(0).unwrap() else {
+            panic!("Expected a list")
+        };
+        assert_eq!(list.items.len(), 2);
+        let Block::ListItem(a) = &list.items[0] else {
+            panic!("Expected a list item")
+        };
+        let [Block::List(b_list)] = a.blocks.as_slice() else {
+            panic!("Expected one nested list in \"a\"")
+        };
+        let Block::ListItem(b) = &b_list.items[0] else {
+            panic!("Expected a list item")
+        };
+        assert!(matches!(b.blocks.as_slice(), [Block::List(_)]));
     }
 }

@@ -108,8 +108,6 @@ features. Some things it does _not_ do (yet):
 * Checklists
 * Conditionals
 * Complex table markup
-* Complex nested lists (`** nested` markers are not recognized, and list
-  continuations are unreliable)
 * The "subs" attribute in blocks
 
 For a more complete list of the current limitations and caveats, see
@@ -194,7 +192,7 @@ tools in Rust now, too. Here are at least a few I know about:
 
 Things that _should_ work, but are currently acting up:
 
-* Nested lists, blank lines between list items, and a `+` after a blank line in a list
+* Blank lines between list items, and a `+` after a blank line in a list
 * A footnote in a list item, if an earlier footnote exists in the document
 * `+++inline passthroughs+++` (the `pass:[]` form works)
 

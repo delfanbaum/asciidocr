@@ -75,7 +75,7 @@ Order of work (each step its own commit or PR):
 . (Done) Move lists into the list context with today's single-level behavior
   (all existing tests pass), and attach item text as soon as the item's
   paragraph ends. List scopes for delimited blocks came with it
-. Nesting by marker identity
+. (Done) Nesting by marker identity
 . Blank lines between items, and the ancestor (blank line, then `+`)
   continuation
 . Description lists in the list context
@@ -85,15 +85,15 @@ Order of work (each step its own commit or PR):
 
 ==== Cases
 
-* [ ] Nested lists: `+* parent+` / `+** nested+` (and `.` / `..`), including
+* [x] Nested lists: `+* parent+` / `+** nested+` (and `.` / `..`), including
   mixed ordered and unordered lists, and shorter markers under longer ones
 * [x] `..` and `...` at the start of a line become an ellipsis, losing the
   item's text
 * [x] `-` and `1.` markers, and markers with leading whitespace
 * [x] A continued item followed by another item (`+* one+`, `+`, `more`,
   `+* two+`) garbles the list
-* [ ] A continuation that attaches a nested list (`+* parent+`, `+`, `. one`,
-  `. two`); since step 3 it starts a second list after the first
+* [x] A continuation that attaches a nested list (`+* parent+`, `+`, `. one`,
+  `. two`)
 * [ ] A continuation, then a blank line, then an item was a hard error ("invalid
   block continuation; no previous block"); since step 3 it gives two lists
 * [ ] Blank lines between items split the list into several lists

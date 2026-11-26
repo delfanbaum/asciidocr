@@ -12,10 +12,6 @@ non-features.
   than the section title, and logs a warning
 * Custom text for cross references: `+<<id,custom text>>+` is left as text
   (`+<<id>>+` works, and uses the title of the target)
-* Nested lists are not nested yet: all the markers are recognized (`*` to
-  `+*****+`, `-`, `.` to `.....`, `1.`), but an item whose marker differs from
-  the previous item's starts a new list after it, rather than a list inside it.
-  This includes a list attached to an item with a continuation (`+`)
 * A blank line ends a list, so items separated by blank lines become separate
   lists, and a continuation after a blank line (`* a`, a blank line, `+`, `para`)
   stops the conversion with an error ("invalid block continuation; no previous
@@ -67,6 +63,8 @@ classes Asciidoctor produces (checked against Asciidoctor 2.0.17), without its
 stylesheet. Known gaps:
 
 * Callout lists
+* Nested ordered lists are all numbered `arabic`, where Asciidoctor numbers
+  them by marker (`..` is `loweralpha`, `...` is `lowerroman`, and so on)
 * Table column widths are always shared out evenly, and table cell alignment and
   styles are not supported
 * A `[source]` block without a language is rendered like any other listing
@@ -141,6 +139,7 @@ moment, we're targeting document creation.
 The DOCX backend is experimental.
 
 * List continuations
+* Nested lists are all at the first indent level
 * Titles on lists
 * Headers on tables
 * Footnotes are included in-line and highlighted, not as footnotes

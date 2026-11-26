@@ -156,7 +156,6 @@ fn test_list_continuation_then_blank_line() {
     "* parent\n+\n. one\n. two\n",
     "list(* \"parent\"(list(. \"one\", . \"two\")))"
 )]
-#[ignore = "lists step 4: nesting by marker identity"]
 fn test_nested_lists(#[case] adoc: &str, #[case] expected: &str) {
     assert_eq!(block_outline_with_timeout(adoc), expected);
 }
