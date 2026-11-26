@@ -333,6 +333,46 @@ impl TokenType {
                 | TokenType::OpenBlock
                 | TokenType::QuoteVerseBlock
                 | TokenType::ExampleBlock
+                | TokenType::BlockContinuation
+                // (only the closing delimiters of these get here: the newline after an opening
+                // one is part of the block's text)
+                | TokenType::SourceBlock
+                | TokenType::LiteralBlock
+                | TokenType::PassthroughBlock
+        )
+    }
+
+    /// Tokens that start a block (or a block's attribute or title line) and so end a list item's
+    /// text, and the list itself unless a `+` attached the block to the item. Inline tokens,
+    /// list and description list markers, `+`, includes, attribute entries and comments don't.
+    pub(crate) fn ends_list_item(&self) -> bool {
+        matches!(
+            self,
+            TokenType::ElementAttributes
+                | TokenType::BlockAnchor
+                | TokenType::BlockLabel
+                | TokenType::Heading1
+                | TokenType::Heading2
+                | TokenType::Heading3
+                | TokenType::Heading4
+                | TokenType::Heading5
+                | TokenType::SidebarBlock
+                | TokenType::OpenBlock
+                | TokenType::ExampleBlock
+                | TokenType::Table
+                | TokenType::QuoteVerseBlock
+                | TokenType::PassthroughBlock
+                | TokenType::LiteralBlock
+                | TokenType::SourceBlock
+                | TokenType::CommentBlock
+                | TokenType::BlockImageMacro
+                | TokenType::PageBreak
+                | TokenType::ThematicBreak
+                | TokenType::NotePara
+                | TokenType::TipPara
+                | TokenType::ImportantPara
+                | TokenType::CautionPara
+                | TokenType::WarningPara
         )
     }
 }

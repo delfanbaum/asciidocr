@@ -12,21 +12,18 @@ non-features.
   than the section title, and logs a warning
 * Custom text for cross references: `+<<id,custom text>>+` is left as text
   (`+<<id>>+` works, and uses the title of the target)
-* Nested lists (`** nested`) are not recognized
-* List continuations (`+`) inside lists are unreliable; a continuation that
-  attaches a nested list, for example, will garble the list
-* A list item with a continuation garbles the list if another item follows it:
-  `* one`, `+`, `more`, `* two` merges "more" into the first item's text
-  ("onemore"), leaves the second item empty, and moves "two" out of the list
-  into a paragraph before it. A continuation on the last item of a list works
-* A continuation followed by a blank line and another list item (`* one`, `+`,
-  `para`, a blank line, `* two`) stops the conversion with an error ("invalid
-  block continuation; no previous block") instead of producing output
-* A block attached to a list item without a continuation (`* one`, then a
-  `[source]` listing, then `* two`) reorders and garbles the list
-* A section heading followed immediately by a list, with no blank line between
-  them (`== Head` then `* a`), loses its title: the title text is merged into
-  the first list item ("Heada"). Put a blank line after the heading
+* Nested lists are not nested yet: all the markers are recognized (`*` to
+  `+*****+`, `-`, `.` to `.....`, `1.`), but an item whose marker differs from
+  the previous item's starts a new list after it, rather than a list inside it.
+  This includes a list attached to an item with a continuation (`+`)
+* A blank line ends a list, so items separated by blank lines become separate
+  lists, and a continuation after a blank line (`* a`, a blank line, `+`, `para`)
+  stops the conversion with an error ("invalid block continuation; no previous
+  block")
+* A list item marker directly after a paragraph line (`Text` then `* a`) starts
+  a list, where Asciidoctor keeps it as paragraph text. Likewise, a heading
+  directly after a list item ends the list, where Asciidoctor keeps it as the
+  item's text
 * A footnote in a list item moves the item's text out of the item's principal
   text if an earlier footnote exists in the document
 * `+pass:[]+` inline passthroughs work, but `+++text+++` does not (it is

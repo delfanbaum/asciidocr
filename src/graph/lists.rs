@@ -31,18 +31,13 @@ impl PartialEq for List {
 }
 
 impl List {
-    pub fn new(variant: ListVariant, location: Vec<Location>) -> Self {
-        let mut list_marker = String::new();
-        match variant {
-            ListVariant::Unordered => list_marker.push('*'),
-            ListVariant::Ordered => list_marker.push('.'),
-            ListVariant::Callout => list_marker.push_str("<1>"),
-        }
-
+    /// Creates an empty list; the marker is the first item's marker as written (`*`, `**`, `-`,
+    /// `.`, `1.`, ...), without whitespace
+    pub fn new(variant: ListVariant, marker: String, location: Vec<Location>) -> Self {
         List {
             name: "list".to_string(),
             node_type: NodeTypes::Block,
-            marker: list_marker,
+            marker: marker.trim().to_string(),
             variant,
             items: vec![],
             title: vec![],
@@ -288,7 +283,13 @@ mod tests {
 
     #[test]
     fn callout_lists_can_be_created() {
-        let list = List::new(ListVariant::Callout, vec![]);
+        let list = List::new(ListVariant::Callout, "<1>".to_string(), vec![]);
         assert_eq!(list.marker, "<1>");
+    }
+
+    #[test]
+    fn list_markers_are_kept_as_written() {
+        let list = List::new(ListVariant::Ordered, "  .. ".to_string(), vec![]);
+        assert_eq!(list.marker, "..");
     }
 }

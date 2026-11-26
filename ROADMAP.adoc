@@ -17,26 +17,110 @@ bindings and DOCX title page can build on it.
 
 === Lists (L)
 
-List parsing needs a design pass before more patches: the continuation bugs all
-look like the same stack-handling problem, and nested lists need the same
-machinery.
+The list bugs come from four causes, so they get fixed by reworking how the
+parser holds lists rather than one patch each:
+
+. The scanner only recognizes `+* +` and `+. +`: `+**+` scans as a strong span,
+  `..` and `...` at the start of a line become an ellipsis (dropping the item),
+  and `-`, `1.` and indented markers are text.
+. An item's text is attached late: it waits on the inline stack until the next
+  item or blank line, then goes to whatever block is on top of the stack by then.
+  The reverse also happens: inlines still waiting when a list starts (a heading,
+  a paragraph line) are merged into its first item.
+. Nothing records which lists are open, so the parser can't nest a list or close
+  back to an outer one.
+. A blank line closes the list at once, so a later item starts a new list and a
+  later `+` has nothing to attach to.
+
+==== Design
+
+Asciidoctor (2.0.17) is the oracle; these rules were checked against it:
+
+* Lists nest by marker identity, not marker length: a marker not already open
+  starts a deeper list (`+**+`, `+***+`, then `+*+` is three levels deep), and
+  one that is open closes back to its level. `-` under `+*+` nests.
+* Blank lines between items don't end a list; the next non-blank line decides.
+  An item (with any marker) continues it, anything else ends it.
+* `+` attaches the next block to the deepest open item; a blank line before the
+  `+` attaches it to the top-level item.
+* A block start without `+` (an attribute line, a delimiter, a block title) ends
+  the list.
+* A delimited block attached to an item has its own list scope, and the outer
+  list resumes after it closes.
+* A list directly after a description list item (even after a blank line) is
+  attached to that item.
+* The numeral style of an ordered list follows its marker (`.` arabic, `..`
+  loweralpha, `...` lowerroman, `....` upperalpha, `.....` upperroman), not its
+  depth.
+
+Decisions:
+
+* The parser gets a separate list context: a stack of open lists (marker, list,
+  current item), with one context per open delimited block. Lists stay off the
+  block stack until they close, and an item's text is attached to that item as
+  soon as its paragraph ends.
+* Markers in 0.3: `+*+` to `+*****+`, `-`, `.` to `.....` and `1.`, with or
+  without leading whitespace. `a.` and `i)` numbering waits.
+* Description lists join the same context, so lists can attach to their items.
+  Nested description lists (`;;`, `:::`) are optional.
+* `List.marker` in the ASG holds the marker as written (`+**+`, `..`, `-`).
+
+Order of work (each step its own commit or PR):
+
+. (Done) A `block_outline` test helper that descends into list items, and
+  tests for every case below in `tests/list_tests.rs`; the ones for later steps
+  are ignored, with the step in the reason
+. (Done) Scanner: the new markers, and list markers before the ellipsis at the
+  start of a line
+. (Done) Move lists into the list context with today's single-level behavior
+  (all existing tests pass), and attach item text as soon as the item's
+  paragraph ends. List scopes for delimited blocks came with it
+. Nesting by marker identity
+. Blank lines between items, and the ancestor (blank line, then `+`)
+  continuation
+. Description lists in the list context
+. Lists after headings and paragraphs, and headings after list items (`+* a+`
+  then `== B` is one item, "a == B", in Asciidoctor)
+. Backends and docs
+
+==== Cases
 
 * [ ] Nested lists: `+* parent+` / `+** nested+` (and `.` / `..`), including
-  mixed ordered and unordered lists
-* [ ] A continued item followed by another item (`+* one+`, `+`, `more`,
+  mixed ordered and unordered lists, and shorter markers under longer ones
+* [x] `..` and `...` at the start of a line become an ellipsis, losing the
+  item's text
+* [x] `-` and `1.` markers, and markers with leading whitespace
+* [x] A continued item followed by another item (`+* one+`, `+`, `more`,
   `+* two+`) garbles the list
 * [ ] A continuation that attaches a nested list (`+* parent+`, `+`, `. one`,
-  `. two`)
-* [ ] A continuation, then a blank line, then an item is a hard error ("invalid
-  block continuation; no previous block")
-* [ ] A block attached without `+` (`+* one+`, a `[source]` listing,
-  `+* two+`) reorders the list
-* [ ] `== Head` directly followed by `+* a+` merges the title into the item
+  `. two`); since step 3 it starts a second list after the first
+* [ ] A continuation, then a blank line, then an item was a hard error ("invalid
+  block continuation; no previous block"); since step 3 it gives two lists
+* [ ] Blank lines between items split the list into several lists
+* [ ] A blank line, then `+`, attaches to the top-level item (now a hard error)
+* [x] A block attached without `+` (`+* one+`, a `[source]` listing,
+  `+* two+`) garbles the list; it should end the list (list, listing, list)
+* [x] A delimited block attached with `+` loses the item's text into the block
+* [x] `== Head` directly followed by `+* a+` merges the title into the item
   ("Heada")
-* [ ] A footnote in a list item, when an earlier footnote exists, moves the
-  item's text
-* [ ] Asciidoctor-style backend: nested list markers (depth classes,
-  `arabic`/`loweralpha`) once the parser produces nested lists
+* [ ] A paragraph line followed by `+* a+` should stay paragraph text, as in
+  Asciidoctor; since step 3 it is a paragraph and then a list (it used to merge
+  into the item, like "Heada")
+* [x] A list directly after a description list item (`Term:: def`, `+* item+`)
+  merges into its text and swallows the next term
+* [ ] A list after a description list item and a blank line is attached to the
+  item
+* [ ] The indentation of a lazy continuation line (`+* one+`, `  more`) is kept
+  in the item's text; Asciidoctor strips it
+* [ ] Asciidoctor-style backend: the ordered numeral style (`arabic`,
+  `loweralpha`, ...) from the list's marker
+* [ ] DOCX: nested lists at their indent level (they are all at level 0 now)
+
+The footnote bug that used to be listed here ("a footnote in a list item, when
+an earlier footnote exists, moves the item's text") doesn't reproduce in any
+backend. The faulty code, `Asg::standardize_footnotes` and the
+`extract_footnote*` functions, is only called by its own test; it goes in the
+API audit below.
 
 === Inline and block parser bugs (S–M each)
 
@@ -59,6 +143,17 @@ machinery.
 * [ ] A paragraph after a `+[[anchor]]+` line gets a leading space
 * [ ] A warning for the block macros we don't support (`toc::`, `audio::`,
   `video::`, `[stem]`), which are currently output as plain text without one
+* [ ] A line of text directly after a section heading (`== Head`, `Text`) is
+  merged into the section title ("Head\nText")
+* [ ] A line of text directly after a delimited listing (`----`, `x`, `----`,
+  `more`) is added to the listing; it should be a paragraph
+* [ ] A single-column table with one cell per line (`|===`, `|a`, `|b`,
+  `|===`) fails with "Error creating table"
+* [ ] A description list term ending its line (`Term::` with the description
+  on the next line) doesn't count that newline, so every later location in the
+  document is a line too early
+* [ ] A listing's text in the ASG starts with the newline after the opening
+  delimiter (`"\ncode\n"`); check against the ASG schema
 
 === Cross references and section IDs (M)
 
@@ -90,7 +185,12 @@ machinery.
 === Library API (M)
 
 * [ ] Audit the public API in `src/lib.rs`: what's `pub` by accident, and what a
-  library user actually needs. Tidy it before the 0.4 Python bindings freeze it
+  library user actually needs. Tidy it before the 0.4 Python bindings freeze it.
+  Known candidates: `Block::is_ordered_list_item` and
+  `Block::is_unordered_list_item`, unused since the list context
+* [ ] Remove the unused footnote extraction (`Asg::standardize_footnotes`,
+  `Block::extract_footnote_definitions` and the list items' `extract_footnotes`),
+  and its `LIMITATIONS.adoc` entry
 * [ ] Docs on docs.rs good enough to use the crate without reading the source
 
 === Document header (M)
