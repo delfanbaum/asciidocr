@@ -1,0 +1,10 @@
+link:a.html[x]
+link:b.html[y]
+
+`link:c.html[in code]` and foo
+
+a link:d.html[unclosed
+
+*a link:e.html[f *g
+
+link:h.html[Foo *bold*] and link:http://i.com/?q[1]=2[query]

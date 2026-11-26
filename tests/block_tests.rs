@@ -428,3 +428,21 @@ fn test_heading_lines(#[case] adoc: &str, #[case] expected: &str) {
 fn test_delimiters_end_paragraphs(#[case] adoc: &str, #[case] expected: &str) {
     assert_eq!(block_outline(adoc), expected);
 }
+
+/// A delimited block inside another one, and the text after each
+#[rstest]
+#[case::sidebar_in_example(
+    "====\nouter\n****\ninner\n****\nafter inner\n====\nafter\n",
+    "example(paragraph \"outer\", sidebar(paragraph \"inner\"), paragraph \"after inner\") paragraph \"after\""
+)]
+#[case::open_in_example(
+    "====\nouter\n--\ninner\n--\n====\nafter\n",
+    "example(paragraph \"outer\", open(paragraph \"inner\")) paragraph \"after\""
+)]
+#[case::only_a_sidebar(
+    "====\n****\ninner\n****\n====\nafter\n",
+    "example(sidebar(paragraph \"inner\")) paragraph \"after\""
+)]
+fn test_nested_delimited_blocks(#[case] adoc: &str, #[case] expected: &str) {
+    assert_eq!(block_outline(adoc), expected);
+}

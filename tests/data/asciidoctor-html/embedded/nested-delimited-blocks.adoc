@@ -1,0 +1,23 @@
+====
+outer
+****
+inner
+****
+after inner
+====
+after the example
+
+====
+outer again
+--
+inner open
+--
+====
+after the second example
+
+====
+****
+only a sidebar
+****
+====
+after the third example
