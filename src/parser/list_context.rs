@@ -5,16 +5,15 @@
 //! whatever block happens to be on top of the block stack by the time the item ends.
 //!
 //! Lists live in scopes. A scope belongs to one level of the block stack: the lists at the top
-//! level of a section, of a delimited block, or of a description list item. A scope is active
+//! level of a section or of a delimited block. A scope is active
 //! only while the block stack is at that depth; a delimited block attached to an item pushes the
 //! stack deeper, which suspends the scope until that block is complete. The parser must close a
 //! scope before the block stack shrinks below its depth.
+//!
+//! Description lists live here too, so that lists nest in their items, and theirs in list items,
+//! in the same way.
 
-use crate::graph::{
-    blocks::Block,
-    inlines::Inline,
-    lists::{List, ListItem},
-};
+use crate::graph::{blocks::Block, inlines::Inline};
 
 use crate::errors::BlockError;
 
@@ -23,10 +22,11 @@ use crate::errors::BlockError;
 struct OpenList {
     /// what items must have in common to belong to this list (see [`marker_key`])
     key: String,
-    /// a `Block::List`, holding the items before the current one
+    /// a `Block::List` or `Block::DList`, holding the items before the current one
     list: Block,
-    /// the item being added to, which joins the list when the next item starts or the list ends
-    item: ListItem,
+    /// the item being added to (a `Block::ListItem` or `Block::DListItem`), which joins the list
+    /// when the next item starts or the list ends
+    item: Block,
 }
 
 /// The lists open at one level of the block stack
@@ -48,7 +48,7 @@ pub(super) struct ListScope {
 }
 
 impl ListScope {
-    fn current_item(&mut self) -> &mut ListItem {
+    fn current_item(&mut self) -> &mut Block {
         // a scope is only created with a list in it, and is dropped when it closes
         &mut self
             .lists
@@ -58,14 +58,14 @@ impl ListScope {
     }
 
     /// Adds an inline to the current item's principal text
-    pub fn push_principal(&mut self, inline: Inline) {
-        self.current_item().add_inline(inline)
+    pub fn push_principal(&mut self, inline: Inline) -> Result<(), BlockError> {
+        self.current_item().push_inline(inline)
     }
 
     /// Attaches a block to the current item (a block that followed a `+`)
-    pub fn attach_block(&mut self, block: Block) {
-        self.current_item().blocks.push(block);
+    pub fn attach_block(&mut self, block: Block) -> Result<(), BlockError> {
         self.attach_next = false;
+        self.current_item().push_block(block)
     }
 
     /// Adds an item to the open list with its key, closing the lists nested deeper than that one.
@@ -73,25 +73,21 @@ impl ListScope {
     /// current item (see [`nest`](Self::nest)). Lists nest by marker, not by marker length: after
     /// `**`, a `*` item closes back to the `*` list only if one is open, and otherwise nests
     /// deeper.
-    pub fn add_item(&mut self, key: &str, item: ListItem) -> Result<Option<ListItem>, BlockError> {
+    pub fn add_item(&mut self, key: &str, item: Block) -> Result<Option<Block>, BlockError> {
         let Some(level) = self.lists.iter().position(|open| open.key == key) else {
             return Ok(Some(item));
         };
         self.close_deeper_than(level)?;
         let open = &mut self.lists[level];
         let finished = std::mem::replace(&mut open.item, item);
-        open.list.push_block(Block::ListItem(finished))?;
+        open.list.push_block(finished)?;
         self.start_item();
         Ok(None)
     }
 
     /// Starts a list, with its first item, nested in the current item
-    pub fn nest(&mut self, key: String, list: List, item: ListItem) {
-        self.lists.push(OpenList {
-            key,
-            list: Block::List(list),
-            item,
-        });
+    pub fn nest(&mut self, key: String, list: Block, item: Block) {
+        self.lists.push(OpenList { key, list, item });
         self.start_item();
     }
 
@@ -126,13 +122,12 @@ impl ListScope {
     fn close_deeper_than(&mut self, level: usize) -> Result<(), BlockError> {
         while self.lists.len() > level + 1 {
             let mut open = self.lists.pop().expect("Checked by the loop condition");
-            open.list.push_block(Block::ListItem(open.item))?;
+            open.list.push_block(open.item)?;
             self.lists
                 .last_mut()
                 .expect("Checked by the loop condition")
                 .item
-                .blocks
-                .push(open.list);
+                .push_block(open.list)?;
         }
         Ok(())
     }
@@ -144,7 +139,7 @@ impl ListScope {
             return Ok(None);
         };
         let mut list = open.list;
-        list.push_block(Block::ListItem(open.item))?;
+        list.push_block(open.item)?;
         Ok(Some(list))
     }
 }
@@ -164,15 +159,11 @@ impl ListContext {
 
     /// Starts a new list (with its first item) at this depth of the block stack. The caller
     /// closes any list already open at this depth first.
-    pub fn start_list(&mut self, depth: usize, key: String, list: List, item: ListItem) {
+    pub fn start_list(&mut self, depth: usize, key: String, list: Block, item: Block) {
         debug_assert!(self.active(depth).is_none());
         self.scopes.push(ListScope {
             depth,
-            lists: vec![OpenList {
-                key,
-                list: Block::List(list),
-                item,
-            }],
+            lists: vec![OpenList { key, list, item }],
             principal_open: true,
             attach_next: false,
             after_blank: false,
@@ -201,6 +192,10 @@ impl ListContext {
     }
 }
 
+/// The key of description lists. Only `::` is recognized for now, so they don't nest in each
+/// other (`;;` and `:::` would)
+pub(super) const DLIST_KEY: &str = "::";
+
 /// What a list item's marker must share with the list's other items. Numbered items (`1.`,
 /// `2.`) and callouts (`<1>`, `<2>`) belong together whatever their number; every other marker
 /// only matches itself, so `*` and `**`, or `.` and `1.`, are different lists.
@@ -224,7 +219,7 @@ pub(super) fn marker_key(marker: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::graph::lists::ListVariant;
+    use crate::graph::lists::{List, ListItem, ListVariant};
     use rstest::rstest;
 
     #[rstest]
@@ -239,7 +234,7 @@ mod tests {
         assert_eq!(marker_key(marker), expected);
     }
 
-    fn item(marker: &str, text: &str) -> ListItem {
+    fn item(marker: &str, text: &str) -> Block {
         let mut item = ListItem::new(marker.to_string(), vec![]);
         item.add_inline(Inline::InlineLiteral(
             crate::graph::inlines::InlineLiteral::new(
@@ -248,14 +243,21 @@ mod tests {
                 vec![],
             ),
         ));
-        item
+        Block::ListItem(item)
+    }
+
+    fn list(marker: &str) -> Block {
+        Block::List(List::new(
+            ListVariant::Unordered,
+            marker.to_string(),
+            vec![],
+        ))
     }
 
     #[test]
     fn scopes_are_only_active_at_their_depth() {
         let mut lists = ListContext::default();
-        let list = List::new(ListVariant::Unordered, "*".to_string(), vec![]);
-        lists.start_list(1, "*".to_string(), list, item("*", "a"));
+        lists.start_list(1, "*".to_string(), list("*"), item("*", "a"));
         assert!(lists.active(0).is_none());
         assert!(lists.active(2).is_none());
         assert!(lists.active(1).is_some());
@@ -264,8 +266,7 @@ mod tests {
     #[test]
     fn closing_a_scope_returns_its_items_in_order() {
         let mut lists = ListContext::default();
-        let list = List::new(ListVariant::Unordered, "*".to_string(), vec![]);
-        lists.start_list(0, "*".to_string(), list, item("*", "a"));
+        lists.start_list(0, "*".to_string(), list("*"), item("*", "a"));
         let handed_back = lists.active(0).unwrap().add_item("*", item("*", "b"));
         assert!(handed_back.unwrap().is_none());
         let Some(Block::List(list)) = lists.close_active(0).unwrap() else {
@@ -278,8 +279,7 @@ mod tests {
     #[test]
     fn an_item_with_an_unopened_marker_is_handed_back() {
         let mut lists = ListContext::default();
-        let list = List::new(ListVariant::Unordered, "*".to_string(), vec![]);
-        lists.start_list(0, "*".to_string(), list, item("*", "a"));
+        lists.start_list(0, "*".to_string(), list("*"), item("*", "a"));
         let scope = lists.active(0).unwrap();
         assert!(scope.add_item("**", item("**", "b")).unwrap().is_some());
     }
@@ -288,11 +288,10 @@ mod tests {
     #[test]
     fn an_open_marker_closes_the_lists_nested_deeper() {
         let mut lists = ListContext::default();
-        let new_list = |marker: &str| List::new(ListVariant::Unordered, marker.to_string(), vec![]);
-        lists.start_list(0, "*".to_string(), new_list("*"), item("*", "a"));
+        lists.start_list(0, "*".to_string(), list("*"), item("*", "a"));
         let scope = lists.active(0).unwrap();
-        scope.nest("**".to_string(), new_list("**"), item("**", "b"));
-        scope.nest("***".to_string(), new_list("***"), item("***", "c"));
+        scope.nest("**".to_string(), list("**"), item("**", "b"));
+        scope.nest("***".to_string(), list("***"), item("***", "c"));
         assert!(scope.add_item("*", item("*", "d")).unwrap().is_none());
         assert_eq!(scope.lists.len(), 1);
 

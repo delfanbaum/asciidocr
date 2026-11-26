@@ -28,7 +28,7 @@ use crate::{
 };
 
 mod list_context;
-use list_context::{ListContext, marker_key};
+use list_context::{DLIST_KEY, ListContext, marker_key};
 
 /// Parses a stream of tokens into an [`Asg`] (Abstract Syntax Graph), returning the graph once all
 /// tokens have been parsed.
@@ -78,8 +78,8 @@ pub struct Parser {
     /// forces a new block when we add inlines; helps distinguish between adding to section.title
     /// and section.blocks
     force_new_block: bool,
-    /// Temporarily preserves newline characters as separate inline literal tokens (where ambiguous
-    /// blocks, i.e., DListItems, may require splitting the inline_stack on the newline)
+    /// Preserves newline characters as separate inline literal tokens. Set by the first
+    /// description list item, whose fixtures expect it, and never unset
     preserve_newline_text: bool,
     /// Some parent elements have non-obvious closing conditions, so we want an easy way to close these
     close_parent_after_push: bool,
@@ -534,13 +534,8 @@ impl Parser {
         Ok(())
     }
 
-    /// A blank line completes the open paragraph, and whatever block on the stack it completes
-    /// (a description list item, say), and the text after it starts a new block
+    /// A blank line completes the open paragraph, and the text after it starts a new block
     fn end_blocks_at_blank_line(&mut self, asg: &mut Asg) -> Result<(), ParserError> {
-        // consolidate any dangling description list items
-        if let Some(Block::DListItem(_)) = self.block_stack.last() {
-            self.add_last_list_item_to_list(asg)?;
-        }
         // clear out any inlines
         self.in_inline_span = false;
         self.add_inlines_to_block_stack()?;
@@ -564,6 +559,9 @@ impl Parser {
     /// After a blank line in a list, the next line that isn't blank decides whether the list
     /// goes on: an item or a `+` continues it, and anything else ends it. Ending it then does
     /// what the blank line would have done without a list.
+    ///
+    /// A line of text is only known not to be a description list item (whose terms come before
+    /// the `::`) once it ends without a `::`, so text waits on the inline stack until then.
     fn end_list_after_blank_line(
         &mut self,
         token_type: TokenType,
@@ -576,21 +574,41 @@ impl Parser {
         {
             return Ok(());
         }
-        let continues_list = matches!(
-            token_type,
+        match token_type {
+            // the end of a line of text: the text wasn't a term, so it comes after the list
+            TokenType::NewLineChar | TokenType::Eof if !self.inline_stack.is_empty() => {
+                let line = std::mem::take(&mut self.inline_stack);
+                self.close_lists(asg)?;
+                self.end_blocks_at_blank_line(asg)?;
+                self.inline_stack = line;
+            }
+            // another blank line
             TokenType::NewLineChar
-                | TokenType::BlockContinuation
-                | TokenType::UnorderedListItem
-                | TokenType::OrderedListItem
-                | TokenType::CodeCalloutListItem
-                // an include decides nothing; the first line it includes does
-                | TokenType::Include
-                | TokenType::StartTag
-                | TokenType::EndTag
-        );
-        if !continues_list {
-            self.close_lists(asg)?;
-            self.end_blocks_at_blank_line(asg)?;
+            | TokenType::BlockContinuation
+            | TokenType::UnorderedListItem
+            | TokenType::OrderedListItem
+            | TokenType::CodeCalloutListItem
+            | TokenType::DescriptionListMarker
+            // an include decides nothing; the first line it includes does
+            | TokenType::Include
+            | TokenType::StartTag
+            | TokenType::EndTag => {}
+            // lines that aren't text
+            token_type
+                if token_type.ends_list_item()
+                    || matches!(
+                        token_type,
+                        TokenType::Eof
+                            | TokenType::Comment
+                            | TokenType::Attribute
+                            | TokenType::TableCell
+                    ) =>
+            {
+                self.close_lists(asg)?;
+                self.end_blocks_at_blank_line(asg)?;
+            }
+            // text, which may be the terms of a description list item
+            _ => {}
         }
         Ok(())
     }
@@ -736,55 +754,86 @@ impl Parser {
         Ok(())
     }
 
-    /// Gathers preceding inlines into the "terms" attribute on DListItem, then adds what follows
-    /// as you would for a normal list
+    /// Starts a description list item, which works like any other list item (see
+    /// [`parse_list_item`](Self::parse_list_item)). Its terms are the text on the marker's line;
+    /// the text on the lines before it belongs to what came before (the previous item, say).
     fn parse_description_list_term(
         &mut self,
         token: Token,
         asg: &mut Asg,
     ) -> Result<(), ParserError> {
-        // create the list item
-        let mut dlist_item = DListItem::new_from_token(token);
+        self.dangling_newline = None;
         // ensure we're not forcing a new block, given that all sorts of things can follow
         self.force_new_block = false;
-
-        // check for splits
-        if let Some(newline_idx) = self
-            .inline_stack
-            .iter()
-            .position(|inline| inline.is_newline())
-        {
-            // remove the inlines that ought to constitute the next term
-            let mut next_terms: VecDeque<Inline> = self.inline_stack.drain(newline_idx..).collect();
-            // remove the newline, since we don't care about that anymore
-            next_terms.pop_front();
-            // add the other inlines
-            self.add_inlines_to_block_stack()?;
-            // then add the next terms back
-            self.inline_stack.append(&mut next_terms);
-        }
-        // collect the inlines
-        while !self.inline_stack.is_empty() {
-            let inline = self.inline_stack.pop_front().unwrap();
+        let depth = self.block_stack.len();
+        let mut dlist_item = DListItem::new_from_token(token);
+        for inline in self.take_current_line_inlines() {
             dlist_item.push_term(inline);
         }
-        if self.block_stack.last().is_some()
-            && self.block_stack.last().unwrap().is_definition_list_item()
-        {
-            self.add_last_list_item_to_list(asg)?
-        } else {
-            // we need to create the list first
-            let mut dlist = DList::new(dlist_item.locations().clone());
-            if let Some(title) = self.block_title.take() {
-                dlist.title = title;
-            }
-            self.push_block_to_stack(Block::DList(dlist))?;
-        }
-        // either way, add the new list item
-        self.push_block_to_stack(Block::DListItem(dlist_item))?;
+        let locations = dlist_item.locations();
+        let item = Block::DListItem(dlist_item);
+        let key = DLIST_KEY.to_string();
+
+        self.add_inlines_to_block_stack()?;
         // preserve newlines for now
         self.preserve_newline_text = true;
+        if let Some(scope) = self.lists.active(depth) {
+            if let Some(item) = scope.add_item(&key, item)? {
+                let dlist = self.new_dlist(locations);
+                if let Some(scope) = self.lists.active(depth) {
+                    scope.nest(key, dlist, item);
+                }
+            }
+            return Ok(());
+        }
+
+        self.emit_completed_block_before_list(asg)?;
+        let dlist = self.new_dlist(locations);
+        self.lists
+            .start_list(self.block_stack.len(), key, dlist, item);
         Ok(())
+    }
+
+    /// Makes a description list, which takes the block title and metadata that are waiting for
+    /// a block
+    fn new_dlist(&mut self, locations: Vec<Location>) -> Block {
+        let mut dlist = DList::new(locations);
+        if let Some(title) = self.block_title.take() {
+            dlist.title = title;
+        }
+        if let Some(metadata) = self.metadata.take()
+            && !metadata.is_empty()
+        {
+            dlist.metadata = Some(metadata);
+        }
+        Block::DList(dlist)
+    }
+
+    /// Takes the inlines on the current line off the inline stack: those after the last newline,
+    /// which is dropped
+    fn take_current_line_inlines(&mut self) -> VecDeque<Inline> {
+        let mut line = VecDeque::new();
+        while let Some(inline) = self.inline_stack.pop_back() {
+            if inline.is_newline() {
+                break;
+            }
+            // text that runs onto this line from the lines before is split at the newline
+            if let Inline::InlineLiteral(mut literal) = inline {
+                if matches!(literal.name, InlineLiteralName::Text)
+                    && let Some(last_line) = literal.split_off_last_line()
+                {
+                    line.push_front(Inline::InlineLiteral(last_line));
+                    if !literal.value().is_empty() {
+                        self.inline_stack.push_back(Inline::InlineLiteral(literal));
+                    }
+                    break;
+                }
+                line.push_front(Inline::InlineLiteral(literal));
+            } else {
+                line.push_front(inline);
+            }
+        }
+        line
     }
 
     /// Starts a list item: a new item in the open list with the same marker, or else a new list,
@@ -796,7 +845,7 @@ impl Parser {
         let depth = self.block_stack.len();
         let marker = token.lexeme.trim().to_string();
         let key = marker_key(&marker);
-        let item = ListItem::new(token.lexeme.clone(), token.locations());
+        let item = Block::ListItem(ListItem::new(token.lexeme.clone(), token.locations()));
         // the item's text follows on this line even if an attribute line or a section heading
         // asked for a new block
         self.force_new_block = false;
@@ -806,7 +855,7 @@ impl Parser {
         self.add_inlines_to_block_stack()?;
         if let Some(scope) = self.lists.active(depth) {
             if let Some(item) = scope.add_item(&key, item)? {
-                let list = self.new_list(&token, marker, asg)?;
+                let list = Block::List(self.new_list(&token, marker, asg)?);
                 if let Some(scope) = self.lists.active(depth) {
                     scope.nest(key, list, item);
                 }
@@ -815,7 +864,7 @@ impl Parser {
         }
 
         self.emit_completed_block_before_list(asg)?;
-        let list = self.new_list(&token, marker, asg)?;
+        let list = Block::List(self.new_list(&token, marker, asg)?);
         self.lists
             .start_list(self.block_stack.len(), key, list, item);
         Ok(())
@@ -861,15 +910,15 @@ impl Parser {
 
     /// Outside a delimited block, a block left complete on top of the stack (a paragraph, say,
     /// or a closed listing) goes to its parent before a list starts, so that the list comes after
-    /// it rather than inside it. Sections and description list items stay, since they hold the
-    /// list. (Inside a delimited block, completed blocks wait on the stack for the closing
-    /// delimiter, which collects them in order.)
+    /// it rather than inside it. Sections stay, since they hold the list. (Inside a delimited
+    /// block, completed blocks wait on the stack for the closing delimiter, which collects them
+    /// in order.)
     fn emit_completed_block_before_list(&mut self, asg: &mut Asg) -> Result<(), ParserError> {
         if self.open_delimited_block_lines.is_empty()
             && self
                 .block_stack
                 .last()
-                .is_some_and(|block| !block.is_section() && !block.is_definition_list_item())
+                .is_some_and(|block| !block.is_section())
         {
             self.add_last_to_block_stack_or_graph(asg)?;
         }
@@ -884,6 +933,8 @@ impl Parser {
         let Some(scope) = self.lists.active(self.block_stack.len()) else {
             return Ok(());
         };
+        // the newline that ended the item's last line of text is not the block's
+        self.dangling_newline = None;
         if scope.attach_next && !inlines_pending {
             scope.principal_open = false;
             return Ok(());
@@ -1010,7 +1061,7 @@ impl Parser {
             // the next block belongs to the current list item
             scope.continuation()?;
         } else {
-            // e.g., a description list item, which is still on the block stack
+            // outside a list, where Asciidoctor keeps a `+` as text; see the roadmap
             self.in_block_continuation = true;
         }
         self.force_new_block = true;
@@ -1469,7 +1520,7 @@ impl Parser {
         if let Some(scope) = self.lists.active(self.block_stack.len())
             && scope.attach_next
         {
-            scope.attach_block(block);
+            scope.attach_block(block)?;
             return Ok(());
         }
         self.push_block_to_stack(block)
@@ -1616,7 +1667,7 @@ impl Parser {
             && scope.principal_open
         {
             while let Some(inline) = self.inline_stack.pop_front() {
-                scope.push_principal(inline);
+                scope.push_principal(inline)?;
             }
             return Ok(());
         }
@@ -1657,7 +1708,7 @@ impl Parser {
         if self.lists.active(depth).is_some() {
             self.warn_paragraph_title_dropped(pending_title.as_deref(), &para_block);
             if let Some(scope) = self.lists.active(depth) {
-                scope.attach_block(para_block);
+                scope.attach_block(para_block)?;
             }
             return Ok(());
         }
@@ -1724,29 +1775,6 @@ impl Parser {
                 self.metadata = Some(ElementMetadata::new_block_meta_from_token(token));
             }
         }
-    }
-
-    /// Adds the description list item on top of the stack to its list
-    fn add_last_list_item_to_list(&mut self, asg: &mut Asg) -> Result<(), ParserError> {
-        // clear out any forced new blocks
-        self.force_new_block = false;
-        // add the inlines to the list item
-        self.add_inlines_to_block_stack()?;
-        // a list that followed the item belongs to it
-        self.close_lists(asg)?;
-        // then add it to the list
-        let last_item = self.block_stack.pop().unwrap();
-        // if the last thing is a list item, add it to the list
-        if matches!(last_item, Block::ListItem(_) | Block::DListItem(_)) {
-            if let Some(list) = self.block_stack.last_mut() {
-                list.push_block(last_item)?
-            }
-        } else {
-            // otherwise return the list to the open block stack, and create a new unordered
-            // list item
-            self.push_block_to_stack(last_item)?;
-        }
-        Ok(())
     }
 
     fn add_to_block_stack_or_graph(

@@ -78,7 +78,7 @@ Order of work (each step its own commit or PR):
 . (Done) Nesting by marker identity
 . (Done) Blank lines between items, and the ancestor (blank line, then `+`)
   continuation
-. Description lists in the list context
+. (Done) Description lists in the list context
 . Lists after headings and paragraphs, and headings after list items (`+* a+`
   then `== B` is one item, "a == B", in Asciidoctor)
 . Backends and docs
@@ -108,8 +108,14 @@ Order of work (each step its own commit or PR):
   into the item, like "Heada")
 * [x] A list directly after a description list item (`Term:: def`, `+* item+`)
   merges into its text and swallows the next term
-* [ ] A list after a description list item and a blank line is attached to the
+* [x] A list after a description list item and a blank line is attached to the
   item
+* [x] Description lists: a blank line between items splits the list; a `+` or a
+  lazy line after an item garbles the next term (`A:: a`, `more a`, `B:: b` gave
+  the term "more aB"); a delimited block without `+` swallows the item's text;
+  and a description list after a list item merges into the item's text
+* [ ] Several terms for one description (`A::` directly followed by `B:: b`):
+  Asciidoctor gives one item with two terms, we give `A` an empty description
 * [ ] The indentation of a lazy continuation line (`+* one+`, `  more`) is kept
   in the item's text; Asciidoctor strips it
 * [ ] Asciidoctor-style backend: the ordered numeral style (`arabic`,
@@ -145,8 +151,17 @@ API audit below.
   `video::`, `[stem]`), which are currently output as plain text without one
 * [ ] A line of text directly after a section heading (`== Head`, `Text`) is
   merged into the section title ("Head\nText")
-* [ ] A line of text directly after a delimited listing (`----`, `x`, `----`,
-  `more`) is added to the listing; it should be a paragraph
+* [ ] A line of text directly before or after a delimited listing (`Text`,
+  `----`, `x`, `----`, or `----`, `x`, `----`, `more`) is added to the listing;
+  it should be a paragraph. (Asciidoctor reads `Text` then `----` as a setext
+  section title, which we don't support)
+* [ ] A `+` line outside a list stops the conversion after a paragraph ("push_block
+  not implemented for LeafBlock") and is dropped after a heading; Asciidoctor
+  keeps it as text. `Parser::in_block_continuation` is only reached outside
+  lists now, so this can replace it
+* [ ] `Parser::preserve_newline_text` is set by the first description list item
+  and never unset, so every paragraph after it has its newlines as separate
+  inlines in the ASG
 * [ ] A single-column table with one cell per line (`|===`, `|a`, `|b`,
   `|===`) fails with "Error creating table"
 * [ ] A description list term ending its line (`Term::` with the description

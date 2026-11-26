@@ -779,6 +779,35 @@ impl InlineLiteral {
         self.location = Location::reconcile(self.location.clone(), inline.locations().clone());
     }
 
+    /// Splits off the text after the last newline, i.e., the text on this literal's last line
+    /// (the term of a description list item, say, whose line the `::` ends). The newline is
+    /// dropped. Returns `None` if the text has no newline.
+    pub fn split_off_last_line(&mut self) -> Option<InlineLiteral> {
+        let newline_idx = self.value.rfind('\n')?;
+        let (Some(start), Some(end)) = (self.location.first(), self.location.last()) else {
+            return None;
+        };
+        let (start, end) = (start.clone(), end.clone());
+        let last_line = self.value.split_off(newline_idx + 1);
+        self.value.truncate(newline_idx);
+        // the text before the newline now ends a line earlier, at its last character
+        let end_col = match self.value.rfind('\n') {
+            Some(idx) => self.value[idx + 1..].chars().count(),
+            None => (start.col + self.value.chars().count()).saturating_sub(1),
+        };
+        self.location = vec![
+            start,
+            Location::new(end.line.saturating_sub(1), end_col.max(1), end.file.clone()),
+        ];
+        // and the last line starts at its first column
+        let last_line_start = Location::new(end.line, 1, end.file.clone());
+        Some(InlineLiteral::new(
+            self.name.clone(),
+            last_line,
+            vec![last_line_start, end],
+        ))
+    }
+
     pub fn combine_literals(&mut self, inline: InlineLiteral) {
         self.value.push_str(&inline.value());
         self.location = Location::reconcile(self.location.clone(), inline.location.clone());
@@ -925,5 +954,38 @@ mod tests {
             vec![Location::default(), Location::default()],
         );
         assert_eq!(inline.value_or_refd_char(), replacement)
+    }
+
+    /// "def\nmore\nTerm", from (1, 5) to (3, 4): "Term" is on line 3, and the rest ends at the
+    /// end of line 2
+    #[test]
+    fn split_off_last_line() {
+        let mut literal = InlineLiteral::new(
+            InlineLiteralName::Text,
+            "def\nmore\nTerm".to_string(),
+            vec![Location::new(1, 5, vec![]), Location::new(3, 4, vec![])],
+        );
+        let last_line = literal.split_off_last_line().unwrap();
+        assert_eq!(last_line.value(), "Term");
+        assert_eq!(
+            last_line.location,
+            vec![Location::new(3, 1, vec![]), Location::new(3, 4, vec![])]
+        );
+        assert_eq!(literal.value(), "def\nmore");
+        assert_eq!(
+            literal.location,
+            vec![Location::new(1, 5, vec![]), Location::new(2, 4, vec![])]
+        );
+    }
+
+    #[test]
+    fn split_off_last_line_without_a_newline() {
+        let mut literal = InlineLiteral::new(
+            InlineLiteralName::Text,
+            "Term".to_string(),
+            vec![Location::new(1, 1, vec![]), Location::new(1, 4, vec![])],
+        );
+        assert!(literal.split_off_last_line().is_none());
+        assert_eq!(literal.value(), "Term");
     }
 }

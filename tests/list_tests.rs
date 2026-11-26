@@ -88,6 +88,10 @@ fn test_list_item_lazy_line_indentation() {
     "* one\n\nA paragraph.\n\n* two\n",
     "list(* \"one\") paragraph \"A paragraph.\" list(* \"two\")"
 )]
+#[case::literal_without_continuation(
+    "* one\n....\nlit\n....\n",
+    "list(* \"one\") literal \"\nlit\n\""
+)]
 #[case::comment_separator(
     ". one\n. two\n\n//-\n\n. new list\n",
     "list(. \"one\", . \"two\") list(. \"new list\")"
@@ -192,12 +196,44 @@ fn test_list_scopes() {
 
 /// A list after a description list item belongs to it, even after a blank line
 #[test]
-#[ignore = "lists step 6: description lists in the list context"]
 fn test_list_after_dlist_item_and_blank_line() {
     assert_eq!(
         block_outline_with_timeout("Term:: def\n\n* item\n"),
         "dlist(\"Term\":: \"def\"(list(* \"item\")))"
     );
+}
+
+/// Description lists follow the same rules as other lists: their items take the lines that
+/// follow, `+` attaches a block, blank lines don't end them, and lists nest in their items
+#[rstest]
+#[case::lazy_line(
+    "A:: a\nmore a\nB:: b\n",
+    "dlist(\"A\":: \"a\nmore a\", \"B\":: \"b\")"
+)]
+#[case::continuation(
+    "A:: a\n+\npara\nB:: b\n",
+    "dlist(\"A\":: \"a\"(paragraph \"para\"), \"B\":: \"b\")"
+)]
+#[case::blank_between_items("A:: a\n\nB:: b\n", "dlist(\"A\":: \"a\", \"B\":: \"b\")")]
+#[case::ancestor_continuation(
+    "A:: a\n\n\nB:: b\n\n+\npara\n",
+    "dlist(\"A\":: \"a\", \"B\":: \"b\"(paragraph \"para\"))"
+)]
+#[case::text_after_blank_line(
+    "A:: a\n\nText\nmore text\n",
+    "dlist(\"A\":: \"a\") paragraph \"Text\nmore text\""
+)]
+#[case::block_without_continuation(
+    "A:: a\n....\nlit\n....\n",
+    "dlist(\"A\":: \"a\") literal \"\nlit\n\""
+)]
+#[case::in_list_item("* x\nA:: a\n", "list(* \"x\"(dlist(\"A\":: \"a\")))")]
+#[case::list_item_after_term(
+    "A:: a\n* x\nB:: b\n** y\n",
+    "dlist(\"A\":: \"a\"(list(* \"x\")), \"B\":: \"b\"(list(** \"y\")))"
+)]
+fn test_description_lists(#[case] adoc: &str, #[case] expected: &str) {
+    assert_eq!(block_outline_with_timeout(adoc), expected);
 }
 
 /// A list item can't interrupt a paragraph, and a heading can't interrupt an item's text
