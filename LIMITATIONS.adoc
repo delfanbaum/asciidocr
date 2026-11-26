@@ -12,10 +12,6 @@ non-features.
   than the section title, and logs a warning
 * Custom text for cross references: `+<<id,custom text>>+` is left as text
   (`+<<id>>+` works, and uses the title of the target)
-* A list item marker directly after a paragraph line (`Text` then `* a`) starts
-  a list, where Asciidoctor keeps it as paragraph text. Likewise, a heading
-  directly after a list item ends the list, where Asciidoctor keeps it as the
-  item's text
 * A footnote in a list item moves the item's text out of the item's principal
   text if an earlier footnote exists in the document
 * `+pass:[]+` inline passthroughs work, but `+++text+++` does not (it is

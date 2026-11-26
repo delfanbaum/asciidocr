@@ -79,7 +79,7 @@ Order of work (each step its own commit or PR):
 . (Done) Blank lines between items, and the ancestor (blank line, then `+`)
   continuation
 . (Done) Description lists in the list context
-. Lists after headings and paragraphs, and headings after list items (`+* a+`
+. (Done) Lists after headings and paragraphs, and headings after list items (`+* a+`
   then `== B` is one item, "a == B", in Asciidoctor)
 . Backends and docs
 
@@ -103,9 +103,12 @@ Order of work (each step its own commit or PR):
 * [x] A delimited block attached with `+` loses the item's text into the block
 * [x] `== Head` directly followed by `+* a+` merges the title into the item
   ("Heada")
-* [ ] A paragraph line followed by `+* a+` should stay paragraph text, as in
-  Asciidoctor; since step 3 it is a paragraph and then a list (it used to merge
-  into the item, like "Heada")
+* [x] A paragraph line followed by `+* a+` (or `Term:: def`) should stay
+  paragraph text, as in Asciidoctor (it used to merge into the item, like
+  "Heada")
+* [x] A heading directly after a list item's text, or after a paragraph line,
+  is text (`+* a+`, `== B` is one item; `Text`, `== B` used to be a section
+  titled "TextB")
 * [x] A list directly after a description list item (`Term:: def`, `+* item+`)
   merges into its text and swallows the next term
 * [x] A list after a description list item and a blank line is attached to the
@@ -116,7 +119,7 @@ Order of work (each step its own commit or PR):
   and a description list after a list item merges into the item's text
 * [ ] Several terms for one description (`A::` directly followed by `B:: b`):
   Asciidoctor gives one item with two terms, we give `A` an empty description
-* [ ] The indentation of a lazy continuation line (`+* one+`, `  more`) is kept
+* [x] The indentation of a lazy continuation line (`+* one+`, `  more`) is kept
   in the item's text; Asciidoctor strips it
 * [ ] Asciidoctor-style backend: the ordered numeral style (`arabic`,
   `loweralpha`, ...) from the list's marker
@@ -149,7 +152,7 @@ API audit below.
 * [ ] A paragraph after a `+[[anchor]]+` line gets a leading space
 * [ ] A warning for the block macros we don't support (`toc::`, `audio::`,
   `video::`, `[stem]`), which are currently output as plain text without one
-* [ ] A line of text directly after a section heading (`== Head`, `Text`) is
+* [x] A line of text directly after a section heading (`== Head`, `Text`) is
   merged into the section title ("Head\nText")
 * [ ] A line of text directly before or after a delimited listing (`Text`,
   `----`, `x`, `----`, or `----`, `x`, `----`, `more`) is added to the listing;
@@ -166,7 +169,8 @@ API audit below.
   `|===`) fails with "Error creating table"
 * [ ] A description list term ending its line (`Term::` with the description
   on the next line) doesn't count that newline, so every later location in the
-  document is a line too early
+  document is a line too early. The indentation of that next line is also
+  kept, where Asciidoctor strips it as it does for other lines of an item's text
 * [ ] A listing's text in the ASG starts with the newline after the opening
   delimiter (`"\ncode\n"`); check against the ASG schema
 

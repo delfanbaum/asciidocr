@@ -157,6 +157,11 @@ impl ListContext {
         self.scopes.last_mut().filter(|scope| scope.depth == depth)
     }
 
+    /// Like [`active`](Self::active), but only to look
+    pub fn get(&self, depth: usize) -> Option<&ListScope> {
+        self.scopes.last().filter(|scope| scope.depth == depth)
+    }
+
     /// Starts a new list (with its first item) at this depth of the block stack. The caller
     /// closes any list already open at this depth first.
     pub fn start_list(&mut self, depth: usize, key: String, list: Block, item: Block) {

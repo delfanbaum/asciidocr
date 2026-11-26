@@ -67,14 +67,18 @@ fn test_list_item_text(#[case] adoc: &str, #[case] expected: &str) {
     assert_eq!(block_outline(adoc), expected);
 }
 
-/// Like Asciidoctor, the indentation of a lazy continuation line is not part of the text
-#[test]
-#[ignore = "lists: strip the indentation of lazy lines"]
-fn test_list_item_lazy_line_indentation() {
-    assert_eq!(
-        block_outline("* one\n  continued text\n* two\n"),
-        "list(* \"one\ncontinued text\", * \"two\")"
-    );
+/// Like Asciidoctor, the indentation of an item's lazy lines is not part of its text, while a
+/// paragraph's (attached or not) keeps it
+#[rstest]
+#[case::list_item(
+    "* one\n  continued text\n* two\n",
+    "list(* \"one\ncontinued text\", * \"two\")"
+)]
+#[case::dlist_item("A:: a\n  more\n", "dlist(\"A\":: \"a\nmore\")")]
+#[case::attached_paragraph("* a\n+\npara\n  more\n", "list(* \"a\"(paragraph \"para\n  more\"))")]
+#[case::paragraph("Para\n  indented\n", "paragraph \"Para\n  indented\"")]
+fn test_list_item_lazy_line_indentation(#[case] adoc: &str, #[case] expected: &str) {
+    assert_eq!(block_outline(adoc), expected);
 }
 
 /// What ends a list, and what comes before it
@@ -96,9 +100,6 @@ fn test_list_item_lazy_line_indentation() {
     ". one\n. two\n\n//-\n\n. new list\n",
     "list(. \"one\", . \"two\") list(. \"new list\")"
 )]
-// Until step 7: Asciidoctor keeps "* a" as text in the paragraph (see
-// test_list_interrupting_paragraph)
-#[case::paragraph_then_list("Text\n* a\n", "paragraph \"Text\" list(* \"a\")")]
 fn test_list_ends(#[case] adoc: &str, #[case] expected: &str) {
     assert_eq!(block_outline(adoc), expected);
 }
@@ -240,7 +241,6 @@ fn test_description_lists(#[case] adoc: &str, #[case] expected: &str) {
 #[rstest]
 #[case::paragraph_then_marker("Text\n* a\n", "paragraph \"Text\n* a\"")]
 #[case::item_then_heading("* a\n== B\n\ntext\n", "list(* \"a\n== B\") paragraph \"text\"")]
-#[ignore = "lists step 7: lists after headings and paragraphs"]
 fn test_list_interrupting_paragraph(#[case] adoc: &str, #[case] expected: &str) {
     assert_eq!(block_outline_with_timeout(adoc), expected);
 }

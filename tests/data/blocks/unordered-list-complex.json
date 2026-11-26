@@ -112,7 +112,7 @@
                         {
                             "name": "text",
                             "type": "string",
-                            "value": "to drink\n  I hear",
+                            "value": "to drink\nI hear",
                             "location": [
                                 {
                                     "line": 4,

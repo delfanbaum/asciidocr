@@ -56,6 +56,9 @@ pub struct Parser {
     /// true only while we are still reading the title line itself; once its newline arrives, the
     /// title is complete and later inlines belong to the block it precedes
     block_title_open: bool,
+    /// true while we are reading a section heading's line; its newline completes the title, so
+    /// that the next line starts the section's first block
+    section_title_open: bool,
     /// the line the pending block title was declared on
     block_title_line: usize,
     /// holding ground for block metadata, to be applied to the subsequent block
@@ -126,6 +129,7 @@ impl Parser {
             file_stack: vec![],
             block_title: None,
             block_title_open: false,
+            section_title_open: false,
             block_title_line: 0,
             metadata: None,
             open_delimited_block_lines: vec![],
@@ -232,6 +236,7 @@ impl Parser {
             }
         }
 
+        let token = self.as_text_if_it_cannot_interrupt(token);
         self.end_list_after_blank_line(token.token_type(), asg)?;
         // the start of a block ends the current list item's text, and the list too, unless a `+`
         // attached the block to the item
@@ -494,6 +499,12 @@ impl Parser {
             }
             self.block_title_open = false;
         }
+        let closes_section_title = self.section_title_open;
+        if closes_section_title {
+            self.add_inlines_to_block_stack()?;
+            self.section_title_open = false;
+            self.force_new_block = true;
+        }
 
         if self.last_token_type == TokenType::NewLineChar
             && self.open_parse_after_as_text_type == Some(TokenType::QuoteVerseBlock)
@@ -522,6 +533,7 @@ impl Parser {
                 self.end_blocks_at_blank_line(asg)?;
             }
         } else if closes_title
+            || closes_section_title
             || self.in_block_continuation
             || self.last_token_type.clears_newline_after()
         {
@@ -554,6 +566,42 @@ impl Parser {
             }
         }
         Ok(())
+    }
+
+    /// Like Asciidoctor, a list item or a section heading can't interrupt a line of text, so it is
+    /// text if it directly follows a paragraph line. Nor can a heading interrupt a list, unless a
+    /// blank line came before it: it is text in the item (a list item can't contain a section).
+    fn as_text_if_it_cannot_interrupt(&self, mut token: Token) -> Token {
+        let is_heading = matches!(
+            token.token_type(),
+            TokenType::Heading1
+                | TokenType::Heading2
+                | TokenType::Heading3
+                | TokenType::Heading4
+                | TokenType::Heading5
+        );
+        let is_list_item = matches!(
+            token.token_type(),
+            TokenType::UnorderedListItem | TokenType::OrderedListItem
+        );
+        if !is_heading && !is_list_item {
+            return token;
+        }
+        let as_text = match self.lists.get(self.block_stack.len()) {
+            Some(scope) => is_heading && !scope.after_blank,
+            None => self.in_paragraph(),
+        };
+        if as_text {
+            token.token_type = TokenType::Text;
+            token.literal = Some(token.lexeme.clone());
+        }
+        token
+    }
+
+    /// Whether a paragraph's text is waiting on the inline stack (section and block titles are
+    /// complete at the end of their lines, so pending text at the start of a line is a paragraph's)
+    fn in_paragraph(&self) -> bool {
+        !self.inline_stack.is_empty() && self.document_header.is_none() && !self.section_title_open
     }
 
     /// After a blank line in a list, the next line that isn't blank decides whether the list
@@ -762,10 +810,15 @@ impl Parser {
         token: Token,
         asg: &mut Asg,
     ) -> Result<(), ParserError> {
+        let depth = self.block_stack.len();
+        // like a list item, a term can't interrupt a paragraph: if the paragraph started on an
+        // earlier line, `Term::` is more of its text
+        if self.lists.get(depth).is_none() && self.in_paragraph() && self.text_before_this_line() {
+            return self.parse_text(token);
+        }
         self.dangling_newline = None;
         // ensure we're not forcing a new block, given that all sorts of things can follow
         self.force_new_block = false;
-        let depth = self.block_stack.len();
         let mut dlist_item = DListItem::new_from_token(token);
         for inline in self.take_current_line_inlines() {
             dlist_item.push_term(inline);
@@ -807,6 +860,32 @@ impl Parser {
             dlist.metadata = Some(metadata);
         }
         Block::DList(dlist)
+    }
+
+    /// Whether the inline stack holds text from the lines before this one (a newline with nothing
+    /// before it, such as the one after a block anchor line, doesn't count)
+    fn text_before_this_line(&self) -> bool {
+        let mut seen_text = false;
+        for inline in &self.inline_stack {
+            if inline.is_newline() {
+                if seen_text {
+                    return true;
+                }
+                continue;
+            }
+            if let Inline::InlineLiteral(literal) = inline {
+                let value = literal.value();
+                if let Some(newline_idx) = value.find('\n')
+                    && (seen_text || newline_idx > 0)
+                {
+                    return true;
+                }
+                seen_text |= !value.trim().is_empty();
+            } else {
+                seen_text = true;
+            }
+        }
+        false
     }
 
     /// Takes the inlines on the current line off the inline stack: those after the last newline,
@@ -1003,6 +1082,7 @@ impl Parser {
         )))?;
         // let us know we're in a block line
         self.in_block_line = true;
+        self.section_title_open = true;
         // clear any dangling newlines, since we don't want these added to the title
         self.dangling_newline = None;
         // let us know that we want to add to the section title for a little bit
@@ -1258,7 +1338,22 @@ impl Parser {
         Ok(())
     }
 
-    fn parse_text(&mut self, token: Token) -> Result<(), ParserError> {
+    fn parse_text(&mut self, mut token: Token) -> Result<(), ParserError> {
+        // like Asciidoctor, the indentation of a list item's lazy lines is not part of its text
+        // (a paragraph's, or an attached paragraph's, is)
+        if self.dangling_newline.is_some()
+            && self
+                .lists
+                .get(self.block_stack.len())
+                .is_some_and(|scope| scope.principal_open)
+        {
+            let text = token.text();
+            let indent = text.len() - text.trim_start().len();
+            if indent > 0 {
+                token.literal = Some(text[indent..].to_string());
+                token.startcol += indent;
+            }
+        }
         if let Some(newline_token) = self.dangling_newline.clone() {
             if self.preserve_newline_text {
                 // add the newline as such

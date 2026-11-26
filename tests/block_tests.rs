@@ -388,3 +388,13 @@ fn test_list_markers_in_table_cells_are_text() {
         "table(tableCell \"* a \", tableCell \" 1. b\")"
     );
 }
+
+/// A heading's title is its own line, and like Asciidoctor, a heading can't interrupt a
+/// paragraph
+#[rstest]
+#[case::text_after_heading("== Head\nText\n", "section \"Head\"(paragraph \"Text\")")]
+#[case::heading_after_text("Text\n== B\n", "paragraph \"Text\n== B\"")]
+#[case::heading_after_blank_line("Text\n\n== B\n", "paragraph \"Text\" section \"B\"")]
+fn test_heading_lines(#[case] adoc: &str, #[case] expected: &str) {
+    assert_eq!(block_outline(adoc), expected);
+}
