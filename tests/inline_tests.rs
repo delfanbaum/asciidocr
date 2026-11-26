@@ -3,7 +3,7 @@ use std::fs;
 
 use common::{
     assert_parsed_doc_matches_expected_asg, assert_parsed_doc_matches_expected_asg_from_str,
-    parsed_text,
+    parsed_text, render_asciidoctor_embedded_from_str,
 };
 use rstest::rstest;
 
@@ -285,4 +285,73 @@ fn test_unclosed_include_is_text(#[case] adoc: &str, #[case] expected: &str) {
         .recv_timeout(std::time::Duration::from_secs(5))
         .expect("Parsing did not finish: the scanner is stuck");
     assert_eq!(text, expected);
+}
+
+/// A footnote ends at its own `]`, and a footnote that has ended takes nothing after it
+#[rstest]
+#[case::stray_bracket(
+    "A footnote:[plain] here and a stray ] there.\n",
+    "</sup> here and a stray ] there.</p>"
+)]
+#[case::span_after(
+    "A footnote:[x] and *b* end.\n",
+    "</sup> and <strong>b</strong> end.</p>"
+)]
+fn test_footnote_ends_at_its_bracket(#[case] adoc: &str, #[case] expected: &str) {
+    let html = render_asciidoctor_embedded_from_str(adoc);
+    assert!(html.contains(expected), "{html}");
+}
+
+/// The `link:` macro, with a URL or a relative target
+#[rstest]
+#[case::url(
+    "See link:http://x.com[the site] now.\n",
+    "<p>See <a href=\"http://x.com\">the site</a> now.</p>"
+)]
+#[case::relative(
+    "See link:other.html[other] now.\n",
+    "<p>See <a href=\"other.html\">other</a> now.</p>"
+)]
+#[case::formatted_text_with_url(
+    "link:x.html[*x http://q.com y*]\n",
+    "<a href=\"x.html\"><strong>x <a href=\"http://q.com\" class=\"bare\">http://q.com</a> y</strong></a>"
+)]
+fn test_link_macro(#[case] adoc: &str, #[case] expected: &str) {
+    let html = render_asciidoctor_embedded_from_str(adoc);
+    assert!(html.contains(expected), "{html}");
+}
+
+/// Markup that is never closed is text, at the end of a paragraph as at the end of the document
+#[rstest]
+#[case::emphasis_before_block("a _unclosed text\n\nb\n", "a _unclosed text")]
+#[case::strong_before_block("a *unclosed text\n\nb\n", "a *unclosed text")]
+#[case::plus_plus("C++ uses a::b\n", "C++ uses a::b")]
+#[case::single_plus("1 + 1 and a+b\n", "1 + 1 and a+b")]
+fn test_unclosed_markup_is_text(#[case] adoc: &str, #[case] expected: &str) {
+    assert!(
+        parsed_text(adoc).starts_with(expected),
+        "{}",
+        parsed_text(adoc)
+    );
+}
+
+/// Like Asciidoctor, an apostrophe between letters is a typographic one, in a span or not
+#[rstest]
+#[case::plain("don't stop\n", "don&#8217;t stop")]
+#[case::emphasis("_don't stop_\n", "<em>don&#8217;t stop</em>")]
+#[case::strong("*it's here*\n", "<strong>it&#8217;s here</strong>")]
+#[case::twice("rock'n'roll\n", "rock&#8217;n&#8217;roll")]
+#[case::quotes_untouched("say 'hi' now\n", "say 'hi' now")]
+fn test_apostrophes(#[case] adoc: &str, #[case] expected: &str) {
+    let html = render_asciidoctor_embedded_from_str(adoc);
+    assert!(html.contains(expected), "{html}");
+}
+
+/// Windows line endings are line endings
+#[test]
+fn test_crlf_line_endings() {
+    assert_eq!(
+        parsed_text("line one\r\nline two\r\n"),
+        "line one\nline two"
+    );
 }

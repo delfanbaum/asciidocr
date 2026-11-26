@@ -408,3 +408,23 @@ fn test_list_markers_in_table_cells_are_text(#[case] adoc: &str, #[case] expecte
 fn test_heading_lines(#[case] adoc: &str, #[case] expected: &str) {
     assert_eq!(block_outline(adoc), expected);
 }
+
+/// Like Asciidoctor, a delimiter interrupts a paragraph, and the text after a closing delimiter
+/// is a new paragraph (`Text` then `----` is a setext title in Asciidoctor, which we don't support,
+/// so these use other delimiters)
+#[rstest]
+#[case::literal_after_text("Text\n....\nx\n....\n", "paragraph \"Text\" literal \"\nx\n\"")]
+#[case::sidebar_after_text("Text\n****\nx\n****\n", "paragraph \"Text\" sidebar(paragraph \"x\")")]
+#[case::text_after_listing(
+    "Para\n\n----\nx\n----\nmore\n",
+    "paragraph \"Para\" listing \"\nx\n\" paragraph \"more\""
+)]
+#[case::text_after_literal("....\nx\n....\nmore\n", "literal \"\nx\n\" paragraph \"more\"")]
+#[case::text_after_sidebar("****\nx\n****\nmore\n", "sidebar(paragraph \"x\") paragraph \"more\"")]
+#[case::in_section(
+    "== S\n\n....\nx\n....\nmore\n",
+    "section \"S\"(literal \"\nx\n\", paragraph \"more\")"
+)]
+fn test_delimiters_end_paragraphs(#[case] adoc: &str, #[case] expected: &str) {
+    assert_eq!(block_outline(adoc), expected);
+}
