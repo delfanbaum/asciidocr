@@ -259,11 +259,15 @@ removed (with the helpers only it used, `InlineError`, and the never-created
 
 Parse the header into the ASG; the backends can mostly ignore it for now.
 
-* [ ] Author information and revision information (author line, `:author:`,
-  `:email:`, revision line)
-* [ ] Document metadata (`:description:`, `:keywords:`)
-* [ ] Render the header in the Asciidoctor-style backend (Asciidoctor's
+* [x] Author information and revision information (author line, `:author:`,
+  `:email:`, revision line). Authors are in the ASG's header; the revision has
+  no place in the ASG schema, so it's on the header but not serialized. The
+  attributes they imply (`author`, `revnumber`, ...) work in references
+* [x] Document metadata (`:description:`, `:keywords:`)
+* [x] Render the header in the Asciidoctor-style backend (Asciidoctor's
   `#header` details), since it already copies Asciidoctor's document shell
+* [x] The AsciiDoc TCK's header test passes (the header's location runs to its
+  last attribute entry, and a document without blocks has no `blocks`)
 
 *Done when:* the README's "Known Bugs" is empty (or lists only things
 deliberately moved to a later release), every fixed bug has a fixture, a fuzz

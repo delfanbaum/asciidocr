@@ -71,9 +71,9 @@ stylesheet. Known gaps:
 
 * Hardbreaks-option attribute (which we shall include for our poet friends who
   don't want to have to wrap everything in `[verse]`) 
-* https://docs.asciidoctor.org/asciidoc/latest/document/author-information/[Author information]
-* https://docs.asciidoctor.org/asciidoc/latest/document/revision-information/[Revision information]
-* https://docs.asciidoctor.org/asciidoc/latest/document/metadata/[Document metadata]
+* The document header in the HTMLBook and DOCX backends (authors, revision and
+  metadata are parsed, and the Asciidoctor-style backend renders them)
+* `:authors:` (several authors in one attribute entry); use an author line
 * https://docs.asciidoctor.org/asciidoc/latest/document/doctype/[Document types]
 * https://docs.asciidoctor.org/asciidoc/latest/sections/section-ref/[Section
   Attributes and styles]
