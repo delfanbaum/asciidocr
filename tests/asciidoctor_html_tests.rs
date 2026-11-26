@@ -13,6 +13,7 @@ use rstest::rstest;
 #[case::ordered_list("asciidoctor-html/blocks-ordered-list")]
 #[case::code("asciidoctor-html/blocks-code")]
 #[case::open("asciidoctor-html/blocks-open")]
+#[case::header_details("asciidoctor-html/header-details")]
 fn test_full_documents(#[case] fn_pattern: &str) {
     let adoc_fn = format!("{}.adoc", fn_pattern);
     let html_fn = format!("{}.html", fn_pattern);

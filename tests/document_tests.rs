@@ -8,7 +8,10 @@ use asciidocr::{
         tokens::{Token, TokenType},
     },
 };
-use common::assert_parsed_doc_matches_expected_asg;
+use common::{
+    assert_parsed_doc_matches_expected_asg, assert_parsed_doc_matches_expected_asg_from_str,
+};
+use rstest::rstest;
 
 pub mod common;
 
@@ -96,4 +99,98 @@ fn test_unexpected_token_is_an_error() {
         result.err(),
         Some(ParserError::UnexpectedToken(1, "email address".to_string()))
     );
+}
+
+/// The AsciiDoc TCK's header test (tests/block/header/attribute-entries-below-title), with its
+/// expected ASG as it is
+#[test]
+fn test_tck_attribute_entries_below_title() {
+    assert_parsed_doc_matches_expected_asg_from_str(
+        "= Document Title\n:icons: font\n:toc:\n",
+        r#"{
+  "name": "document",
+  "type": "block",
+  "attributes": { "icons": "font", "toc": "" },
+  "header": {
+    "title": [
+      {
+        "name": "text",
+        "type": "string",
+        "value": "Document Title",
+        "location": [{ "line": 1, "col": 3 }, { "line": 1, "col": 16 }]
+      }
+    ],
+    "location": [{ "line": 1, "col": 1 }, { "line": 3, "col": 5 }]
+  },
+  "location": [{ "line": 1, "col": 1 }, { "line": 3, "col": 5 }]
+}"#,
+    );
+}
+
+/// The author and revision lines under the title: authors go in the header (as the ASG schema
+/// has them); the revision has no place in the ASG; and the attributes they imply (`author`,
+/// `revnumber`, ...) work in references, but aren't listed with the document's own attributes
+#[test]
+fn test_author_and_revision_lines() {
+    let asg = common::parsed_asg(
+        "= Document Title\nJane Q. Doe <jane@example.com>; John Smith\nv1.2, 2026-01-15: A remark\n:description: About things\n\nBy {author}, version {revnumber} of {revdate}.\n",
+    );
+    let header = &asg["header"];
+    assert_eq!(header["title"][0]["value"], "Document Title", "{header}");
+    assert_eq!(
+        header["authors"],
+        serde_json::json!([
+            {
+                "fullname": "Jane Q. Doe",
+                "initials": "JQD",
+                "firstname": "Jane",
+                "middlename": "Q.",
+                "lastname": "Doe",
+                "address": "jane@example.com"
+            },
+            {
+                "fullname": "John Smith",
+                "initials": "JS",
+                "firstname": "John",
+                "lastname": "Smith"
+            }
+        ])
+    );
+    assert_eq!(
+        asg["attributes"],
+        serde_json::json!({ "description": "About things" })
+    );
+    assert_eq!(
+        common::parsed_text(
+            "= T\nJane Q. Doe <jane@example.com>\nv1.2, 2026-01-15\n\nBy {author}, version {revnumber} of {revdate}.\n"
+        ),
+        "TBy Jane Q. Doe, version 1.2 of 2026-01-15."
+    );
+}
+
+/// The forms of an author line and a revision line, as Asciidoctor reads them
+#[rstest]
+#[case::one_name("= T\nCher\n", "Cher", "C")]
+#[case::underscored_name("= T\nMary_Ann Smith\n", "Mary Ann Smith", "MS")]
+#[case::more_than_three_names("= T\nA B C D\n", "A B C D", "A")]
+fn test_author_names(#[case] adoc: &str, #[case] fullname: &str, #[case] initials: &str) {
+    let asg = common::parsed_asg(adoc);
+    let author = &asg["header"]["authors"][0];
+    assert_eq!(author["fullname"], fullname, "{author}");
+    assert_eq!(author["initials"], initials, "{author}");
+}
+
+#[rstest]
+#[case::number_only("= T\nJane Doe\nv1.0\n\n{revnumber}|{revdate}\n", "T1.0|{revdate}")]
+#[case::date_only(
+    "= T\nJane Doe\n2026-01-15\n\n{revnumber}|{revdate}\n",
+    "T{revnumber}|2026-01-15"
+)]
+#[case::number_and_date(
+    "= T\nJane Doe\nv1.0, 2026-01-15\n\n{revnumber}|{revdate}\n",
+    "T1.0|2026-01-15"
+)]
+#[case::remark("= T\nJane Doe\nv1.0, 2026-01-15: Fixed\n\n{revremark}\n", "TFixed")]
+fn test_revision_line(#[case] adoc: &str, #[case] text: &str) {
+    assert_eq!(common::parsed_text(adoc), text);
 }
