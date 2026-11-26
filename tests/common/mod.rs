@@ -204,6 +204,20 @@ pub fn parsed_asg(adoc: &str) -> Value {
     )
 }
 
+/// Like [`parsed_asg`], but parses on its own thread and panics if parsing takes longer than a few
+/// seconds (or panics), so that a parser that loops forever fails the test instead of hanging
+/// the run
+pub fn parsed_asg_with_timeout(adoc: &str) -> Value {
+    let (sender, receiver) = std::sync::mpsc::channel();
+    let adoc = adoc.to_string();
+    std::thread::spawn(move || {
+        let _ = sender.send(parsed_asg(&adoc));
+    });
+    receiver
+        .recv_timeout(std::time::Duration::from_secs(5))
+        .expect("Parsing timed out (or panicked)")
+}
+
 /// Like [`block_outline`], but parses on its own thread and panics if parsing takes longer than
 /// a few seconds, so that a parser that loops forever fails the test instead of hanging the run
 pub fn block_outline_with_timeout(adoc: &str) -> String {

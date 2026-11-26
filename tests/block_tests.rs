@@ -481,3 +481,21 @@ fn test_xref_custom_text() {
     assert_eq!(xref["target"], "_a", "{xref}");
     assert_eq!(xref["inlines"][0]["value"], "the A section", "{xref}");
 }
+
+/// Found by the fuzz run (tests/fuzz_tests.rs): markup on the last line of a file, with no newline
+/// after it, made the scanner run past the end of the input (a panic) or loop forever
+#[rstest]
+#[case::example_delimiter("====", "example")]
+#[case::example_delimiter_after_text("x\n\n====", "paragraph \"x\" example")]
+#[case::block_anchor("text\n\n[[para-id]]", "paragraph \"text\"")]
+#[case::attribute_entry("text\n\n:cat: George", "paragraph \"text\"")]
+#[case::header_attribute_entry("= Title\n:foo: bar", "")]
+#[case::equals_signs_without_space("====x", "paragraph \"====x\"")]
+fn test_markup_at_end_of_file(#[case] adoc: &str, #[case] expected: &str) {
+    let asg = common::parsed_asg_with_timeout(adoc);
+    let outline = match asg["blocks"].as_array() {
+        Some(_) => block_outline(adoc),
+        None => String::new(),
+    };
+    assert_eq!(outline, expected);
+}
