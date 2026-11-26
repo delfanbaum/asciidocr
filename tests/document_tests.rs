@@ -205,3 +205,14 @@ fn body_text(adoc: &str) -> String {
         .filter_map(|inline| inline["value"].as_str())
         .collect()
 }
+
+/// `:author:` and `:email:` attribute entries in the header stand in for an author line
+#[test]
+fn test_author_attribute_entries() {
+    let adoc =
+        "= T\n:author: Jane Q. Doe\n:email: jane@example.com\n\nBy {author} ({authorinitials}).\n";
+    let asg = common::parsed_asg(adoc);
+    assert_eq!(asg["header"]["authors"][0]["fullname"], "Jane Q. Doe");
+    assert_eq!(asg["header"]["authors"][0]["address"], "jane@example.com");
+    assert_eq!(body_text(adoc), "By Jane Q. Doe (JQD).");
+}
