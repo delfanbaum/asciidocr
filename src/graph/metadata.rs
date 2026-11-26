@@ -6,9 +6,9 @@ use once_cell::sync::Lazy;
 use regex::Regex;
 use serde::Serialize;
 
+use crate::errors::ParserError;
 use crate::graph::nodes::Location;
 use crate::scanner::tokens::{Token, TokenType};
-use crate::utils::{extract_attributes, key_values_from_named_attribute};
 
 // just make this quoted, and then pull everything else out
 pub static RE_NAMED_QUOTED: Lazy<Regex> = Lazy::new(|| Regex::new(r#"(\w*=".*?")"#).unwrap());
@@ -281,6 +281,83 @@ impl ElementMetadata {
             }
         }
     }
+}
+
+/// Splits an attribute list (`role="a b",width=50`) into its entries, keeping quoted values
+/// whole
+pub fn extract_attributes(attribute_list: &str) -> Vec<String> {
+    let mut attributes: Vec<String> = vec![];
+    let mut non_quoted_key_values = attribute_list.to_owned();
+    // TK "1,2,4" should be a single attribute, not "1,", 2, 4"
+    for quoted_attr in RE_NAMED_QUOTED.captures_iter(attribute_list) {
+        let (total, [_]) = quoted_attr.extract();
+        attributes.push(total.to_owned());
+        non_quoted_key_values = non_quoted_key_values.replace(total, "");
+    }
+    attributes.extend(non_quoted_key_values.split(',').map(|s| s.to_string()));
+    attributes
+}
+
+/// Splits a named attribute (`role="a b"`) into its name and its space-separated values
+pub fn key_values_from_named_attribute(
+    attribute: &str,
+    line: usize,
+) -> Result<(String, Vec<&str>), ParserError> {
+    match RE_NAMED.captures(attribute) {
+        Some(captures) => {
+            let (_, [named, mut values_str]) = captures.extract();
+            // remove quotes values
+            if values_str.starts_with('"') {
+                values_str = &values_str[1..values_str.len() - 1]
+            }
+            Ok((
+                named.to_string(),
+                values_str.split(' ').collect::<Vec<&str>>(),
+            ))
+        }
+        None => Err(ParserError::AttributeError(
+            line,
+            format!("{} does not contain a named attribute", attribute),
+        )),
+    }
+}
+
+/// Given a foo:target.foo[attributes] token, return the target and metadata
+pub fn target_and_attrs_from_token(token: &Token) -> (String, Option<ElementMetadata>) {
+    let target_and_attrs = match token.token_type() {
+        TokenType::BlockImageMacro => {
+            token.text()[7..].to_string() // after image::
+        }
+        TokenType::InlineImageMacro => {
+            token.text()[6..].to_string() // after image:
+        }
+        TokenType::Include => {
+            token.text()[9..].to_string() // after include::
+        }
+        _ => panic!("Invalid token provided to target_and_attrs_from_token"),
+    };
+
+    let target: String = target_and_attrs.chars().take_while(|c| c != &'[').collect();
+    // get rid of the "[]" chars (there are none if the target runs to the end)
+    let attributes = target_and_attrs
+        .get(target.len() + 1..target_and_attrs.len().saturating_sub(1))
+        .unwrap_or_default()
+        .to_string();
+    let mut metadata: Option<ElementMetadata> = None;
+    if !attributes.is_empty() {
+        let mut token_metadata = ElementMetadata {
+            attributes: HashMap::new(),
+            options: vec![],
+            roles: vec![],
+            inline_metadata: true,
+            declared_type: None,
+            location: vec![],
+            line: token.line,
+        };
+        token_metadata.process_attributes(extract_attributes(&attributes));
+        metadata = Some(token_metadata);
+    }
+    (target, metadata)
 }
 
 #[cfg(test)]

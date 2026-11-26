@@ -8,15 +8,16 @@ use std::{
 };
 
 use log::{info, warn};
+use once_cell::sync::Lazy;
+use regex::Regex;
 
 use crate::scanner::tokens::{Token, TokenType};
 use crate::{errors::ParserError, scanner::Scanner};
-use crate::{
-    graph::asg::Asg,
-    utils::{extract_page_ranges, target_and_attrs_from_token},
-};
+use crate::{graph::asg::Asg, graph::metadata::target_and_attrs_from_token};
 
 use super::Parser;
+
+static RE_LINE_RANGES: Lazy<Regex> = Lazy::new(|| Regex::new(r#"([^,;]*)"#).unwrap());
 
 impl Parser {
     pub(super) fn parse_include(&mut self, token: Token, asg: &mut Asg) -> Result<(), ParserError> {
@@ -185,4 +186,37 @@ where
             None
         }
     }
+}
+
+/// Extracts included page ranges from the "lines=" attribute of an include directive
+fn extract_page_ranges(ranges_str: &str) -> Vec<i32> {
+    let mut ranges: Vec<i32> = vec![];
+
+    let mut captured_ranges = RE_LINE_RANGES.captures_iter(ranges_str).peekable();
+    while let Some(range) = captured_ranges.next() {
+        let (range_str, [_]) = range.extract();
+        let parts: Vec<&str> = range_str.split("..").collect();
+        if !parts.is_empty() {
+            let start = parts[0].parse::<i32>().unwrap_or(0);
+            if parts.len() == 2 {
+                // if there is an end value
+                if let Ok(mut end) = parts[1].parse::<i32>() {
+                    if end == -1 {
+                        // if we're reading to the end, read to the end
+                        ranges.push(start);
+                        ranges.push(-1);
+                    } else {
+                        end += 1; // because we want an inclusive range 
+                        ranges.extend(start..end)
+                    }
+                } else if captured_ranges.peek().is_none() {
+                    ranges.push(start);
+                    ranges.push(-1); // signals that we read to the end
+                }
+            } else {
+                ranges.push(start);
+            }
+        }
+    }
+    ranges
 }

@@ -8,12 +8,12 @@ use log::warn;
 use crate::scanner::tokens::{Token, TokenType};
 use crate::{errors::ParserError, scanner::Scanner};
 use crate::{
+    graph::metadata::target_and_attrs_from_token,
     graph::{
         asg::Asg,
         blocks::{Block, BlockMacro, Break, LeafBlock, ParentBlock, Section, TableCell},
         nodes::{Header, Location},
     },
-    utils::target_and_attrs_from_token,
 };
 
 use super::{HeaderLine, Parser};

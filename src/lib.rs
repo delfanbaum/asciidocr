@@ -39,4 +39,3 @@ pub mod errors;
 pub mod graph;
 pub mod parser;
 pub mod scanner;
-pub mod utils;
