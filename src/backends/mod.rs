@@ -11,9 +11,8 @@ pub mod docx;
 
 pub mod htmls;
 
-use clap::ValueEnum;
-
-#[derive(Debug, ValueEnum, Clone)]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "cli", derive(clap::ValueEnum))]
 /// Enum containing all available backends for `asciidocr`. Note that some backends may be behind
 /// feature flags.
 pub enum Backends {
