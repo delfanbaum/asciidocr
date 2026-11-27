@@ -11,7 +11,7 @@ use crate::scanner::Scanner;
 use super::blocks::Block;
 use super::ids::IdSettings;
 use super::inlines::Inline;
-use super::{NodeTypes, header::Header, location::Location};
+use super::{NodeTypes, header::Header, location::Location, word_count};
 
 /// Abstract Syntax Graph used to represent an asciidoc document
 /// roughly meaning to follow the "official" schema:
@@ -149,18 +149,19 @@ impl Asg {
         }
     }
 
-    /// Gathers all the "literal" text in a given document graph (i.e., without styling, etc.)
-    /// (Largely a testing/verification function)
-    pub(crate) fn all_text(&self) -> String {
-        let mut graph_text = String::new();
-        for block in self.blocks.iter() {
-            graph_text.push_str(&block.block_text())
-        }
-        graph_text
-    }
-
-    /// The number of words in the document's text, not counting markup or comments
+    /// The number of words in the document's text (its titles included), not counting markup or
+    /// comments. Words are counted as LibreOffice counts them: dashes separate them, and each
+    /// Chinese, Japanese or Korean character is one.
     pub fn word_count(&self) -> usize {
-        self.all_text().split_whitespace().count()
+        let title = self
+            .header
+            .as_ref()
+            .map_or(0, |header| word_count::count_run(&header.title));
+        title
+            + self
+                .blocks
+                .iter()
+                .map(word_count::count_block)
+                .sum::<usize>()
     }
 }

@@ -16,9 +16,8 @@ pub mod inlines;
 pub mod lists;
 pub mod location;
 pub mod metadata;
-// only the docx backend (and a test) needs the characters that references stand for
-#[cfg_attr(not(feature = "docx"), allow(dead_code))]
 pub(crate) mod substitutions;
+mod word_count;
 
 /// The `type` of a node in the ASG
 #[derive(Clone, Copy, Serialize, Debug)]

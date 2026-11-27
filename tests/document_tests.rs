@@ -180,3 +180,53 @@ fn test_author_attribute_entries() {
     assert_eq!(asg["header"]["authors"][0]["address"], "jane@example.com");
     assert_eq!(body_text(adoc), "By Jane Q. Doe (JQD).");
 }
+
+/// Words are counted as LibreOffice counts them (the numbers in the first group are what it
+/// reports for the same text)
+#[rstest]
+#[case::plain("one two three", 3)]
+#[case::em_dash("one—two three", 3)]
+#[case::spaced_em_dash("one — two", 2)]
+#[case::en_dash("1914–1918 war", 3)]
+#[case::hyphen("well-known e-mail", 2)]
+#[case::lone_punctuation("a & b ! ?", 5)]
+#[case::url("see http://example.com/a-b?c=d now", 3)]
+#[case::quote_after_dash("“wait—” she said", 4)]
+#[case::no_break_space("a\u{a0}b", 2)]
+#[case::zero_width_space("a\u{200b}b", 1)]
+#[case::chinese("中文字符 test", 5)]
+#[case::chinese_punctuation("中文，中文。", 6)]
+#[case::kana("コーヒー", 4)]
+#[case::hangul("한국어 단어", 5)]
+#[case::among_latin("abc中def", 3)]
+// the same rules, for what AsciiDoc makes of the source
+#[case::blocks("one\n\ntwo\n\nthree\n\n* four\n* five\n", 5)]
+#[case::title_and_sections("= Title Here\n\n== A Section\n\nbody\n", 5)]
+#[case::dash_replacement("one -- two", 2)]
+#[case::apostrophe("it's don't", 2)]
+#[case::formatting("a *bold*, _word_ and **in**side", 5)]
+#[case::character_reference("a&#8212;b &amp; c&nbsp;d", 5)]
+#[case::line_break("one +\ntwo", 2)]
+#[case::link_text("see link:a.html[the page] now", 4)]
+#[case::bare_link("see http://example.com now", 3)]
+#[case::footnote("word.footnote:[A note.] more", 4)]
+#[case::inline_image("a image:i.png[alt text] b", 2)]
+#[case::description_list("term one:: the description", 4)]
+#[case::table("|===\n|one two |three\n|===\n", 3)]
+#[case::block_titles(".A title\n====\ninside\n====\n", 3)]
+#[case::listing("----\nlet x = 1;\n----\n", 4)]
+#[case::passthrough("++++\n<p class=\"a b\">raw words</p>\n++++\n", 2)]
+#[case::comments("// not this\none\n\n////\nnor this\n////\n", 1)]
+#[case::dash_replacement_unspaced("one--two", 2)]
+#[case::dash_replacement_at_end("wait--\n\nthen", 2)]
+#[case::inline_passthrough("a pass:[<b class=\"x y\">bold</b>] word", 3)]
+#[case::xref_to_a_title("== Two Words\n\nsee <<_two_words>>", 5)]
+#[case::several_terms("one::\ntwo:: three\n", 3)]
+#[case::image_caption(".A caption\nimage::i.png[alt text]\n", 2)]
+#[case::list_title(".A title\n* item\n", 3)]
+fn test_word_count(#[case] adoc: &str, #[case] expected: usize) {
+    let graph = Parser::default()
+        .parse(Scanner::new(adoc))
+        .expect("Unable to parse");
+    assert_eq!(graph.word_count(), expected);
+}

@@ -295,8 +295,10 @@ removed (with the helpers only it used, `InlineError`, and the never-created
   library user actually needs. Done before the 0.4 Python bindings freeze it:
   only the parser, scanner, graph (to read), render functions and errors are
   public, and the command-line dependencies are behind the `cli` feature
-* [ ] `Asg::word_count` (the CLI's `-c`) is far too low: it joins the text of one
-  block to the next without a space, so three one-word paragraphs are one word
+* [x] `Asg::word_count` (the CLI's `-c`) was far too low: it joined the text of
+  one block to the next without a space, so three one-word paragraphs were one
+  word. It counts titles, terms and footnotes too, and splits words as
+  LibreOffice does
 * [x] `backends::htmls` split into `backends::htmlbook` and
   `backends::asciidoctor`, with what they share in a private module
 * [x] Other path changes the audit suggested: `graph::nodes` split into
