@@ -12,7 +12,7 @@ use crate::graph::{
     metadata::ElementMetadata,
     nodes::Location,
 };
-use crate::scanner::tokens::{Token, TokenType};
+use crate::scanner::{Token, TokenType};
 
 use super::Parser;
 use super::list_context::marker_key;

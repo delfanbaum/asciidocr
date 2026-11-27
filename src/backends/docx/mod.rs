@@ -1,8 +1,8 @@
 //! This module contains document and style-building code for the docx output
-pub mod document;
-pub mod numbering;
-pub mod styles;
-pub mod units;
+mod document;
+mod numbering;
+mod styles;
+mod units;
 
 use std::{fs::File, path::Path};
 
@@ -11,7 +11,7 @@ use docx_rs::Paragraph;
 use crate::errors::ConversionError;
 use crate::graph::asg::Asg;
 
-use self::document::DocxRenderError;
+pub use self::document::DocxRenderError;
 
 /// docx-rs hardcodes `useFELayout` and `balanceSingleByteDoubleByteWidth` into `settings.xml`.
 /// Word and LibreOffice treat those as East Asian layout modes and add extra space at the

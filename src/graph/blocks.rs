@@ -14,11 +14,12 @@ use crate::graph::{
     metadata::ElementMetadata,
     nodes::{Location, NodeTypes},
 };
-use crate::scanner::tokens::{Token, TokenType};
+use crate::scanner::{Token, TokenType};
 
 /// Blocks Enum, containing all possible document blocks
 #[derive(Serialize, PartialEq, Clone, Debug)]
 #[serde(untagged)]
+#[non_exhaustive]
 pub enum Block {
     Section(Section),
     List(List),
@@ -53,14 +54,7 @@ impl Display for Block {
 }
 
 impl Block {
-    pub fn last_inline(&mut self) -> Option<&mut Inline> {
-        match self {
-            Block::LeafBlock(block) => Some(block.inlines.last_mut()?),
-            _ => None,
-        }
-    }
-
-    pub fn push_block(&mut self, block: Block) -> Result<(), BlockError> {
+    pub(crate) fn push_block(&mut self, block: Block) -> Result<(), BlockError> {
         match self {
             Block::Section(section) => {
                 if block.is_section() {
@@ -111,7 +105,7 @@ impl Block {
         Ok(())
     }
 
-    pub fn takes_inlines(&self) -> bool {
+    pub(crate) fn takes_inlines(&self) -> bool {
         matches!(
             self,
             Block::Section(_)
@@ -122,7 +116,7 @@ impl Block {
         )
     }
 
-    pub fn push_inline(&mut self, inline: Inline) -> Result<(), BlockError> {
+    pub(crate) fn push_inline(&mut self, inline: Inline) -> Result<(), BlockError> {
         match self {
             Block::Section(section) => section.inlines.push(inline),
             Block::LeafBlock(block) => block.inlines.push(inline),
@@ -134,7 +128,7 @@ impl Block {
         Ok(())
     }
 
-    pub fn takes_block_of_type(&self, block: &Block) -> bool {
+    pub(crate) fn takes_block_of_type(&self, block: &Block) -> bool {
         match self {
             Block::Section(check) => {
                 if let Some(block_level) = block.level_check() {
@@ -155,14 +149,14 @@ impl Block {
         matches!(self, Block::Section(_))
     }
 
-    pub fn is_source_block(&self) -> bool {
+    pub(crate) fn is_source_block(&self) -> bool {
         match self {
             Block::LeafBlock(block) => block.name == LeafBlockName::Listing,
             _ => false,
         }
     }
 
-    pub fn level_check(&self) -> Option<usize> {
+    pub(crate) fn level_check(&self) -> Option<usize> {
         match self {
             Block::Section(section) => Some(section.level),
             _ => None,
@@ -181,7 +175,7 @@ impl Block {
         }
     }
 
-    pub fn consolidate_table_info(&mut self) -> Result<(), BlockError> {
+    pub(crate) fn consolidate_table_info(&mut self) -> Result<(), BlockError> {
         let Block::ParentBlock(table) = self else {
             return Err(BlockError::IncorrectCall);
         };
@@ -255,6 +249,22 @@ impl Block {
         Ok(())
     }
 
+    /// The block's attributes, roles and options, if it was given any
+    pub fn metadata(&self) -> Option<&ElementMetadata> {
+        match self {
+            Block::Section(block) => block.metadata.as_ref(),
+            Block::List(block) => block.metadata.as_ref(),
+            Block::ListItem(block) => block.metadata.as_ref(),
+            Block::DList(block) => block.metadata.as_ref(),
+            Block::DListItem(block) => block.metadata.as_ref(),
+            Block::BlockMacro(block) => block.metadata.as_ref(),
+            Block::LeafBlock(block) => block.metadata.as_ref(),
+            Block::ParentBlock(block) => block.metadata.as_ref(),
+            Block::TableCell(block) => block.metadata.as_ref(),
+            Block::Break(_) => None,
+        }
+    }
+
     pub fn title(&self) -> Option<Vec<Inline>> {
         match self {
             Block::Section(block) => Some(block.inlines.clone()),
@@ -316,7 +326,7 @@ impl Block {
 
         inlines
     }
-    pub fn inlines_mut(&mut self) -> Vec<&mut Inline> {
+    pub(crate) fn inlines_mut(&mut self) -> Vec<&mut Inline> {
         let mut inlines: Vec<&mut Inline> = vec![];
         match self {
             // parents
@@ -392,7 +402,7 @@ impl Block {
     /// document order, unique among the IDs in `taken` (which they are added to, as are the
     /// explicit IDs met on the way); each generated ID and its section's title go in `titles`, for
     /// cross references
-    pub fn generate_section_ids(
+    pub(crate) fn generate_section_ids(
         &mut self,
         settings: &IdSettings,
         taken: &mut HashSet<String>,
@@ -426,7 +436,7 @@ impl Block {
         }
     }
 
-    pub fn id_hashes(&self) -> HashMap<String, Vec<Inline>> {
+    pub(crate) fn id_hashes(&self) -> HashMap<String, Vec<Inline>> {
         let mut block_id_hash = HashMap::new();
         if let Some(id) = self.id() {
             if let Some(title) = self.title() {
@@ -556,7 +566,7 @@ impl Block {
     }
 
     /// adds and reconciles a block location; specifically useful for delimited blocks
-    pub fn add_locations(&mut self, locations: Vec<Location>) {
+    pub(crate) fn add_locations(&mut self, locations: Vec<Location>) {
         match self {
             Block::LeafBlock(block) => {
                 block.location = Location::reconcile(block.location.clone(), locations)
@@ -565,7 +575,7 @@ impl Block {
         }
     }
 
-    pub fn consolidate_locations(&mut self) {
+    pub(crate) fn consolidate_locations(&mut self) {
         match self {
             Block::Section(block) => {
                 // consolidate the inlines/title
@@ -646,7 +656,7 @@ impl Block {
         }
     }
 
-    pub fn add_metadata(&mut self, metadata: ElementMetadata) -> Result<(), BlockError> {
+    pub(crate) fn add_metadata(&mut self, metadata: ElementMetadata) -> Result<(), BlockError> {
         if metadata.is_empty() {
             return Ok(());
         }
@@ -737,6 +747,14 @@ impl Block {
         }
         block_text
     }
+
+    #[allow(dead_code)] // unused for now; see the cleanup pass in the roadmap
+    pub(crate) fn last_inline(&mut self) -> Option<&mut Inline> {
+        match self {
+            Block::LeafBlock(block) => Some(block.inlines.last_mut()?),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Serialize, Clone, Debug)]
@@ -758,7 +776,7 @@ pub struct Section {
     /// the ID generated for a section that wasn't given one (see [`crate::graph::ids`]); not part
     /// of the JSON (TCK) output
     #[serde(skip)]
-    pub generated_id: Option<String>,
+    pub(crate) generated_id: Option<String>,
 }
 
 impl PartialEq for Section {
@@ -769,7 +787,7 @@ impl PartialEq for Section {
 
 impl Section {
     // generated as a result of a heading
-    pub fn new(id: String, level: usize, first_location: Location) -> Self {
+    pub(crate) fn new(id: String, level: usize, first_location: Location) -> Self {
         Section {
             name: "section".to_string(),
             node_type: NodeTypes::Block,
@@ -806,13 +824,14 @@ impl PartialEq for Break {
 
 #[derive(Serialize, Clone, Debug, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
+#[non_exhaustive]
 pub enum BreakVariant {
     Page,
     Thematic,
 }
 
 impl Break {
-    pub fn new(variant: BreakVariant, location: Vec<Location>) -> Self {
+    pub(crate) fn new(variant: BreakVariant, location: Vec<Location>) -> Self {
         Break {
             name: "break".to_string(),
             node_type: NodeTypes::Block,
@@ -844,6 +863,7 @@ impl PartialEq for BlockMacro {
 
 #[derive(Serialize, PartialEq, Clone, Debug)]
 #[serde(rename_all = "lowercase")]
+#[non_exhaustive]
 pub enum BlockMacroName {
     Audio,
     Video,
@@ -852,7 +872,7 @@ pub enum BlockMacroName {
 }
 
 impl BlockMacro {
-    pub fn new(
+    pub(crate) fn new(
         name: BlockMacroName,
         target: String,
         metadata: Option<ElementMetadata>,
@@ -869,7 +889,7 @@ impl BlockMacro {
         }
     }
 
-    pub fn new_image_block(
+    pub(crate) fn new_image_block(
         target: String,
         metadata: Option<ElementMetadata>,
         locations: Vec<Location>,
@@ -877,7 +897,7 @@ impl BlockMacro {
         BlockMacro::new(BlockMacroName::Image, target, metadata, locations)
     }
 
-    pub fn add_metadata(mut self, incoming_metadata: &ElementMetadata) -> Self {
+    pub(crate) fn add_metadata(mut self, incoming_metadata: &ElementMetadata) -> Self {
         match self.metadata {
             Some(ref mut metadata) => metadata.add_metadata_from_other(incoming_metadata),
             None => self.metadata = Some(incoming_metadata.clone()),
@@ -905,6 +925,7 @@ pub struct LeafBlock {
 
 #[derive(Serialize, Clone, Debug, PartialEq)]
 #[serde(rename_all = "lowercase")]
+#[non_exhaustive]
 pub enum LeafBlockName {
     Listing,
     Literal,
@@ -916,6 +937,7 @@ pub enum LeafBlockName {
 }
 #[derive(Serialize, Clone, Debug)]
 #[serde(rename_all = "lowercase")]
+#[non_exhaustive]
 pub enum LeafBlockForm {
     Delimited,
     Indented,
@@ -935,7 +957,7 @@ impl PartialEq for LeafBlock {
 }
 
 impl LeafBlock {
-    pub fn new(
+    pub(crate) fn new(
         // note that the locations must be calculated later
         name: LeafBlockName,
         form: LeafBlockForm,
@@ -969,7 +991,7 @@ impl LeafBlock {
     }
 
     /// Creates a delimited block from based on the token type
-    pub fn new_from_token(token: Token) -> Result<Self, BlockError> {
+    pub(crate) fn new_from_token(token: Token) -> Result<Self, BlockError> {
         match token.token_type() {
             TokenType::PassthroughBlock => {
                 Ok(Self::new_delimited_block(token, LeafBlockName::Pass))
@@ -984,15 +1006,16 @@ impl LeafBlock {
         }
     }
 
-    pub fn opening_line(&self) -> Result<usize, BlockError> {
+    pub fn inlines(&self) -> Vec<Inline> {
+        self.inlines.clone()
+    }
+
+    #[allow(dead_code)] // unused for now; see the cleanup pass in the roadmap
+    pub(crate) fn opening_line(&self) -> Result<usize, BlockError> {
         match self.location.first() {
             Some(first_location) => Ok(first_location.line),
             None => Err(BlockError::Location),
         }
-    }
-
-    pub fn inlines(&self) -> Vec<Inline> {
-        self.inlines.clone()
     }
 }
 
@@ -1030,6 +1053,7 @@ impl PartialEq for ParentBlock {
 
 #[derive(Serialize, Clone, Debug, PartialEq)]
 #[serde(rename_all = "lowercase")]
+#[non_exhaustive]
 pub enum ParentBlockName {
     Admonition,
     Example,
@@ -1042,6 +1066,7 @@ pub enum ParentBlockName {
 
 #[derive(Serialize, Clone, Debug, PartialEq)]
 #[serde(rename_all = "lowercase")]
+#[non_exhaustive]
 pub enum ParentBlockVarient {
     Caution,
     Important,
@@ -1063,7 +1088,7 @@ impl Display for ParentBlockVarient {
 }
 
 impl ParentBlock {
-    pub fn new(
+    pub(crate) fn new(
         name: ParentBlockName,
         variant: Option<ParentBlockVarient>,
         delimiter: String,
@@ -1083,7 +1108,7 @@ impl ParentBlock {
         }
     }
 
-    pub fn new_from_token(token: Token) -> Result<Self, BlockError> {
+    pub(crate) fn new_from_token(token: Token) -> Result<Self, BlockError> {
         match token.token_type() {
             TokenType::SidebarBlock => Ok(ParentBlock::new(
                 ParentBlockName::Sidebar,
@@ -1160,7 +1185,7 @@ impl ParentBlock {
         }
     }
 
-    pub fn opening_line(&self) -> Result<usize, BlockError> {
+    pub(crate) fn opening_line(&self) -> Result<usize, BlockError> {
         match self.location.first() {
             Some(first_location) => Ok(first_location.line),
             None => Err(BlockError::Location),
@@ -1198,7 +1223,7 @@ impl TableCell {
         }
     }
 
-    pub fn new_from_token(token: Token) -> Self {
+    pub(crate) fn new_from_token(token: Token) -> Self {
         TableCell {
             name: "tableCell".to_string(),
             node_type: NodeTypes::Block,

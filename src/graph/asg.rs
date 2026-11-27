@@ -69,12 +69,12 @@ impl Asg {
     /// Standardizes the graph into the "official" ASG format. Since we keep an intermediate
     /// representation that differs slightly (e.g., see footnotes), we need to do this ahead of
     /// JSON or (eventually) "asciidoctor-style" HTML output.
-    pub fn consolidate(&mut self) {
+    pub(crate) fn consolidate(&mut self) {
         self.consolidate_locations();
         self.consolidate_xrefs();
     }
 
-    pub fn add_header(&mut self, header: Header, doc_attributes: HashMap<String, String>) {
+    pub(crate) fn add_header(&mut self, header: Header, doc_attributes: HashMap<String, String>) {
         // add document_id if there is one
         self.document_id = header.document_id();
         self.header = Some(header);
@@ -83,7 +83,7 @@ impl Asg {
     }
 
     /// Adds a block (tree) to the "root" of the document
-    pub fn push_block(&mut self, mut block: Block) -> Result<(), AsgError> {
+    pub(crate) fn push_block(&mut self, mut block: Block) -> Result<(), AsgError> {
         block.consolidate_locations();
         self.document_id_hash.extend(block.id_hashes());
         if block.is_section() {
@@ -107,7 +107,7 @@ impl Asg {
     /// Generates IDs for the sections that weren't given one, as the document's attributes
     /// (`sectids`, `idprefix`, `idseparator`) ask, so that the backends can use them, and cross
     /// references to them find the section's title. They aren't part of the JSON (TCK) output.
-    pub fn generate_section_ids(&mut self, attributes: &HashMap<String, String>) {
+    pub(crate) fn generate_section_ids(&mut self, attributes: &HashMap<String, String>) {
         let settings = IdSettings::from_attributes(attributes);
         let mut taken = HashSet::new();
         let mut titles = HashMap::new();
@@ -121,7 +121,7 @@ impl Asg {
     }
 
     /// Consolidates location information about the tree
-    pub fn consolidate_locations(&mut self) {
+    pub(crate) fn consolidate_locations(&mut self) {
         if let Some(last_block) = self.blocks.last_mut() {
             self.location = Location::reconcile(self.location.clone(), last_block.locations())
         } else {
@@ -146,7 +146,7 @@ impl Asg {
 
     /// Gathers all the "literal" text in a given document graph (i.e., without styling, etc.)
     /// (Largely a testing/verification function)
-    pub fn all_text(&self) -> String {
+    pub(crate) fn all_text(&self) -> String {
         let mut graph_text = String::new();
         for block in self.blocks.iter() {
             graph_text.push_str(&block.block_text())

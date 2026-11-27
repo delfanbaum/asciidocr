@@ -54,6 +54,7 @@ pub fn asciidocr_default_docx() -> Docx {
 }
 
 #[derive(thiserror::Error, Debug)]
+#[non_exhaustive]
 pub enum DocxRenderError {
     #[error(transparent)]
     FileError(#[from] std::io::Error),

@@ -302,6 +302,10 @@ removed (with the helpers only it used, `InlineError`, and the never-created
 * [x] Remove the unused footnote extraction (`Asg::standardize_footnotes`,
   `Block::extract_footnote_definitions` and the list items' `extract_footnotes`),
   and its `LIMITATIONS.adoc` entry
+* [ ] A dedicated cleanup pass over code that is unused for now (allowed with a
+  comment): `Block::last_inline`, `LeafBlock::opening_line`, `Inline::trim`,
+  `Inline::is_empty` and `AttributeType::Lines`. (`TokenType::Email` stays, for
+  email autolinks)
 * [ ] Docs on docs.rs good enough to use the crate without reading the source.
   `cargo doc` has two broken intra-doc links to start with (`attributes` in
   `graph::metadata`, `Scanner` in the parser)

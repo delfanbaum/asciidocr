@@ -7,6 +7,7 @@ use crate::graph::inlines::Inline;
 
 #[derive(Clone, Copy, Serialize, Debug)]
 #[serde(rename_all = "lowercase")]
+#[non_exhaustive]
 pub enum NodeTypes {
     Block,
     Inline,
@@ -33,7 +34,7 @@ impl Default for Header {
 }
 
 impl Header {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Header {
             title: vec![],
             authors: None,
@@ -46,7 +47,7 @@ impl Header {
     /// `email`, `firstname`, `middlename`, `lastname` and `authorinitials` for the first author
     /// (with a `_2`, `_3`, ... suffix for the others), `authors` and `authorcount`, and `revnumber`,
     /// `revdate` and `revremark`
-    pub fn implied_attributes(&self) -> Vec<(String, String)> {
+    pub(crate) fn implied_attributes(&self) -> Vec<(String, String)> {
         let mut attributes = vec![];
         let authors = self.authors.clone().unwrap_or_default();
         for (idx, author) in authors.iter().enumerate() {
@@ -87,11 +88,11 @@ impl Header {
         attributes
     }
 
-    pub fn is_empty(&self) -> bool {
+    pub(crate) fn is_empty(&self) -> bool {
         self.title.is_empty() && self.authors.is_none()
     }
 
-    pub fn consolidate(&mut self) {
+    pub(crate) fn consolidate(&mut self) {
         if let Some(last_inline) = self.title.last_mut() {
             self.location = Location::reconcile(self.location.clone(), last_inline.locations())
         }
@@ -102,7 +103,7 @@ impl Header {
     }
 
     /// Returns a document_id from the title, otherwise an empty string
-    pub fn document_id(&self) -> String {
+    pub(crate) fn document_id(&self) -> String {
         let mut id = String::new();
         for inline in self.title() {
             id.push_str(&inline.extract_values_to_string());
@@ -139,7 +140,7 @@ impl Author {
     /// The authors on an author line (`Jane Q. Doe <jane@example.com>; John Smith`), read as
     /// Asciidoctor reads them: up to three names (first, middle, last; an underscore in one is a
     /// space) and an optional email address in angle brackets; anything else is one full name
-    pub fn from_line(line: &str) -> Vec<Author> {
+    pub(crate) fn from_line(line: &str) -> Vec<Author> {
         line.split(';')
             .map(str::trim)
             .filter(|entry| !entry.is_empty())
@@ -213,7 +214,7 @@ pub struct Revision {
 
 impl Revision {
     /// Reads a revision line as Asciidoctor does
-    pub fn from_line(line: &str) -> Revision {
+    pub(crate) fn from_line(line: &str) -> Revision {
         let line = line.trim();
         // a remark follows a colon (not one at the start of the line)
         let (head, remark) = match line.char_indices().find(|(idx, c)| *c == ':' && *idx > 0) {
@@ -287,7 +288,7 @@ impl PartialOrd for Location {
 }
 
 impl Location {
-    pub fn new(line: usize, col: usize, file: Vec<String>) -> Self {
+    pub(crate) fn new(line: usize, col: usize, file: Vec<String>) -> Self {
         Location { line, col, file }
     }
 
@@ -295,7 +296,7 @@ impl Location {
         self.col
     }
 
-    pub fn reconcile(mut start: Vec<Location>, other: Vec<Location>) -> Vec<Location> {
+    pub(crate) fn reconcile(mut start: Vec<Location>, other: Vec<Location>) -> Vec<Location> {
         if !other.is_empty() {
             start.extend(other);
             start.sort();

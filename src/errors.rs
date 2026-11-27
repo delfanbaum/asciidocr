@@ -2,9 +2,10 @@
 use docx_rs::DocxError;
 
 #[cfg(feature = "docx")]
-use crate::backends::docx::document::DocxRenderError;
+use crate::backends::docx::DocxRenderError;
 
 #[derive(thiserror::Error, Debug)]
+#[non_exhaustive]
 pub enum AsciidocrError {
     #[error(transparent)]
     Scanner(#[from] ScannerError),
@@ -19,6 +20,7 @@ pub enum AsciidocrError {
 }
 
 #[derive(thiserror::Error, PartialEq, Debug)]
+#[non_exhaustive]
 pub enum ScannerError {
     #[error(transparent)]
     Token(#[from] TokenError),
@@ -29,6 +31,7 @@ pub enum ScannerError {
 }
 
 #[derive(thiserror::Error, PartialEq, Debug)]
+#[non_exhaustive]
 pub enum ParserError {
     #[error(transparent)]
     Scanner(#[from] ScannerError),
@@ -55,6 +58,7 @@ pub enum ParserError {
 }
 
 #[derive(thiserror::Error, Debug)]
+#[non_exhaustive]
 pub enum ConversionError {
     #[cfg(feature = "docx")]
     #[error("Unable to create {0:?}: {1}")]
@@ -70,12 +74,14 @@ pub enum ConversionError {
 }
 
 #[derive(thiserror::Error, PartialEq, Debug)]
+#[non_exhaustive]
 pub enum AsgError {
     #[error(transparent)]
     Block(#[from] BlockError),
 }
 
 #[derive(thiserror::Error, PartialEq, Debug)]
+#[non_exhaustive]
 pub enum BlockError {
     #[error("Attempted to push dangling ListItem to parent block")]
     DanglingList,
@@ -96,6 +102,7 @@ pub enum BlockError {
 }
 
 #[derive(thiserror::Error, PartialEq, Debug)]
+#[non_exhaustive]
 pub enum TokenError {
     #[error("Invalid character match to produce block TokenType")]
     CharacterMatch,

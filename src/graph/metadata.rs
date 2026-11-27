@@ -8,18 +8,19 @@ use serde::Serialize;
 
 use crate::errors::ParserError;
 use crate::graph::nodes::Location;
-use crate::scanner::tokens::{Token, TokenType};
+use crate::scanner::{Token, TokenType};
 
 // just make this quoted, and then pull everything else out
-pub static RE_NAMED_QUOTED: Lazy<Regex> = Lazy::new(|| Regex::new(r#"(\w*=".*?")"#).unwrap());
-pub static RE_NAMED: Lazy<Regex> = Lazy::new(|| Regex::new(r#"(.*?)[=|,](.*)"#).unwrap());
+static RE_NAMED_QUOTED: Lazy<Regex> = Lazy::new(|| Regex::new(r#"(\w*=".*?")"#).unwrap());
+static RE_NAMED: Lazy<Regex> = Lazy::new(|| Regex::new(r#"(.*?)[=|,](.*)"#).unwrap());
 
 #[derive(PartialEq, Clone, Debug)]
-pub enum AttributeType {
+pub(crate) enum AttributeType {
     Role,
     Quote,
     Verse,
     Source,
+    #[allow(dead_code)] // unused for now; see the cleanup pass in the roadmap
     Lines,
 }
 
@@ -54,12 +55,12 @@ pub struct ElementMetadata {
     pub roles: Vec<String>,
     /// this is a flag to let us know if it should be applied
     #[serde(skip)]
-    pub inline_metadata: bool,
+    pub(crate) inline_metadata: bool,
     #[serde(skip)]
-    pub declared_type: Option<AttributeType>,
+    pub(crate) declared_type: Option<AttributeType>,
     pub location: Vec<Location>,
     #[serde(skip)]
-    pub line: usize,
+    pub(crate) line: usize,
 }
 
 impl ElementMetadata {
@@ -69,7 +70,7 @@ impl ElementMetadata {
         self.attributes.is_empty() && self.options.is_empty() && self.roles.is_empty()
     }
 
-    pub fn new_with_role(role_name: String, line: usize) -> Self {
+    pub(crate) fn new_with_role(role_name: String, line: usize) -> Self {
         ElementMetadata {
             attributes: HashMap::new(),
             options: vec![],
@@ -82,7 +83,7 @@ impl ElementMetadata {
     }
 
     /// [positional, named="value inside named", positional]
-    pub fn new_inline_meta_from_token(token: Token) -> Self {
+    pub(crate) fn new_inline_meta_from_token(token: Token) -> Self {
         // Regex for parsing named attributes
         let mut new_block_metadata = ElementMetadata {
             attributes: HashMap::new(),
@@ -105,7 +106,7 @@ impl ElementMetadata {
 
         new_block_metadata
     }
-    pub fn new_block_meta_from_token(token: Token) -> Self {
+    pub(crate) fn new_block_meta_from_token(token: Token) -> Self {
         // Regex for parsing named attributes
         let mut new_block_metadata = ElementMetadata {
             attributes: HashMap::new(),
@@ -126,7 +127,7 @@ impl ElementMetadata {
         new_block_metadata
     }
 
-    pub fn add_metadata_from_token(&mut self, token: Token) {
+    pub(crate) fn add_metadata_from_token(&mut self, token: Token) {
         if matches!(token.token_type(), TokenType::BlockAnchor) {
             let id = token.lexeme[2..token.lexeme.len() - 2].to_string(); // skip the "[[" and "]]"
             if !self.attributes.contains_key("id") {
@@ -138,7 +139,7 @@ impl ElementMetadata {
         }
     }
 
-    pub fn add_metadata_from_other(&mut self, incoming: &ElementMetadata) {
+    pub(crate) fn add_metadata_from_other(&mut self, incoming: &ElementMetadata) {
         // combine attributes, deferring to incoming in the case of duplicate keys
         for (key, value) in incoming.attributes.iter() {
             if let Some(extant_key) = self.attributes.get_mut(key) {
@@ -152,7 +153,7 @@ impl ElementMetadata {
         self.roles.extend(incoming.options.clone());
     }
 
-    pub fn process_attributes(&mut self, mut attributes: Vec<String>) {
+    pub(crate) fn process_attributes(&mut self, mut attributes: Vec<String>) {
         for (idx, attribute) in attributes.iter_mut().enumerate() {
             match key_values_from_named_attribute(attribute, self.line) {
                 Ok((key, values)) => {
@@ -223,7 +224,7 @@ impl ElementMetadata {
         }
     }
 
-    pub fn simplify_cols(&mut self) {
+    pub(crate) fn simplify_cols(&mut self) {
         if let Some(cols_value) = self.attributes.get("cols") {
             if cols_value.contains(',') {
                 // cols="1,2,1"
@@ -243,7 +244,7 @@ impl ElementMetadata {
 
 /// Splits an attribute list (`role="a b",width=50`) into its entries, keeping quoted values
 /// whole
-pub fn extract_attributes(attribute_list: &str) -> Vec<String> {
+pub(crate) fn extract_attributes(attribute_list: &str) -> Vec<String> {
     let mut attributes: Vec<String> = vec![];
     let mut non_quoted_key_values = attribute_list.to_owned();
     // TK "1,2,4" should be a single attribute, not "1,", 2, 4"
@@ -257,7 +258,7 @@ pub fn extract_attributes(attribute_list: &str) -> Vec<String> {
 }
 
 /// Splits a named attribute (`role="a b"`) into its name and its space-separated values
-pub fn key_values_from_named_attribute(
+pub(crate) fn key_values_from_named_attribute(
     attribute: &str,
     line: usize,
 ) -> Result<(String, Vec<&str>), ParserError> {
@@ -285,7 +286,7 @@ pub fn key_values_from_named_attribute(
 
 /// Given a foo:target.foo[attributes] token, return the target and metadata. Only image and
 /// include macro tokens have these; any other token is an error
-pub fn target_and_attrs_from_token(
+pub(crate) fn target_and_attrs_from_token(
     token: &Token,
 ) -> Result<(String, Option<ElementMetadata>), ParserError> {
     let prefix = match token.token_type() {

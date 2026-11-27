@@ -9,7 +9,7 @@ use crate::graph::{
     asg::Asg,
     nodes::{Author, Location, Revision},
 };
-use crate::scanner::tokens::{Token, TokenType};
+use crate::scanner::{Token, TokenType};
 
 use super::Parser;
 

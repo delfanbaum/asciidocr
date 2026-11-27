@@ -11,7 +11,7 @@ use log::{info, warn};
 use once_cell::sync::Lazy;
 use regex::Regex;
 
-use crate::scanner::tokens::{Token, TokenType};
+use crate::scanner::{Token, TokenType};
 use crate::{errors::ParserError, scanner::Scanner};
 use crate::{graph::asg::Asg, graph::metadata::target_and_attrs_from_token};
 

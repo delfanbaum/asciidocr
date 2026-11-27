@@ -8,9 +8,11 @@
 
 pub mod asg;
 pub mod blocks;
-pub mod ids;
+pub(crate) mod ids;
 pub mod inlines;
 pub mod lists;
 pub mod metadata;
 pub mod nodes;
-pub mod substitutions;
+// only the docx backend (and a test) needs the characters that references stand for
+#[cfg_attr(not(feature = "docx"), allow(dead_code))]
+pub(crate) mod substitutions;

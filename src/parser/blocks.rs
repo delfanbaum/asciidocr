@@ -5,7 +5,7 @@ use std::collections::VecDeque;
 
 use log::warn;
 
-use crate::scanner::tokens::{Token, TokenType};
+use crate::scanner::{Token, TokenType};
 use crate::{errors::ParserError, scanner::Scanner};
 use crate::{
     graph::metadata::target_and_attrs_from_token,

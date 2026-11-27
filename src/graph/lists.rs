@@ -3,7 +3,7 @@ use crate::graph::{
     inlines::Inline,
     nodes::{Location, NodeTypes},
 };
-use crate::scanner::tokens::Token;
+use crate::scanner::Token;
 use serde::Serialize;
 
 use super::metadata::ElementMetadata;
@@ -32,7 +32,7 @@ impl PartialEq for List {
 impl List {
     /// Creates an empty list; the marker is the first item's marker as written (`*`, `**`, `-`,
     /// `.`, `1.`, ...), without whitespace
-    pub fn new(variant: ListVariant, marker: String, location: Vec<Location>) -> Self {
+    pub(crate) fn new(variant: ListVariant, marker: String, location: Vec<Location>) -> Self {
         List {
             name: "list".to_string(),
             node_type: NodeTypes::Block,
@@ -45,7 +45,7 @@ impl List {
         }
     }
 
-    pub fn add_item(&mut self, item: Block) {
+    pub(crate) fn add_item(&mut self, item: Block) {
         self.items.push(item)
     }
 
@@ -64,6 +64,7 @@ impl List {
 /// list's depth: `.` and `1.` are arabic, `..` and `a.` lower alpha, `...` and `i)` lower roman,
 /// `....` and `A.` upper alpha, `.....` and `I)` upper roman.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum NumeralStyle {
     Arabic,
     LowerAlpha,
@@ -114,6 +115,7 @@ impl NumeralStyle {
 
 #[derive(Serialize, PartialEq, Eq, Clone, Debug)]
 #[serde(rename_all = "lowercase")]
+#[non_exhaustive]
 pub enum ListVariant {
     Callout,
     Ordered,
@@ -141,7 +143,7 @@ impl PartialEq for ListItem {
 }
 
 impl ListItem {
-    pub fn new(marker: String, location: Vec<Location>) -> Self {
+    pub(crate) fn new(marker: String, location: Vec<Location>) -> Self {
         let trimmed_mark = marker.trim().to_string();
         ListItem {
             name: "listItem".to_string(),
@@ -154,7 +156,7 @@ impl ListItem {
         }
     }
 
-    pub fn add_inline(&mut self, inline: Inline) {
+    pub(crate) fn add_inline(&mut self, inline: Inline) {
         self.principal.push(inline)
     }
 
@@ -190,8 +192,13 @@ impl PartialEq for DList {
 }
 
 impl DList {
+    /// The marker of the list's items, as written (e.g., `::`)
+    pub fn marker(&self) -> &str {
+        &self.marker
+    }
+
     /// Creates an empty description list; the marker is its first item's (`::`, `;;`, ...)
-    pub fn new(marker: String, location: Vec<Location>) -> Self {
+    pub(crate) fn new(marker: String, location: Vec<Location>) -> Self {
         DList {
             name: "dlist".to_string(),
             node_type: NodeTypes::Block,
@@ -202,7 +209,7 @@ impl DList {
             location,
         }
     }
-    pub fn add_item(&mut self, item: Block) {
+    pub(crate) fn add_item(&mut self, item: Block) {
         self.items.push(item)
     }
 }
@@ -233,7 +240,12 @@ impl PartialEq for DListItem {
 }
 
 impl DListItem {
-    pub fn new_from_token(token: Token) -> Self {
+    /// The item's marker, as written (e.g., `::`)
+    pub fn marker(&self) -> &str {
+        &self.marker
+    }
+
+    pub(crate) fn new_from_token(token: Token) -> Self {
         DListItem {
             name: "dlistItem".to_string(),
             node_type: NodeTypes::Block,
@@ -247,7 +259,7 @@ impl DListItem {
     }
 
     /// Adds a term, and reconciles the item's location with it
-    pub fn add_term(&mut self, term: Vec<Inline>) {
+    pub(crate) fn add_term(&mut self, term: Vec<Inline>) {
         for inline in &term {
             self.location = Location::reconcile(self.location.clone(), inline.locations().clone());
         }
@@ -262,7 +274,7 @@ impl DListItem {
         self.principal.clone()
     }
 
-    pub fn add_inline(&mut self, inline: Inline) {
+    pub(crate) fn add_inline(&mut self, inline: Inline) {
         self.principal.push(inline)
     }
 

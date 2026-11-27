@@ -6,18 +6,18 @@ use crate::graph::nodes::Location;
 /// file it came from (helpful when sorting out `include::` directives... and because its required
 /// by the official schema).
 pub struct Token {
-    pub token_type: TokenType,
+    pub(crate) token_type: TokenType,
     //id: Option<String>,
-    pub lexeme: String,          // raw string of code
-    pub literal: Option<String>, // our literals are only ever strings (or represented as such)
-    pub line: usize,
-    pub startcol: usize,
-    pub endcol: usize,
+    pub(crate) lexeme: String,          // raw string of code
+    pub(crate) literal: Option<String>, // our literals are only ever strings (or represented as such)
+    pub(crate) line: usize,
+    pub(crate) startcol: usize,
+    pub(crate) endcol: usize,
     /// The file's stack hierarchy if it's an include, otherwise stays empty
-    pub file_stack: Vec<String>,
+    pub(crate) file_stack: Vec<String>,
     /// For a formatting mark, whether it can close a span (a constrained mark can't after a
     /// space, or before a letter or digit)
-    pub can_close: bool,
+    pub(crate) can_close: bool,
 }
 
 impl Default for Token {
@@ -38,7 +38,8 @@ impl Default for Token {
 
 impl Token {
     /// Creates a new token
-    pub fn new(
+    #[cfg(test)]
+    pub(crate) fn new(
         token_type: TokenType,
         lexeme: String,
         literal: Option<String>,
@@ -60,7 +61,8 @@ impl Token {
     }
 
     /// Testing helper; essentially `Token::new()` but defaulting to an empty file stack
-    pub fn new_default(
+    #[cfg(test)]
+    pub(crate) fn new_default(
         token_type: TokenType,
         lexeme: String,
         literal: Option<String>,
@@ -80,7 +82,7 @@ impl Token {
         }
     }
 
-    pub fn final_token(line: usize, file_stack: Vec<String>) -> Self {
+    pub(crate) fn final_token(line: usize, file_stack: Vec<String>) -> Self {
         Token {
             token_type: TokenType::Eof,
             lexeme: "".to_string(),
@@ -116,14 +118,14 @@ impl Token {
     }
 
     /// Convince function to return the [`TokenType`] for matching
-    pub fn token_type(&self) -> TokenType {
+    pub(crate) fn token_type(&self) -> TokenType {
         self.token_type
     }
 
     /// Returns the Token's text content
     /// NOTE: for typographers' quotes, this inserts the characters instead of the entities; this
     /// may change in future releases.
-    pub fn text(&self) -> String {
+    pub(crate) fn text(&self) -> String {
         match self.token_type() {
             TokenType::OpenDoubleQuote => "“".into(),
             TokenType::CloseDoubleQuote => "”".into(),
@@ -139,24 +141,24 @@ impl Token {
         }
     }
 
-    pub fn first_location(&self) -> Location {
+    pub(crate) fn first_location(&self) -> Location {
         Location::new(self.line, self.startcol, self.file_stack.clone())
     }
-    pub fn last_location(&self) -> Location {
+    pub(crate) fn last_location(&self) -> Location {
         Location::new(self.line, self.endcol, self.file_stack.clone())
     }
 
-    pub fn locations(&self) -> Vec<Location> {
+    pub(crate) fn locations(&self) -> Vec<Location> {
         vec![self.first_location(), self.last_location()]
     }
 
-    pub fn update_token_loc_offsets_by(&mut self, lines: usize, cols: usize) {
+    pub(crate) fn update_token_loc_offsets_by(&mut self, lines: usize, cols: usize) {
         self.line += lines - 1;
         self.startcol += cols;
         self.endcol += cols;
     }
 
-    pub fn is_inline(&self) -> bool {
+    pub(crate) fn is_inline(&self) -> bool {
         matches!(self.token_type(), |TokenType::Comment| TokenType::Text
             | TokenType::Emphasis
             | TokenType::Strong
@@ -172,7 +174,7 @@ impl Token {
             | TokenType::InlineMacroClose)
     }
 
-    pub fn can_be_in_document_header(&self) -> bool {
+    pub(crate) fn can_be_in_document_header(&self) -> bool {
         matches!(
             self.token_type(),
             TokenType::Heading1 | TokenType::Attribute | TokenType::AttributeReference
@@ -181,7 +183,7 @@ impl Token {
 
     /// If the token is a TokenType::StartTag or TokenType::EndTag, return the tag value,
     /// otherwise return None
-    pub fn tag(&self) -> Option<String> {
+    pub(crate) fn tag(&self) -> Option<String> {
         if matches!(self.token_type(), TokenType::StartTag | TokenType::EndTag) {
             return Some((self.lexeme[5..self.lexeme.len() - 2]).to_string());
         }
@@ -191,7 +193,7 @@ impl Token {
     /// Performs some sanity-check validations; currently checking for characters that aren't
     /// allowed in, for example, IDs, as well as performs the character substitutions for
     /// Charref entities, following asciidoctor
-    pub fn validate(&mut self) {
+    pub(crate) fn validate(&mut self) {
         match self.token_type() {
             TokenType::BlockAnchor => {
                 // no spaces or newlines inside
@@ -318,7 +320,9 @@ pub enum TokenType {
 
     // garden-variety text
     Hyperlink, // http://whatever.txt
-    Email,     // cats@dogs.foo
+    // nothing scans an email address yet; the parser reports one until it can use it
+    #[allow(dead_code)]
+    Email, // cats@dogs.foo
     Text,
 
     // character reference, such as "&mdash;"

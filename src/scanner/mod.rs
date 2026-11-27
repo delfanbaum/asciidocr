@@ -1,12 +1,14 @@
 //! The Scanner scans the asciidoc string into Tokens, which is then consumed by the Parser.
 
-pub mod tokens;
+mod tokens;
+
 use core::str;
 use log::debug;
 use once_cell::sync::Lazy;
 use regex::Regex;
 use std::borrow::Cow;
-use tokens::{Token, TokenType};
+pub use tokens::Token;
+pub(crate) use tokens::TokenType;
 
 use crate::errors::ScannerError;
 
@@ -24,7 +26,7 @@ fn normalize_line_endings(source: &str) -> Cow<'_, str> {
 /// Scans an asciidoc `&str` into [`Token`]s to be consumed by the Parser.
 pub struct Scanner<'a> {
     /// the text to scan, with Windows line endings (`\r\n`) made `\n`
-    pub source: Cow<'a, str>,
+    pub(crate) source: Cow<'a, str>,
     start: usize,
     startcol: usize,
     current: usize,
@@ -81,7 +83,7 @@ impl<'a> Scanner<'a> {
         }
     }
 
-    pub fn new_with_stack(source: &'a str, file_stack: Vec<String>) -> Self {
+    pub(crate) fn new_with_stack(source: &'a str, file_stack: Vec<String>) -> Self {
         Scanner {
             source: normalize_line_endings(source),
             start: 0,    // beginning of the current lexeme being scanned
@@ -1149,7 +1151,7 @@ impl<'a> Scanner<'a> {
 mod tests {
     use std::char;
 
-    use crate::scanner::tokens::TokenType;
+    use crate::scanner::TokenType;
     use rstest::rstest;
 
     use super::*;

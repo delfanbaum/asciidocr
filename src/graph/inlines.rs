@@ -14,11 +14,12 @@ use super::{
     nodes::{Location, NodeTypes},
     substitutions::CHARREF_MAP,
 };
-use crate::scanner::tokens::{Token, TokenType};
+use crate::scanner::{Token, TokenType};
 
 /// Inlines enum containing literals, spans, and references (the latter not implemented)
 #[derive(Serialize, Clone, Debug)]
 #[serde(untagged)]
+#[non_exhaustive]
 pub enum Inline {
     InlineSpan(InlineSpan),
     InlineRef(InlineRef),
@@ -54,7 +55,7 @@ impl PartialEq for Inline {
 }
 
 impl Inline {
-    pub fn push_inline(&mut self, child: Inline) {
+    pub(crate) fn push_inline(&mut self, child: Inline) {
         match self {
             Inline::InlineSpan(span) => span.inlines.push(child),
             Inline::InlineRef(iref) => iref.inlines.push(child),
@@ -70,7 +71,7 @@ impl Inline {
         }
     }
 
-    pub fn reconcile_locations(&mut self, other_locs: Vec<Location>) {
+    pub(crate) fn reconcile_locations(&mut self, other_locs: Vec<Location>) {
         match self {
             Inline::InlineSpan(inline) => {
                 inline.location = Location::reconcile(inline.location.clone(), other_locs)
@@ -89,7 +90,7 @@ impl Inline {
 
     /// Whether this is a macro still waiting for its closing `]`: a footnote, or a link macro
     /// (but not a bare URL, which is also a link)
-    pub fn is_open_macro(&self) -> bool {
+    pub(crate) fn is_open_macro(&self) -> bool {
         match self {
             Inline::InlineRef(iref) => iref.open,
             Inline::InlineSpan(span) => span.variant == InlineSpanVariant::Footnote && span.open,
@@ -97,7 +98,7 @@ impl Inline {
         }
     }
 
-    pub fn is_open(&self) -> bool {
+    pub(crate) fn is_open(&self) -> bool {
         match self {
             Inline::InlineSpan(span) => span.open,
             _ => false,
@@ -106,7 +107,7 @@ impl Inline {
 
     /// Whether this is markup still waiting to be closed: an open span, or a link macro waiting
     /// for its `]`. At the end of a paragraph, such markup is text.
-    pub fn is_unclosed(&self) -> bool {
+    pub(crate) fn is_unclosed(&self) -> bool {
         match self {
             Inline::InlineSpan(span) => span.open,
             Inline::InlineRef(iref) => iref.open,
@@ -115,7 +116,7 @@ impl Inline {
     }
 
     /// Used for checking if a given inline is just a literal "\n"
-    pub fn is_newline(&self) -> bool {
+    pub(crate) fn is_newline(&self) -> bool {
         match self {
             Inline::InlineLiteral(lit) => lit.value == *"\n",
             _ => false,
@@ -143,7 +144,7 @@ impl Inline {
         }
     }
 
-    pub fn extract_child_inlines(&mut self) -> VecDeque<Inline> {
+    pub(crate) fn extract_child_inlines(&mut self) -> VecDeque<Inline> {
         match &self {
             Inline::InlineSpan(span) => span.extract_span_inlines(),
             Inline::InlineRef(ref_) => ref_.inlines.clone().into(),
@@ -156,7 +157,7 @@ impl Inline {
         }
     }
 
-    pub fn produce_literal_from_self(&mut self) -> String {
+    pub(crate) fn produce_literal_from_self(&mut self) -> String {
         match &self {
             Inline::InlineRef(iref) => iref.markup.clone(),
             Inline::InlineSpan(span) if !span.markup.is_empty() => span.markup.clone(),
@@ -187,7 +188,7 @@ impl Inline {
     /// Markup that was never closed (a span, or a link macro), as what it was all along: its
     /// markup is text, in front of what it held. A URL followed by a `[` that never closes
     /// (`http://x.com[ y`) is a bare link, and the `[` is text, as in Asciidoctor.
-    pub fn unclosed_as_text(&mut self) -> VecDeque<Inline> {
+    pub(crate) fn unclosed_as_text(&mut self) -> VecDeque<Inline> {
         if let Inline::InlineRef(iref) = self
             && iref.open
             && let Some(url) = iref.markup.strip_suffix('[')
@@ -219,7 +220,7 @@ impl Inline {
         self.children_with_markup_as_text()
     }
 
-    pub fn children_with_markup_as_text(&mut self) -> VecDeque<Inline> {
+    pub(crate) fn children_with_markup_as_text(&mut self) -> VecDeque<Inline> {
         let markup = self.produce_literal_from_self();
         let locations = self.locations();
         let mut children = self.extract_child_inlines();
@@ -248,23 +249,7 @@ impl Inline {
         children
     }
 
-    pub fn trim(&mut self) {
-        if let Inline::InlineLiteral(inline) = self {
-            inline.value = inline.value.trim().to_string();
-            println!("{:?}", inline.value)
-        }
-    }
-
-    pub fn is_empty(&self) -> bool {
-        match self {
-            Inline::InlineRef(inline) => inline.inlines.is_empty(),
-            Inline::InlineSpan(inline) => inline.inlines.is_empty(),
-            Inline::InlineLiteral(inline) => inline.value.is_empty(),
-            Inline::InlineBreak(_) => unreachable!(),
-        }
-    }
-
-    pub fn consolidate_locations_from_token(&mut self, token: Token) {
+    pub(crate) fn consolidate_locations_from_token(&mut self, token: Token) {
         match self {
             Inline::InlineLiteral(_) => unreachable!(),
             Inline::InlineSpan(inline) => {
@@ -277,14 +262,14 @@ impl Inline {
         }
     }
 
-    pub fn add_metadata(&mut self, metadata: ElementMetadata) {
+    pub(crate) fn add_metadata(&mut self, metadata: ElementMetadata) {
         match self {
             Inline::InlineSpan(span) => span.metadata = Some(metadata),
             _ => panic!("Invalid action: this inline does not take metadata"),
         }
     }
 
-    pub fn close(&mut self) {
+    pub(crate) fn close(&mut self) {
         match self {
             Inline::InlineSpan(span) => {
                 span.open = false;
@@ -294,7 +279,7 @@ impl Inline {
         }
     }
 
-    pub fn attempt_xref_standardization(&mut self, id_hash: &HashMap<String, Vec<Inline>>) {
+    pub(crate) fn attempt_xref_standardization(&mut self, id_hash: &HashMap<String, Vec<Inline>>) {
         if let Inline::InlineRef(iref) = self
             && matches!(iref.variant, InlineRefVariant::Xref)
         {
@@ -306,6 +291,24 @@ impl Inline {
             } else {
                 warn!("Unable to find xref: {}", iref.target)
             }
+        }
+    }
+
+    #[allow(dead_code)] // unused for now; see the cleanup pass in the roadmap
+    pub(crate) fn trim(&mut self) {
+        if let Inline::InlineLiteral(inline) = self {
+            inline.value = inline.value.trim().to_string();
+            println!("{:?}", inline.value)
+        }
+    }
+
+    #[allow(dead_code)] // unused for now; see the cleanup pass in the roadmap
+    pub(crate) fn is_empty(&self) -> bool {
+        match self {
+            Inline::InlineRef(inline) => inline.inlines.is_empty(),
+            Inline::InlineSpan(inline) => inline.inlines.is_empty(),
+            Inline::InlineLiteral(inline) => inline.value.is_empty(),
+            Inline::InlineBreak(_) => unreachable!(),
         }
     }
 }
@@ -323,7 +326,7 @@ pub struct InlineSpan {
     pub metadata: Option<ElementMetadata>,
     location: Vec<Location>,
     #[serde(skip)]
-    pub open: bool,
+    pub(crate) open: bool,
     /// the markup that opened the span, as written (`+` and `` ` `` are both code, e.g.), to put
     /// back as text if the span is never closed
     #[serde(skip)]
@@ -331,7 +334,7 @@ pub struct InlineSpan {
 }
 
 impl InlineSpan {
-    pub fn new(
+    pub(crate) fn new(
         variant: InlineSpanVariant,
         node_form: InlineSpanForm,
         location: Vec<Location>,
@@ -349,7 +352,7 @@ impl InlineSpan {
         }
     }
 
-    pub fn inline_span_from_token(token: Token) -> Self {
+    pub(crate) fn inline_span_from_token(token: Token) -> Self {
         let markup = token.lexeme.clone();
         let mut span = Self::span_from_token(token);
         span.markup = markup;
@@ -487,7 +490,7 @@ impl InlineSpan {
         }
     }
 
-    pub fn add_inline(&mut self, inline: Inline) {
+    pub(crate) fn add_inline(&mut self, inline: Inline) {
         // update the locations
         self.location = Location::reconcile(self.location.clone(), inline.locations());
         // a link macro inside the span takes what follows, until its `]`
@@ -547,7 +550,7 @@ impl InlineSpan {
 
     /// Closes the link macro open inside this span (or a span open inside it), at its `]`.
     /// Returns whether there was one.
-    pub fn close_open_link(&mut self) -> bool {
+    pub(crate) fn close_open_link(&mut self) -> bool {
         match self.inlines.last_mut() {
             Some(Inline::InlineRef(last_ref)) if last_ref.open => {
                 last_ref.open = false;
@@ -578,6 +581,7 @@ impl InlineSpan {
 
 #[derive(Serialize, PartialEq, Eq, Clone, Debug)]
 #[serde(rename_all = "lowercase")]
+#[non_exhaustive]
 pub enum InlineSpanVariant {
     Strong,
     Emphasis,
@@ -590,6 +594,7 @@ pub enum InlineSpanVariant {
 
 #[derive(Serialize, PartialEq, Eq, Clone, Debug)]
 #[serde(rename_all = "lowercase")]
+#[non_exhaustive]
 pub enum InlineSpanForm {
     Constrained,
     Unconstrained,
@@ -609,7 +614,7 @@ pub struct InlineRef {
     /// Whether the ref still takes the text that follows it: only a link macro does, until its
     /// closing `]`. A bare URL, an xref or an image is complete as soon as it is scanned.
     #[serde(skip)]
-    pub open: bool,
+    pub(crate) open: bool,
     /// the markup that opened a link macro, as written (`link:x.html[`), to put back as text if
     /// the macro is never closed
     #[serde(skip)]
@@ -633,7 +638,7 @@ impl InlineRef {
 
     /// An xref (`<<id>>`, or `<<id,text>>`): its target is the ID. One with text of its own is
     /// open, for the parser to add the text to (see [`xref_text`](Self::xref_text)).
-    pub fn new_xref_from_token(token: Token) -> Self {
+    pub(crate) fn new_xref_from_token(token: Token) -> Self {
         let inner = token.text()[2..token.text().len() - 2].to_string();
         let (target, text) = match inner.split_once(',') {
             Some((target, text)) => (target.to_string(), Some(text)),
@@ -647,7 +652,7 @@ impl InlineRef {
 
     /// The text an xref token gives its reference (`<<id,the text>>`), without the whitespace it
     /// starts with, as in Asciidoctor; `None` if it gives none
-    pub fn xref_text(token: &Token) -> Option<String> {
+    pub(crate) fn xref_text(token: &Token) -> Option<String> {
         let text = token.text();
         let inner = &text[2..text.len() - 2];
         inner
@@ -655,7 +660,7 @@ impl InlineRef {
             .map(|(_, text)| text.trim_start().to_string())
     }
 
-    pub fn new_link_from_macro_token(token: Token) -> Self {
+    pub(crate) fn new_link_from_macro_token(token: Token) -> Self {
         let markup = token.text();
         let mut target = markup.clone();
         target.pop(); // remove trailing '['
@@ -670,12 +675,12 @@ impl InlineRef {
         }
     }
 
-    pub fn new_link_from_token(token: Token) -> Self {
+    pub(crate) fn new_link_from_token(token: Token) -> Self {
         let target = token.text();
         InlineRef::new(InlineRefVariant::Link, target, token.locations())
     }
 
-    pub fn new_inline_image(
+    pub(crate) fn new_inline_image(
         target: String,
         metadata: Option<ElementMetadata>,
         location: Vec<Location>,
@@ -697,11 +702,11 @@ impl InlineRef {
         }
     }
 
-    pub fn add_text_from_token(&mut self, token: Token) {
+    pub(crate) fn add_text_from_token(&mut self, token: Token) {
         self.text_from_token(token, false);
     }
 
-    pub fn pass_text_from_token(&mut self, token: Token) {
+    pub(crate) fn pass_text_from_token(&mut self, token: Token) {
         self.text_from_token(token, true);
     }
 
@@ -724,6 +729,7 @@ impl InlineRef {
 
 #[derive(Serialize, PartialEq, Clone, Debug)]
 #[serde(rename_all = "lowercase")]
+#[non_exhaustive]
 pub enum InlineRefVariant {
     Link,
     Xref,
@@ -740,7 +746,7 @@ pub struct InlineLiteral {
 }
 
 impl InlineLiteral {
-    pub fn new(name: InlineLiteralName, value: String, location: Vec<Location>) -> Self {
+    pub(crate) fn new(name: InlineLiteralName, value: String, location: Vec<Location>) -> Self {
         InlineLiteral {
             name,
             node_type: NodeTypes::String,
@@ -749,16 +755,16 @@ impl InlineLiteral {
         }
     }
 
-    pub fn new_text_from_token(token: &Token) -> Self {
+    pub(crate) fn new_text_from_token(token: &Token) -> Self {
         InlineLiteral::new(InlineLiteralName::Text, token.text(), token.locations())
     }
 
-    pub fn new_charref_from_token(token: &Token) -> Self {
+    pub(crate) fn new_charref_from_token(token: &Token) -> Self {
         InlineLiteral::new(InlineLiteralName::Charref, token.text(), token.locations())
     }
 
     /// Passes the lexeme through, e.g., when we're in a source or literal block
-    pub fn new_text_from_token_pass(token: &Token) -> Self {
+    pub(crate) fn new_text_from_token_pass(token: &Token) -> Self {
         InlineLiteral::new(
             InlineLiteralName::Text,
             token.lexeme.clone(),
@@ -768,7 +774,7 @@ impl InlineLiteral {
 
     /// Text that was passed through an inline passthrough macro (e.g., `pass:[<b>text</b>]`), which
     /// backends output as is.
-    pub fn new_raw_from_token(token: &Token) -> Self {
+    pub(crate) fn new_raw_from_token(token: &Token) -> Self {
         InlineLiteral::new(
             InlineLiteralName::Raw,
             token.lexeme.clone(),
@@ -777,12 +783,12 @@ impl InlineLiteral {
     }
 
     /// Add text and reconcile location information from a given (text) token
-    pub fn add_text_from_token(&mut self, token: &Token) {
+    pub(crate) fn add_text_from_token(&mut self, token: &Token) {
         self.text_from_token(token, false);
     }
 
     /// Add text and reconcile location information from a given (text) token
-    pub fn pass_text_from_token(&mut self, token: &Token) {
+    pub(crate) fn pass_text_from_token(&mut self, token: &Token) {
         self.text_from_token(token, true);
     }
 
@@ -798,12 +804,12 @@ impl InlineLiteral {
     /// Whether the other literal's text can simply be appended to this one. Passthrough text only
     /// merges with other passthrough text, because backends output it as is while escaping
     /// everything else.
-    pub fn can_merge_with(&self, other: &InlineLiteral) -> bool {
+    pub(crate) fn can_merge_with(&self, other: &InlineLiteral) -> bool {
         matches!(self.name, InlineLiteralName::Raw) == matches!(other.name, InlineLiteralName::Raw)
     }
 
     /// Add test from inline literals; should only really be used in reconciling multi-line spans
-    pub fn add_text_from_inline_literal(&mut self, inline: Inline) {
+    pub(crate) fn add_text_from_inline_literal(&mut self, inline: Inline) {
         match inline {
             Inline::InlineLiteral(ref literal) => self.value.push_str(&literal.value),
             _ => panic!("Can't add test from this kind of inline: {:?}", inline),
@@ -814,7 +820,7 @@ impl InlineLiteral {
     /// Splits off the text after the last newline, i.e., the text on this literal's last line
     /// (the term of a description list item, say, whose line the `::` ends). The newline is
     /// dropped. Returns `None` if the text has no newline.
-    pub fn split_off_last_line(&mut self) -> Option<InlineLiteral> {
+    pub(crate) fn split_off_last_line(&mut self) -> Option<InlineLiteral> {
         let newline_idx = self.value.rfind('\n')?;
         let (Some(start), Some(end)) = (self.location.first(), self.location.last()) else {
             return None;
@@ -842,7 +848,7 @@ impl InlineLiteral {
 
     /// Drops the whitespace the text starts with (the indentation of its line), and moves its
     /// start location past it
-    pub fn trim_start(&mut self) {
+    pub(crate) fn trim_start(&mut self) {
         let indent = self.value.len() - self.value.trim_start().len();
         if indent > 0 {
             self.value.drain(..indent);
@@ -852,20 +858,20 @@ impl InlineLiteral {
         }
     }
 
-    pub fn combine_literals(&mut self, inline: InlineLiteral) {
+    pub(crate) fn combine_literals(&mut self, inline: InlineLiteral) {
         self.value.push_str(&inline.value());
         self.location = Location::reconcile(self.location.clone(), inline.location.clone());
     }
 
     /// Drops the comment markup (`//`, `#`, `--` or `;;`) that ends this text, which is how code
     /// callouts are usually introduced (e.g., `int x; // <1>`)
-    pub fn strip_trailing_comment_markup(&mut self) {
+    pub(crate) fn strip_trailing_comment_markup(&mut self) {
         static TRAILING_COMMENT: Lazy<Regex> =
             Lazy::new(|| Regex::new(r"(?://|#|--|;;)[ \t]*$").unwrap());
         self.value = TRAILING_COMMENT.replace(&self.value, "").to_string();
     }
 
-    pub fn prepend_to_value(&mut self, value: String, value_locations: Vec<Location>) {
+    pub(crate) fn prepend_to_value(&mut self, value: String, value_locations: Vec<Location>) {
         // add the value
         self.value.insert_str(0, &value);
         // update the locations
@@ -876,7 +882,8 @@ impl InlineLiteral {
         self.value.clone()
     }
 
-    pub fn value_or_refd_char(&self) -> String {
+    #[cfg_attr(not(feature = "docx"), allow(dead_code))]
+    pub(crate) fn value_or_refd_char(&self) -> String {
         // In HTML these just get passed through, but for certain outputs we want to do replacements. This
         // is obviously an incomplete table.
         if matches!(self.name, InlineLiteralName::Charref) {
@@ -893,6 +900,7 @@ impl InlineLiteral {
 
 #[derive(Serialize, Clone, Debug)]
 #[serde(rename_all = "lowercase")]
+#[non_exhaustive]
 pub enum InlineLiteralName {
     Text,
     Charref,
@@ -908,7 +916,7 @@ pub struct LineBreak {
 }
 
 impl LineBreak {
-    pub fn new_from_token(token: Token) -> Self {
+    pub(crate) fn new_from_token(token: Token) -> Self {
         LineBreak {
             name: "linebreak".to_string(),
             node_type: NodeTypes::Inline,
@@ -921,7 +929,7 @@ impl LineBreak {
 mod tests {
 
     use crate::graph::metadata::target_and_attrs_from_token;
-    use crate::scanner::tokens::{Token, TokenType};
+    use crate::scanner::{Token, TokenType};
 
     use super::*;
     use rstest::rstest;
