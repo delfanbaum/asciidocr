@@ -4,9 +4,9 @@ use std::env;
 use std::{fs, path::PathBuf};
 
 use asciidocr::{
-    backends::htmls::{
-        render_asciidoctor_html, render_asciidoctor_html_embedded, render_htmlbook,
-        render_htmlbook_embedded,
+    backends::{
+        asciidoctor::{render_asciidoctor_html, render_asciidoctor_html_embedded},
+        htmlbook::{render_htmlbook, render_htmlbook_embedded},
     },
     parser::Parser,
     scanner::Scanner,

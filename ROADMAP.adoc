@@ -297,9 +297,10 @@ removed (with the helpers only it used, `InlineError`, and the never-created
   public, and the command-line dependencies are behind the `cli` feature
 * [ ] `Asg::word_count` (the CLI's `-c`) is far too low: it joins the text of one
   block to the next without a space, so three one-word paragraphs are one word
-* [ ] Path changes the audit suggested, for the cleanup pass (fine before 1.0,
-  since nobody is known to use the library yet): `backends::htmls` as
-  `backends::html`; `graph::nodes`, which holds `Header`, `Author`, `Revision`
+* [x] `backends::htmls` split into `backends::htmlbook` and
+  `backends::asciidoctor`, with what they share in a private module
+* [ ] Other path changes the audit suggested, for the cleanup pass (fine before
+  1.0, since nobody is known to use the library yet): `graph::nodes`, which holds `Header`, `Author`, `Revision`
   and `Location` (a `header` and a `location` module would say more); the
   `ParentBlockVarient` spelling; `backends::docx::units`, one function
 * [x] Remove the unused footnote extraction (`Asg::standardize_footnotes`,

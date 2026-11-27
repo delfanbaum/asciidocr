@@ -203,7 +203,7 @@ $ cargo add asciidocr --no-default-features
 Then scan, parse and render:
 
 ```rust
-use asciidocr::backends::htmls::render_htmlbook_embedded;
+use asciidocr::backends::htmlbook::render_htmlbook_embedded;
 use asciidocr::parser::Parser;
 use asciidocr::scanner::Scanner;
 

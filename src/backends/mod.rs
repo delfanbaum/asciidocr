@@ -9,7 +9,9 @@
 #[cfg(feature = "docx")]
 pub mod docx;
 
-pub mod htmls;
+pub mod asciidoctor;
+mod html;
+pub mod htmlbook;
 
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "cli", derive(clap::ValueEnum))]

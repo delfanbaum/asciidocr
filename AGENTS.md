@@ -16,8 +16,8 @@ The pipeline is `Scanner` → `Parser` → `Asg` → backend.
 - `src/graph/`: the ASG types (`asg`, `blocks`, `inlines`, `lists`, `metadata`, `nodes`,
   `substitutions`). They roughly follow the official Asciidoc ASG schema and are all
   `serde`-serializable. That serialization is how the JSON/TCK output and the templates work.
-- `src/backends/`: `htmls.rs` (HTMLBook, rendered with minijinja) and `docx/` (behind the `docx`
-  feature). The `Backends` enum in `backends/mod.rs` is also the CLI's `--backend` value enum.
+- `src/backends/`: `htmlbook.rs` and `asciidoctor.rs` (the HTML backends, rendered with minijinja,
+  with what they share in `html.rs`) and `docx/` (behind the `docx` feature). The `Backends` enum in `backends/mod.rs` is also the CLI's `--backend` value enum.
 - `src/errors.rs`: every error type, defined with `thiserror`.
 - `src/bin/asciidocr/`: the CLI (`clap` derive in `cli.rs`).
 - `templates/`: HTML templates, embedded at compile time with `include_str!`. Changing a
@@ -170,13 +170,14 @@ cargo clippy --all-features --all-targets
   output (embedded mode, i.e., document contents only), and the five full-document fixtures in
   `tests/data/asciidoctor-html/` cover the shell (header, content, footer). Numbering
   ("Figure 1."), section ids, footnotes and image alt text need per-render state or helpers, so
-  they are template functions registered in `src/backends/htmls.rs` (`next_number`, `section_id`,
-  `register_footnote`/`footnotes`, `image_alt`). `section_id(block)` returns the section's ID:
+  they are template functions registered in `src/backends/asciidoctor.rs` (`next_number`,
+  `register_footnote`/`footnotes`, `image_alt`) and, for both backends, `src/backends/html.rs`
+  (`section_id`, `warn`). `section_id(block)` returns the section's ID:
   its explicit one, or the one the parser generated (`src/graph/ids.rs`, which follows
   Asciidoctor's algorithm). Generated IDs are kept out of the JSON output (a `#[serde(skip)]`
   field), because the TCK's expected ASG has none. Those tests compare whitespace as it renders
   (see `assert_html_eq`).
-- minijinja environments in `src/backends/htmls.rs` have autoescape turned off, because the parser
+- minijinja environments (set up in `src/backends/html.rs`) have autoescape turned off, because the parser
   makes character references (`&#8217;`, `&amp;`) of replacements and of references the author
   wrote, and those must not be escaped again. Templates escape the rest themselves, with the
   `escape_text` filter (text: `&`, `<`, `>`) on `text` literals and the `escape_attr` filter

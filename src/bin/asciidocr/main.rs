@@ -8,10 +8,8 @@ use std::{fs, path::PathBuf};
 use asciidocr::{
     backends::{
         Backends,
-        htmls::{
-            render_asciidoctor_html, render_asciidoctor_html_embedded, render_htmlbook,
-            render_htmlbook_embedded,
-        },
+        asciidoctor::{render_asciidoctor_html, render_asciidoctor_html_embedded},
+        htmlbook::{render_htmlbook, render_htmlbook_embedded},
     },
     parser::Parser as AdocParser,
     scanner::Scanner,

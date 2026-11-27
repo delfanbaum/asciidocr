@@ -14,7 +14,7 @@
 //! graph:
 //!
 //! ```
-//! use asciidocr::backends::htmls::render_htmlbook_embedded;
+//! use asciidocr::backends::htmlbook::render_htmlbook_embedded;
 //! use asciidocr::parser::Parser;
 //! use asciidocr::scanner::Scanner;
 //!

@@ -13,7 +13,8 @@ use std::sync::mpsc;
 use std::thread;
 use std::time::Duration;
 
-use asciidocr::backends::htmls::{render_asciidoctor_html, render_htmlbook};
+use asciidocr::backends::asciidoctor::render_asciidoctor_html;
+use asciidocr::backends::htmlbook::render_htmlbook;
 use asciidocr::parser::Parser;
 use asciidocr::scanner::Scanner;
 

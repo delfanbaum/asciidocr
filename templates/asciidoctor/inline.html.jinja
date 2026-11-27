@@ -10,7 +10,7 @@
 {%- endfor -%}
 {%- endmacro -%}
 
-{#- The alt text given for an image, or Asciidoctor's fallback (see `image_alt` in htmls.rs) -#}
+{#- The alt text given for an image, or Asciidoctor's fallback (see `image_alt` in asciidoctor.rs) -#}
 {%- macro alt_text(target, metadata) -%}
 {%- if metadata and metadata.attributes and metadata.attributes.positional_1 -%}
     {{- metadata.attributes.positional_1 | escape_attr -}}
