@@ -20,7 +20,8 @@ impl Parser {
         &mut self,
         token: Token,
     ) -> Result<(), ParserError> {
-        self.metadata = Some(ElementMetadata::new_inline_meta_from_token(token));
+        // kept apart from the block's metadata, which is waiting for the block to be complete
+        self.inline_style = Some(ElementMetadata::new_inline_meta_from_token(token));
         self.force_new_block = true;
         Ok(())
     }
@@ -32,6 +33,10 @@ impl Parser {
     pub(super) fn parse_inline_span(&mut self, token: Token) -> Result<(), ParserError> {
         let can_close = token.can_close;
         let mut inline = Inline::InlineSpan(InlineSpan::inline_span_from_token(token.clone()));
+        // the style written before a mark (`[.role]#text#`) is that span's
+        if let Some(style) = self.inline_style.take() {
+            inline.add_metadata(style);
+        }
         // Only a span that is still open can be closed by, or contain, the incoming span. A newline
         // is held back as "dangling" rather than pushed as text, so after "*a*\n" the closed
         // strong span is still the last inline on the stack; treating it as open would swallow a
@@ -73,11 +78,6 @@ impl Parser {
         }
         // check for any other dangling spans (otherwise they disappear!)
         self.handle_dangling_spans(false);
-        // add any metadata to new inline
-        if self.metadata.is_some() {
-            inline.add_metadata(self.metadata.as_ref().unwrap().clone());
-            self.metadata = None;
-        }
         self.inline_stack.push_back(inline);
 
         self.in_inline_span = true;

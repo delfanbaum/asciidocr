@@ -941,3 +941,33 @@ fn test_six_equals_signs_are_level_five() {
     let asg = common::parsed_asg("x\n\n====== A\n");
     assert_eq!(asg["blocks"][1]["level"], 5, "{asg}");
 }
+
+/// Attributes above a paragraph are the paragraph's, even when it has formatting (they went to
+/// its first span, and were lost)
+#[rstest]
+#[case::id("[[i]]\nA *b*.\n")]
+#[case::first_word("[[i]]\n*A* b.\n")]
+#[case::later_line("[[i]]\na\n_b_\n")]
+#[case::attribute_list("[id=i]\nA `b`.\n")]
+#[case::after_a_block("====\nx\n====\n\n[[i]]\nA *b*.\n")]
+#[case::inline_style("[[i]]\nA [.r]#b#.\n")]
+fn test_attributes_above_a_formatted_paragraph(#[case] adoc: &str) {
+    let asg = common::parsed_asg(adoc);
+    let paragraph = asg["blocks"]
+        .as_array()
+        .and_then(|blocks| blocks.last())
+        .expect("No paragraph");
+    assert_eq!(paragraph["metadata"]["attributes"]["id"], "i", "{asg}");
+    assert!(
+        !paragraph["inlines"].to_string().contains("\"id\""),
+        "{asg}"
+    );
+}
+
+/// An inline style stays with its span, and the block's roles with the block
+#[test]
+fn test_inline_style_and_block_role() {
+    let html = common::render_asciidoctor_embedded_from_str("[role=outer]\nA [.inner]#b#.\n");
+    assert!(html.contains("<div class=\"paragraph outer\">"), "{html}");
+    assert!(html.contains("<span class=\"inner\">b</span>"), "{html}");
+}

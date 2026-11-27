@@ -2,7 +2,11 @@
 pub mod common;
 use std::str::FromStr;
 
-use asciidocr::{graph::asg::Asg, parser::Parser, scanner::Scanner};
+use asciidocr::{
+    graph::{asg::Asg, blocks::Block, inlines::Inline},
+    parser::Parser,
+    scanner::Scanner,
+};
 use serde_json::json;
 
 /// Without a file, includes are found from the current directory (they were looked for in its
@@ -35,6 +39,39 @@ fn test_parser_reuse() {
         .parse(Scanner::new(second))
         .expect("Unable to parse");
     assert_eq!(json!(reused), json!(fresh));
+}
+
+/// Another crate can read everything in a graph (the compiler checks that this much is public)
+#[test]
+fn test_reading_a_graph() {
+    let adoc = "= Title\n\n== Section\n\n[[id]]\nA *paragraph*.\n\nterm:: description\n\n* item\n";
+    let graph = Asg::from_str(adoc).expect("Unable to parse");
+    let header = graph.header.as_ref().expect("No header");
+    assert_eq!(header.title()[0].extract_values_to_string(), "Title");
+
+    let section = &graph.blocks[0];
+    assert!(matches!(section, Block::Section(section) if section.level == 1));
+    assert_eq!(section.section_id().as_deref(), Some("_section"));
+
+    let paragraph = &section.child_blocks()[0];
+    assert_eq!(paragraph.id().as_deref(), Some("id"));
+    assert!(paragraph.metadata().is_some());
+    assert_eq!(paragraph.line().ok(), Some(6));
+    let text: String = paragraph
+        .inlines()
+        .iter()
+        .map(Inline::extract_values_to_string)
+        .collect();
+    assert_eq!(text, "A paragraph.");
+
+    let Block::DList(dlist) = &section.child_blocks()[1] else {
+        panic!("Expected a description list")
+    };
+    assert_eq!(dlist.marker(), "::");
+    let Block::List(list) = &dlist.items[0].child_blocks()[0] else {
+        panic!("Expected a list")
+    };
+    assert_eq!(list.marker(), "*");
 }
 
 /// An output file that can't be created is an error

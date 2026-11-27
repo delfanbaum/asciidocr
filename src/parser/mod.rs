@@ -69,6 +69,8 @@ pub struct Parser {
     block_title_line: usize,
     /// holding ground for block metadata, to be applied to the subsequent block
     metadata: Option<ElementMetadata>,
+    /// an inline style (`[.role]`), to be applied to the span that follows it
+    inline_style: Option<ElementMetadata>,
     /// counts in/out delimited blocks by line reference; allows us to warn/error if they are
     /// unclosed at the end of the document
     open_delimited_block_lines: Vec<usize>,
@@ -133,6 +135,7 @@ impl Parser {
             admonitions_around_blocks: vec![],
             block_title_line: 0,
             metadata: None,
+            inline_style: None,
             open_delimited_block_lines: vec![],
             open_delimited_block_files: vec![],
             level_offset: 0,
