@@ -192,6 +192,31 @@ tools in Rust now, too. Here are at least a few I know about:
 * [`acdc`](https://github.com/nlopes/acdc/tree/main/acdc-parser)
 * [`asciidoc-parser`](https://github.com/scouten/asciidoc-parser)
 
+## Usage (Library)
+
+Add the crate without the command-line tool's dependencies:
+
+```console
+$ cargo add asciidocr --no-default-features
+```
+
+Then scan, parse and render:
+
+```rust
+use asciidocr::backends::htmls::render_htmlbook_embedded;
+use asciidocr::parser::Parser;
+use asciidocr::scanner::Scanner;
+
+let adoc = "== A Section\n\nWith *a paragraph*.\n";
+let graph = Parser::default().parse(Scanner::new(adoc))?;
+let html = render_htmlbook_embedded(&graph)?;
+```
+
+Use `Parser::new` with a file's path to find its includes from its directory.
+The `docx` and `json` features add those backends. See
+[docs.rs](https://docs.rs/asciidocr) for the rest; the library API isn't stable
+yet.
+
 ## Known Bugs
 
 Things that _should_ work, but are currently acting up:

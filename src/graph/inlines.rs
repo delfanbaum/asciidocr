@@ -1,3 +1,5 @@
+//! Inline elements: text, formatting, links and line breaks
+
 use core::panic;
 use std::{
     collections::{HashMap, VecDeque},
@@ -21,9 +23,13 @@ use crate::scanner::{Token, TokenType};
 #[serde(untagged)]
 #[non_exhaustive]
 pub enum Inline {
+    /// Formatted text, or another inline element that contains inlines (a footnote)
     InlineSpan(InlineSpan),
+    /// A link, cross reference or inline image
     InlineRef(InlineRef),
+    /// Text
     InlineLiteral(InlineLiteral),
+    /// A forced line break (a `+` at the end of a line)
     InlineBreak(LineBreak),
 }
 
@@ -62,6 +68,7 @@ impl Inline {
             _ => panic!("Inlines of type {} do not accept child inlines!", &self),
         }
     }
+    /// Where the inline starts and ends in the source
     pub fn locations(&self) -> Vec<Location> {
         match &self {
             Inline::InlineSpan(span) => span.location.clone(),
@@ -123,6 +130,7 @@ impl Inline {
         }
     }
 
+    /// The inline's text, without any formatting
     pub fn extract_values_to_string(&self) -> String {
         match &self {
             Inline::InlineLiteral(literal) => literal.value.clone(),
@@ -313,15 +321,20 @@ impl Inline {
     }
 }
 
+/// Formatted text
 #[derive(Serialize, Clone, Debug)]
 pub struct InlineSpan {
     name: String,
     #[serde(rename = "type")]
     node_type: NodeTypes,
+    /// The kind of formatting
     pub variant: InlineSpanVariant,
+    /// Whether the marks were single (`*a*`) or doubled (`**a**`)
     #[serde(rename = "form")]
     pub node_form: InlineSpanForm,
+    /// The text inside
     pub inlines: Vec<Inline>,
+    /// Attributes written before the span (`[.role]#text#`)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub metadata: Option<ElementMetadata>,
     location: Vec<Location>,
@@ -579,35 +592,51 @@ impl InlineSpan {
     }
 }
 
+/// The kinds of formatting
 #[derive(Serialize, PartialEq, Eq, Clone, Debug)]
 #[serde(rename_all = "lowercase")]
 #[non_exhaustive]
 pub enum InlineSpanVariant {
+    /// `*strong*`
     Strong,
+    /// `_emphasis_`
     Emphasis,
+    /// `` `code` ``
     Code,
+    /// `#highlighted#`
     Mark,
+    /// `^superscript^`
     Superscript,
+    /// `~subscript~`
     Subscript,
+    /// `footnote:[text]`
     Footnote,
 }
 
+/// Whether formatting marks are single or doubled
 #[derive(Serialize, PartialEq, Eq, Clone, Debug)]
 #[serde(rename_all = "lowercase")]
 #[non_exhaustive]
 pub enum InlineSpanForm {
+    /// Single marks, at the edges of words
     Constrained,
+    /// Doubled marks, which work inside words too
     Unconstrained,
 }
 
+/// A reference to something else
 #[derive(Serialize, Clone, Debug)]
 pub struct InlineRef {
     name: String,
     #[serde(rename = "type")]
     node_type: NodeTypes,
+    /// Which kind of reference
     pub variant: InlineRefVariant,
+    /// The URL, the ID referred to, or the image's path
     pub target: String,
+    /// The link's or reference's text
     pub inlines: Vec<Inline>,
+    /// Attributes of the reference, such as an image's size
     #[serde(skip_serializing_if = "Option::is_none")]
     pub metadata: Option<ElementMetadata>,
     location: Vec<Location>,
@@ -727,17 +756,23 @@ impl InlineRef {
     }
 }
 
+/// The kinds of reference
 #[derive(Serialize, PartialEq, Clone, Debug)]
 #[serde(rename_all = "lowercase")]
 #[non_exhaustive]
 pub enum InlineRefVariant {
+    /// A link to a URL
     Link,
+    /// A cross reference to an ID in the document
     Xref,
+    /// An inline image
     Image,
 }
 
+/// A run of text
 #[derive(Serialize, Clone, Debug)]
 pub struct InlineLiteral {
+    /// How the text is to be output
     pub name: InlineLiteralName,
     #[serde(rename = "type")]
     node_type: NodeTypes, // always "string"
@@ -878,6 +913,7 @@ impl InlineLiteral {
         self.location = Location::reconcile(self.location.clone(), value_locations);
     }
 
+    /// The text
     pub fn value(&self) -> String {
         self.value.clone()
     }
@@ -898,15 +934,20 @@ impl InlineLiteral {
     }
 }
 
+/// How a run of text is to be output
 #[derive(Serialize, Clone, Debug)]
 #[serde(rename_all = "lowercase")]
 #[non_exhaustive]
 pub enum InlineLiteralName {
+    /// Plain text, to be escaped as the output needs
     Text,
+    /// A character reference (e.g., `&#8217;`), already in its output form for HTML
     Charref,
+    /// Passthrough text, to be output as written
     Raw,
 }
 
+/// A forced line break
 #[derive(Serialize, Clone, Debug)]
 pub struct LineBreak {
     name: String,

@@ -1,3 +1,5 @@
+//! The document header, source locations and node types
+
 use serde::Serialize;
 
 use once_cell::sync::Lazy;
@@ -5,21 +7,28 @@ use regex::Regex;
 
 use crate::graph::inlines::Inline;
 
+/// The `type` of a node in the ASG
 #[derive(Clone, Copy, Serialize, Debug)]
 #[serde(rename_all = "lowercase")]
 #[non_exhaustive]
 pub enum NodeTypes {
+    /// A block
     Block,
+    /// An inline element
     Inline,
+    /// A string of text
     String,
 }
 
 /// Struct containing document header information
 #[derive(Serialize, Clone, Debug)]
 pub struct Header {
+    /// The title's text
     pub title: Vec<Inline>,
+    /// The authors, from the author line or the `:author:` attribute
     #[serde(skip_serializing_if = "Option::is_none")]
     pub authors: Option<Vec<Author>>,
+    /// Where the header starts and ends in the source
     pub location: Vec<Location>,
     /// the revision line (`v1.2, 2026-01-15: remark`); the ASG schema has no place for it, so it
     /// isn't serialized (the backends get it from here, and `{revnumber}` and the like work)
@@ -98,6 +107,7 @@ impl Header {
         }
     }
 
+    /// The title's text
     pub fn title(&self) -> Vec<Inline> {
         self.title.clone()
     }
@@ -121,14 +131,19 @@ impl Header {
 /// field optional)
 #[derive(Serialize, Clone, Debug, Default, PartialEq, Eq)]
 pub struct Author {
+    /// The whole name
     #[serde(skip_serializing_if = "String::is_empty")]
     pub fullname: String,
+    /// The first letter of each part of the name
     #[serde(skip_serializing_if = "String::is_empty")]
     pub initials: String,
+    /// The first name
     #[serde(skip_serializing_if = "String::is_empty")]
     pub firstname: String,
+    /// The middle name, or empty
     #[serde(skip_serializing_if = "String::is_empty")]
     pub middlename: String,
+    /// The last name, or empty
     #[serde(skip_serializing_if = "String::is_empty")]
     pub lastname: String,
     /// the email address
@@ -251,8 +266,11 @@ impl Revision {
 /// A "location" pertaining to a given document object, usually the start or end of something
 #[derive(Serialize, Clone, PartialEq, Eq, Debug)]
 pub struct Location {
+    /// The line, counting from 1
     pub line: usize, // 1-indexed
-    pub col: usize,  // 1-indexed
+    /// The column, counting from 1
+    pub col: usize, // 1-indexed
+    /// The files that were included to get here, outermost first; empty for the document itself
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub file: Vec<String>,
 }
@@ -292,6 +310,7 @@ impl Location {
         Location { line, col, file }
     }
 
+    /// The column, counting from 1
     pub fn col(&self) -> usize {
         self.col
     }

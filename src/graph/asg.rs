@@ -1,3 +1,5 @@
+//! The graph of a whole document
+
 use std::collections::{HashMap, HashSet};
 
 use serde::Serialize;
@@ -21,8 +23,10 @@ pub struct Asg {
     #[serde(rename = "type")]
     /// This is always "block"
     pub node_type: NodeTypes,
+    /// The document's attributes (`:name: value`), present when it has a header
     #[serde(skip_serializing_if = "Option::is_none")]
     pub attributes: Option<HashMap<String, String>>, // the value can also be a bool; deal with this later
+    /// The document header, if it has a title
     #[serde(skip_serializing_if = "Option::is_none")]
     pub header: Option<Header>,
     #[serde(skip)]
@@ -53,6 +57,7 @@ impl std::str::FromStr for Asg {
 }
 
 impl Asg {
+    /// An empty document
     pub fn new() -> Self {
         Asg {
             name: "document".to_string(),
@@ -154,6 +159,7 @@ impl Asg {
         graph_text
     }
 
+    /// The number of words in the document's text, not counting markup or comments
     pub fn word_count(&self) -> usize {
         self.all_text().split_whitespace().count()
     }

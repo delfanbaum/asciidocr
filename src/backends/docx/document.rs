@@ -53,15 +53,20 @@ pub fn asciidocr_default_docx() -> Docx {
         )
 }
 
+/// Why a graph couldn't be written as DOCX
 #[derive(thiserror::Error, Debug)]
 #[non_exhaustive]
 pub enum DocxRenderError {
+    /// Reading or writing a file failed
     #[error(transparent)]
     FileError(#[from] std::io::Error),
+    /// A table's column count isn't a number
     #[error("Docx error: Invalid column designation")]
     ColumnError,
+    /// The DOCX file (a zip archive) couldn't be written
     #[error("Docx error: error writing file")]
     ZipFileError,
+    /// The graph has a block the DOCX backend can't render
     #[error("Docx error: {0} blocks are not supported")]
     UnsupportedBlock(String),
 }

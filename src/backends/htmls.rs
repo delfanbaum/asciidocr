@@ -1,3 +1,5 @@
+//! The HTMLBook and Asciidoctor-style HTML backends
+
 use chrono::Local;
 use log::warn;
 use minijinja::{AutoEscape, Environment, Value, context, value::Serde};

@@ -1,3 +1,5 @@
+//! Blocks: sections, paragraphs, delimited blocks, tables and so on
+
 use log::warn;
 use std::{
     collections::{HashMap, HashSet},
@@ -21,13 +23,21 @@ use crate::scanner::{Token, TokenType};
 #[serde(untagged)]
 #[non_exhaustive]
 pub enum Block {
+    /// A section: a heading and what is under it
     Section(Section),
+    /// An ordered or unordered list
     List(List),
+    /// An item of a [`Block::List`]
     ListItem(ListItem),
+    /// A description list (`term:: description`)
     DList(DList),
+    /// An item of a [`Block::DList`]
     DListItem(DListItem),
+    /// A page break or thematic break
     Break(Break),
+    /// A block macro, such as a block image
     BlockMacro(BlockMacro),
+    /// A block that holds text: a paragraph, listing, verse, etc.
     LeafBlock(LeafBlock),
     /// Parent blocks also include admonition elements
     ParentBlock(ParentBlock),
@@ -145,6 +155,7 @@ impl Block {
         }
     }
 
+    /// Whether this is a section
     pub fn is_section(&self) -> bool {
         matches!(self, Block::Section(_))
     }
@@ -163,10 +174,12 @@ impl Block {
         }
     }
 
+    /// Whether this is a list item (of an ordered or unordered list)
     pub fn is_list_item(&self) -> bool {
         matches!(self, Block::ListItem(_))
     }
 
+    /// Whether this is a table
     pub fn is_table(&self) -> bool {
         if let Block::ParentBlock(parent_block) = self {
             parent_block.name == ParentBlockName::Table
@@ -265,6 +278,9 @@ impl Block {
         }
     }
 
+    /// The title of a section, a delimited block that holds blocks, a list or description list, or
+    /// a block macro (its caption); `None` for other blocks. A [`LeafBlock`]'s title is its
+    /// `title` field
     pub fn title(&self) -> Option<Vec<Inline>> {
         match self {
             Block::Section(block) => Some(block.inlines.clone()),
@@ -276,6 +292,8 @@ impl Block {
         }
     }
 
+    /// All the inlines of this block, followed down through the blocks inside it, in document
+    /// order (including most blocks' titles)
     pub fn inlines(&self) -> Vec<Inline> {
         let mut inlines: Vec<Inline> = vec![];
         match self {
@@ -481,6 +499,7 @@ impl Block {
         block_id_hash
     }
 
+    /// The ID the block was given (`[[id]]` or `id=`), if any; see also [`Block::section_id`]
     pub fn id(&self) -> Option<String> {
         match self {
             Block::Section(block) => {
@@ -550,6 +569,7 @@ impl Block {
         }
     }
 
+    /// Where the block starts and ends in the source
     pub fn locations(&self) -> Vec<Location> {
         match self {
             Block::Section(block) => block.location.clone(),
@@ -648,6 +668,7 @@ impl Block {
         }
     }
 
+    /// The line the block starts on
     pub fn line(&self) -> Result<usize, BlockError> {
         let locs = self.locations();
         match locs.first() {
@@ -757,11 +778,13 @@ impl Block {
     }
 }
 
+/// A heading and the blocks under it
 #[derive(Serialize, Clone, Debug)]
 pub struct Section {
     name: String,
     #[serde(rename = "type")]
     node_type: NodeTypes,
+    /// The section's ID in the JSON output; use [`Block::section_id`] for the ID the section has
     #[serde(skip_serializing_if = "String::is_empty")]
     pub id: String,
     #[serde(rename = "title")]
@@ -770,7 +793,10 @@ pub struct Section {
     reftext: Vec<Inline>,
     #[serde(skip_serializing_if = "Option::is_none")]
     metadata: Option<ElementMetadata>,
+    /// The heading level: 1 for `==`, up to 5 for `======`, and 0 for a `= Title` that isn't the
+    /// document's
     pub level: usize,
+    /// The blocks in the section, subsections included
     pub blocks: Vec<Block>,
     location: Vec<Location>,
     /// the ID generated for a section that wasn't given one (see [`crate::graph::ids`]); not part
@@ -802,16 +828,19 @@ impl Section {
         }
     }
 
+    /// The heading's text
     pub fn title(&self) -> Vec<Inline> {
         self.inlines.clone()
     }
 }
 
+/// A page break (`<<<`) or thematic break (`'''`)
 #[derive(Serialize, Clone, Debug)]
 pub struct Break {
     name: String,
     #[serde(rename = "type")]
     node_type: NodeTypes,
+    /// Which kind of break
     pub variant: BreakVariant,
     location: Vec<Location>,
 }
@@ -822,11 +851,14 @@ impl PartialEq for Break {
     }
 }
 
+/// The kinds of break
 #[derive(Serialize, Clone, Debug, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 #[non_exhaustive]
 pub enum BreakVariant {
+    /// A page break
     Page,
+    /// A thematic break (a horizontal rule)
     Thematic,
 }
 
@@ -841,13 +873,17 @@ impl Break {
     }
 }
 
+/// A macro on a line of its own, such as `image::target[]`
 #[derive(Serialize, Clone, Debug)]
 pub struct BlockMacro {
+    /// Which macro
     pub name: BlockMacroName,
     #[serde(rename = "type")]
     node_type: NodeTypes,
     form: String,
+    /// What the macro points at (an image's path or URL)
     pub target: String,
+    /// The caption, from a block title above the macro
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub caption: Vec<Inline>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -861,13 +897,18 @@ impl PartialEq for BlockMacro {
     }
 }
 
+/// The block macros
 #[derive(Serialize, PartialEq, Clone, Debug)]
 #[serde(rename_all = "lowercase")]
 #[non_exhaustive]
 pub enum BlockMacroName {
+    /// An audio clip (not parsed yet)
     Audio,
+    /// A video (not parsed yet)
     Video,
+    /// An image
     Image,
+    /// A table of contents (not parsed yet)
     Toc,
 }
 
@@ -906,8 +947,10 @@ impl BlockMacro {
     }
 }
 
+/// A block that holds text rather than other blocks
 #[derive(Serialize, Clone, Debug)]
 pub struct LeafBlock {
+    /// Which kind of block
     pub name: LeafBlockName,
     #[serde(rename = "type")]
     node_type: NodeTypes,
@@ -915,32 +958,46 @@ pub struct LeafBlock {
     form: LeafBlockForm,
     #[serde(skip_serializing_if = "Option::is_none")]
     delimiter: Option<String>, // if it's a delimited block, then we provide the delimiter
+    /// The block title above it, if any
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub title: Vec<Inline>,
     inlines: Vec<Inline>,
+    /// The block's attributes, roles and options
     #[serde(skip_serializing_if = "Option::is_none")]
     pub metadata: Option<ElementMetadata>,
     location: Vec<Location>,
 }
 
+/// The kinds of block that hold text
 #[derive(Serialize, Clone, Debug, PartialEq)]
 #[serde(rename_all = "lowercase")]
 #[non_exhaustive]
 pub enum LeafBlockName {
+    /// A source or listing block (`----`)
     Listing,
+    /// A literal block (`....`)
     Literal,
+    /// A paragraph
     Paragraph,
+    /// A passthrough block (`++++`), whose content is output as written
     Pass,
+    /// Equations (not parsed yet)
     Stem, // TK not handling now
+    /// A verse (`[verse]` above `____`)
     Verse,
+    /// A comment block; these aren't kept in the graph
     Comment, // Gets thrown away, but convenient
 }
+/// How a block was written
 #[derive(Serialize, Clone, Debug)]
 #[serde(rename_all = "lowercase")]
 #[non_exhaustive]
 pub enum LeafBlockForm {
+    /// Between delimiter lines
     Delimited,
+    /// As indented lines (not parsed yet)
     Indented,
+    /// As a plain paragraph
     Paragraph,
 }
 
@@ -1006,6 +1063,7 @@ impl LeafBlock {
         }
     }
 
+    /// The block's text
     pub fn inlines(&self) -> Vec<Inline> {
         self.inlines.clone()
     }
@@ -1019,9 +1077,12 @@ impl LeafBlock {
     }
 }
 
+/// A block that holds other blocks
 #[derive(Serialize, Clone, Debug)]
 pub struct ParentBlock {
+    /// Which kind of block
     pub name: ParentBlockName,
+    /// An admonition's label (note, tip, etc.)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub variant: Option<ParentBlockVarient>,
     #[serde(rename = "type")]
@@ -1029,11 +1090,15 @@ pub struct ParentBlock {
     form: String, // required as "delimited", but really could also be "paragraph"
     #[serde(skip_serializing_if = "String::is_empty")]
     delimiter: String, // required, but if it should be "paragraph" it's empty
+    /// The blocks inside; for a table, its cells, row after row
     pub blocks: Vec<Block>,
+    /// The block title above it, if any
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub title: Vec<Inline>,
+    /// The block's attributes, roles and options
     #[serde(skip_serializing_if = "Option::is_none")]
     pub metadata: Option<ElementMetadata>,
+    /// Where the block starts and ends in the source
     pub location: Vec<Location>,
 }
 
@@ -1051,27 +1116,40 @@ impl PartialEq for ParentBlock {
     }
 }
 
+/// The kinds of block that hold blocks
 #[derive(Serialize, Clone, Debug, PartialEq)]
 #[serde(rename_all = "lowercase")]
 #[non_exhaustive]
 pub enum ParentBlockName {
+    /// An admonition (`NOTE: text`, or `[NOTE]` above a block)
     Admonition,
+    /// An example (`====`)
     Example,
+    /// A sidebar (`****`)
     Sidebar,
+    /// An open block (`--`)
     Open,
+    /// A quote (`____`)
     Quote,
+    /// A table (`|===`)
     Table, // Tables function basically the same in terms of delimiter, so I'm going to reuse
            // ParentBlock until someone convinces me otherwise
 }
 
+/// The labels of admonitions
 #[derive(Serialize, Clone, Debug, PartialEq)]
 #[serde(rename_all = "lowercase")]
 #[non_exhaustive]
 pub enum ParentBlockVarient {
+    /// `CAUTION`
     Caution,
+    /// `IMPORTANT`
     Important,
+    /// `NOTE`
     Note,
+    /// `TIP`
     Tip,
+    /// `WARNING`
     Warning,
 }
 
@@ -1193,13 +1271,18 @@ impl ParentBlock {
     }
 }
 
+/// A table cell
 #[derive(Serialize, Clone, Debug)]
 pub struct TableCell {
+    /// Always `tableCell`
     pub name: String,
     node_type: NodeTypes,
+    /// The cell's text
     pub inlines: Vec<Inline>,
+    /// The cell's attributes
     #[serde(skip_serializing_if = "Option::is_none")]
     pub metadata: Option<ElementMetadata>,
+    /// Where the cell is in the source
     pub location: Vec<Location>,
 }
 

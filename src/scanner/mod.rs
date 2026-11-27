@@ -68,6 +68,8 @@ static RE_CELL_SPECIFIER: Lazy<Regex> = Lazy::new(|| {
 });
 
 impl<'a> Scanner<'a> {
+    /// A scanner over a document's source. Pass it to
+    /// [`Parser::parse`](crate::parser::Parser::parse)
     pub fn new(source: &'a str) -> Self {
         Scanner {
             source: normalize_line_endings(source),
@@ -1061,7 +1063,7 @@ impl<'a> Scanner<'a> {
         self.add_token(TokenType::CharRef, true, 0)
     }
 
-    /// Checks for lines such as [quote], [verse, Mary Oliver], [source, python], etc.
+    /// Checks for lines such as `[quote]`, `[verse, Mary Oliver]`, `[source, python]`, etc.
     fn starts_attribution_line(&mut self) -> bool {
         let current_placeholder = self.current;
         while self.peek() != '\n' && !self.is_at_end() {

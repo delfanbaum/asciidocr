@@ -1,3 +1,5 @@
+//! The attributes, roles and options of elements
+
 use std::fmt::Display;
 use std::{collections::HashMap, fmt::Debug};
 
@@ -48,16 +50,21 @@ impl AttributeType {
     }
 }
 
+/// What an attribute list (`[...]`) or anchor (`[[id]]`) says about the element it is on
 #[derive(Serialize, PartialEq, Default, Clone, Debug)]
 pub struct ElementMetadata {
+    /// Named attributes (the ID among them, as `id`) and positional ones (`positional_1`, etc.)
     pub attributes: HashMap<String, String>,
+    /// Options, such as a table's `header`
     pub options: Vec<String>,
+    /// Roles (`role=`), which become CSS classes in HTML
     pub roles: Vec<String>,
     /// this is a flag to let us know if it should be applied
     #[serde(skip)]
     pub(crate) inline_metadata: bool,
     #[serde(skip)]
     pub(crate) declared_type: Option<AttributeType>,
+    /// Where the attributes were written
     pub location: Vec<Location>,
     #[serde(skip)]
     pub(crate) line: usize,
@@ -284,7 +291,7 @@ pub(crate) fn key_values_from_named_attribute(
     }
 }
 
-/// Given a foo:target.foo[attributes] token, return the target and metadata. Only image and
+/// Given a `foo:target.foo[attributes]` token, return the target and metadata. Only image and
 /// include macro tokens have these; any other token is an error
 pub(crate) fn target_and_attrs_from_token(
     token: &Token,
