@@ -91,7 +91,7 @@ fn run(args: Cli) -> Result<()> {
             }
 
             if let Some(output_path) = read_output(args) {
-                render_docx(&graph, &output_path).expect("Error rendering docx");
+                render_docx(&graph, &output_path)?;
                 Ok(())
             } else {
                 eprintln!("Error: can't send docx backend to stdout");

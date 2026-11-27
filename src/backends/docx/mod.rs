@@ -36,7 +36,8 @@ fn strip_default_normal_style(styles: Vec<u8>) -> Vec<u8> {
 
 /// !Experimental! Renders a Docx file. Some [`Asg`] blocks are still unsupported.
 pub fn render_docx(graph: &Asg, output_path: &Path) -> Result<(), ConversionError> {
-    let file = File::create(output_path).unwrap();
+    let file = File::create(output_path)
+        .map_err(|e| ConversionError::OutputFile(output_path.to_path_buf(), e))?;
     let mut writer = document::DocxWriter::new();
     let mut docx = document::asciidocr_default_docx();
 

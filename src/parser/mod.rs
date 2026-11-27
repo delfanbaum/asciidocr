@@ -1,7 +1,6 @@
 //! Parses a stream of tokens into an [`Asg`] (Abstract Syntax Graph)
 use std::{
     collections::{HashMap, VecDeque},
-    env,
     fmt::Debug,
     path::PathBuf,
 };
@@ -103,21 +102,19 @@ pub struct Parser {
 }
 
 impl Default for Parser {
+    /// A parser for a document that isn't a file (e.g., from stdin), whose includes are found
+    /// from the current directory
     fn default() -> Self {
-        // defaults assuming stdin
-        // (or the current directory as `.`, if its path can't be had)
-        Self::new(env::current_dir().unwrap_or_else(|_| PathBuf::from(".")))
+        Self::new(PathBuf::new())
     }
 }
 impl Parser {
-    /// Initializes the parser with a "origin", which is either the current directory (in the case
-    /// of STDIN (`-`)) or the parent of the provided asciidoc file; this origin is required for
-    /// correct `include::` directive resolution.
+    /// Initializes the parser with the path of the document it will parse, from whose directory
+    /// `include::` directives and other targets are found. For a document that isn't a file, use
+    /// [`Parser::default`].
     pub fn new(origin: PathBuf) -> Self {
-        let origin_directory = origin
-            .parent()
-            .unwrap_or(&env::current_dir().unwrap())
-            .to_path_buf();
+        // (an empty path is the current directory)
+        let origin_directory = origin.parent().map(PathBuf::from).unwrap_or_default();
         Parser {
             origin_directory,
             last_token_type: TokenType::Eof,
@@ -160,11 +157,13 @@ impl Parser {
         test_parser
     }
 
-    /// Parses the stream of tokens provided by the [`Scanner`].
+    /// Parses the stream of tokens provided by the [`Scanner`](crate::scanner::Scanner). A
+    /// parser can be used for one document after another.
     pub fn parse<I>(&mut self, tokens: I) -> Result<Asg, ParserError>
     where
         I: Iterator<Item = Result<Token, ScannerError>>,
     {
+        self.reset();
         let mut asg = Asg::new();
         for result in tokens {
             match result {
@@ -201,6 +200,14 @@ impl Parser {
         asg.generate_section_ids(&self.document_attributes);
         asg.consolidate();
         Ok(asg)
+    }
+
+    /// Forgets everything about the last document, keeping the parser's settings
+    fn reset(&mut self) {
+        let mut fresh = Self::new(PathBuf::new());
+        fresh.origin_directory = std::mem::take(&mut self.origin_directory);
+        fresh.resolve_targets = self.resolve_targets;
+        *self = fresh;
     }
 
     /// Parses one token, from the document itself or from an included file, and remembers its

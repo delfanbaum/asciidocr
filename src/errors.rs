@@ -57,6 +57,9 @@ pub enum ParserError {
 #[derive(thiserror::Error, Debug)]
 pub enum ConversionError {
     #[cfg(feature = "docx")]
+    #[error("Unable to create {0:?}: {1}")]
+    OutputFile(std::path::PathBuf, #[source] std::io::Error),
+    #[cfg(feature = "docx")]
     #[error(transparent)]
     Docx(#[from] DocxError),
     #[cfg(feature = "docx")]

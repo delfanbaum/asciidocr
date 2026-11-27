@@ -1,5 +1,4 @@
 use std::collections::{HashMap, HashSet};
-use std::env::current_dir;
 
 use serde::Serialize;
 
@@ -49,7 +48,7 @@ impl Default for Asg {
 impl std::str::FromStr for Asg {
     type Err = AsciidocrError;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(Parser::new(current_dir()?).parse(Scanner::new(s))?)
+        Ok(Parser::default().parse(Scanner::new(s))?)
     }
 }
 
