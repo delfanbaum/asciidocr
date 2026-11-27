@@ -10,11 +10,12 @@ use serde::Serialize;
 
 use crate::errors::BlockError;
 use crate::graph::{
+    NodeTypes,
     ids::{IdSettings, generate_id, title_for_id, unique_id},
     inlines::Inline,
     lists::{DList, DListItem, List, ListItem},
+    location::Location,
     metadata::ElementMetadata,
-    nodes::{Location, NodeTypes},
 };
 use crate::scanner::{Token, TokenType};
 
@@ -1067,7 +1068,7 @@ pub struct ParentBlock {
     pub name: ParentBlockName,
     /// An admonition's label (note, tip, etc.)
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub variant: Option<ParentBlockVarient>,
+    pub variant: Option<ParentBlockVariant>,
     #[serde(rename = "type")]
     node_type: NodeTypes,
     form: String, // required as "delimited", but really could also be "paragraph"
@@ -1123,7 +1124,7 @@ pub enum ParentBlockName {
 #[derive(Serialize, Clone, Debug, PartialEq)]
 #[serde(rename_all = "lowercase")]
 #[non_exhaustive]
-pub enum ParentBlockVarient {
+pub enum ParentBlockVariant {
     /// `CAUTION`
     Caution,
     /// `IMPORTANT`
@@ -1136,14 +1137,14 @@ pub enum ParentBlockVarient {
     Warning,
 }
 
-impl Display for ParentBlockVarient {
+impl Display for ParentBlockVariant {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ParentBlockVarient::Caution => write!(f, "Caution"),
-            ParentBlockVarient::Important => write!(f, "Important"),
-            ParentBlockVarient::Note => write!(f, "Note"),
-            ParentBlockVarient::Tip => write!(f, "Tip"),
-            ParentBlockVarient::Warning => write!(f, "Warning"),
+            ParentBlockVariant::Caution => write!(f, "Caution"),
+            ParentBlockVariant::Important => write!(f, "Important"),
+            ParentBlockVariant::Note => write!(f, "Note"),
+            ParentBlockVariant::Tip => write!(f, "Tip"),
+            ParentBlockVariant::Warning => write!(f, "Warning"),
         }
     }
 }
@@ -1151,7 +1152,7 @@ impl Display for ParentBlockVarient {
 impl ParentBlock {
     pub(crate) fn new(
         name: ParentBlockName,
-        variant: Option<ParentBlockVarient>,
+        variant: Option<ParentBlockVariant>,
         delimiter: String,
         blocks: Vec<Block>,
         location: Vec<Location>,
@@ -1201,35 +1202,35 @@ impl ParentBlock {
             )),
             TokenType::NotePara => Ok(ParentBlock::new(
                 ParentBlockName::Admonition,
-                Some(ParentBlockVarient::Note),
+                Some(ParentBlockVariant::Note),
                 token.text(),
                 vec![],
                 token.locations(),
             )),
             TokenType::TipPara => Ok(ParentBlock::new(
                 ParentBlockName::Admonition,
-                Some(ParentBlockVarient::Tip),
+                Some(ParentBlockVariant::Tip),
                 token.text(),
                 vec![],
                 token.locations(),
             )),
             TokenType::ImportantPara => Ok(ParentBlock::new(
                 ParentBlockName::Admonition,
-                Some(ParentBlockVarient::Important),
+                Some(ParentBlockVariant::Important),
                 token.text(),
                 vec![],
                 token.locations(),
             )),
             TokenType::CautionPara => Ok(ParentBlock::new(
                 ParentBlockName::Admonition,
-                Some(ParentBlockVarient::Caution),
+                Some(ParentBlockVariant::Caution),
                 token.text(),
                 vec![],
                 token.locations(),
             )),
             TokenType::WarningPara => Ok(ParentBlock::new(
                 ParentBlockName::Admonition,
-                Some(ParentBlockVarient::Warning),
+                Some(ParentBlockVariant::Warning),
                 token.text(),
                 vec![],
                 token.locations(),

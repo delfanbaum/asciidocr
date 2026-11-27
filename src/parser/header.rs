@@ -5,10 +5,7 @@ use std::fmt::Debug;
 use log::warn;
 
 use crate::errors::ParserError;
-use crate::graph::{
-    asg::Asg,
-    nodes::{Author, Location, Revision},
-};
+use crate::graph::{asg::Asg, header::Author, header::Revision, location::Location};
 use crate::scanner::{Token, TokenType};
 
 use super::Parser;

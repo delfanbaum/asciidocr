@@ -9,8 +9,8 @@ use crate::graph::{
     blocks::Block,
     inlines::{Inline, InlineLiteralName},
     lists::{DList, DListItem, List, ListItem, ListVariant},
+    location::Location,
     metadata::ElementMetadata,
-    nodes::Location,
 };
 use crate::scanner::{Token, TokenType};
 

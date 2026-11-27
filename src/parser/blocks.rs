@@ -12,7 +12,8 @@ use crate::{
     graph::{
         asg::Asg,
         blocks::{Block, BlockMacro, Break, LeafBlock, ParentBlock, Section, TableCell},
-        nodes::{Header, Location},
+        header::Header,
+        location::Location,
     },
 };
 

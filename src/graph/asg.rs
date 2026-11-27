@@ -11,7 +11,7 @@ use crate::scanner::Scanner;
 use super::blocks::Block;
 use super::ids::IdSettings;
 use super::inlines::Inline;
-use super::nodes::{Header, Location, NodeTypes};
+use super::{NodeTypes, header::Header, location::Location};
 
 /// Abstract Syntax Graph used to represent an asciidoc document
 /// roughly meaning to follow the "official" schema:

@@ -22,7 +22,13 @@ use super::numbering::{
     LEVELS, bullet_abstract_numbering, level_indent, ordered_abstract_numbering,
 };
 use super::styles::DocumentStyles;
-use super::units::{DXA_INCH, inches};
+
+/// Word's standard measuring unit ("twentieths of a point") in an inch
+const DXA_INCH: i32 = 1440;
+
+fn inches(i: f32) -> u32 {
+    (DXA_INCH as f32 * i) as u32
+}
 
 static RE_WHITESPACE_NEWLINE: Lazy<Regex> = Lazy::new(|| Regex::new(r#"\s*\n"#).unwrap());
 

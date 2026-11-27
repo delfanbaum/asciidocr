@@ -1,10 +1,6 @@
 //! Lists and description lists, and their items
 
-use crate::graph::{
-    blocks::Block,
-    inlines::Inline,
-    nodes::{Location, NodeTypes},
-};
+use crate::graph::{NodeTypes, blocks::Block, inlines::Inline, location::Location};
 use crate::scanner::Token;
 use serde::Serialize;
 

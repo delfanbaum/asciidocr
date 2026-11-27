@@ -13,11 +13,12 @@ The pipeline is `Scanner` → `Parser` → `Asg` → backend.
   and it resolves includes, attributes and targets. Lists (description lists too) stay off the
   block stack while they are open, in `src/parser/list_context.rs`; its module docs explain the
   scopes.
-- `src/graph/`: the ASG types (`asg`, `blocks`, `inlines`, `lists`, `metadata`, `nodes`,
-  `substitutions`). They roughly follow the official Asciidoc ASG schema and are all
+- `src/graph/`: the ASG types (`asg`, `blocks`, `header`, `inlines`, `lists`, `location`,
+  `metadata`, `substitutions`). They roughly follow the official Asciidoc ASG schema and are all
   `serde`-serializable. That serialization is how the JSON/TCK output and the templates work.
 - `src/backends/`: `htmlbook.rs` and `asciidoctor.rs` (the HTML backends, rendered with minijinja,
-  with what they share in `html.rs`) and `docx/` (behind the `docx` feature). The `Backends` enum in `backends/mod.rs` is also the CLI's `--backend` value enum.
+  with what they share in `html.rs`) and `docx/` (behind the `docx` feature). The `Backends` enum
+  in `backends/mod.rs` is also the CLI's `--backend` value enum.
 - `src/errors.rs`: every error type, defined with `thiserror`.
 - `src/bin/asciidocr/`: the CLI (`clap` derive in `cli.rs`).
 - `templates/`: HTML templates, embedded at compile time with `include_str!`. Changing a

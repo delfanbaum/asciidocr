@@ -11,9 +11,10 @@ use crate::errors::{ParserError, ScannerError};
 use crate::graph::{
     asg::Asg,
     blocks::{Block, LeafBlock, ParentBlock},
+    header::Header,
     inlines::{Inline, LineBreak},
+    location::Location,
     metadata::{AttributeType, ElementMetadata},
-    nodes::{Header, Location},
 };
 use crate::scanner::{Token, TokenType};
 

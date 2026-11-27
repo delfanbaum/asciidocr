@@ -9,7 +9,7 @@ use regex::Regex;
 use serde::Serialize;
 
 use crate::errors::ParserError;
-use crate::graph::nodes::Location;
+use crate::graph::location::Location;
 use crate::scanner::{Token, TokenType};
 
 // just make this quoted, and then pull everything else out

@@ -11,11 +11,7 @@ use once_cell::sync::Lazy;
 use regex::Regex;
 use serde::Serialize;
 
-use super::{
-    metadata::ElementMetadata,
-    nodes::{Location, NodeTypes},
-    substitutions::CHARREF_MAP,
-};
+use super::{NodeTypes, location::Location, metadata::ElementMetadata, substitutions::CHARREF_MAP};
 use crate::scanner::{Token, TokenType};
 
 /// Inlines enum containing literals, spans, and references (the latter not implemented)

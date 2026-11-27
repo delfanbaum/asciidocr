@@ -2,7 +2,6 @@
 mod document;
 mod numbering;
 mod styles;
-mod units;
 
 use std::{fs::File, path::Path};
 

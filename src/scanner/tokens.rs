@@ -1,5 +1,5 @@
 use crate::errors::TokenError;
-use crate::graph::nodes::Location;
+use crate::graph::location::Location;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 /// Produced by the Scanner; contains the text, location information about itself, and what
