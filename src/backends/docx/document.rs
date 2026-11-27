@@ -187,10 +187,6 @@ impl DocxWriter {
             },
             Block::BlockMacro(block) => Self::update(docx, |d| self.add_block_macro(d, block))?,
             Block::TableCell(_) => {} // handled directly in the parent block
-            Block::BlockMetadata(_) => {} // not implemented by parser
-            Block::SectionBody => {}  // not implemented by parser
-            Block::NonSectionBlockBody(_) => {} // not implemented by parser
-            Block::DiscreteHeading => {} // not implemented by parser
         }
         Ok(())
     }

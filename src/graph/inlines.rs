@@ -87,31 +87,12 @@ impl Inline {
         }
     }
 
-    pub fn is_literal(&self) -> bool {
-        matches!(self, Inline::InlineLiteral(_))
-    }
-
-    pub fn is_macro(&self) -> bool {
-        match self {
-            Inline::InlineRef(iref) => iref.variant == InlineRefVariant::Link,
-            Inline::InlineSpan(span) => span.variant == InlineSpanVariant::Footnote,
-            _ => false,
-        }
-    }
-
     /// Whether this is a macro still waiting for its closing `]`: a footnote, or a link macro
     /// (but not a bare URL, which is also a link)
     pub fn is_open_macro(&self) -> bool {
         match self {
             Inline::InlineRef(iref) => iref.open,
             Inline::InlineSpan(span) => span.variant == InlineSpanVariant::Footnote && span.open,
-            _ => false,
-        }
-    }
-
-    pub fn is_passthrough(&self) -> bool {
-        match self {
-            Inline::InlineRef(iref) => iref.variant == InlineRefVariant::Link,
             _ => false,
         }
     }
@@ -159,13 +140,6 @@ impl Inline {
                 values
             }
             Inline::InlineBreak(_) => String::new(), // has no value
-        }
-    }
-
-    pub fn extract_literal(&mut self) -> InlineLiteral {
-        match &self {
-            Inline::InlineLiteral(literal) => literal.clone(),
-            _ => panic!("Tried to extract an inline literal from the wrong Inline"),
         }
     }
 
@@ -272,22 +246,6 @@ impl Inline {
             }
         }
         children
-    }
-
-    pub fn prepend_literal(&mut self, preceding_literal: InlineLiteral) {
-        match self {
-            Inline::InlineLiteral(literal) => {
-                // combine values
-                literal.value.insert_str(0, &preceding_literal.value);
-                // combine locations
-                if let Some(end_location) = literal.location.pop() {
-                    literal.location = vec![preceding_literal.location[0].clone(), end_location]
-                } else {
-                    literal.location = preceding_literal.location.clone()
-                }
-            }
-            _ => panic!("Tried to prepend an inline literal to the wrong Inline"),
-        }
     }
 
     pub fn trim(&mut self) {
@@ -737,10 +695,6 @@ impl InlineRef {
         } else {
             InlineRef::new(InlineRefVariant::Image, target, location)
         }
-    }
-
-    pub fn is_link(&self) -> bool {
-        self.variant == InlineRefVariant::Link
     }
 
     pub fn add_text_from_token(&mut self, token: Token) {

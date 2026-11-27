@@ -10,7 +10,7 @@ use crate::errors::BlockError;
 use crate::graph::{
     ids::{IdSettings, generate_id, title_for_id, unique_id},
     inlines::Inline,
-    lists::{DList, DListItem, List, ListItem, ListVariant},
+    lists::{DList, DListItem, List, ListItem},
     metadata::ElementMetadata,
     nodes::{Location, NodeTypes},
 };
@@ -21,22 +21,15 @@ use crate::scanner::tokens::{Token, TokenType};
 #[serde(untagged)]
 pub enum Block {
     Section(Section),
-    /// Current unused, but included in schema
-    SectionBody,
-    /// Current unused, but included in schema
-    NonSectionBlockBody(NonSectionBlockBody),
     List(List),
     ListItem(ListItem),
     DList(DList),
     DListItem(DListItem),
-    /// Current unused, but included in schema
-    DiscreteHeading,
     Break(Break),
     BlockMacro(BlockMacro),
     LeafBlock(LeafBlock),
     /// Parent blocks also include admonition elements
     ParentBlock(ParentBlock),
-    BlockMetadata(ElementMetadata),
     /// Tables aren't explicitly specified in the official schema yet, so this is a temporary
     /// workaround for convenience
     TableCell(TableCell),
@@ -46,18 +39,14 @@ impl Display for Block {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Block::Section(_) => write!(f, "Section"),
-            Block::SectionBody => write!(f, "SectionBody"),
-            Block::NonSectionBlockBody(_) => write!(f, "NonSectionBlockBody"),
             Block::List(_) => write!(f, "List"),
             Block::ListItem(_) => write!(f, "ListItem"),
             Block::DList(_) => write!(f, "DList"),
             Block::DListItem(_) => write!(f, "DListItem"),
-            Block::DiscreteHeading => write!(f, "DiscreteHeading"),
             Block::Break(_) => write!(f, "Break"),
             Block::BlockMacro(_) => write!(f, "BlockMacro"),
             Block::LeafBlock(_) => write!(f, "LeafBlock"),
             Block::ParentBlock(_) => write!(f, "ParentBlock"),
-            Block::BlockMetadata(_) => write!(f, "BlockMetadata"),
             Block::TableCell(_) => write!(f, "TableCell"),
         }
     }
@@ -180,33 +169,8 @@ impl Block {
         }
     }
 
-    pub fn list_type(&self) -> Option<ListVariant> {
-        match self {
-            Block::List(list) => Some(list.variant.clone()),
-            _ => None,
-        }
-    }
-
     pub fn is_list_item(&self) -> bool {
         matches!(self, Block::ListItem(_))
-    }
-
-    pub fn is_ordered_list_item(&self) -> bool {
-        match self {
-            Block::ListItem(list) => list.marker == *"." || list.marker.contains('<'),
-            _ => false,
-        }
-    }
-
-    pub fn is_unordered_list_item(&self) -> bool {
-        match self {
-            Block::ListItem(list) => list.marker == *"*",
-            _ => false,
-        }
-    }
-
-    pub fn is_definition_list_item(&self) -> bool {
-        matches!(self, Block::DListItem(_))
     }
 
     pub fn is_table(&self) -> bool {
@@ -289,25 +253,6 @@ impl Block {
         // FOR NOW, make the cols an integer for easier templating.
         metadata.simplify_cols();
         Ok(())
-    }
-
-    pub fn has_blocks(&self) -> bool {
-        match self {
-            Block::Section(section) => !section.blocks.is_empty(),
-            Block::LeafBlock(_) => false,
-            _ => true,
-        }
-    }
-
-    /// Helper when we need to move child blocks from one Block to another
-    pub fn extract_blocks(&mut self) -> Vec<Block> {
-        match self {
-            Block::List(list) => list.items.drain(..).collect(),
-            _ => {
-                let v: Vec<Block> = Vec::new();
-                v
-            }
-        }
     }
 
     pub fn title(&self) -> Option<Vec<Inline>> {
@@ -420,19 +365,6 @@ impl Block {
         }
 
         inlines
-    }
-
-    pub fn create_id(&mut self) {
-        if let Block::Section(section) = self
-            && section.id == *""
-        {
-            let mut id = String::new();
-            for inline in &section.inlines {
-                id.push_str(&inline.extract_values_to_string())
-            }
-            id = id.replace(' ', "-");
-            section.id = id
-        }
     }
 
     /// The blocks directly inside this one (a section's, a list's items, ...)
@@ -611,18 +543,14 @@ impl Block {
     pub fn locations(&self) -> Vec<Location> {
         match self {
             Block::Section(block) => block.location.clone(),
-            Block::SectionBody => vec![],
-            Block::NonSectionBlockBody(block) => block.location.clone(),
             Block::List(block) => block.location.clone(),
             Block::ListItem(block) => block.location.clone(),
             Block::DList(block) => block.location.clone(),
             Block::DListItem(block) => block.location.clone(),
-            Block::DiscreteHeading => vec![],
             Block::Break(block) => block.location.clone(),
             Block::BlockMacro(block) => block.location.clone(),
             Block::LeafBlock(block) => block.location.clone(),
             Block::ParentBlock(block) => block.location.clone(),
-            Block::BlockMetadata(block) => block.location.clone(),
             Block::TableCell(block) => block.location.clone(),
         }
     }
@@ -706,12 +634,7 @@ impl Block {
             }
             Block::Break(_) => {} // do nothing, since there is nothing to do!
             Block::BlockMacro(_) => {} // do nothing for now; maybe we include the meta
-            // locations?
-            // never created (and nothing to consolidate if they were)
-            Block::SectionBody
-            | Block::NonSectionBlockBody(_)
-            | Block::DiscreteHeading
-            | Block::BlockMetadata(_) => {}
+                                   // locations?
         }
     }
 
@@ -806,14 +729,11 @@ impl Block {
                     block_text.push_str(&block.block_text())
                 }
             }
-            Block::BlockMetadata(_) => {}
             Block::TableCell(block) => {
                 for inline in block.inlines.iter() {
                     block_text.push_str(&inline.extract_values_to_string())
                 }
             }
-            // never created (and have no text if they were)
-            Block::SectionBody | Block::NonSectionBlockBody(_) | Block::DiscreteHeading => {}
         }
         block_text
     }
@@ -866,24 +786,6 @@ impl Section {
 
     pub fn title(&self) -> Vec<Inline> {
         self.inlines.clone()
-    }
-}
-
-#[derive(Serialize, Clone, Debug)]
-pub struct NonSectionBlockBody {
-    name: String,
-    #[serde(rename = "type")]
-    node_type: NodeTypes,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    metadata: Option<ElementMetadata>,
-    blocks: Vec<Block>,
-    location: Vec<Location>,
-}
-
-// always equal
-impl PartialEq for NonSectionBlockBody {
-    fn eq(&self, _: &Self) -> bool {
-        true
     }
 }
 

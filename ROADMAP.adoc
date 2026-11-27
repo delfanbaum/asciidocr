@@ -293,8 +293,7 @@ removed (with the helpers only it used, `InlineError`, and the never-created
 
 * [ ] Audit the public API in `src/lib.rs`: what's `pub` by accident, and what a
   library user actually needs. Tidy it before the 0.4 Python bindings freeze it.
-  Known candidates: `Block::is_ordered_list_item` and
-  `Block::is_unordered_list_item`, unused since the list context. Path changes
+  Unused methods and `Block` variants are gone. Path changes
   are fine before 1.0 (nobody is known to use the library yet); candidates
   from the code organization pass: `backends::htmls` as `backends::html`;
   `graph::nodes`, which holds `Header`, `Author`, `Revision` and `Location`

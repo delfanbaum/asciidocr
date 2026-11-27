@@ -81,45 +81,6 @@ impl ElementMetadata {
         }
     }
 
-    pub fn new_with_id(id: String, line: usize) -> Self {
-        let mut attrs: HashMap<String, String> = HashMap::with_capacity(1);
-        attrs.insert("id".to_string(), id);
-        ElementMetadata {
-            attributes: attrs,
-            options: vec![],
-            roles: vec![],
-            inline_metadata: false,
-            declared_type: None,
-            location: vec![],
-            line,
-        }
-    }
-
-    pub fn new_with_id_and_roles(id: String, roles: Vec<String>, line: usize) -> Self {
-        let mut attrs: HashMap<String, String> = HashMap::with_capacity(1);
-        attrs.insert("id".to_string(), id);
-        ElementMetadata {
-            attributes: attrs,
-            options: vec![],
-            roles,
-            inline_metadata: false,
-            declared_type: None,
-            location: vec![],
-            line,
-        }
-    }
-
-    /// Metadata from ID
-    pub fn new_inline_with_id(id: String, line: usize) -> Self {
-        let mut inline_meta = Self::new_with_id(id, line);
-        inline_meta.inline_metadata = true;
-        inline_meta
-    }
-
-    pub fn element_id(&self) -> Option<String> {
-        self.attributes.get("id").cloned()
-    }
-
     /// [positional, named="value inside named", positional]
     pub fn new_inline_meta_from_token(token: Token) -> Self {
         // Regex for parsing named attributes
