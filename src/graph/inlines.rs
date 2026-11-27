@@ -301,24 +301,6 @@ impl Inline {
             }
         }
     }
-
-    #[allow(dead_code)] // unused for now; see the cleanup pass in the roadmap
-    pub(crate) fn trim(&mut self) {
-        if let Inline::InlineLiteral(inline) = self {
-            inline.value = inline.value.trim().to_string();
-            println!("{:?}", inline.value)
-        }
-    }
-
-    #[allow(dead_code)] // unused for now; see the cleanup pass in the roadmap
-    pub(crate) fn is_empty(&self) -> bool {
-        match self {
-            Inline::InlineRef(inline) => inline.inlines.is_empty(),
-            Inline::InlineSpan(inline) => inline.inlines.is_empty(),
-            Inline::InlineLiteral(inline) => inline.value.is_empty(),
-            Inline::InlineBreak(_) => unreachable!(),
-        }
-    }
 }
 
 /// Formatted text

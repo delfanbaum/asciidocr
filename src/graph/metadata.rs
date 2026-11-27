@@ -18,22 +18,17 @@ static RE_NAMED: Lazy<Regex> = Lazy::new(|| Regex::new(r#"(.*?)[=|,](.*)"#).unwr
 
 #[derive(PartialEq, Clone, Debug)]
 pub(crate) enum AttributeType {
-    Role,
     Quote,
     Verse,
     Source,
-    #[allow(dead_code)] // unused for now; see the cleanup pass in the roadmap
-    Lines,
 }
 
 impl Display for AttributeType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            AttributeType::Role => write!(f, "Role"),
             AttributeType::Quote => write!(f, "Quote"),
             AttributeType::Verse => write!(f, "Verse"),
             AttributeType::Source => write!(f, "Source"),
-            AttributeType::Lines => write!(f, "Lines"),
         }
     }
 }
@@ -41,7 +36,6 @@ impl Display for AttributeType {
 impl AttributeType {
     fn from_str(s: &str) -> Option<Self> {
         match s {
-            "role" => Some(AttributeType::Role),
             "quote" => Some(AttributeType::Quote),
             "verse" => Some(AttributeType::Verse),
             "source" => Some(AttributeType::Source),
@@ -213,9 +207,6 @@ impl ElementMetadata {
                         attribute.trim().to_string(),
                     );
                 }
-            }
-            Some(AttributeType::Lines) => {
-                // nothing declares this type yet, and there is nothing to do with its attributes
             }
             _ => {
                 // a quoted value loses its quotes (a lone `"` isn't a quoted value)

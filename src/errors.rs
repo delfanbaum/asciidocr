@@ -38,9 +38,6 @@ pub enum ScannerError {
     /// text
     #[error("Line {0}: Invalid include tag pattern: {1}")]
     TagError(usize, String),
-    /// The scanner failed for no more particular reason, on this line
-    #[error("Line {0}: Unknown scanner error")]
-    UnknownError(usize),
 }
 
 /// Why a document couldn't be parsed. Most problems in a document only log a warning; these are

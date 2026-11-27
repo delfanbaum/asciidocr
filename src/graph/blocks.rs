@@ -768,14 +768,6 @@ impl Block {
         }
         block_text
     }
-
-    #[allow(dead_code)] // unused for now; see the cleanup pass in the roadmap
-    pub(crate) fn last_inline(&mut self) -> Option<&mut Inline> {
-        match self {
-            Block::LeafBlock(block) => Some(block.inlines.last_mut()?),
-            _ => None,
-        }
-    }
 }
 
 /// A heading and the blocks under it
@@ -784,7 +776,8 @@ pub struct Section {
     name: String,
     #[serde(rename = "type")]
     node_type: NodeTypes,
-    /// The section's ID in the JSON output; use [`Block::section_id`] for the ID the section has
+    /// The ASG schema's `id`, which nothing fills in yet, so it is empty; use
+    /// [`Block::section_id`] for the ID the section has
     #[serde(skip_serializing_if = "String::is_empty")]
     pub id: String,
     #[serde(rename = "title")]
@@ -985,8 +978,6 @@ pub enum LeafBlockName {
     Stem, // TK not handling now
     /// A verse (`[verse]` above `____`)
     Verse,
-    /// A comment block; these aren't kept in the graph
-    Comment, // Gets thrown away, but convenient
 }
 /// How a block was written
 #[derive(Serialize, Clone, Debug)]
@@ -1066,14 +1057,6 @@ impl LeafBlock {
     /// The block's text
     pub fn inlines(&self) -> Vec<Inline> {
         self.inlines.clone()
-    }
-
-    #[allow(dead_code)] // unused for now; see the cleanup pass in the roadmap
-    pub(crate) fn opening_line(&self) -> Result<usize, BlockError> {
-        match self.location.first() {
-            Some(first_location) => Ok(first_location.line),
-            None => Err(BlockError::Location),
-        }
     }
 }
 

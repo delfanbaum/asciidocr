@@ -307,10 +307,12 @@ removed (with the helpers only it used, `InlineError`, and the never-created
   and its `LIMITATIONS.adoc` entry
 * [x] A paragraph with formatting lost the attributes above it (`[[id]]`,
   `[role=r]`): its first span took them
-* [ ] A dedicated cleanup pass over code that is unused for now (allowed with a
-  comment): `Block::last_inline`, `LeafBlock::opening_line`, `Inline::trim`,
-  `Inline::is_empty` and `AttributeType::Lines`. (`TokenType::Email` stays, for
-  email autolinks)
+* [x] Remove unused code (`TokenType::Email` stays, for email autolinks, as do
+  the placeholders for planned macros, equations, literal paragraphs and callout
+  lists), and put `serde_json` behind the `json` feature
+* [ ] The ASG schema's `id` on a block is never filled in: a section's `id` field
+  is always empty (IDs are in `metadata.attributes`), so all sections compare as
+  equal. `reftext` is never filled in either. Check what the TCK expects
 * [x] Docs on docs.rs good enough to use the crate without reading the source,
   with `missing_docs` on, and a library section in the README
 
