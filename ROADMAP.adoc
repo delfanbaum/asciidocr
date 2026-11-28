@@ -274,7 +274,12 @@ removed (with the helpers only it used, `InlineError`, and the never-created
   found panics and hangs on markup left open at the end of a file, and three
   `std::process::exit` calls in the library; all fixed, each with a test. CI
   runs the full run for PRs into `main`
-* [ ] CLI-level tests of `-b asciidoctor` and `-e`
+* [x] CLI-level tests of `-b asciidoctor` and `-e`, and of the other options.
+  Any file was taken as input, and the output could overwrite it (`asciidocr
+  page.html`), so only `.adoc`, `.asciidoc` and `.txt` files are accepted now,
+  and `-o` can't name the input. The tests also found that an output that
+  couldn't be written caused a panic, and that `-c` mixed the count into a
+  document sent to stdout; it now only prints the count
 * [ ] Compare a few more real documents against `asciidoctor -s` and file what
   differs
 * [x] Commit `Cargo.lock` (done in 0.2.1)

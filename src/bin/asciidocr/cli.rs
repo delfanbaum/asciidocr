@@ -7,7 +7,8 @@ use std::{fs, io, path::PathBuf};
 #[derive(Parser)]
 #[command(name = "asciidocr", version, about)]
 pub struct Cli {
-    /// Asciidoc file for processing. To read from standard input (stdin), use "-".
+    /// Asciidoc file for processing (.adoc, .asciidoc or .txt). To read from standard input
+    /// (stdin), use "-".
     pub file: String,
 
     /// Optionally provide a filename for the output.
@@ -19,7 +20,8 @@ pub struct Cli {
     #[arg(value_enum, short = 'b', long = "backend", default_value = "htmlbook")]
     pub backend: Backends,
 
-    /// Print a document word count (excludes comments, markup characters, etc.).
+    /// Print the document's word count (excluding comments, markup characters, etc.) instead of
+    /// converting it.
     #[arg(short, long = "count-words")]
     pub count: bool,
 
@@ -57,7 +59,8 @@ pub fn read_input(args: &Cli) -> String {
     }
 }
 
-pub fn read_output(args: Cli) -> Option<PathBuf> {
+/// Where the output goes: `None` is standard output
+pub fn read_output(args: &Cli) -> Option<PathBuf> {
     match args.output {
         Some(ref output) => {
             if output == "-" {

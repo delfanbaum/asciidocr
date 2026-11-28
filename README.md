@@ -52,7 +52,7 @@ Usage: asciidocr [OPTIONS] <FILE>
 
 Arguments:
   <FILE>
-          Asciidoc file for processing. To read from standard input (stdin), use "-"
+          Asciidoc file for processing (.adoc, .asciidoc or .txt). To read from standard input (stdin), use "-"
 
 Options:
   -o, --out-file <OUTPUT>
@@ -70,7 +70,7 @@ Options:
           - docx:        !Experimental! Produces a "manuscript-styled" DOCX document
 
   -c, --count-words
-          Print a document word count (excludes comments, markup characters, etc.)
+          Print the document's word count (excluding comments, markup characters, etc.) instead of converting it
 
   -e, --embedded
           If this flag is given alongside an HTML backend (htmlbook or asciidoctor), an "embeddable" document is output, i.e., one that includes only the <body> element contents (excluding any headers, footers, etc.)
