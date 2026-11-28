@@ -174,6 +174,26 @@ impl Token {
             | TokenType::InlineMacroClose)
     }
 
+    /// Whether the token is markup in a verse, whose other tokens are text. (`pass:[]` isn't
+    /// supported in one: it would end the verse's own text mode)
+    pub(crate) fn is_markup_in_verse(&self) -> bool {
+        self.is_inline()
+            || matches!(
+                self.token_type(),
+                TokenType::Literal
+                    | TokenType::UnconstrainedLiteral
+                    | TokenType::Superscript
+                    | TokenType::Subscript
+                    | TokenType::LineContinuation
+                    | TokenType::LinkMacro
+                    | TokenType::Hyperlink
+                    | TokenType::CrossReference
+                    | TokenType::FootnoteMacro
+                    | TokenType::InlineImageMacro
+                    | TokenType::AttributeReference
+            )
+    }
+
     pub(crate) fn can_be_in_document_header(&self) -> bool {
         matches!(
             self.token_type(),

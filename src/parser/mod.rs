@@ -24,9 +24,11 @@ mod includes;
 mod inlines;
 mod list_context;
 mod lists;
+mod quotes;
 
 use header::HeaderLine;
 use list_context::ListContext;
+use quotes::{take_quoted_paragraph_attribution, undelimited_quote};
 
 /// Parses a stream of tokens into an [`Asg`] (Abstract Syntax Graph), returning the graph once all
 /// tokens have been parsed.
@@ -81,6 +83,9 @@ pub struct Parser {
     /// appends text to block or inline regardless of markup, token, etc. (will need to change
     /// if/when we handle code callouts)
     open_parse_after_as_text_type: Option<TokenType>,
+    /// Whether the open verse is a paragraph under `[verse]`, which a blank line ends (rather
+    /// than a delimiter)
+    in_verse_paragraph: bool,
     /// tracks the document heading level offset
     level_offset: i32,
     /// designates whether we're to be adding inlines to the previous block until a newline
@@ -142,6 +147,7 @@ impl Parser {
             in_inline_span: false,
             continuation_line: None,
             open_parse_after_as_text_type: None,
+            in_verse_paragraph: false,
             force_new_block: false,
             dangling_newline: None,
             line: 1,
@@ -222,6 +228,7 @@ impl Parser {
         if self.document_header.is_some() && !token.can_be_in_document_header() {
             self.check_and_move_header(asg)?;
         }
+        self.open_or_close_verse_paragraph(&token, asg)?;
         if token.token_type() == TokenType::BlockContinuation {
             self.make_text_if_not_a_continuation(&mut token, asg)?;
         }
@@ -238,7 +245,9 @@ impl Parser {
         if let Some(token_type) = self.open_parse_after_as_text_type {
             match token_type {
                 TokenType::QuoteVerseBlock => {
-                    if token.token_type() == TokenType::QuoteVerseBlock || token.is_inline() {
+                    if token.token_type() == TokenType::QuoteVerseBlock
+                        || token.is_markup_in_verse()
+                    {
                         self.open_parse_after_as_text_type = Some(token_type);
                     } else {
                         self.parse_text(token)?;
@@ -756,8 +765,35 @@ impl Parser {
         self.warn_unsupported_block_macro(&para_block);
         // a styled paragraph: an admonition (`NOTE: text`), or a quote
         let mut block = para_block;
+        let styled = self.pending_admonition.is_some()
+            || self
+                .metadata
+                .as_ref()
+                .is_some_and(|metadata| metadata.declared_type.is_some());
+        let attribution = match &mut block {
+            Block::LeafBlock(paragraph) if !styled => {
+                take_quoted_paragraph_attribution(paragraph.inlines_mut())
+            }
+            _ => None,
+        };
         let mut title_dropped = pending_title.clone();
-        if let Some(admonition) = self.pending_admonition.take() {
+        if let Some((attribution, citation)) = attribution {
+            // the attributes above are the quote's
+            let mut metadata = self.metadata.take().unwrap_or_default();
+            metadata
+                .attributes
+                .insert("attribution".to_string(), attribution);
+            if let Some(citation) = citation {
+                metadata.attributes.insert("citation".to_string(), citation);
+            }
+            let mut quote = undelimited_quote(Some(metadata));
+            if let Some(title) = title_dropped.take() {
+                quote.title = title;
+            }
+            let mut quote = Block::ParentBlock(quote);
+            quote.push_block(block)?;
+            block = quote;
+        } else if let Some(admonition) = self.pending_admonition.take() {
             let mut admonition = Block::ParentBlock(admonition);
             // the attributes above are the admonition's
             if let Some(metadata) = self.metadata.take() {
@@ -769,16 +805,9 @@ impl Parser {
             // check to see if we need to apply metadata to the para block
             let line_above = block.locations().first().map_or(0, |loc| loc.line) + 1;
             if self.open_delimited_block_lines.last() == Some(&line_above)
-                || self.open_delimited_block_lines.is_empty()
-                    && block_metadata.declared_type == Some(AttributeType::Quote)
+                || block_metadata.declared_type == Some(AttributeType::Quote)
             {
-                let mut quote = ParentBlock::new(
-                    crate::graph::blocks::ParentBlockName::Quote,
-                    None,
-                    "".to_string(),
-                    vec![],
-                    vec![],
-                );
+                let mut quote = undelimited_quote(None);
                 // the title belongs to the quote, not the paragraph inside it
                 if let Some(title) = title_dropped.take() {
                     quote.title = title;

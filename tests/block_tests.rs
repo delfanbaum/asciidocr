@@ -998,3 +998,72 @@ fn test_section_after_a_macro_stays_open() {
         "paragraph \"x\" section \"A\"(paragraph \"y\", paragraph \"z\")"
     );
 }
+
+/// A paragraph under `[verse]` is a verse, whose lines are kept as they are
+#[rstest]
+#[case::lines("[verse]\na\n  b\n\nc\n", "verse \"a\n  b\" paragraph \"c\"")]
+#[case::not_a_list("[verse]\n* a\n== b\n", "verse \"* a\n== b\"")]
+#[case::before_a_delimiter(
+    "====\n[verse]\nv\n====\n\nz\n",
+    "example(verse \"v\") paragraph \"z\""
+)]
+#[case::before_attributes("[verse]\nv\n[.r]\nz\n", "verse \"v\" paragraph \"z\"")]
+#[case::in_a_list("* i\n+\n[verse]\nv\n* j\n", "list(* \"i\"(verse \"v\"), * \"j\")")]
+#[case::end_of_document("[verse]\nv", "verse \"v\"")]
+fn test_verse_paragraph(#[case] adoc: &str, #[case] expected: &str) {
+    assert_eq!(block_outline(adoc), expected);
+}
+
+/// Verses, delimited or not, have inline markup
+#[rstest]
+#[case::paragraph("[verse]\n", "")]
+#[case::delimited("[verse]\n____\n", "\n____")]
+fn test_markup_in_a_verse(#[case] open: &str, #[case] close: &str) {
+    let adoc =
+        format!("{open}link:x.html[X] and H~2~O +\nfootnote:[n] <<i,t>> image:i.png[A]{close}\n");
+    let html = common::render_asciidoctor_embedded_from_str(&adoc);
+    for expected in [
+        "<a href=\"x.html\">X</a>",
+        "H<sub>2</sub>O<br>",
+        "class=\"footnote\"",
+        "<a href=\"#i\">t</a>",
+        "<img src=\"i.png\" alt=\"A\">",
+    ] {
+        assert!(html.contains(expected), "Missing {expected:?} in {html}");
+    }
+}
+
+/// A quoted paragraph with its attribution line is a quote
+#[rstest]
+#[case::attribution("\"a\nb\"\n-- Ada\n", "a\nb", "Ada", None)]
+#[case::citation("\"a\"\n-- Ada, A Book, p. 3\n", "a", "Ada", Some("A Book, p. 3"))]
+#[case::apostrophe("\"a\"\n-- Ada O'Neil\n", "a", "Ada O\u{2019}Neil", None)]
+#[case::quotes_inside("\"a \"b\" c\"\n-- Ada\n", "a \"b\" c", "Ada", None)]
+#[case::formatting("\"*a*\"\n-- Ada\n", "a", "Ada", None)]
+fn test_quoted_paragraph(
+    #[case] adoc: &str,
+    #[case] text: &str,
+    #[case] attribution: &str,
+    #[case] citation: Option<&str>,
+) {
+    let asg = common::parsed_asg(adoc);
+    let quote = &asg["blocks"][0];
+    assert_eq!(quote["name"], "quote", "{asg}");
+    assert_eq!(quote["metadata"]["attributes"]["attribution"], attribution);
+    assert_eq!(
+        quote["metadata"]["attributes"]["citation"].as_str(),
+        citation
+    );
+    assert_eq!(common::parsed_text(adoc), text);
+}
+
+#[rstest]
+#[case::blank_line("\"a\"\n\n-- Ada\n")]
+#[case::no_space("\"a\"\n--Ada\n")]
+#[case::text_before("x\n\"a\"\n-- Ada\n")]
+#[case::text_after("\"a\"\n-- Ada\nmore\n")]
+#[case::no_closing_mark("\"a\n-- Ada\n")]
+#[case::styled("[verse]\n\"a\"\n-- Ada\n")]
+fn test_not_a_quoted_paragraph(#[case] adoc: &str) {
+    assert!(!block_outline(adoc).starts_with("quote"));
+}

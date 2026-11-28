@@ -233,9 +233,14 @@ HTMLBook's.
 <div{{ wrapper_attrs(block, "quoteblock") }}>
 {{- render_title(block) }}
 <blockquote>
+{#- like Asciidoctor, a quote written as a paragraph has the text directly in the blockquote -#}
+{%- if not block.delimiter and block.blocks | length == 1 and block.blocks[0].name == "paragraph" %}
+{{ render_inlines(block.blocks[0].inlines) }}
+{%- else %}
 {%- for child in block.blocks %}
 {{ render_block(child) }}
 {%- endfor %}
+{%- endif %}
 </blockquote>
 {{ render_attribution(attrs) }}
 </div>

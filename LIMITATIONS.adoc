@@ -11,8 +11,8 @@ non-features.
   changes partway through a document, its last value counts for every section.
   The generated IDs are not part of the `json` output, as the AsciiDoc TCK
   expects
-* `[verse]` and literal (indented) paragraphs: only the delimited forms (`____`
-  and `....`) are verse and literal blocks
+* Literal (indented) paragraphs: only the delimited form (`....`) is a literal
+  block
 * `+pass:[]+` inline passthroughs work, but `+++text+++` does not (it is
   treated as a code span), and `[pass]` is not recognized as a paragraph style
 * Typographic replacements are not complete: ` -- ` becomes a plain em dash
@@ -102,6 +102,17 @@ ends up requiring them.
 https://docs.asciidoctor.org/asciidoc/latest/attributes/positional-and-named-attributes/#block-style-and-attribute-shorthand[Block
 style attribute shorthand]:: I'm not a fan (just use `role=` and `[[id]]`,
 etc.!), and parsing it is going to be semi-annoying.
+
+https://docs.asciidoctor.org/asciidoc/latest/blocks/blockquotes/#markdown-style-blockquotes[Markdown-style
+quotes]:: Write quotes the AsciiDoc way; a line starting `>` is text.
+
+`[quote]` or `[verse]` above an open block:: This isn't correct markup, so the
+style is ignored and the block stays an open block (`--`). Use a quote block
+(`____`).
+
+Admonition labels in a `[quote]` paragraph:: A `[quote]` paragraph that starts
+`NOTE:` (or another label) is an admonition, where Asciidoctor keeps the label as
+the quote's text.
 
 https://docs.asciidoctor.org/asciidoc/latest/macros/keyboard-macro/[Keyboard,
 button and menu macros]:: I mean to target "writers" first, and these are for

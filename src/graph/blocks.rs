@@ -1055,6 +1055,11 @@ impl LeafBlock {
         }
     }
 
+    /// The block's text, for the parser to change
+    pub(crate) fn inlines_mut(&mut self) -> &mut Vec<Inline> {
+        &mut self.inlines
+    }
+
     /// The block's text
     pub fn inlines(&self) -> Vec<Inline> {
         self.inlines.clone()

@@ -876,6 +876,25 @@ impl InlineLiteral {
         self.location = Location::reconcile(self.location.clone(), inline.location.clone());
     }
 
+    /// Drops up to `count` characters from the end of the text, and returns how many it dropped
+    pub(crate) fn remove_from_end(&mut self, count: usize) -> usize {
+        let removed = (0..count).filter_map(|_| self.value.pop()).count();
+        if let Some(end) = self.location.last_mut() {
+            end.col = end.col.saturating_sub(removed).max(1);
+        }
+        removed
+    }
+
+    /// Drops the first character of the text, and moves its start location past it
+    pub(crate) fn remove_first_character(&mut self) {
+        if !self.value.is_empty() {
+            self.value.remove(0);
+            if let Some(start) = self.location.first_mut() {
+                start.col += 1;
+            }
+        }
+    }
+
     /// Drops the comment markup (`//`, `#`, `--` or `;;`) that ends this text, which is how code
     /// callouts are usually introduced (e.g., `int x; // <1>`)
     pub(crate) fn strip_trailing_comment_markup(&mut self) {

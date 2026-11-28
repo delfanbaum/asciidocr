@@ -171,10 +171,8 @@ removed (with the helpers only it used, `InlineError`, and the never-created
 * [x] A `+` line outside a list (or a second one in a row) stopped the conversion
   after a paragraph ("push_block not implemented for LeafBlock") and was dropped
   after a heading; Asciidoctor keeps it as text
-* [ ] `[verse]` above a paragraph (without a delimited block) is ignored: the
-  paragraph stays a paragraph. In the Asciidoctor-style backend, a `[quote]`
-  paragraph's text is wrapped in a paragraph `div`, where Asciidoctor has the
-  text directly in the `blockquote`
+* [x] `[verse]` above a paragraph was ignored, and in the Asciidoctor-style
+  backend a `[quote]` paragraph's text was wrapped in a paragraph `div`
 * [x] A `::` line directly after a list item (`+* a+`, `:: b`) dropped the text
   after it; Asciidoctor keeps "a:: b" as the item's text. (A line starting `::`
   was read as an attribute entry with no name)
@@ -249,7 +247,9 @@ removed (with the helpers only it used, `InlineError`, and the never-created
 * [ ] A constrained mark followed by a hyphen (`+_semi_-formal and _casual_+`)
   doesn't close its span
 * [ ] `` `+*+` `` (a passthrough in backticks) comes out as empty code spans
-* [ ] A quoted paragraph (`"text"`, then `-- Author, Title`) isn't a quote
+* [x] A quoted paragraph (`"text"`, then `-- Author, Title`) wasn't a quote
+* [x] Delimited verses output links, footnotes, cross references, line breaks,
+  superscripts and other markup as text
 * [ ] Some highlights with a role (`+([.note]#text#)+`) in a long document are
   left as text; not yet reduced to a small example
 
@@ -442,6 +442,11 @@ track.
   Asciidoctor makes one ("+ b")
 * [ ] A listing's text in the ASG starts with the newline after the opening
   delimiter (`"\ncode\n"`); check against the ASG schema
+* [ ] `pass:[]` in a verse should be a passthrough: a verse paragraph outputs
+  the macro as text, and a delimited verse outputs nothing for it
+* [ ] Keep formatting in the attribution line of a quoted paragraph
+  (`-- _Name_`) in the HTMLBook and DOCX backends. The Asciidoctor-style backend
+  goes on dropping it, as Asciidoctor does
 
 === Inlines (S each)
 

@@ -6,12 +6,12 @@
 //! Japanese or Korean character is a word.
 
 use once_cell::sync::Lazy;
-use regex::{Captures, Regex};
+use regex::Regex;
 
 use super::{
     blocks::{Block, LeafBlockName},
     inlines::{Inline, InlineLiteralName, InlineRefVariant},
-    substitutions::CHARREF_MAP,
+    substitutions::decode_references,
 };
 
 /// The number of words in a block, its titles and the blocks inside it
@@ -95,30 +95,6 @@ fn strip_tags(source: &str) -> String {
     static TAG: Lazy<Regex> =
         Lazy::new(|| Regex::new(r"(?s)<!--.*?-->|</?[A-Za-z!][^>]*>").unwrap());
     TAG.replace_all(source, " ").into_owned()
-}
-
-/// Replaces character references with their characters, where they are known
-fn decode_references(text: &str) -> String {
-    static REFERENCE: Lazy<Regex> = Lazy::new(|| {
-        Regex::new(r"&(?:#([0-9]+)|#[xX]([0-9a-fA-F]+)|[A-Za-z][A-Za-z0-9]*);").unwrap()
-    });
-    REFERENCE
-        .replace_all(text, |found: &Captures| {
-            let number = match (found.get(1), found.get(2)) {
-                (Some(decimal), _) => decimal.as_str().parse().ok(),
-                (_, Some(hex)) => u32::from_str_radix(hex.as_str(), 16).ok(),
-                _ => None,
-            };
-            match number.and_then(char::from_u32) {
-                Some(character) => character.to_string(),
-                None => CHARREF_MAP
-                    .lock()
-                    .unwrap()
-                    .get(&found[0])
-                    .map_or_else(|| found[0].to_string(), |known| known.to_string()),
-            }
-        })
-        .into_owned()
 }
 
 /// Whether a character is a word by itself: Chinese characters and punctuation, kana, Korean

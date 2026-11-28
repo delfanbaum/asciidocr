@@ -26,6 +26,7 @@ fn test_full_documents(#[case] fn_pattern: &str) {
 #[case::leaf_blocks("asciidoctor-html/embedded/leaf-blocks")]
 #[case::breaks("asciidoctor-html/embedded/breaks")]
 #[case::parent_blocks("asciidoctor-html/embedded/parent-blocks")]
+#[case::quote_paragraphs("asciidoctor-html/embedded/quote-paragraphs")]
 #[case::description_list("asciidoctor-html/embedded/description-list")]
 #[case::nested_lists("asciidoctor-html/embedded/nested-lists")]
 #[case::lettered_lists("asciidoctor-html/embedded/lettered-lists")]
