@@ -395,3 +395,13 @@ fn test_header_only_table() {
     let html = common::render_htmlbook_embedded_from_str("|===\n|a |b\n\n|===\n");
     assert!(!html.contains("<tbody>"), "{html}");
 }
+
+/// An admonition in a quote block stays inside the quote
+#[test]
+fn test_admonition_in_a_quote_block() {
+    let html = render_htmlbook_embedded_from_str("[quote]\n____\nNOTE: A note.\n____\n");
+    assert_html_eq(
+        &select(&html, "blockquote"),
+        "<blockquote><div data-type=\"note\"><p>A note.</p></div></blockquote>",
+    );
+}

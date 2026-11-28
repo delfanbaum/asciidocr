@@ -112,7 +112,8 @@ style is ignored and the block stays an open block (`--`). Use a quote block
 
 Admonition labels in a `[quote]` paragraph:: A `[quote]` paragraph that starts
 `NOTE:` (or another label) is an admonition, where Asciidoctor keeps the label as
-the quote's text.
+the quote's text. In a quote _block_ (`____`), admonitions are
+supported, and are rendered inside the quote.
 
 https://docs.asciidoctor.org/asciidoc/latest/macros/keyboard-macro/[Keyboard,
 button and menu macros]:: I mean to target "writers" first, and these are for

@@ -1,0 +1,14 @@
+[quote, Ada Lovelace]
+____
+Before the note.
+
+NOTE: A note in a quote.
+
+[TIP]
+A tip as a styled paragraph.
+
+[WARNING]
+====
+A warning as a block.
+====
+____
