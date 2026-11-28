@@ -1,16 +1,32 @@
 //! The Scanner scans the asciidoc string into Tokens, which is then consumed by the Parser.
 
-pub mod tokens;
+mod tokens;
+
 use core::str;
-use log::{debug, warn};
-use tokens::{Token, TokenType};
+use log::debug;
+use once_cell::sync::Lazy;
+use regex::Regex;
+use std::borrow::Cow;
+pub use tokens::Token;
+pub(crate) use tokens::TokenType;
 
 use crate::errors::ScannerError;
+
+/// Windows line endings are line endings: `\r\n` becomes `\n` (the text is only copied when it
+/// has any)
+fn normalize_line_endings(source: &str) -> Cow<'_, str> {
+    if source.contains("\r\n") {
+        Cow::Owned(source.replace("\r\n", "\n"))
+    } else {
+        Cow::Borrowed(source)
+    }
+}
 
 #[derive(Debug)]
 /// Scans an asciidoc `&str` into [`Token`]s to be consumed by the Parser.
 pub struct Scanner<'a> {
-    pub source: &'a str,
+    /// the text to scan, with Windows line endings (`\r\n`) made `\n`
+    pub(crate) source: Cow<'a, str>,
     start: usize,
     startcol: usize,
     current: usize,
@@ -18,6 +34,11 @@ pub struct Scanner<'a> {
     scanning: bool,          // flag to let us know when we're done with a file
     expecting_tag_end: bool, // flag to avoid returning `<--` in lines like `<--end:foo[]-->`
     file_stack: Vec<String>,
+    /// between a table's delimiters, where every `|` starts a cell
+    in_table: bool,
+    /// the delimited verbatim or comment block being scanned, if any, whose `|===` lines are
+    /// only text
+    verbatim: Option<TokenType>,
 }
 
 impl Iterator for Scanner<'_> {
@@ -37,36 +58,103 @@ impl Iterator for Scanner<'_> {
     }
 }
 
+/// A table cell specifier and the `|` after it: a span or repeat (`2+`, `.3+`, `2*`),
+/// alignment (`^`, `.>`) and a style (`h`, `a`, ...), at least one of them
+static RE_CELL_SPECIFIER: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(
+        r"^(?:(?:\d+(?:\.\d+)?|\.\d+)[+*](?:[<^>])?(?:\.[<^>])?[adehlms]?|[<^>](?:\.[<^>])?[adehlms]?|\.[<^>][adehlms]?|[adehlms])\|",
+    )
+    .unwrap()
+});
+
 impl<'a> Scanner<'a> {
+    /// A scanner over a document's source. Pass it to
+    /// [`Parser::parse`](crate::parser::Parser::parse)
     pub fn new(source: &'a str) -> Self {
         Scanner {
-            source,
+            source: normalize_line_endings(source),
             start: 0,    // beginning of the current lexeme being scanned
             startcol: 1, // because asciidoc spec wants start/end locations
             current: 0,  // the character we're looking at *now*
             line: 1,
             scanning: true,
             expecting_tag_end: false,
+            in_table: false,
+            verbatim: None,
             file_stack: vec![],
         }
     }
 
-    pub fn new_with_stack(source: &'a str, file_stack: Vec<String>) -> Self {
+    pub(crate) fn new_with_stack(source: &'a str, file_stack: Vec<String>) -> Self {
         Scanner {
-            source,
+            source: normalize_line_endings(source),
             start: 0,    // beginning of the current lexeme being scanned
             startcol: 1, // because asciidoc spec wants start/end locations
             current: 0,  // the character we're looking at *now*
             line: 1,
             scanning: true,
             expecting_tag_end: false,
+            in_table: false,
+            verbatim: None,
             file_stack,
         }
     }
 
+    /// Starts scanning as inside a table, or not (an included file's lines may be a table's
+    /// rows)
+    pub(crate) fn set_in_table(&mut self, in_table: bool) {
+        self.in_table = in_table;
+    }
+
+    fn track_verbatim_block(&mut self, delimiter: TokenType) {
+        // in a table, delimiters are text
+        if self.in_table {
+            return;
+        }
+        if self.verbatim == Some(delimiter) {
+            self.verbatim = None;
+        } else if self.verbatim.is_none()
+            && matches!(
+                delimiter,
+                TokenType::SourceBlock
+                    | TokenType::LiteralBlock
+                    | TokenType::PassthroughBlock
+                    | TokenType::CommentBlock
+            )
+        {
+            self.verbatim = Some(delimiter);
+        }
+    }
+
+    /// Skips a cell specifier (`2+|`, `^|`, `h|`: spans, alignment and styles, none of which
+    /// are supported) in a table, so that the token starts at the cell's `|`
+    fn skip_cell_specifier(&mut self) {
+        let after_space = self.starts_new_line()
+            || matches!(self.source.as_bytes()[self.start - 1], b' ' | b'\t');
+        if self.in_table
+            && self.verbatim.is_none()
+            && after_space
+            && let Some(specifier) = RE_CELL_SPECIFIER.find(&self.source[self.start..])
+        {
+            let width = specifier.len() - 1;
+            self.start += width;
+            self.startcol += width;
+            self.current = self.start;
+        }
+    }
+
     fn scan_token(&mut self) -> Result<Token, ScannerError> {
+        self.skip_cell_specifier();
         let c = self.source.as_bytes()[self.current] as char;
         self.current += 1; // this instead of the "advance" function in "Crafting Interpreters"
+
+        // list item markers come first: at the start of a line, `.. ` is a list item and not an
+        // ellipsis, and `** ` is a list item and not a strong span
+        if matches!(c, ' ' | '\t' | '*' | '-' | '.' | '0'..='9' | 'a'..='z' | 'A'..='Z')
+            && let Some((token_type, marker_len)) = self.list_item_marker_at_line_start()
+        {
+            return self.add_list_item(token_type, marker_len);
+        }
 
         match c {
             '\n' => self.add_token(TokenType::NewLineChar, false, 1),
@@ -82,6 +170,9 @@ impl<'a> Scanner<'a> {
                 } else if ["s ", "s\n"].contains(&self.peeks_ahead(2))
                 // edge at end case
                     || (self.peeks_ahead(2) == "\0" && self.peek() == 's')
+                    // like Asciidoctor, an apostrophe between a letter (or digit) and a letter
+                    // (`don't`, `rock'n'roll`)
+                    || (self.peek_back().is_alphanumeric() && self.peek().is_alphabetic())
                 {
                     self.add_token(TokenType::CharRef, false, 0)
                 } else {
@@ -115,7 +206,9 @@ impl<'a> Scanner<'a> {
                     self.add_tag()
                 } else if self.starts_new_line() && self.starts_repeated_char_line(c, 4) {
                     self.current += 3; // the remaining repeated chars
-                    self.add_token(TokenType::block_from_char(c)?, false, 0)
+                    let delimiter = TokenType::block_from_char(c)?;
+                    self.track_verbatim_block(delimiter);
+                    self.add_token(delimiter, false, 0)
                 } else {
                     match c {
                         '=' => {
@@ -147,18 +240,11 @@ impl<'a> Scanner<'a> {
                                 self.add_text_until_next_markup()
                             }
                         }
-                        '*' => {
-                            // check if it's a list item
-                            if self.starts_new_line() && self.peek() == ' ' {
-                                self.add_list_item(TokenType::UnorderedListItem)
-                            } else {
-                                self.handle_inline_formatting(
-                                    c,
-                                    TokenType::Strong,
-                                    TokenType::UnconstrainedStrong,
-                                )
-                            }
-                        }
+                        '*' => self.handle_inline_formatting(
+                            c,
+                            TokenType::Strong,
+                            TokenType::UnconstrainedStrong,
+                        ),
                         '/' => {
                             if self.starts_end_tag_line() {
                                 self.add_tag()
@@ -177,9 +263,10 @@ impl<'a> Scanner<'a> {
                             }
                         }
                         '+' => {
-                            if self.starts_new_line() && self.peek() == '\n' {
+                            let ends_line = self.peek() == '\n' || self.is_at_end();
+                            if self.starts_new_line() && ends_line {
                                 self.add_token(TokenType::BlockContinuation, false, 0)
-                            } else if self.peek_back() == ' ' && self.peek() == '\n' {
+                            } else if self.peek_back() == ' ' && ends_line {
                                 self.add_token(TokenType::LineContinuation, false, 0)
                             } else {
                                 self.handle_inline_formatting(
@@ -194,17 +281,13 @@ impl<'a> Scanner<'a> {
                             TokenType::Emphasis,
                             TokenType::UnconstrainedEmphasis,
                         ),
-                        // ordered list item or section title
+                        // ellipsis or block title (ordered list items are found above)
                         '.' => {
                             if self.peeks_ahead(2) == ".." {
                                 self.current += 2;
                                 self.add_token(TokenType::CharRef, false, 0)
                             } else if self.starts_new_line() {
-                                if self.peek() == ' ' {
-                                    self.add_list_item(TokenType::OrderedListItem)
-                                } else {
-                                    self.add_token(TokenType::BlockLabel, false, 0)
-                                }
+                                self.add_token(TokenType::BlockLabel, false, 0)
                             } else {
                                 self.add_text_until_next_markup()
                             }
@@ -265,14 +348,20 @@ impl<'a> Scanner<'a> {
             }
             ':' => {
                 if self.starts_new_line() && self.starts_attr() {
-                    while self.peek() != '\n' {
+                    while self.peek() != '\n' && !self.is_at_end() {
                         // TK line continuation
                         self.current += 1
                     }
                     self.add_token(TokenType::Attribute, false, 0)
-                } else if self.peek_back() != ' ' && [": ", ":\n"].contains(&self.peeks_ahead(2)) {
-                    self.current += 2;
-                    self.add_token(TokenType::DescriptionListMarker, false, 0)
+                } else if let Some(token) = self.description_list_marker(b':', 4) {
+                    token
+                } else {
+                    self.add_text_until_next_markup()
+                }
+            }
+            ';' => {
+                if let Some(token) = self.description_list_marker(b';', 2) {
+                    token
                 } else {
                     self.add_text_until_next_markup()
                 }
@@ -300,6 +389,13 @@ impl<'a> Scanner<'a> {
                 } else {
                     self.add_text_until_next_markup()
                 }
+            }
+            'l' if self.starts_link_macro(self.start) => {
+                // `link:` and the target, through the `[`
+                self.current = self.source[self.current..]
+                    .find('[')
+                    .map_or(self.source.len(), |idx| self.current + idx + 1);
+                self.add_token(TokenType::LinkMacro, true, 0)
             }
             'h' => {
                 if self.peeks_ahead(3) == "ttp" {
@@ -410,12 +506,19 @@ impl<'a> Scanner<'a> {
                     self.current += 3; // don't consume the newline
                     // check to make sure the next char is a newline or EOF
                     if ['\n', '\0'].contains(&self.peek()) {
+                        if self.verbatim.is_none() {
+                            self.in_table = !self.in_table;
+                        }
                         self.add_token(TokenType::Table, false, 0)
                     } else {
                         self.add_text_until_next_markup()
                     }
-                } else if self.starts_new_line() || self.peek_back() == ' ' {
-                    // it's either a new line, or if on the same line, must have a space before it
+                } else if self.starts_new_line()
+                    || self.peek_back() == ' '
+                    || (self.in_table && self.peek_back() != '\\')
+                {
+                    // outside a table, it's either a new line, or if on the same line, must
+                    // have a space before it
                     self.add_table_cell()
                 } else {
                     self.add_text_until_next_markup()
@@ -467,6 +570,7 @@ impl<'a> Scanner<'a> {
                 startcol: token_start,
                 endcol: token_start + text.len() - 1, // to account for the start char
                 file_stack: self.file_stack.clone(),
+                can_close: true,
             }
         } else {
             self.startcol = token_start + text.len();
@@ -478,6 +582,7 @@ impl<'a> Scanner<'a> {
                 startcol: token_start,
                 endcol: token_start + text.len() - 1, // to account for the start char
                 file_stack: self.file_stack.clone(),
+                can_close: true,
             }
         }
         token.validate();
@@ -489,6 +594,11 @@ impl<'a> Scanner<'a> {
         while self.peek() == '=' {
             self.current += 1
         }
+        // a heading's equals signs are followed by a space; anything else is text
+        if self.peek() != ' ' {
+            self.current = self.start + 1;
+            return self.add_text_until_next_markup();
+        }
         self.current += 1; // add the space to the lexeme, but remove from count
         match self.source.as_bytes()[self.start..self.current - 1].len() {
             1 => self.add_token(TokenType::Heading1, false, 0),
@@ -496,22 +606,97 @@ impl<'a> Scanner<'a> {
             3 => self.add_token(TokenType::Heading3, false, 0),
             4 => self.add_token(TokenType::Heading4, false, 0),
             5 => self.add_token(TokenType::Heading5, false, 0),
+            6 => self.add_token(TokenType::Heading6, false, 0),
+            // a longer run is text
             _ => {
-                warn!("Heading level error at line {}", self.line);
-                Err(ScannerError::HeadingLevelError(self.line))
+                self.current = self.start + 1;
+                self.add_text_until_next_markup()
             }
         }
     }
 
-    /// adds the list item token, then includes the rest of the list item (until a new block or
-    /// another list item marker) in an Text
-    fn add_list_item(&mut self, list_item_token: TokenType) -> Result<Token, ScannerError> {
-        self.current += 1; // advance past the space, which we'll include in the token lexeme
+    /// Adds the list item token, whose lexeme is the marker with any indentation before it and
+    /// the space after it (the parser trims these)
+    fn add_list_item(
+        &mut self,
+        list_item_token: TokenType,
+        marker_len: usize,
+    ) -> Result<Token, ScannerError> {
+        self.current = self.start + marker_len;
         self.add_token(list_item_token, false, 0)
+    }
+
+    /// Checks for a list item marker at the start of a line: one to five `*`, a `-`, one to five
+    /// `.`, or a number followed by a `.`, then a space. The marker may be indented. Returns the
+    /// token type and the length of the marker, including the indentation and the space.
+    fn list_item_marker_at_line_start(&self) -> Option<(TokenType, usize)> {
+        if !self.starts_new_line() {
+            return None;
+        }
+        let line = &self.source.as_bytes()[self.start..];
+        let indent = line
+            .iter()
+            .take_while(|b| matches!(b, b' ' | b'\t'))
+            .count();
+        let rest = &line[indent..];
+        let first = *rest.first()?;
+        let (token_type, marker_len) = match first {
+            b'*' | b'.' => {
+                let repeated = rest.iter().take_while(|b| **b == first).count();
+                if repeated > 5 {
+                    return None;
+                }
+                let token_type = if first == b'*' {
+                    TokenType::UnorderedListItem
+                } else {
+                    TokenType::OrderedListItem
+                };
+                (token_type, repeated)
+            }
+            b'-' => (TokenType::UnorderedListItem, 1),
+            b'0'..=b'9' => {
+                let digits = rest.iter().take_while(|b| b.is_ascii_digit()).count();
+                if rest.get(digits) != Some(&b'.') {
+                    return None;
+                }
+                (TokenType::OrderedListItem, digits + 1)
+            }
+            // like Asciidoctor: one letter and a dot (`a.`, `B.`), or a roman numeral and a
+            // parenthesis (`iv)`, `IX)`)
+            b'a'..=b'z' | b'A'..=b'Z' => {
+                if rest.get(1) == Some(&b'.') {
+                    (TokenType::OrderedListItem, 2)
+                } else {
+                    let numeral = rest
+                        .iter()
+                        .take_while(|b| matches!(b, b'i' | b'v' | b'x' | b'I' | b'V' | b'X'))
+                        .count();
+                    if numeral == 0 || rest.get(numeral) != Some(&b')') {
+                        return None;
+                    }
+                    (TokenType::OrderedListItem, numeral + 1)
+                }
+            }
+            _ => return None,
+        };
+        if rest.get(marker_len) != Some(&b' ') {
+            return None;
+        }
+        // like Asciidoctor (which strips trailing whitespace first), a marker with no text after
+        // it on the line is not a list item
+        let has_text = rest[marker_len..]
+            .iter()
+            .take_while(|b| **b != b'\n')
+            .any(|b| !b.is_ascii_whitespace());
+        has_text.then_some((token_type, indent + marker_len + 1))
     }
 
     /// Adds the block image, consuming the target as well as any attributes
     fn add_block_image(&mut self) -> Result<Token, ScannerError> {
+        // a macro whose brackets don't close on its line is just text
+        if !self.closes_on_this_line("]") {
+            return self.add_text_until_next_markup();
+        }
         while self.peek() != ']' {
             self.current += 1
         }
@@ -521,6 +706,10 @@ impl<'a> Scanner<'a> {
 
     /// Adds the block image, consuming the target as well as any attributes
     fn add_inline_image(&mut self) -> Result<Token, ScannerError> {
+        // a macro whose brackets don't close on its line is just text
+        if !self.closes_on_this_line("]") {
+            return self.add_text_until_next_markup();
+        }
         while self.peek() != ']' {
             self.current += 1
         }
@@ -530,8 +719,8 @@ impl<'a> Scanner<'a> {
 
     /// Adds the include image, consuming the target as well as any attributes
     fn add_include(&mut self) -> Result<Token, ScannerError> {
-        // a directive that never closes (on its line) is just text
-        if !self.closes_on_this_line("]") {
+        // a directive without its brackets (on its line) is just text
+        if !self.closes_on_this_line("[") || !self.closes_on_this_line("]") {
             return self.add_text_until_next_markup();
         }
         while self.peek() != ']' {
@@ -541,58 +730,65 @@ impl<'a> Scanner<'a> {
         self.add_token(TokenType::Include, true, 0)
     }
 
-    /// Adds contents into a TableCell token, regardless of other formatting (simpler to re-scan later)
+    /// Whether the next character is a `|` that isn't escaped
+    fn at_cell_separator(&self) -> bool {
+        self.peek() == '|' && self.source.as_bytes()[self.current - 1] != b'\\'
+    }
+
+    /// Adds contents into a TableCell token, regardless of other formatting (simpler to re-scan
+    /// later). The cell runs to the end of the line, or to the next `|` that isn't escaped
     fn add_table_cell(&mut self) -> Result<Token, ScannerError> {
-        while !['\n', '\0', '|'].contains(&self.peek()) {
+        while !['\n', '\0'].contains(&self.peek()) && !self.at_cell_separator() {
             self.current += 1
         }
-        // if the delimiter is |
-        if self.peek() == '|' && self.source.as_bytes()[self.current - 1] as char != ' ' {
-            self.current += 1;
-            return self.add_table_cell();
+        // the next cell's specifier isn't part of this one
+        if self.in_table
+            && self.at_cell_separator()
+            && let Some(space) = self.source[self.start..self.current].rfind([' ', '\t'])
+        {
+            let word = self.start + space + 1;
+            if word < self.current && RE_CELL_SPECIFIER.is_match(&self.source[word..=self.current])
+            {
+                self.current = word;
+            }
         }
         self.add_token(TokenType::TableCell, true, 0)
     }
 
-    /// Adds the link, consuming the target but not any attributes
+    /// Adds the link, consuming the target but not any attributes. Like Asciidoctor, a bare URL
+    /// runs to whitespace, a bracket or a `<`, less the punctuation at its end that belongs to
+    /// the sentence (`,`, `.`, `?`, `!`, `)`, and here `:` and `;` too) or closes formatting
+    /// around it (`*`, `_`, `` ` ``, `#`).
     fn add_link(&mut self) -> Result<Token, ScannerError> {
-        let hyperlink_allowed_punctuation = ['.', '#', ':', '/', '?', '=', '&'];
-        // a bare link ends at whitespace (including the end of the line) or the end of input
-        let link_terminators = ['\0', ' ', '\t', '\r', '\n'];
-        while !link_terminators.contains(&self.peek()) && !self.peek().is_ascii_punctuation() {
-            self.current += 1
-        }
+        let url_length = self.source[self.current..]
+            .find(|c: char| c.is_whitespace() || matches!(c, '[' | ']' | '<'))
+            .unwrap_or(self.source.len() - self.current);
+        self.current += url_length;
         // it's an attribute-styled link
         if self.peek() == '[' {
             self.current += 1; // consume the '[' char
-            self.add_token(TokenType::LinkMacro, true, 0)
-        } else if link_terminators.contains(&self.peek()) {
-            self.add_token(TokenType::Hyperlink, true, 0)
-        } else if hyperlink_allowed_punctuation.contains(&self.peek()) {
-            // if it's at the end of a sentence
-            if let Some(second_char) = self.peeks_ahead(2).chars().last() {
-                if link_terminators.contains(&second_char) {
-                    // if it's not a possible sentence ender, we want that in the link
-                    if !['.', ':', '?'].contains(&self.peek()) {
-                        self.current += 1;
-                    }
-                    self.add_token(TokenType::Hyperlink, true, 0)
-                } else {
-                    // otherwise it contains an allowed url punctuation character
-                    self.current += 1; // consume the allowed character
-                    self.add_link()
-                }
-            } else {
-                // otherwise it contains an allowed url punctuation character
-                self.current += 1; // consume the allowed character
-                self.add_link()
-            }
-        } else {
-            self.add_token(TokenType::Hyperlink, true, 0)
+            return self.add_token(TokenType::LinkMacro, true, 0);
         }
+        let trailing = self.source[self.start..self.current]
+            .chars()
+            .rev()
+            .take_while(|c| {
+                matches!(
+                    c,
+                    ',' | '.' | '?' | '!' | ')' | ':' | ';' | '*' | '_' | '`' | '#'
+                )
+            })
+            .count();
+        // (the trailing characters are ASCII, so their count is their length in bytes)
+        self.current -= trailing.min(self.current - self.start - 1);
+        self.add_token(TokenType::Hyperlink, true, 0)
     }
 
     fn add_inline_style(&mut self) -> Result<Token, ScannerError> {
+        // a style whose brackets don't close on its line is just text
+        if !self.closes_on_this_line("]") {
+            return self.add_text_until_next_markup();
+        }
         while self.peek() != ']' {
             self.current += 1
         }
@@ -627,11 +823,58 @@ impl<'a> Scanner<'a> {
         if !self.closes_on_this_line("]]") {
             return self.add_text_until_next_markup();
         }
-        while self.peeks_ahead(3) != "]]\n" && !self.is_at_end() {
-            self.current += 1
+        // to the line's last `]]` (not the newline); `closes_on_this_line` found one
+        let line_end = self.source[self.current..]
+            .find('\n')
+            .map_or(self.source.len(), |idx| self.current + idx);
+        if let Some(idx) = self.source[self.current..line_end].rfind("]]") {
+            self.current += idx + 2;
         }
-        self.current += 2; // consume the ']]' chars, NOT newline
         self.add_token(TokenType::BlockAnchor, true, 0)
+    }
+
+    /// A description list marker at the start of the token: a run of two to four colons, or of
+    /// two semicolons, followed by a space, a newline or the end of the file. Like Asciidoctor, a
+    /// longer run ends with the marker, and the colons (or semicolons) before it are the end of
+    /// the term, so they are text. Unlike in Asciidoctor, a run after a space is not a marker
+    /// (`Term :: def` is text).
+    fn description_list_marker(
+        &mut self,
+        mark: u8,
+        max_len: usize,
+    ) -> Option<Result<Token, ScannerError>> {
+        let bytes = self.source.as_bytes();
+        // where the run started: before this token, if the start of the run was split off as text
+        let run_start = self.start
+            - bytes[..self.start]
+                .iter()
+                .rev()
+                .take_while(|b| **b == mark)
+                .count();
+        if run_start > 0 && matches!(bytes[run_start - 1], b' ' | b'\t') {
+            return None;
+        }
+        let run = bytes[self.start..]
+            .iter()
+            .take_while(|b| **b == mark)
+            .count();
+        let after = bytes.get(self.start + run);
+        if run < 2 || !matches!(after, None | Some(b' ') | Some(b'\n')) {
+            return None;
+        }
+        if run > max_len {
+            self.current = self.start + run - max_len;
+            return Some(self.add_token(TokenType::Text, true, 0));
+        }
+        // a marker needs a term before it: at the start of a line (indented, it was turned down
+        // above), it is text
+        if self.starts_new_line() {
+            return None;
+        }
+        // the space after the marker is part of it, but a newline is its own token, so that the
+        // line is counted
+        self.current = self.start + run + usize::from(after == Some(&b' '));
+        Some(self.add_token(TokenType::DescriptionListMarker, false, 0))
     }
 
     fn add_text_until_next_markup(&mut self) -> Result<Token, ScannerError> {
@@ -640,20 +883,45 @@ impl<'a> Scanner<'a> {
         // Chars: newline, bold, italic, code, super, subscript, footnote, pass, link, end inline macro, definition list marker, highlighted, inline admonition initial chars, inline images
         while ![
             '\n', '*', '_', '`', '^', '~', 'f', 'p', 'h', ']', '[', ':', '#', 'N', 'T', 'I', 'C',
-            'W', '&', '{', '+', 'i', '<', '\'', '\"', '-', 't', 'e',
+            'W', '&', '{', '+', 'i', '<', '\'', '\"', '-', 't', 'e', ';',
         ]
         .contains(&self.peek())
             && !self.is_at_end()
+            && !self.starts_link_macro(self.current)
+            && !self.starts_ellipsis(self.current)
+            && (!self.in_table || !self.at_cell_separator())
         {
             self.current += 1;
         }
         self.add_token(TokenType::Text, true, 0)
     }
 
+    /// Whether an ellipsis starts here: three dots with no backslash before them
+    fn starts_ellipsis(&self, at: usize) -> bool {
+        let bytes = self.source.as_bytes();
+        bytes.get(at..at + 3) == Some(b"...") && (at == 0 || bytes[at - 1] != b'\\')
+    }
+
+    /// Whether a `link:` macro starts here: `link:`, a target with no whitespace (which doesn't
+    /// start with a colon), then `[`
+    fn starts_link_macro(&self, at: usize) -> bool {
+        let Some(rest) = self
+            .source
+            .get(at..)
+            .and_then(|rest| rest.strip_prefix("link:"))
+        else {
+            return false;
+        };
+        !rest.starts_with(':')
+            && rest
+                .find(|c: char| c.is_whitespace() || c == '[')
+                .is_some_and(|idx| rest[idx..].starts_with('['))
+    }
+
     fn add_tag(&mut self) -> Result<Token, ScannerError> {
         let tag_type: TokenType;
         if self.expecting_tag_end {
-            while self.peek() != 'e' {
+            while self.peek() != 'e' && !self.is_at_end() {
                 self.current += 1;
             }
             self.start = self.current;
@@ -691,21 +959,27 @@ impl<'a> Scanner<'a> {
         self.start == 0 || self.source.as_bytes()[self.start - 1] == b'\n'
     }
 
+    /// Whether the line is `delimiter_len` of `c` and nothing else (the line may be the last one,
+    /// with no newline after it)
     fn starts_repeated_char_line(&self, c: char, delimiter_len: usize) -> bool {
-        let mut expected_block = String::from(c).repeat(delimiter_len - 1);
-        expected_block.push('\n');
-
-        self.current + delimiter_len <= self.source.len()
-            && self.peeks_ahead(delimiter_len) == expected_block
+        let rest = String::from(c).repeat(delimiter_len - 1);
+        let end = self.current + delimiter_len - 1;
+        end <= self.source.len()
+            && self.source.get(self.current..end) == Some(rest.as_str())
+            && matches!(self.source.as_bytes().get(end), None | Some(b'\n'))
     }
 
     /// Checks for document attribute lines, e.g., ":foo: bar" or ":foo:"
     fn starts_attr(&mut self) -> bool {
+        // an attribute has a name: `::` isn't one
+        if self.peek() == ':' {
+            return false;
+        }
         let current_placeholder = self.current;
         while ![' ', '\n', ':'].contains(&self.peek()) && !self.is_at_end() {
             self.current += 1
         }
-        let check = self.source.as_bytes()[self.current] as char == ':';
+        let check = self.source.as_bytes().get(self.current) == Some(&b':');
         self.current = current_placeholder;
         check
     }
@@ -724,7 +998,7 @@ impl<'a> Scanner<'a> {
         while (self.peek().is_alphanumeric() || self.peek() == '-') && !self.is_at_end() {
             self.current += 1
         }
-        let check = self.source.as_bytes()[self.current] as char == '}';
+        let check = self.source.as_bytes().get(self.current) == Some(&b'}');
         self.current = current_placeholder;
         check
     }
@@ -735,7 +1009,7 @@ impl<'a> Scanner<'a> {
         while self.peek().is_alphanumeric() && !self.is_at_end() {
             self.current += 1
         }
-        let check = self.source.as_bytes()[self.current] as char == ';';
+        let check = self.source.as_bytes().get(self.current) == Some(&b';');
         self.current = current_placeholder;
         check
     }
@@ -769,10 +1043,23 @@ impl<'a> Scanner<'a> {
         // or we're at the beginning, or butted up against another inline marker
         beginning_of_inline_markers.contains(&self.peek_back()) && self.peek() != c
         {
-            self.add_token(constrained, false, 0)
+            // (`^` and `~` mark text inside words, so they can always close)
+            let can_close = matches!(c, '^' | '~') || self.mark_can_close();
+            let mut token = self.add_token(constrained, false, 0)?;
+            token.can_close = can_close;
+            Ok(token)
         } else {
             self.add_text_until_next_markup()
         }
+    }
+
+    /// Like Asciidoctor, whether the constrained mark just read can close a span: there is no
+    /// space before it, and no letter or digit (or `_`) after it
+    fn mark_can_close(&self) -> bool {
+        let before = self.source[..self.start].chars().next_back();
+        let after = self.source[self.current..].chars().next();
+        !before.is_some_and(char::is_whitespace)
+            && !after.is_some_and(|c| c.is_alphanumeric() || c == '_')
     }
 
     fn handle_text_symbol_replacement_parens(&mut self) -> Result<Token, ScannerError> {
@@ -783,7 +1070,7 @@ impl<'a> Scanner<'a> {
         self.add_token(TokenType::CharRef, true, 0)
     }
 
-    /// Checks for lines such as [quote], [verse, Mary Oliver], [source, python], etc.
+    /// Checks for lines such as `[quote]`, `[verse, Mary Oliver]`, `[source, python]`, etc.
     fn starts_attribution_line(&mut self) -> bool {
         let current_placeholder = self.current;
         while self.peek() != '\n' && !self.is_at_end() {
@@ -829,7 +1116,10 @@ impl<'a> Scanner<'a> {
 
     fn starts_text_symbol_replace_emdash(&mut self) -> bool {
         let after_char = self.peeks_ahead(2).chars().last().unwrap();
-        self.peek() == '-' && (after_char.is_alphanumeric() || [' ', '\0'].contains(&after_char))
+        // a spaced dash may end its line (but a line of `--` alone opens or closes a block)
+        let ends_line = after_char == '\n' && matches!(self.peek_back(), ' ' | '\t');
+        self.peek() == '-'
+            && (after_char.is_alphanumeric() || [' ', '\0'].contains(&after_char) || ends_line)
     }
 
     fn is_at_end(&self) -> bool {
@@ -873,7 +1163,7 @@ impl<'a> Scanner<'a> {
 mod tests {
     use std::char;
 
-    use crate::scanner::tokens::TokenType;
+    use crate::scanner::TokenType;
     use rstest::rstest;
 
     use super::*;
@@ -885,7 +1175,28 @@ mod tests {
             .filter_map(|result| result.as_ref().ok().cloned())
             .collect();
         let _ = scanned_tokens.pop();
+        // whether marks can close spans has a test of its own
+        for token in scanned_tokens.iter_mut() {
+            token.can_close = true;
+        }
         assert_eq!(scanned_tokens, expected_tokens);
+    }
+
+    #[rstest]
+    #[case::opening("*a", false)]
+    #[case::closing("a*", true)]
+    #[case::before_punctuation("a*.", true)]
+    #[case::after_space("a *", false)]
+    #[case::before_letter(" *a", false)]
+    #[case::before_non_ascii_letter(" *é", false)]
+    #[case::before_underscore("(*_", false)]
+    #[case::superscript(" ^a", true)]
+    fn marks_that_can_close(#[case] markup: &str, #[case] expected: bool) {
+        let mark = Scanner::new(markup)
+            .filter_map(Result::ok)
+            .find(|token| matches!(token.lexeme.as_str(), "*" | "^"))
+            .expect("No mark");
+        assert_eq!(mark.can_close, expected);
     }
 
     fn newline_token_at(line: usize, col: usize) -> Token {
@@ -1042,6 +1353,74 @@ mod tests {
             ),
         ];
         scan_and_assert_eq(&markup, expected_tokens);
+    }
+
+    /// The lexeme keeps any indentation and the space after the marker
+    #[rstest]
+    #[case::double_star("** Foo\n", "** ", TokenType::UnorderedListItem)]
+    #[case::five_stars("***** Foo\n", "***** ", TokenType::UnorderedListItem)]
+    #[case::dash("- Foo\n", "- ", TokenType::UnorderedListItem)]
+    #[case::double_dot(".. Foo\n", ".. ", TokenType::OrderedListItem)]
+    #[case::triple_dot("... Foo\n", "... ", TokenType::OrderedListItem)]
+    #[case::numbered("12. Foo\n", "12. ", TokenType::OrderedListItem)]
+    #[case::indented("  * Foo\n", "  * ", TokenType::UnorderedListItem)]
+    #[case::tab_indented("\t. Foo\n", "\t. ", TokenType::OrderedListItem)]
+    #[case::lower_alpha("a. Foo\n", "a. ", TokenType::OrderedListItem)]
+    #[case::upper_alpha("B. Foo\n", "B. ", TokenType::OrderedListItem)]
+    #[case::lower_roman("iv) Foo\n", "iv) ", TokenType::OrderedListItem)]
+    #[case::upper_roman("IX) Foo\n", "IX) ", TokenType::OrderedListItem)]
+    fn list_item_markers(
+        #[case] markup: &str,
+        #[case] marker: &str,
+        #[case] expected_token: TokenType,
+    ) {
+        let text_start = marker.len() + 1;
+        let expected_tokens = vec![
+            Token::new_default(expected_token, marker.to_string(), None, 1, 1, marker.len()),
+            Token::new_default(
+                TokenType::Text,
+                "Foo".to_string(),
+                Some("Foo".to_string()),
+                1,
+                text_start,
+                text_start + 2,
+            ),
+            Token::new_default(
+                TokenType::NewLineChar,
+                "\n".to_string(),
+                None,
+                1,
+                text_start + 3,
+                text_start + 3,
+            ),
+        ];
+        scan_and_assert_eq(markup, expected_tokens);
+    }
+
+    /// Markup that looks like a list item marker, but isn't one
+    #[rstest]
+    #[case::six_stars("****** Foo\n")]
+    #[case::six_dots("...... Foo\n")]
+    #[case::no_space_after_star("*Foo*\n")]
+    #[case::no_space_after_dash("-Foo\n")]
+    #[case::double_dash("-- Foo\n")]
+    #[case::number_without_dot("12 Foo\n")]
+    #[case::number_without_space("1.5 Foo\n")]
+    #[case::ellipsis("...Foo\n")]
+    #[case::mid_line("Foo * Bar\n")]
+    #[case::no_text_after_marker("* \n")]
+    #[case::only_whitespace_after_marker(" *  \t\nFoo\n")]
+    #[case::two_letters("ab. Foo\n")]
+    #[case::letter_without_space("a.Foo\n")]
+    #[case::letter_with_parenthesis("a) Foo\n")]
+    #[case::number_with_parenthesis("1) Foo\n")]
+    #[case::not_roman("q) Foo\n")]
+    #[case::roman_with_dot("ii. Foo\n")]
+    fn not_list_item_markers(#[case] markup: &str) {
+        assert!(Scanner::new(markup).all(|token| !matches!(
+            token.unwrap().token_type(),
+            TokenType::UnorderedListItem | TokenType::OrderedListItem
+        )));
     }
 
     #[test]
@@ -1511,24 +1890,64 @@ mod tests {
                 1,
                 4,
             ),
+            // the newline is its own token, so that the lines after it are counted
             Token::new_default(
                 TokenType::DescriptionListMarker,
-                "::\n".to_string(),
+                "::".to_string(),
                 None,
                 1,
                 5,
-                7,
+                6,
             ),
+            newline_token_at(1, 7),
             Token::new_default(
                 TokenType::Text,
                 "DS".to_string(),
                 Some("DS".to_string()),
+                2,
                 1,
-                8,
-                9,
+                2,
             ),
         ];
         scan_and_assert_eq(markup, expected_tokens);
+    }
+
+    /// The text before the marker, and the marker's lexeme. Like Asciidoctor, a run of more
+    /// colons (or semicolons) than a marker has ends with the marker, and the rest is the term's
+    #[rstest]
+    #[case::double_colon("Txrm:: DS", "Txrm", ":: ")]
+    #[case::triple_colon("Txrm::: DS", "Txrm", "::: ")]
+    #[case::quadruple_colon("Txrm:::: DS", "Txrm", ":::: ")]
+    #[case::double_semicolon("Txrm;; DS", "Txrm", ";; ")]
+    #[case::five_colons("Txrm::::: DS", "Txrm:", ":::: ")]
+    #[case::three_semicolons("Txrm;;; DS", "Txrm;", ";; ")]
+    #[case::end_of_line("Txrm:::\nDS", "Txrm", ":::")]
+    fn description_list_markers(#[case] markup: &str, #[case] term: &str, #[case] marker: &str) {
+        let tokens: Vec<Token> = Scanner::new(markup).filter_map(|t| t.ok()).collect();
+        let marker_idx = tokens
+            .iter()
+            .position(|t| t.token_type() == TokenType::DescriptionListMarker)
+            .unwrap_or_else(|| panic!("No marker in {tokens:?}"));
+        let text: String = tokens[..marker_idx]
+            .iter()
+            .map(|t| t.lexeme.clone())
+            .collect();
+        assert_eq!(text, term);
+        assert_eq!(tokens[marker_idx].lexeme, marker);
+    }
+
+    #[rstest]
+    #[case::colons_in_text("a::b::c\n")]
+    #[case::semicolons_in_text("a;;b\n")]
+    #[case::space_before_semicolons("Txrm ;; bar\n")]
+    #[case::space_before_three_colons("Txrm ::: bar\n")]
+    #[case::space_before_four_colons("Txrm :::: bar\n")]
+    fn not_description_list_markers(#[case] markup: &str) {
+        assert!(
+            Scanner::new(markup)
+                .filter_map(|t| t.ok())
+                .all(|t| t.token_type() != TokenType::DescriptionListMarker)
+        );
     }
 
     #[test]
@@ -2243,6 +2662,7 @@ mod tests {
                 startcol: 1,
                 endcol: 9,
                 file_stack: vec![],
+                can_close: true,
             },
             Token {
                 token_type: TokenType::Text,
@@ -2252,6 +2672,7 @@ mod tests {
                 startcol: 10,
                 endcol: 10,
                 file_stack: vec![],
+                can_close: true,
             },
             Token {
                 token_type: TokenType::Text,
@@ -2261,6 +2682,7 @@ mod tests {
                 startcol: 11,
                 endcol: 15,
                 file_stack: vec![],
+                can_close: true,
             },
             Token {
                 token_type: TokenType::NewLineChar,
@@ -2270,6 +2692,7 @@ mod tests {
                 startcol: 16,
                 endcol: 16,
                 file_stack: vec![],
+                can_close: true,
             },
         ];
         scan_and_assert_eq(markup, expected_tokens);
@@ -2464,7 +2887,7 @@ mod tests {
     #[case("(C)", "&#169;")]
     #[case("(R)", "&#174;")]
     #[case("(TM)", "&#8482;")]
-    #[case("...", "&#8230;")]
+    #[case("...", "&#8230;&#8203;")]
     #[case("->", "&#8594;")]
     #[case("=>", "&#8658;")]
     #[case("<-", "&#8592;")]

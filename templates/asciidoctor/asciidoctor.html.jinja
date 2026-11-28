@@ -6,6 +6,15 @@
 <meta charset="UTF-8">
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+{%- if graph.attributes and graph.attributes.description %}
+<meta name="description" content="{{ graph.attributes.description | escape_attr }}">
+{%- endif %}
+{%- if graph.attributes and graph.attributes.keywords %}
+<meta name="keywords" content="{{ graph.attributes.keywords | escape_attr }}">
+{%- endif %}
+{%- if graph.header and graph.header.authors %}
+<meta name="author" content="{{ graph.header.authors | map(attribute="fullname") | join(", ") | escape_attr }}">
+{%- endif %}
 <title>
 {%- if graph.header and graph.header.title -%}
 {{- render_inlines(graph.header.title) -}}
@@ -19,6 +28,28 @@ Untitled
 {%- if graph.header and graph.header.title %}
 <h1>{{ render_inlines(graph.header.title) }}</h1>
 {%- endif %}
+{#- the authors (with their email addresses) and the revision, as Asciidoctor shows them -#}
+{%- set authors = graph.header.authors if graph.header and graph.header.authors else [] %}
+{%- if authors or revision %}
+<div class="details">
+{%- for author in authors %}
+{%- set n = "" if loop.index == 1 else loop.index %}
+<span id="author{{ n }}" class="author">{{ author.fullname | escape_text }}</span><br>
+{%- if author.address %}
+<span id="email{{ n }}" class="email"><a href="mailto:{{ author.address | escape_attr }}">{{ author.address | escape_text }}</a></span><br>
+{%- endif %}
+{%- endfor %}
+{%- if revision and revision.number %}
+<span id="revnumber">version {{ revision.number | escape_text }}{{ "," if revision.date }}</span>
+{%- endif %}
+{%- if revision and revision.date %}
+<span id="revdate">{{ revision.date | escape_text }}</span>
+{%- endif %}
+{%- if revision and revision.remark %}
+<br><span id="revremark">{{ revision.remark | escape_text }}</span>
+{%- endif %}
+</div>
+{%- endif %}
 </div>
 <div id="content">
 {{- render_document_blocks(graph) }}
@@ -26,6 +57,9 @@ Untitled
 {{- render_footnotes() }}
 <div id="footer">
 <div id="footer-text">
+{%- if revision and revision.number %}
+Version {{ revision.number | escape_text }}<br>
+{%- endif %}
 Last updated {{ current_time }}
 </div>
 </div>

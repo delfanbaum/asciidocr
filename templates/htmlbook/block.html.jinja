@@ -79,11 +79,11 @@ loading code simple.
 {# ======== block-specific macros ======== #}
 
 {%- macro render_section(block) -%}
+{#- the section's id is the one it was given, or the one the parser generated -#}
+{%- set id = section_id(block) -%}
 <section data-type="sect{{block.level}}"
-        {%- if block.metadata -%}
-        {%- if block.metadata.roles %} class="{{ block.metadata.roles | join(" ") | escape_attr }}" {%- endif -%}
-        {%- if block.metadata.attributes.id %} id="{{ block.metadata.attributes.id | escape_attr }}" {%- endif -%}
-        {%- endif -%}>
+        {%- if block.metadata and block.metadata.roles %} class="{{ block.metadata.roles | join(" ") | escape_attr }}" {%- endif -%}
+        {%- if id %} id="{{ id | escape_attr }}" {%- endif -%}>
     {% if block.title %}
         {{ render_title_for_block(block) }}
     {% endif -%}
@@ -139,17 +139,20 @@ loading code simple.
 {%- endmacro -%}
 
 {%- macro render_dlist_item(block) -%}
-    {%- if block.terms -%}
-    <dt>{%- for inline in block.terms -%}
+    {%- for term in block.terms -%}
+    <dt>{%- for inline in term -%}
         {{- render_inline(inline) -}}
     {%- endfor -%}</dt>
-    {%- endif -%}
+    {%- endfor -%}
+    {#- a term with no description (one of several terms) has no <dd> -#}
+    {%- if block.principal or block.blocks -%}
     <dd>
     {{- render_principal(block) -}}
     {%- for child in block.blocks -%}
         {{- render_block(child) -}}
     {%- endfor -%}
     </dd>
+    {%- endif -%}
 {%- endmacro -%}
 
 {#- Admonitions, examples, open blocks, quotes and sidebars all share the same shape:
@@ -291,8 +294,9 @@ loading code simple.
                 {{ process_table_cell(cell, tag="th") }}
     {% endfor %}</tr>
     </thead>
+    {%- if body_start < block.blocks | length %}
     <tbody>
-        <tr>
+        <tr>{%- endif %}
         {%- else -%}
         <tr>
         {%- endif %}
@@ -303,8 +307,9 @@ loading code simple.
         {% if idx > 0 and (idx + 1) % cols == 0 and idx+1 != num_cells %}
         </tr>
         <tr>{%- endif %}
-        {% endfor %}</tr>
-    {%- if header %}
+        {% endfor %}
+    {%- if not header %}</tr>
+    {%- elif body_start < num_cells %}</tr>
     </tbody>{%- endif %}
     </table>
 {%- endmacro -%}

@@ -1,0 +1,7 @@
+= Document Title
+Jane Q. Doe <jane@example.com>; John Smith
+v1.2, 2026-01-15: A remark
+:description: About things
+:keywords: a, b
+
+Body text by {author}, version {revnumber}.

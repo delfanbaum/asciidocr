@@ -1,8 +1,7 @@
 //! This module contains document and style-building code for the docx output
-pub mod document;
-pub mod numbering;
-pub mod styles;
-pub mod units;
+mod document;
+mod numbering;
+mod styles;
 
 use std::{fs::File, path::Path};
 
@@ -11,7 +10,7 @@ use docx_rs::Paragraph;
 use crate::errors::ConversionError;
 use crate::graph::asg::Asg;
 
-use self::document::DocxRenderError;
+pub use self::document::DocxRenderError;
 
 /// docx-rs hardcodes `useFELayout` and `balanceSingleByteDoubleByteWidth` into `settings.xml`.
 /// Word and LibreOffice treat those as East Asian layout modes and add extra space at the
@@ -36,7 +35,8 @@ fn strip_default_normal_style(styles: Vec<u8>) -> Vec<u8> {
 
 /// !Experimental! Renders a Docx file. Some [`Asg`] blocks are still unsupported.
 pub fn render_docx(graph: &Asg, output_path: &Path) -> Result<(), ConversionError> {
-    let file = File::create(output_path).unwrap();
+    let file = File::create(output_path)
+        .map_err(|e| ConversionError::OutputFile(output_path.to_path_buf(), e))?;
     let mut writer = document::DocxWriter::new();
     let mut docx = document::asciidocr_default_docx();
 

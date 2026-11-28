@@ -59,12 +59,19 @@ HTMLBook's.
 </div>
 {%- endmacro -%}
 
-{#- Asciidoctor wraps the contents of top-level sections (only) in a "sectionbody" -#}
+{#- Asciidoctor wraps the contents of top-level sections (only) in a "sectionbody". A level 0
+    section has no wrapper at all: its contents follow its heading -#}
 {%- macro render_section(block) %}
 {%- set title_html = render_inlines(block.title) %}
+{%- set id = section_id(block) %}
+{%- if block.level == 0 %}
+<h1{% if id %} id="{{ id | escape_attr }}"{% endif %}{{ wrapper_attrs(block, "sect0", false) }}>{{ title_html }}</h1>
+{%- for child in block.blocks %}
+{{ render_block(child) }}
+{%- endfor -%}
+{%- else %}
 <div{{ wrapper_attrs(block, "sect" ~ block.level, false) }}>
-{%- set explicit_id = block.metadata.attributes.id if block.metadata and block.metadata.attributes else none %}
-<h{{ block.level + 1 }} id="{{ section_id(title_html, explicit_id) | escape_attr }}">{{ title_html }}</h{{ block.level + 1 }}>
+<h{{ block.level + 1 }}{% if id %} id="{{ id | escape_attr }}"{% endif %}>{{ title_html }}</h{{ block.level + 1 }}>
 {%- if block.level == 1 %}
 <div class="sectionbody">
 {%- endif -%}
@@ -75,14 +82,19 @@ HTMLBook's.
 </div>
 {%- endif %}
 </div>
+{%- endif %}
 {%- endmacro -%}
 
+{#- Like Asciidoctor, an ordered list is numbered by its marker, not by its depth -#}
 {%- macro render_list(block) %}
 {%- set ordered = block.variant == "ordered" -%}
-<div{{ wrapper_attrs(block, 'olist arabic' if ordered else 'ulist') }}>
+{%- set numeral_style = numeral_style(block.marker) -%}
+{#- Asciidoctor adds a `type` only for the dot markers (`..`), not the lettered ones (`a.`) -#}
+{%- set numeral_type = {"loweralpha": "a", "lowerroman": "i", "upperalpha": "A", "upperroman": "I"}[numeral_style] if block.marker[:1] == "." -%}
+<div{{ wrapper_attrs(block, 'olist ' ~ numeral_style if ordered else 'ulist') }}>
 {{- render_title(block) }}
 {%- if ordered %}
-<ol class="arabic">
+<ol class="{{ numeral_style }}"{% if numeral_type %} type="{{ numeral_type }}"{% endif %}>
 {%- else %}
 <ul>
 {%- endif -%}
@@ -221,9 +233,14 @@ HTMLBook's.
 <div{{ wrapper_attrs(block, "quoteblock") }}>
 {{- render_title(block) }}
 <blockquote>
+{#- like Asciidoctor, a quote written as a paragraph has the text directly in the blockquote -#}
+{%- if not block.delimiter and block.blocks | length == 1 and block.blocks[0].name == "paragraph" %}
+{{ render_inlines(block.blocks[0].inlines) }}
+{%- else %}
 {%- for child in block.blocks %}
 {{ render_block(child) }}
 {%- endfor %}
+{%- endif %}
 </blockquote>
 {{ render_attribution(attrs) }}
 </div>
@@ -234,7 +251,11 @@ HTMLBook's.
 {{- render_title(block) }}
 <dl>
 {%- for item in block.items %}
-<dt class="hdlist1">{{ render_inlines(item.terms) }}</dt>
+{%- for term in item.terms %}
+<dt class="hdlist1">{{ render_inlines(term) }}</dt>
+{%- endfor %}
+{#- like Asciidoctor, a term with no description (one of several terms) has no <dd> -#}
+{%- if item.principal or item.blocks %}
 <dd>
 {%- if item.principal %}
 <p>{{ render_inlines(item.principal) }}</p>
@@ -243,6 +264,7 @@ HTMLBook's.
 {{ render_block(child) }}
 {%- endfor %}
 </dd>
+{%- endif %}
 {%- endfor %}
 </dl>
 </div>
@@ -271,8 +293,9 @@ HTMLBook's.
 </tr>
 </thead>
 {%- endif %}
-<tbody>
 {%- set body = block.blocks[columns:] if has_header else block.blocks %}
+{%- if body %}
+<tbody>
 {%- for cell in body %}
 {%- if loop.index0 % columns == 0 %}
 <tr>
@@ -283,6 +306,7 @@ HTMLBook's.
 {%- endif %}
 {%- endfor %}
 </tbody>
+{%- endif %}
 </table>
 {%- endmacro -%}
 

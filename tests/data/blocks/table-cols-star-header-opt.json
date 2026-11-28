@@ -92,7 +92,7 @@
           "options": "header",
           "cols": "2"
         },
-        "options": [],
+        "options": ["header"],
         "roles": [],
         "location": [ { "line": 1, "col": 1 }, { "line": 1, "col": 28 } ]
       },

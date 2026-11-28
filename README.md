@@ -52,7 +52,7 @@ Usage: asciidocr [OPTIONS] <FILE>
 
 Arguments:
   <FILE>
-          Asciidoc file for processing. To read from standard input (stdin), use "-"
+          Asciidoc file for processing (.adoc, .asciidoc or .txt). To read from standard input (stdin), use "-"
 
 Options:
   -o, --out-file <OUTPUT>
@@ -70,7 +70,7 @@ Options:
           - docx:        !Experimental! Produces a "manuscript-styled" DOCX document
 
   -c, --count-words
-          Print a document word count (excludes comments, markup characters, etc.)
+          Print the document's word count (excluding comments, markup characters, etc.) instead of converting it
 
   -e, --embedded
           If this flag is given alongside an HTML backend (htmlbook or asciidoctor), an "embeddable" document is output, i.e., one that includes only the <body> element contents (excluding any headers, footers, etc.)
@@ -96,8 +96,9 @@ Options:
 
 `asciidocr` currently produces "Htmlbook"-style or Asciidoctor-style HTML for
 all handled blocks/inlines, and has _experimental_ support for producing `docx`
-files: prose, headings, most lists, tables and images work, but list
-continuations, list titles, table headers and real footnotes do not (_yet_).
+files: prose, headings, lists, tables and images work, but list titles, table
+headers and real footnotes do not (_yet_), and blocks attached to list items
+are written as plain paragraphs.
 The output has only been mostly checked in LibreOffice. *Fair warning*: content may
 be dropped while creating `docx` files until that feature stabilizes a little
 more. It should, however, be good to go for your next great short story.
@@ -108,8 +109,6 @@ features. Some things it does _not_ do (yet):
 * Checklists
 * Conditionals
 * Complex table markup
-* Complex nested lists (`** nested` markers are not recognized, and list
-  continuations are unreliable)
 * The "subs" attribute in blocks
 
 For a more complete list of the current limitations and caveats, see
@@ -122,6 +121,9 @@ capabilities with each release -- if there's something you want but don't
 have, please open an issue. The most up-to-date information will be found on
 each release's page, but some language features recently introduced include:
 
+* Lists that follow Asciidoctor's rules: nested lists (`**`, `..`, `-`, `1.`),
+  blank lines between items, and list continuations (`+`), in description lists
+  too, with nested lists at their indent level in `docx` files
 * An Asciidoctor-style HTML backend (`-b asciidoctor`), checked against
   Asciidoctor's own output, and an "embedded" mode (`-e`) for both HTML backends
 * Escaping of special characters (`<`, `>`, `&`) in the HTML backends
@@ -190,13 +192,36 @@ tools in Rust now, too. Here are at least a few I know about:
 * [`acdc`](https://github.com/nlopes/acdc/tree/main/acdc-parser)
 * [`asciidoc-parser`](https://github.com/scouten/asciidoc-parser)
 
+## Usage (Library)
+
+Add the crate without the command-line tool's dependencies:
+
+```console
+$ cargo add asciidocr --no-default-features
+```
+
+Then scan, parse and render:
+
+```rust
+use asciidocr::backends::htmlbook::render_htmlbook_embedded;
+use asciidocr::parser::Parser;
+use asciidocr::scanner::Scanner;
+
+let adoc = "== A Section\n\nWith *a paragraph*.\n";
+let graph = Parser::default().parse(Scanner::new(adoc))?;
+let html = render_htmlbook_embedded(&graph)?;
+```
+
+Use `Parser::new` with a file's path to find its includes from its directory.
+The `docx` and `json` features add those backends. See
+[docs.rs](https://docs.rs/asciidocr) for the rest; the library API isn't stable
+yet.
+
 ## Known Bugs
 
 Things that _should_ work, but are currently acting up:
 
-* List continuations (`+`) inside lists, and nested lists
-* A footnote in a list item, if an earlier footnote exists in the document
-* `+++inline passthroughs+++` (the `pass:[]` form works)
+* `+++inline passthroughs+++` (the `pass:[]` form works); deferred to 0.5
 
 See `LIMITATIONS.adoc` for more.
 

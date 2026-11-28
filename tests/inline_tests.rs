@@ -3,7 +3,7 @@ use std::fs;
 
 use common::{
     assert_parsed_doc_matches_expected_asg, assert_parsed_doc_matches_expected_asg_from_str,
-    parsed_text,
+    parsed_text, render_asciidoctor_embedded_from_str,
 };
 use rstest::rstest;
 
@@ -31,9 +31,13 @@ fn test_spans_with_chars_between(#[case] markup_char: &str, #[case] variant: &st
     let adoc_str = fs::read_to_string("tests/data/inlines/span-chars-between.adoc")
         .expect("Unable to read asciidoc test template")
         .replace("0", markup_char);
-    let asg_json_str = fs::read_to_string("tests/data/inlines/span-chars-between.json")
+    let mut asg_json_str = fs::read_to_string("tests/data/inlines/span-chars-between.json")
         .expect("Unable to read asg json test template")
         .replace("VARIANT", variant);
+    // an apostrophe in code stays as written (see the `literals-straight-squo` fixture)
+    if variant == "code" {
+        asg_json_str = asg_json_str.replace("&#8217;", "'");
+    }
     assert_parsed_doc_matches_expected_asg_from_str(&adoc_str, &asg_json_str)
 }
 
@@ -285,4 +289,173 @@ fn test_unclosed_include_is_text(#[case] adoc: &str, #[case] expected: &str) {
         .recv_timeout(std::time::Duration::from_secs(5))
         .expect("Parsing did not finish: the scanner is stuck");
     assert_eq!(text, expected);
+}
+
+/// A footnote ends at its own `]`, and a footnote that has ended takes nothing after it
+#[rstest]
+#[case::stray_bracket(
+    "A footnote:[plain] here and a stray ] there.\n",
+    "</sup> here and a stray ] there.</p>"
+)]
+#[case::span_after(
+    "A footnote:[x] and *b* end.\n",
+    "</sup> and <strong>b</strong> end.</p>"
+)]
+fn test_footnote_ends_at_its_bracket(#[case] adoc: &str, #[case] expected: &str) {
+    let html = render_asciidoctor_embedded_from_str(adoc);
+    assert!(html.contains(expected), "{html}");
+}
+
+/// The `link:` macro, with a URL or a relative target
+#[rstest]
+#[case::url(
+    "See link:http://x.com[the site] now.\n",
+    "<p>See <a href=\"http://x.com\">the site</a> now.</p>"
+)]
+#[case::relative(
+    "See link:other.html[other] now.\n",
+    "<p>See <a href=\"other.html\">other</a> now.</p>"
+)]
+#[case::in_footnote("footnote:[see link:x.html[y]] after\n", "</sup> after</p>")]
+#[case::bare_url_then_bracket(
+    "see http://y.com[ x\n",
+    "<p>see <a href=\"http://y.com\" class=\"bare\">http://y.com</a>[ x</p>"
+)]
+#[case::formatted_text_with_url(
+    "link:x.html[*x http://q.com y*]\n",
+    "<a href=\"x.html\"><strong>x <a href=\"http://q.com\" class=\"bare\">http://q.com</a> y</strong></a>"
+)]
+fn test_link_macro(#[case] adoc: &str, #[case] expected: &str) {
+    let html = render_asciidoctor_embedded_from_str(adoc);
+    assert!(html.contains(expected), "{html}");
+}
+
+/// Markup that is never closed is text, at the end of a paragraph as at the end of the document
+#[rstest]
+#[case::emphasis_before_block("a _unclosed text\n\nb\n", "a _unclosed text")]
+#[case::strong_before_block("a *unclosed text\n\nb\n", "a *unclosed text")]
+#[case::plus_plus("C++ uses a::b\n", "C++ uses a::b")]
+#[case::single_plus("1 + 1 and a+b\n", "1 + 1 and a+b")]
+fn test_unclosed_markup_is_text(#[case] adoc: &str, #[case] expected: &str) {
+    assert!(
+        parsed_text(adoc).starts_with(expected),
+        "{}",
+        parsed_text(adoc)
+    );
+}
+
+/// Like Asciidoctor, an apostrophe between letters is a typographic one, in a span or not
+#[rstest]
+#[case::plain("don't stop\n", "don&#8217;t stop")]
+#[case::emphasis("_don't stop_\n", "<em>don&#8217;t stop</em>")]
+#[case::strong("*it's here*\n", "<strong>it&#8217;s here</strong>")]
+#[case::twice("rock'n'roll\n", "rock&#8217;n&#8217;roll")]
+#[case::quotes_untouched("say 'hi' now\n", "say 'hi' now")]
+fn test_apostrophes(#[case] adoc: &str, #[case] expected: &str) {
+    let html = render_asciidoctor_embedded_from_str(adoc);
+    assert!(html.contains(expected), "{html}");
+}
+
+/// Windows line endings are line endings
+#[test]
+fn test_crlf_line_endings() {
+    assert_eq!(
+        parsed_text("line one\r\nline two\r\n"),
+        "line one\nline two"
+    );
+}
+
+/// As in Asciidoctor, a constrained mark after a space, or before a letter or digit, doesn't
+/// close a span, and a span left open inside one that closes is text
+#[rstest]
+#[case::strong("*a b *c", "*a b *c")]
+#[case::emphasis("_a b _c", "_a b _c")]
+#[case::monospace("`a b `c", "`a b `c")]
+#[case::mark("#a b #c", "#a b #c")]
+#[case::closed_later("*a *b* c", "<strong>a *b</strong> c")]
+#[case::open_inside_strong("mix *a _b* c", "mix <strong>a _b</strong> c")]
+#[case::open_inside_emphasis("mix _a *b_ c", "mix <em>a *b</em> c")]
+#[case::open_inside_unconstrained("**a _b** c", "<strong>a _b</strong> c")]
+#[case::two_spans("*a* and _b_", "<strong>a</strong> and <em>b</em>")]
+#[case::before_non_ascii_letter("*a *é* b", "<strong>a *é</strong> b")]
+fn test_spans_that_do_not_close(#[case] adoc: &str, #[case] expected: &str) {
+    let html = common::render_asciidoctor_embedded_from_str(adoc);
+    common::html::assert_html_eq(
+        &common::html::select(&html, "p"),
+        &format!("<p>{expected}</p>"),
+    );
+}
+
+/// A run of marks that never close is text, however long (it overflowed the stack), and quickly
+#[test]
+fn test_many_unclosed_marks() {
+    let adoc = format!("a{}\n", " *x".repeat(20_000));
+    let asg = common::parsed_asg_with_timeout(&adoc);
+    let inlines = &asg["blocks"][0]["inlines"];
+    assert_eq!(inlines.as_array().map(Vec::len), Some(1), "one literal");
+}
+
+/// A mark closes the span of its kind however deeply the spans in it are nested, and a mark
+/// that can't close one is text when a span of its kind is already open
+#[rstest]
+#[case::three_deep(
+    "*a _b `c` d_ e* f",
+    "<strong>a <em>b <code>c</code> d</em> e</strong> f"
+)]
+#[case::three_deep_unconstrained(
+    "**a _b `c` d_ e** f",
+    "<strong>a <em>b <code>c</code> d</em> e</strong> f"
+)]
+#[case::same_kind_again("_a *b _c* d_", "<em>a <strong>b _c</strong> d</em>")]
+#[case::file_globs("Files *.txt, *.md and *.rs", "Files *.txt, *.md and *.rs")]
+fn test_nested_spans(#[case] adoc: &str, #[case] expected: &str) {
+    let html = common::render_asciidoctor_embedded_from_str(adoc);
+    common::html::assert_html_eq(
+        &common::html::select(&html, "p"),
+        &format!("<p>{expected}</p>"),
+    );
+}
+
+/// `...` is an ellipsis wherever it is in the text, followed by a zero-width space, as in
+/// Asciidoctor
+#[rstest]
+#[case::inside_a_word("a...b", "a&#8230;&#8203;b")]
+#[case::between_words("a ... b", "a &#8230;&#8203; b")]
+#[case::after_a_word("Wait... what", "Wait&#8230;&#8203; what")]
+#[case::ending_a_line("a...\nb", "a&#8230;&#8203;\nb")]
+#[case::starting_a_line("...and", "&#8230;&#8203;and")]
+#[case::four_dots("a.... b", "a&#8230;&#8203;. b")]
+#[case::after_formatting("*x* c... d", "x c&#8230;&#8203; d")]
+#[case::in_formatting("_a..._", "a&#8230;&#8203;")]
+#[case::before_a_quote("a...\"", "a&#8230;&#8203;\"")]
+#[case::two_dots("a.. b", "a.. b")]
+#[case::escaped("a\\... b", "a\\... b")]
+#[case::in_a_listing("----\na...b\n----\n", "\na...b\n")]
+fn test_ellipsis(#[case] adoc: &str, #[case] expected: &str) {
+    assert_eq!(parsed_text(adoc), expected);
+}
+
+/// A spaced `--` is an em dash at the start or end of a line too
+#[rstest]
+#[case::ending_a_line("a --\nb", "a &#8212;\nb")]
+#[case::starting_a_line("a\n-- b", "a\n&#8212; b")]
+#[case::ending_a_paragraph("a --\n\nb", "a &#8212;b")]
+#[case::ending_the_document("a --", "a &#8212;")]
+#[case::before_formatting("a --\n*b*", "a &#8212;\nb")]
+#[case::ending_an_item("* a --\n* b --\n", "a &#8212;b &#8212;")]
+// (a section's blocks come before its title in the JSON)
+#[case::ending_a_heading("== a --\n\nb", "ba &#8212;")]
+#[case::three_dashes("a ---\nb", "a ---\nb")]
+#[case::in_a_listing("----\na --\n----\n", "\na --\n")]
+fn test_em_dash_at_line_edges(#[case] adoc: &str, #[case] expected: &str) {
+    assert_eq!(parsed_text(adoc), expected);
+}
+
+/// A line of just `--` is still an open block's delimiter
+#[test]
+fn test_open_block_delimiter_is_not_an_em_dash() {
+    assert_eq!(
+        common::block_tree("a\n\n--\nb\n--\n"),
+        "paragraph open(paragraph)"
+    );
 }

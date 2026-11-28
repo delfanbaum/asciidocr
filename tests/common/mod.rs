@@ -1,10 +1,12 @@
+pub mod html;
+
 use std::env;
 use std::{fs, path::PathBuf};
 
 use asciidocr::{
-    backends::htmls::{
-        render_asciidoctor_html, render_asciidoctor_html_embedded, render_htmlbook,
-        render_htmlbook_embedded,
+    backends::{
+        asciidoctor::{render_asciidoctor_html, render_asciidoctor_html_embedded},
+        htmlbook::{render_htmlbook, render_htmlbook_embedded},
     },
     parser::Parser,
     scanner::Scanner,
@@ -106,6 +108,133 @@ pub fn block_tree(adoc: &str) -> String {
         .join(" ")
 }
 
+/// Parses the Asciidoc source and outlines its blocks with their text, descending into lists,
+/// e.g., `list(* "one"(paragraph "more"), * "two")`; top-level blocks are separated by spaces.
+/// List items show their marker and principal text, description list items their terms and
+/// principal text (`"Term":: "def"`, or `"A" "B":: "def"` for two terms), sections their title, and other blocks their name and inline
+/// text, if any (as it is in the graph: a listing's text starts with a newline, e.g.). This is
+/// for tests of where text and blocks end up, without hand-writing JSON with locations.
+pub fn block_outline(adoc: &str) -> String {
+    outline(&parsed_asg(adoc))
+}
+
+/// Like [`block_outline`], but for a file in tests/data (whose includes resolve from where it is)
+pub fn block_outline_from_file(adoc_fn: &str) -> String {
+    outline(&parsed_asg_from_file(adoc_fn))
+}
+
+/// The graph, as JSON, of a file in tests/data (whose includes resolve from where it is)
+pub fn parsed_asg_from_file(adoc_fn: &str) -> Value {
+    let path = PathBuf::from("tests/data/").join(adoc_fn);
+    json!(
+        Parser::new_no_target_resolution(path.clone())
+            .parse(Scanner::new(
+                &fs::read_to_string(&path).expect("Unable to find adoc")
+            ))
+            .expect("Unable to parse input")
+    )
+}
+
+fn outline(asg: &Value) -> String {
+    fn text(inlines: &Value) -> String {
+        let mut collected = String::new();
+        for inline in inlines.as_array().into_iter().flatten() {
+            if let Some(Value::String(value)) = inline.get("value") {
+                collected.push_str(value);
+            }
+            collected.push_str(&text(&inline["inlines"]));
+        }
+        collected
+    }
+    fn children(block: &Value, key: &str) -> Vec<String> {
+        block[key]
+            .as_array()
+            .map(|blocks| blocks.iter().map(describe).collect())
+            .unwrap_or_default()
+    }
+    fn describe(block: &Value) -> String {
+        let name = block["name"].as_str().unwrap_or_default();
+        let mut outline = match name {
+            "list" | "dlist" => {
+                return format!("{}({})", name, children(block, "items").join(", "));
+            }
+            "listItem" => format!(
+                "{} \"{}\"",
+                block["marker"].as_str().unwrap_or_default(),
+                text(&block["principal"])
+            ),
+            "dlistItem" => format!(
+                "{}:: \"{}\"",
+                block["terms"]
+                    .as_array()
+                    .into_iter()
+                    .flatten()
+                    .map(|term| format!("\"{}\"", text(term)))
+                    .collect::<Vec<_>>()
+                    .join(" "),
+                text(&block["principal"])
+            ),
+            // a section's text is its title
+            "section" => match text(&block["title"]) {
+                title if title.is_empty() => name.to_string(),
+                title => format!("{} \"{}\"", name, title),
+            },
+            _ => match text(&block["inlines"]) {
+                inline_text if inline_text.is_empty() => name.to_string(),
+                inline_text => format!("{} \"{}\"", name, inline_text),
+            },
+        };
+        let blocks = children(block, "blocks");
+        if !blocks.is_empty() {
+            outline.push_str(&format!("({})", blocks.join(", ")));
+        }
+        outline
+    }
+    asg["blocks"]
+        .as_array()
+        .expect("Document has no blocks")
+        .iter()
+        .map(describe)
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+/// Parses the Asciidoc source into its graph, as JSON
+pub fn parsed_asg(adoc: &str) -> Value {
+    json!(
+        Parser::new_no_target_resolution(env::current_dir().unwrap())
+            .parse(Scanner::new(adoc))
+            .expect("Unable to parse input")
+    )
+}
+
+/// Like [`parsed_asg`], but parses on its own thread and panics if parsing takes longer than a few
+/// seconds (or panics), so that a parser that loops forever fails the test instead of hanging
+/// the run
+pub fn parsed_asg_with_timeout(adoc: &str) -> Value {
+    let (sender, receiver) = std::sync::mpsc::channel();
+    let adoc = adoc.to_string();
+    std::thread::spawn(move || {
+        let _ = sender.send(parsed_asg(&adoc));
+    });
+    receiver
+        .recv_timeout(std::time::Duration::from_secs(5))
+        .expect("Parsing timed out (or panicked)")
+}
+
+/// Like [`block_outline`], but parses on its own thread and panics if parsing takes longer than
+/// a few seconds, so that a parser that loops forever fails the test instead of hanging the run
+pub fn block_outline_with_timeout(adoc: &str) -> String {
+    let (sender, receiver) = std::sync::mpsc::channel();
+    let adoc = adoc.to_string();
+    std::thread::spawn(move || {
+        let _ = sender.send(block_outline(&adoc));
+    });
+    receiver
+        .recv_timeout(std::time::Duration::from_secs(5))
+        .expect("Parsing timed out (or panicked)")
+}
+
 /// Given an asciidoc string and an expected abstract syntax graph json string, assert that the
 /// parser produces the correct json from the asciidoc
 pub fn assert_parsed_doc_matches_expected_asg_from_str(adoc_str: &str, asg_json_str: &str) {
@@ -119,11 +248,11 @@ pub fn assert_parsed_doc_matches_expected_asg_from_str(adoc_str: &str, asg_json_
     assert_json_eq!(parsed_asg, expected_asg);
 }
 
-/// Ignoring whitespace (because that's less important for now), ensure that our tags, ordering,
-/// blocks, inlines, etc., are correct
+/// Given a pattern "parent/filename" inside tests/data, assert that the filename.adoc produces the
+/// HTMLBook document in filename.html, compared as it renders (see [`html::assert_html_eq`])
 pub fn assert_rendered_htmlbook_matches_expected(adoc_fn: &str, html_fn: &str) {
     let test_dir = PathBuf::from("tests/data/");
-    let mut rendered_html = render_htmlbook(
+    let rendered_html = render_htmlbook(
         &Parser::new_no_target_resolution(test_dir.join(adoc_fn))
             .parse(Scanner::new(
                 &fs::read_to_string(test_dir.join(adoc_fn)).expect("Unable to find adoc"),
@@ -131,18 +260,16 @@ pub fn assert_rendered_htmlbook_matches_expected(adoc_fn: &str, html_fn: &str) {
             .expect("Unable to parse input file"),
     )
     .expect("Unable to render HTML from document");
-    rendered_html.retain(|c| !c.is_whitespace());
-    let mut expected_html =
-        fs::read_to_string(test_dir.join(html_fn)).expect("Unable to read expectd html file");
-    expected_html.retain(|c| !c.is_whitespace());
-    assert_eq!(rendered_html, expected_html);
+    let expected_html =
+        fs::read_to_string(test_dir.join(html_fn)).expect("Unable to read expected html file");
+    html::assert_html_eq(&rendered_html, &expected_html);
 }
 
 /// Like `assert_rendered_htmlbook_matches_expected`, but for the embedded (no document wrapper)
 /// rendering
 pub fn assert_rendered_htmlbook_embedded_matches_expected(adoc_fn: &str, html_fn: &str) {
     let test_dir = PathBuf::from("tests/data/");
-    let mut rendered_html = render_htmlbook_embedded(
+    let rendered_html = render_htmlbook_embedded(
         &Parser::new_no_target_resolution(test_dir.join(adoc_fn))
             .parse(Scanner::new(
                 &fs::read_to_string(test_dir.join(adoc_fn)).expect("Unable to find adoc"),
@@ -150,16 +277,14 @@ pub fn assert_rendered_htmlbook_embedded_matches_expected(adoc_fn: &str, html_fn
             .expect("Unable to parse input file"),
     )
     .expect("Unable to render HTML from document");
-    rendered_html.retain(|c| !c.is_whitespace());
-    let mut expected_html =
-        fs::read_to_string(test_dir.join(html_fn)).expect("Unable to read expectd html file");
-    expected_html.retain(|c| !c.is_whitespace());
-    assert_eq!(rendered_html, expected_html);
+    let expected_html =
+        fs::read_to_string(test_dir.join(html_fn)).expect("Unable to read expected html file");
+    html::assert_html_eq(&rendered_html, &expected_html);
 }
 
 /// Given a pattern "parent/filename" inside tests/data, assert that the filename.adoc produces the
-/// Asciidoctor-styled full document found in filename.html. Ignores whitespace, and the
-/// "Last updated" timestamp (which is `NOW` in the expected html).
+/// Asciidoctor-styled full document found in filename.html, compared as it renders (see
+/// [`html::assert_html_eq`]), ignoring the "Last updated" timestamp (`NOW` in the expected html).
 pub fn assert_rendered_asciidoctor_html_matches_expected(adoc_fn: &str, html_fn: &str) {
     let test_dir = PathBuf::from("tests/data/");
     let rendered_html = render_asciidoctor_html(
@@ -171,14 +296,12 @@ pub fn assert_rendered_asciidoctor_html_matches_expected(adoc_fn: &str, html_fn:
     )
     .expect("Unable to render HTML from document");
     let timestamp = regex::Regex::new(r"Last updated [^<]*").unwrap();
-    let mut rendered_html = timestamp
+    let rendered_html = timestamp
         .replace(&rendered_html, "Last updated NOW")
         .to_string();
-    rendered_html.retain(|c| !c.is_whitespace());
-    let mut expected_html =
-        fs::read_to_string(test_dir.join(html_fn)).expect("Unable to read expectd html file");
-    expected_html.retain(|c| !c.is_whitespace());
-    assert_eq!(rendered_html, expected_html);
+    let expected_html =
+        fs::read_to_string(test_dir.join(html_fn)).expect("Unable to read expected html file");
+    html::assert_html_eq(&rendered_html, &expected_html);
 }
 
 /// Renders Asciidoc source to embedded HTMLBook, keeping whitespace as is (for tests of things
@@ -205,10 +328,10 @@ pub fn render_asciidoctor_embedded_from_str(adoc: &str) -> String {
 
 /// Given a pattern "parent/filename" inside tests/data, assert that the filename.adoc produces the
 /// embedded Asciidoctor-styled html (i.e., the document contents only, like `asciidoctor -s`)
-/// found in filename.html. Ignores whitespace.
+/// found in filename.html, compared as it renders (see [`html::assert_html_eq`]).
 pub fn assert_rendered_asciidoctor_embedded_matches_expected(adoc_fn: &str, html_fn: &str) {
     let test_dir = PathBuf::from("tests/data/");
-    let mut rendered_html = render_asciidoctor_html_embedded(
+    let rendered_html = render_asciidoctor_html_embedded(
         &Parser::new_no_target_resolution(test_dir.join(adoc_fn))
             .parse(Scanner::new(
                 &fs::read_to_string(test_dir.join(adoc_fn)).expect("Unable to find adoc"),
@@ -216,11 +339,9 @@ pub fn assert_rendered_asciidoctor_embedded_matches_expected(adoc_fn: &str, html
             .expect("Unable to parse input file"),
     )
     .expect("Unable to render HTML from document");
-    rendered_html.retain(|c| !c.is_whitespace());
-    let mut expected_html =
-        fs::read_to_string(test_dir.join(html_fn)).expect("Unable to read expectd html file");
-    expected_html.retain(|c| !c.is_whitespace());
-    assert_eq!(rendered_html, expected_html);
+    let expected_html =
+        fs::read_to_string(test_dir.join(html_fn)).expect("Unable to read expected html file");
+    html::assert_html_eq(&rendered_html, &expected_html);
 }
 
 pub fn generate_temp_image() -> NamedTempFile {
@@ -272,6 +393,27 @@ pub struct RunSummary {
     pub line_break: bool,
 }
 
+#[cfg(feature = "docx")]
+impl RunSummary {
+    fn same_formatting(&self, other: &RunSummary) -> bool {
+        !self.line_break
+            && !other.line_break
+            && (
+                self.bold,
+                self.italic,
+                self.mono,
+                self.highlight,
+                &self.vert_align,
+            ) == (
+                other.bold,
+                other.italic,
+                other.mono,
+                other.highlight,
+                &other.vert_align,
+            )
+    }
+}
+
 /// Renders Asciidoc source to docx and summarizes the runs of every body paragraph.
 #[cfg(feature = "docx")]
 pub fn rendered_docx_runs(adoc: &str) -> Vec<Vec<RunSummary>> {
@@ -304,7 +446,15 @@ pub fn rendered_docx_runs(adoc: &str) -> Vec<Vec<RunSummary>> {
                     }
                     run
                 })
-                .collect()
+                // adjacent runs with the same formatting look the same, and how the writer splits
+                // text into runs (a typographic apostrophe is its own, e.g.) isn't what's tested
+                .fold(Vec::<RunSummary>::new(), |mut runs, run| {
+                    match runs.last_mut() {
+                        Some(last) if last.same_formatting(&run) => last.text.push_str(&run.text),
+                        _ => runs.push(run),
+                    }
+                    runs
+                })
         })
         .collect()
 }

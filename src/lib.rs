@@ -7,6 +7,29 @@
 //! <https://gitlab.eclipse.org/eclipse/asciidoc-lang/asciidoc-tck>) via the `json` backend, and
 //! library access to the parser, scanner, backends, and Abstract Syntax Graph elements.
 //!
+//! # Using the library
+//!
+//! A [`Scanner`](scanner::Scanner) turns a document into tokens, a [`Parser`](parser::Parser)
+//! builds its graph ([`Asg`](graph::asg::Asg)) from them, and a [backend](backends) renders the
+//! graph:
+//!
+//! ```
+//! use asciidocr::backends::htmlbook::render_htmlbook_embedded;
+//! use asciidocr::parser::Parser;
+//! use asciidocr::scanner::Scanner;
+//!
+//! let adoc = "== A Section\n\nWith *a paragraph*.\n";
+//! let graph = Parser::default().parse(Scanner::new(adoc))?;
+//!
+//! let html = render_htmlbook_embedded(&graph)?;
+//! assert!(html.contains("<strong>a paragraph</strong>"));
+//! # Ok::<(), Box<dyn std::error::Error>>(())
+//! ```
+//!
+//! Use [`Parser::new`](parser::Parser::new) with a file's path to find its includes from its
+//! directory. The command-line tool's dependencies come with the default `cli` feature, so a
+//! library user can leave them out with `default-features = false`.
+//!
 //! NOTE: This crate is still in progress and nothing, including library elements, should be
 //! considered stable. If something disappears that you're interested in, please open an [`issue`].
 //!
@@ -15,8 +38,6 @@
 //!
 //! - Some Asciidoctor document attributes (e.g., `:toc:`, `:icons:`, etc.)
 //! - Indented source blocks
-//! - Offsets
-//! - Tagged regions
 //! - Conditionals (`ifdef`, `ifndef`, `ifeval`)
 //!
 //! It's also important to note that though we have targeted (and are passing) all of the
@@ -34,9 +55,10 @@
 //! [`issue`]: https://github.com/delfanbaum/asciidocr/issues
 //! [`HTMLBook`]: https://oreillymedia.github.io/HTMLBook/
 
+#![warn(missing_docs)]
+
 pub mod backends;
 pub mod errors;
 pub mod graph;
 pub mod parser;
 pub mod scanner;
-pub mod utils;

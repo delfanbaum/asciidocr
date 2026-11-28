@@ -9,11 +9,12 @@
 #[cfg(feature = "docx")]
 pub mod docx;
 
-pub mod htmls;
+pub mod asciidoctor;
+mod html;
+pub mod htmlbook;
 
-use clap::ValueEnum;
-
-#[derive(Debug, ValueEnum, Clone)]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "cli", derive(clap::ValueEnum))]
 /// Enum containing all available backends for `asciidocr`. Note that some backends may be behind
 /// feature flags.
 pub enum Backends {

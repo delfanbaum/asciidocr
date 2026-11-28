@@ -1,0 +1,22 @@
+[quote]
+A quoted *paragraph*,
+on two lines.
+
+.A title
+[quote, Ada Lovelace, Notes]
+With an attribution.
+
+[verse, Ada Lovelace]
+Roses  are red,
+  violets are blue.
+
+.A quoted paragraph
+"It said so,
+and meant it."
+-- Ada Lovelace, A Book, p. 3
+
+* An item
++
+[verse]
+In a list
+* Another item

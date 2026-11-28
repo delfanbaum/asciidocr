@@ -9,13 +9,16 @@ The pipeline is `Scanner` → `Parser` → `Asg` → backend.
 
 - `src/scanner/`: turns source text into `Token`s (`tokens.rs` holds `Token`/`TokenType`).
   The scanner is an iterator of `Result<Token, ScannerError>`.
-- `src/parser.rs`: consumes tokens and builds the `Asg`. It uses stacks for blocks and inlines,
-  and it resolves includes, attributes and targets.
-- `src/graph/`: the ASG types (`asg`, `blocks`, `inlines`, `lists`, `metadata`, `nodes`,
-  `substitutions`). They roughly follow the official Asciidoc ASG schema and are all
+- `src/parser/`: consumes tokens and builds the `Asg`. It uses stacks for blocks and inlines,
+  and it resolves includes, attributes and targets. Lists (description lists too) stay off the
+  block stack while they are open, in `src/parser/list_context.rs`; its module docs explain the
+  scopes.
+- `src/graph/`: the ASG types (`asg`, `blocks`, `header`, `inlines`, `lists`, `location`,
+  `metadata`, `substitutions`). They roughly follow the official Asciidoc ASG schema and are all
   `serde`-serializable. That serialization is how the JSON/TCK output and the templates work.
-- `src/backends/`: `htmls.rs` (HTMLBook, rendered with minijinja) and `docx/` (behind the `docx`
-  feature). The `Backends` enum in `backends/mod.rs` is also the CLI's `--backend` value enum.
+- `src/backends/`: `htmlbook.rs` and `asciidoctor.rs` (the HTML backends, rendered with minijinja,
+  with what they share in `html.rs`) and `docx/` (behind the `docx` feature). The `Backends` enum
+  in `backends/mod.rs` is also the CLI's `--backend` value enum.
 - `src/errors.rs`: every error type, defined with `thiserror`.
 - `src/bin/asciidocr/`: the CLI (`clap` derive in `cli.rs`).
 - `templates/`: HTML templates, embedded at compile time with `include_str!`. Changing a
@@ -72,20 +75,33 @@ cargo clippy --all-features --all-targets
 
 - **Unit tests** live inline at the bottom of the file, in `#[cfg(test)] mod tests { use super::*; ... }`.
   Use small local helpers (for example `scan_and_assert_eq`, `newline_token_at`).
-- **Integration tests** live in `tests/*_tests.rs`, named by area: `block_tests`, `inline_tests`,
-  `document_tests`, `htmlbook_tests`, `asciidoctor_html_tests`, `docx_tests`, `log_tests`,
-  `offset_tests`, and `cli_tests` (which runs the `asciidocr` binary itself). Each one starts
+- **Integration tests** live in `tests/*_tests.rs`, named by area: `block_tests`, `list_tests`,
+  `inline_tests`, `document_tests`, `htmlbook_tests`, `asciidoctor_html_tests`, `docx_tests`, `log_tests`,
+  `offset_tests`, `html_compare_tests` (tests of the HTML comparison itself), `fuzz_tests` (every
+  fixture cut off and mutated, checked for panics and hangs; the full run is
+  `cargo test --all-features --test fuzz_tests -- --ignored`, which CI runs for PRs into `main`, and
+  anything it finds becomes a test of its own in the area's test file), and `cli_tests` (which
+  runs the `asciidocr` binary itself). Each one starts
   with `pub mod common;` (except `cli_tests`) and uses the shared helpers in `tests/common/mod.rs`:
   - `assert_parsed_doc_matches_expected_asg(adoc_fn, json_fn)`
   - `assert_parsed_doc_matches_expected_asg_from_str(adoc, json)`
-  - `assert_rendered_htmlbook_matches_expected(adoc_fn, html_fn)` and its `_embedded_` sibling.
-    They ignore whitespace.
+  - `html::assert_html_eq(actual, expected)` compares two pieces of HTML (documents or fragments)
+    as a browser renders them: indentation between blocks is ignored, but a missing or extra space
+    between words or next to an inline element, a stray newline in a link, and anything inside
+    `<pre>` are not. A failure is a line diff of both sides' canonical forms (one node per line,
+    text quoted). `html::select(html, css)` gives the HTML of the elements a CSS selector matches,
+    for comparing part of a page. See `tests/common/html.rs`
+  - `assert_rendered_htmlbook_matches_expected(adoc_fn, html_fn)` and its `_embedded_` sibling,
+    built on `assert_html_eq`
   - `assert_rendered_asciidoctor_html_matches_expected(adoc_fn, html_fn)` (a full document; it
-    ignores whitespace and the "Last updated" time) and
-    `assert_rendered_asciidoctor_embedded_matches_expected`
+    ignores the "Last updated" time) and `assert_rendered_asciidoctor_embedded_matches_expected`,
+    built on `assert_html_eq`
   - `parsed_text(adoc)`, `top_level_block_names(adoc)` and `block_tree(adoc)` for tests that
     only care about a document's text or how its blocks nest, without hand-writing JSON with
     locations
+  - `block_outline(adoc)` (and `block_outline_with_timeout`, for inputs that could hang): like
+    `block_tree`, but it descends into lists and shows each block's text, e.g.
+    `list(* "one"(paragraph "more"), * "two")`. Use it for list tests
   - `rendered_docx_part(adoc, part)`, `rendered_docx_runs(adoc)` and
     `assert_rendered_docx_runs_match_expected(adoc_fn, json_fn)` for docx: the runs of each
     paragraph (text, bold, italic, ...) are compared against a `.json` fixture in `tests/data/docx/`
@@ -94,9 +110,14 @@ cargo clippy --all-features --all-targets
 - **Fixtures** live in `tests/data/<area>/`, as an `.adoc` file and its expected output under the
   same kebab-case base name:
   - `blocks/`, `inlines/`, `documents/`: `name.adoc` + `name.json` (expected ASG)
-  - `htmlbook/`: `name.adoc` + `name.html`
+  - `htmlbook/`: `name.adoc` + `name.html`. These are hand-written; keep the existing ones, but
+    don't add new whole-page ones: a new HTMLBook test renders a short input
+    (`render_htmlbook_embedded_from_str`) and compares just the part it's about with
+    `assert_html_eq(&select(&html, "..."), "<expected>...")`
   - `asciidoctor-html/`: `name.adoc` + `name.html` (a full document), and
-    `asciidoctor-html/embedded/`: the same, but the `.html` is embedded output
+    `asciidoctor-html/embedded/`: the same, but the `.html` is embedded output. Never write these
+    by hand: generate them with `scripts/asciidoctor-fixtures.sh path/to/name.adoc` (Asciidoctor
+    is the oracle)
 - Use `rstest` for parameterized cases, and name each case after its fixture:
 
   ```rust
@@ -113,9 +134,12 @@ cargo clippy --all-features --all-targets
   `htmlbook_tests.rs`.
 - Tests that need real files use `tempfile` (and `image` to generate test images). Parse with
   `Parser::new_no_target_resolution` unless the test is about target resolution.
-- **Whitespace**: the HTML comparison helpers ignore whitespace, so they cannot see bugs inside
-  `<pre>` or verse blocks. When whitespace matters, add an exact test (render to a string with
-  `render_htmlbook_embedded_from_str`/`render_asciidoctor_embedded_from_str` and `assert!(html.contains(..))`).
+- **Whitespace**: compare HTML with `assert_html_eq` (or the helpers built on it), never by
+  deleting whitespace from both sides, which hides missing spaces and stray newlines. It compares
+  whitespace as it renders; for whitespace that HTML itself doesn't render (the newline directly
+  after `<pre>`, say), add an exact test (render to a string with
+  `render_htmlbook_embedded_from_str`/`render_asciidoctor_embedded_from_str` and
+  `assert!(html.contains(..))`).
 - **Logging** (`tests/log_tests.rs`): `Logger::start` can only be called once per process, so the
   tests share one `logtest` logger behind a mutex (see the `logger()` helper); anything logged by
   earlier tests is discarded when a test takes the lock.
@@ -147,10 +171,14 @@ cargo clippy --all-features --all-targets
   output (embedded mode, i.e., document contents only), and the five full-document fixtures in
   `tests/data/asciidoctor-html/` cover the shell (header, content, footer). Numbering
   ("Figure 1."), section ids, footnotes and image alt text need per-render state or helpers, so
-  they are template functions registered in `src/backends/htmls.rs` (`next_number`, `section_id`,
-  `register_footnote`/`footnotes`, `image_alt`). Those tests ignore whitespace, so whitespace
-  that matters (inside `<pre>`) has its own exact-match test.
-- minijinja environments in `src/backends/htmls.rs` have autoescape turned off, because the parser
+  they are template functions registered in `src/backends/asciidoctor.rs` (`next_number`,
+  `register_footnote`/`footnotes`, `image_alt`) and, for both backends, `src/backends/html.rs`
+  (`section_id`, `warn`). `section_id(block)` returns the section's ID:
+  its explicit one, or the one the parser generated (`src/graph/ids.rs`, which follows
+  Asciidoctor's algorithm). Generated IDs are kept out of the JSON output (a `#[serde(skip)]`
+  field), because the TCK's expected ASG has none. Those tests compare whitespace as it renders
+  (see `assert_html_eq`).
+- minijinja environments (set up in `src/backends/html.rs`) have autoescape turned off, because the parser
   makes character references (`&#8217;`, `&amp;`) of replacements and of references the author
   wrote, and those must not be escaped again. Templates escape the rest themselves, with the
   `escape_text` filter (text: `&`, `<`, `>`) on `text` literals and the `escape_attr` filter

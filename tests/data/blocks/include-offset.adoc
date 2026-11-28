@@ -1,0 +1,7 @@
+text
+
+include::include-offset-part.adoc[leveloffset=+1]
+
+include::include-offset-part.adoc[leveloffset=+1]
+
+== After

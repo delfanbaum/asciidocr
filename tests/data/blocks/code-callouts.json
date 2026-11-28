@@ -167,7 +167,7 @@
     {
       "name": "list",
       "type": "block",
-      "marker": ".",
+      "marker": "<1>",
       "variant": "ordered",
       "items": [
         {

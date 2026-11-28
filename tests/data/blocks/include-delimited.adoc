@@ -1,0 +1,10 @@
+x
+
+====
+first
+
+include::included-sidebar.adoc[]
+
+last
+====
+after

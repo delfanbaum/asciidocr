@@ -13,6 +13,7 @@ use rstest::rstest;
 #[case::ordered_list("asciidoctor-html/blocks-ordered-list")]
 #[case::code("asciidoctor-html/blocks-code")]
 #[case::open("asciidoctor-html/blocks-open")]
+#[case::header_details("asciidoctor-html/header-details")]
 fn test_full_documents(#[case] fn_pattern: &str) {
     let adoc_fn = format!("{}.adoc", fn_pattern);
     let html_fn = format!("{}.html", fn_pattern);
@@ -25,7 +26,15 @@ fn test_full_documents(#[case] fn_pattern: &str) {
 #[case::leaf_blocks("asciidoctor-html/embedded/leaf-blocks")]
 #[case::breaks("asciidoctor-html/embedded/breaks")]
 #[case::parent_blocks("asciidoctor-html/embedded/parent-blocks")]
+#[case::quote_paragraphs("asciidoctor-html/embedded/quote-paragraphs")]
+#[case::quote_admonitions("asciidoctor-html/embedded/quote-admonitions")]
 #[case::description_list("asciidoctor-html/embedded/description-list")]
+#[case::nested_lists("asciidoctor-html/embedded/nested-lists")]
+#[case::lettered_lists("asciidoctor-html/embedded/lettered-lists")]
+#[case::description_list_terms("asciidoctor-html/embedded/description-list-terms")]
+#[case::nested_description_lists("asciidoctor-html/embedded/nested-description-lists")]
+#[case::nested_delimited_blocks("asciidoctor-html/embedded/nested-delimited-blocks")]
+#[case::link_macros("asciidoctor-html/embedded/link-macros")]
 #[case::table("asciidoctor-html/embedded/table")]
 #[case::xrefs("asciidoctor-html/embedded/xrefs")]
 #[case::images("asciidoctor-html/embedded/images")]
@@ -37,6 +46,11 @@ fn test_full_documents(#[case] fn_pattern: &str) {
 #[case::no_preamble("asciidoctor-html/embedded/no-preamble")]
 #[case::escaping("asciidoctor-html/embedded/escaping")]
 #[case::section_ids("asciidoctor-html/embedded/section-ids")]
+#[case::section_id_xrefs("asciidoctor-html/embedded/section-id-xrefs")]
+#[case::section_id_attributes("asciidoctor-html/embedded/section-id-attributes")]
+#[case::section_ids_off("asciidoctor-html/embedded/section-ids-off")]
+#[case::xref_text("asciidoctor-html/embedded/xref-text")]
+#[case::level_zero_sections("asciidoctor-html/embedded/level-zero-sections")]
 fn test_embedded(#[case] fn_pattern: &str) {
     let adoc_fn = format!("{}.adoc", fn_pattern);
     let html_fn = format!("{}.html", fn_pattern);

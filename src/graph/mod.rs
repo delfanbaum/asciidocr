@@ -6,10 +6,28 @@
 //! graph itself, are serializeable with `serde`, giving us JSON output (as required by the
 //! Technology Compatibility Kit) and making certain templating tasks simpler.
 
+use serde::Serialize;
+
 pub mod asg;
 pub mod blocks;
+pub mod header;
+pub(crate) mod ids;
 pub mod inlines;
 pub mod lists;
+pub mod location;
 pub mod metadata;
-pub mod nodes;
-pub mod substitutions;
+pub(crate) mod substitutions;
+mod word_count;
+
+/// The `type` of a node in the ASG
+#[derive(Clone, Copy, Serialize, Debug)]
+#[serde(rename_all = "lowercase")]
+#[non_exhaustive]
+pub enum NodeTypes {
+    /// A block
+    Block,
+    /// An inline element
+    Inline,
+    /// A string of text
+    String,
+}

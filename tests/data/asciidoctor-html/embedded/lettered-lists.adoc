@@ -1,0 +1,25 @@
+a. lower alpha
+b. again
+
+//-
+
+A. upper alpha
+B. again
+
+//-
+
+i) lower roman
+ii) again
+
+//-
+
+I) upper roman
+II) again
+
+//-
+
+. arabic
+a. nested lower alpha
+i) nested lower roman
+b. back to alpha
+. back to arabic

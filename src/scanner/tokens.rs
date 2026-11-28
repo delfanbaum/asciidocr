@@ -1,20 +1,23 @@
 use crate::errors::TokenError;
-use crate::graph::nodes::Location;
+use crate::graph::location::Location;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 /// Produced by the Scanner; contains the text, location information about itself, and what
 /// file it came from (helpful when sorting out `include::` directives... and because its required
 /// by the official schema).
 pub struct Token {
-    pub token_type: TokenType,
+    pub(crate) token_type: TokenType,
     //id: Option<String>,
-    pub lexeme: String,          // raw string of code
-    pub literal: Option<String>, // our literals are only ever strings (or represented as such)
-    pub line: usize,
-    pub startcol: usize,
-    pub endcol: usize,
+    pub(crate) lexeme: String,          // raw string of code
+    pub(crate) literal: Option<String>, // our literals are only ever strings (or represented as such)
+    pub(crate) line: usize,
+    pub(crate) startcol: usize,
+    pub(crate) endcol: usize,
     /// The file's stack hierarchy if it's an include, otherwise stays empty
-    pub file_stack: Vec<String>,
+    pub(crate) file_stack: Vec<String>,
+    /// For a formatting mark, whether it can close a span (a constrained mark can't after a
+    /// space, or before a letter or digit)
+    pub(crate) can_close: bool,
 }
 
 impl Default for Token {
@@ -28,13 +31,15 @@ impl Default for Token {
             startcol: 1,
             endcol: 1,
             file_stack: vec![],
+            can_close: true,
         }
     }
 }
 
 impl Token {
     /// Creates a new token
-    pub fn new(
+    #[cfg(test)]
+    pub(crate) fn new(
         token_type: TokenType,
         lexeme: String,
         literal: Option<String>,
@@ -51,11 +56,13 @@ impl Token {
             startcol,
             endcol,
             file_stack,
+            can_close: true,
         }
     }
 
     /// Testing helper; essentially `Token::new()` but defaulting to an empty file stack
-    pub fn new_default(
+    #[cfg(test)]
+    pub(crate) fn new_default(
         token_type: TokenType,
         lexeme: String,
         literal: Option<String>,
@@ -71,10 +78,11 @@ impl Token {
             startcol,
             endcol,
             file_stack: vec![],
+            can_close: true,
         }
     }
 
-    pub fn final_token(line: usize, file_stack: Vec<String>) -> Self {
+    pub(crate) fn final_token(line: usize, file_stack: Vec<String>) -> Self {
         Token {
             token_type: TokenType::Eof,
             lexeme: "".to_string(),
@@ -83,18 +91,41 @@ impl Token {
             startcol: 0,
             endcol: 0,
             file_stack,
+            can_close: true,
         }
     }
 
+    /// Makes the token text, as written
+    pub(crate) fn make_text(&mut self) {
+        self.token_type = TokenType::Text;
+        self.literal = Some(self.lexeme.clone());
+    }
+
+    /// Markup that, in a table, is more of a cell's text: block markup is only parsed in
+    /// AsciiDoc (`a|`) cells, which we don't support. (Includes still work, and comment lines
+    /// are still comments.)
+    pub(crate) fn is_text_in_table(&self) -> bool {
+        // everything that would start a block, and the other markup that belongs to one
+        self.token_type.ends_list_item() && self.token_type != TokenType::Table
+            || matches!(
+                self.token_type,
+                TokenType::Attribute
+                    | TokenType::UnorderedListItem
+                    | TokenType::OrderedListItem
+                    | TokenType::CodeCalloutListItem
+                    | TokenType::DescriptionListMarker
+            )
+    }
+
     /// Convince function to return the [`TokenType`] for matching
-    pub fn token_type(&self) -> TokenType {
+    pub(crate) fn token_type(&self) -> TokenType {
         self.token_type
     }
 
     /// Returns the Token's text content
     /// NOTE: for typographers' quotes, this inserts the characters instead of the entities; this
     /// may change in future releases.
-    pub fn text(&self) -> String {
+    pub(crate) fn text(&self) -> String {
         match self.token_type() {
             TokenType::OpenDoubleQuote => "“".into(),
             TokenType::CloseDoubleQuote => "”".into(),
@@ -110,24 +141,24 @@ impl Token {
         }
     }
 
-    pub fn first_location(&self) -> Location {
+    pub(crate) fn first_location(&self) -> Location {
         Location::new(self.line, self.startcol, self.file_stack.clone())
     }
-    pub fn last_location(&self) -> Location {
+    pub(crate) fn last_location(&self) -> Location {
         Location::new(self.line, self.endcol, self.file_stack.clone())
     }
 
-    pub fn locations(&self) -> Vec<Location> {
+    pub(crate) fn locations(&self) -> Vec<Location> {
         vec![self.first_location(), self.last_location()]
     }
 
-    pub fn update_token_loc_offsets_by(&mut self, lines: usize, cols: usize) {
+    pub(crate) fn update_token_loc_offsets_by(&mut self, lines: usize, cols: usize) {
         self.line += lines - 1;
         self.startcol += cols;
         self.endcol += cols;
     }
 
-    pub fn is_inline(&self) -> bool {
+    pub(crate) fn is_inline(&self) -> bool {
         matches!(self.token_type(), |TokenType::Comment| TokenType::Text
             | TokenType::Emphasis
             | TokenType::Strong
@@ -143,16 +174,36 @@ impl Token {
             | TokenType::InlineMacroClose)
     }
 
-    pub fn can_be_in_document_header(&self) -> bool {
+    /// Whether the token is markup in a verse, whose other tokens are text. (`pass:[]` isn't
+    /// supported in one: it would end the verse's own text mode)
+    pub(crate) fn is_markup_in_verse(&self) -> bool {
+        self.is_inline()
+            || matches!(
+                self.token_type(),
+                TokenType::Literal
+                    | TokenType::UnconstrainedLiteral
+                    | TokenType::Superscript
+                    | TokenType::Subscript
+                    | TokenType::LineContinuation
+                    | TokenType::LinkMacro
+                    | TokenType::Hyperlink
+                    | TokenType::CrossReference
+                    | TokenType::FootnoteMacro
+                    | TokenType::InlineImageMacro
+                    | TokenType::AttributeReference
+            )
+    }
+
+    pub(crate) fn can_be_in_document_header(&self) -> bool {
         matches!(
             self.token_type(),
-            TokenType::Heading1 | TokenType::Attribute
+            TokenType::Heading1 | TokenType::Attribute | TokenType::AttributeReference
         ) || self.is_inline()
     }
 
     /// If the token is a TokenType::StartTag or TokenType::EndTag, return the tag value,
     /// otherwise return None
-    pub fn tag(&self) -> Option<String> {
+    pub(crate) fn tag(&self) -> Option<String> {
         if matches!(self.token_type(), TokenType::StartTag | TokenType::EndTag) {
             return Some((self.lexeme[5..self.lexeme.len() - 2]).to_string());
         }
@@ -162,11 +213,19 @@ impl Token {
     /// Performs some sanity-check validations; currently checking for characters that aren't
     /// allowed in, for example, IDs, as well as performs the character substitutions for
     /// Charref entities, following asciidoctor
-    pub fn validate(&mut self) {
+    pub(crate) fn validate(&mut self) {
         match self.token_type() {
-            TokenType::BlockAnchor | TokenType::CrossReference => {
+            TokenType::BlockAnchor => {
                 // no spaces or newlines inside
                 if self.lexeme.contains(' ') || self.lexeme.contains('\n') {
+                    self.token_type = TokenType::Text
+                }
+            }
+            TokenType::CrossReference => {
+                // no spaces or newlines in the ID; the text after a comma (`<<id,the text>>`) can
+                // have spaces
+                let id = self.lexeme.split(',').next().unwrap_or_default();
+                if id.contains(' ') || self.lexeme.contains('\n') {
                     self.token_type = TokenType::Text
                 }
             }
@@ -175,7 +234,8 @@ impl Token {
                     "(C)" => self.literal = Some("&#169;".into()),
                     "(R)" => self.literal = Some("&#174;".into()),
                     "(TM)" => self.literal = Some("&#8482;".into()),
-                    "..." => self.literal = Some("&#8230;".into()),
+                    // (with a zero-width space, where a line may break, as in Asciidoctor)
+                    "..." => self.literal = Some("&#8230;&#8203;".into()),
                     "->" => self.literal = Some("&#8594;".into()),
                     "=>" => self.literal = Some("&#8658;".into()),
                     "<-" => self.literal = Some("&#8592;".into()),
@@ -238,6 +298,7 @@ pub enum TokenType {
     Heading3,
     Heading4,
     Heading5,
+    Heading6,
 
     NotePara,      // NOTE:
     TipPara,       // TIP:
@@ -280,7 +341,9 @@ pub enum TokenType {
 
     // garden-variety text
     Hyperlink, // http://whatever.txt
-    Email,     // cats@dogs.foo
+    // nothing scans an email address yet; the parser reports one until it can use it
+    #[allow(dead_code)]
+    Email, // cats@dogs.foo
     Text,
 
     // character reference, such as "&mdash;"
@@ -329,10 +392,54 @@ impl TokenType {
         matches!(
             self,
             TokenType::ElementAttributes
+                | TokenType::BlockAnchor
+                // a term that ends its line: the description starts on the next
+                | TokenType::DescriptionListMarker
                 | TokenType::SidebarBlock
                 | TokenType::OpenBlock
                 | TokenType::QuoteVerseBlock
                 | TokenType::ExampleBlock
+                | TokenType::BlockContinuation
+                // (only the closing delimiters of these get here: the newline after an opening
+                // one is part of the block's text)
+                | TokenType::SourceBlock
+                | TokenType::LiteralBlock
+                | TokenType::PassthroughBlock
+        )
+    }
+
+    /// Tokens that start a block (or a block's attribute or title line) and so end a list item's
+    /// text, and the list itself unless a `+` attached the block to the item. Inline tokens,
+    /// list and description list markers, `+`, includes, attribute entries and comments don't.
+    pub(crate) fn ends_list_item(&self) -> bool {
+        matches!(
+            self,
+            TokenType::ElementAttributes
+                | TokenType::BlockAnchor
+                | TokenType::BlockLabel
+                | TokenType::Heading1
+                | TokenType::Heading2
+                | TokenType::Heading3
+                | TokenType::Heading4
+                | TokenType::Heading5
+                | TokenType::Heading6
+                | TokenType::SidebarBlock
+                | TokenType::OpenBlock
+                | TokenType::ExampleBlock
+                | TokenType::Table
+                | TokenType::QuoteVerseBlock
+                | TokenType::PassthroughBlock
+                | TokenType::LiteralBlock
+                | TokenType::SourceBlock
+                | TokenType::CommentBlock
+                | TokenType::BlockImageMacro
+                | TokenType::PageBreak
+                | TokenType::ThematicBreak
+                | TokenType::NotePara
+                | TokenType::TipPara
+                | TokenType::ImportantPara
+                | TokenType::CautionPara
+                | TokenType::WarningPara
         )
     }
 }

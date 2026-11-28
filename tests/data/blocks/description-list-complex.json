@@ -12,21 +12,23 @@
           "type": "block",
           "marker": "::",
           "terms": [
-            {
-              "name": "text",
-              "type": "string",
-              "value": "Term",
-              "location": [
-                {
-                  "line": 1,
-                  "col": 1
-                },
-                {
-                  "line": 1,
-                  "col": 4
-                }
-              ]
-            }
+            [
+              {
+                "name": "text",
+                "type": "string",
+                "value": "Term",
+                "location": [
+                  {
+                    "line": 1,
+                    "col": 1
+                  },
+                  {
+                    "line": 1,
+                    "col": 4
+                  }
+                ]
+              }
+            ]
           ],
           "principal": [
             {
@@ -61,35 +63,37 @@
           "type": "block",
           "marker": "::",
           "terms": [
-            {
-              "name": "text",
-              "type": "string",
-              "value": "Another Term",
-              "location": [
-                {
-                  "line": 2,
-                  "col": 1
-                },
-                {
-                  "line": 2,
-                  "col": 12
-                }
-              ]
-            }
+            [
+              {
+                "name": "text",
+                "type": "string",
+                "value": "Another Term",
+                "location": [
+                  {
+                    "line": 2,
+                    "col": 1
+                  },
+                  {
+                    "line": 2,
+                    "col": 12
+                  }
+                ]
+              }
+            ]
           ],
           "principal": [
             {
               "name": "text",
               "type": "string",
-              "value": "    With its description on a separate line",
+              "value": "With its description on a separate line",
               "location": [
                 {
-                  "line": 2,
-                  "col": 16
+                  "line": 3,
+                  "col": 5
                 },
                 {
-                  "line": 2,
-                  "col": 58
+                  "line": 3,
+                  "col": 43
                 }
               ]
             }
@@ -100,8 +104,8 @@
               "col": 1
             },
             {
-              "line": 2,
-              "col": 58
+              "line": 3,
+              "col": 43
             }
           ]
         },
@@ -110,21 +114,23 @@
           "type": "block",
           "marker": "::",
           "terms": [
-            {
-              "name": "text",
-              "type": "string",
-              "value": "Another term",
-              "location": [
-                {
-                  "line": 3,
-                  "col": 1
-                },
-                {
-                  "line": 3,
-                  "col": 12
-                }
-              ]
-            }
+            [
+              {
+                "name": "text",
+                "type": "string",
+                "value": "Another term",
+                "location": [
+                  {
+                    "line": 4,
+                    "col": 1
+                  },
+                  {
+                    "line": 4,
+                    "col": 12
+                  }
+                ]
+              }
+            ]
           ],
           "blocks": [
             {
@@ -143,11 +149,11 @@
                       "value": "That is just an open block, ya know? Put lists here if you must:",
                       "location": [
                         {
-                          "line": 5,
+                          "line": 7,
                           "col": 1
                         },
                         {
-                          "line": 5,
+                          "line": 7,
                           "col": 64
                         }
                       ]
@@ -155,11 +161,11 @@
                   ],
                   "location": [
                     {
-                      "line": 5,
+                      "line": 7,
                       "col": 1
                     },
                     {
-                      "line": 5,
+                      "line": 7,
                       "col": 64
                     }
                   ]
@@ -181,11 +187,11 @@
                           "value": "Item one",
                           "location": [
                             {
-                              "line": 7,
+                              "line": 9,
                               "col": 3
                             },
                             {
-                              "line": 7,
+                              "line": 9,
                               "col": 10
                             }
                           ]
@@ -193,11 +199,11 @@
                       ],
                       "location": [
                         {
-                          "line": 7,
+                          "line": 9,
                           "col": 1
                         },
                         {
-                          "line": 7,
+                          "line": 9,
                           "col": 10
                         }
                       ]
@@ -213,11 +219,11 @@
                           "value": "Item two",
                           "location": [
                             {
-                              "line": 8,
+                              "line": 10,
                               "col": 3
                             },
                             {
-                              "line": 8,
+                              "line": 10,
                               "col": 10
                             }
                           ]
@@ -225,11 +231,11 @@
                       ],
                       "location": [
                         {
-                          "line": 8,
+                          "line": 10,
                           "col": 1
                         },
                         {
-                          "line": 8,
+                          "line": 10,
                           "col": 10
                         }
                       ]
@@ -237,11 +243,11 @@
                   ],
                   "location": [
                     {
-                      "line": 7,
+                      "line": 9,
                       "col": 1
                     },
                     {
-                      "line": 8,
+                      "line": 10,
                       "col": 10
                     }
                   ]
@@ -249,11 +255,11 @@
               ],
               "location": [
                 {
-                  "line": 4,
+                  "line": 6,
                   "col": 1
                 },
                 {
-                  "line": 9,
+                  "line": 11,
                   "col": 2
                 }
               ]
@@ -261,11 +267,11 @@
           ],
           "location": [
             {
-              "line": 3,
+              "line": 4,
               "col": 1
             },
             {
-              "line": 9,
+              "line": 11,
               "col": 2
             }
           ]
@@ -275,21 +281,23 @@
           "type": "block",
           "marker": "::",
           "terms": [
-            {
-              "name": "text",
-              "type": "string",
-              "value": "And then a term with a list",
-              "location": [
-                {
-                  "line": 10,
-                  "col": 1
-                },
-                {
-                  "line": 10,
-                  "col": 27
-                }
-              ]
-            }
+            [
+              {
+                "name": "text",
+                "type": "string",
+                "value": "And then a term with a list",
+                "location": [
+                  {
+                    "line": 12,
+                    "col": 1
+                  },
+                  {
+                    "line": 12,
+                    "col": 27
+                  }
+                ]
+              }
+            ]
           ],
           "blocks": [
             {
@@ -309,24 +317,24 @@
                       "value": "One",
                       "location": [
                         {
-                          "line": 10,
-                          "col": 33
+                          "line": 13,
+                          "col": 3
                         },
                         {
-                          "line": 10,
-                          "col": 35
+                          "line": 13,
+                          "col": 5
                         }
                       ]
                     }
                   ],
                   "location": [
                     {
-                      "line": 10,
-                      "col": 31
+                      "line": 13,
+                      "col": 1
                     },
                     {
-                      "line": 10,
-                      "col": 35
+                      "line": 13,
+                      "col": 5
                     }
                   ]
                 },
@@ -341,11 +349,11 @@
                       "value": "Two",
                       "location": [
                         {
-                          "line": 11,
+                          "line": 14,
                           "col": 3
                         },
                         {
-                          "line": 11,
+                          "line": 14,
                           "col": 5
                         }
                       ]
@@ -353,11 +361,11 @@
                   ],
                   "location": [
                     {
-                      "line": 11,
+                      "line": 14,
                       "col": 1
                     },
                     {
-                      "line": 11,
+                      "line": 14,
                       "col": 5
                     }
                   ]
@@ -365,11 +373,11 @@
               ],
               "location": [
                 {
-                  "line": 10,
-                  "col": 31
+                  "line": 13,
+                  "col": 1
                 },
                 {
-                  "line": 11,
+                  "line": 14,
                   "col": 5
                 }
               ]
@@ -377,11 +385,11 @@
           ],
           "location": [
             {
-              "line": 10,
+              "line": 12,
               "col": 1
             },
             {
-              "line": 11,
+              "line": 14,
               "col": 5
             }
           ]
@@ -393,7 +401,7 @@
           "col": 1
         },
         {
-          "line": 11,
+          "line": 14,
           "col": 5
         }
       ]
@@ -405,7 +413,7 @@
       "col": 1
     },
     {
-      "line": 11,
+      "line": 14,
       "col": 5
     }
   ]
