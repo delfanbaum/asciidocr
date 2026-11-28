@@ -237,9 +237,9 @@ removed (with the helpers only it used, `InlineError`, and the never-created
   non-ASCII text (`[aé]`); the fuzz run's mutations don't reach these. And
   `target_and_attrs_from_token` panicked on a token that isn't an image or
   include macro (it returns an error now)
-* [ ] A paragraph with a link macro (`http://a.com[x]` or `link:a[x]`) in a
-  section ends the section: the blocks after it go to the top of the document
-  (0.2.2 does this too)
+* [x] A paragraph with a link macro (`http://a.com[x]` or `link:a[x]`), a
+  footnote, a cross reference or an inline image in a section ended the section:
+  the blocks after it went to the top of the document (0.2.2 did this too)
 * [ ] `...` is only replaced at the start of a line (and without the zero-width
   space Asciidoctor adds)
 * [ ] `--` isn't replaced at the start or end of a line, or before a closing

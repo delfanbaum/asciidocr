@@ -92,8 +92,6 @@ pub struct Parser {
     /// forces a new block when we add inlines; helps distinguish between adding to section.title
     /// and section.blocks
     force_new_block: bool,
-    /// Some parent elements have non-obvious closing conditions, so we want an easy way to close these
-    close_parent_after_push: bool,
     /// Used to see if we need to add a newline before new text; we don't add newlines to the text
     /// literals unless they're continuous (i.e., we never count newline paras as paras)
     dangling_newline: Option<Token>,
@@ -145,7 +143,6 @@ impl Parser {
             continuation_line: None,
             open_parse_after_as_text_type: None,
             force_new_block: false,
-            close_parent_after_push: false,
             dangling_newline: None,
             line: 1,
             resolve_targets: true,
@@ -563,10 +560,6 @@ impl Parser {
             // check for dangling list items
             if !last_block.is_section() && self.open_delimited_block_lines.is_empty() {
                 self.add_to_block_stack_or_graph(asg, last_block)?;
-                if self.close_parent_after_push && !self.block_stack.is_empty() {
-                    self.add_last_to_block_stack_or_graph(asg)?;
-                    self.close_parent_after_push = false;
-                }
             } else {
                 self.push_block_to_stack(last_block)?
             }

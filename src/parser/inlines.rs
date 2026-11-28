@@ -124,7 +124,6 @@ impl Parser {
                 metadata,
                 token.locations(),
             )));
-        self.close_parent_after_push = true;
         Ok(())
     }
 
@@ -179,8 +178,6 @@ impl Parser {
             inline_macro.consolidate_locations_from_token(token);
             // add it back to the stack
             self.inline_stack.push_back(inline_macro);
-            // note that we're now closed
-            self.close_parent_after_push = true;
             // and that the inline span is ended
             self.in_inline_span = false;
         } else {
@@ -220,7 +217,6 @@ impl Parser {
     ) -> Result<(), ParserError> {
         let Some(text) = InlineRef::xref_text(&token) else {
             self.push_link(Inline::InlineRef(InlineRef::new_xref_from_token(token)));
-            self.close_parent_after_push = true;
             return Ok(());
         };
         // an xref with its own text (`<<id,the *A* section>>`): the text is parsed like a link

@@ -971,3 +971,30 @@ fn test_inline_style_and_block_role() {
     assert!(html.contains("<div class=\"paragraph outer\">"), "{html}");
     assert!(html.contains("<span class=\"inner\">b</span>"), "{html}");
 }
+
+/// A paragraph holding a macro ends at a blank line like any other: its section stays open (the
+/// section used to end with it, and the blocks after went to the top of the document)
+#[rstest]
+#[case::url_macro("http://a.com[x]")]
+#[case::link_macro("link:a.html[x]")]
+#[case::xref_with_text("<<a,x>>")]
+#[case::footnote("a footnote:[x]")]
+#[case::inline_image("image:a.png[x]")]
+#[case::admonition("NOTE: http://a.com[x]")]
+fn test_section_continues_after_a_macro(#[case] paragraph: &str) {
+    let outline = block_outline(&format!("== A\n\n{paragraph}\n\ny\n\n== B\n\nz\n"));
+    assert!(
+        outline.starts_with("section \"A\"(")
+            && outline.contains("paragraph \"y\") section \"B\"(paragraph \"z\")"),
+        "{outline}"
+    );
+}
+
+/// Nor does a macro before a section end that section at its first blank line
+#[test]
+fn test_section_after_a_macro_stays_open() {
+    assert_eq!(
+        block_outline("link:a.html[x]\n\n== A\n\ny\n\nz\n"),
+        "paragraph \"x\" section \"A\"(paragraph \"y\", paragraph \"z\")"
+    );
+}
