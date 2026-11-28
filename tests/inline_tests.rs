@@ -415,3 +415,47 @@ fn test_nested_spans(#[case] adoc: &str, #[case] expected: &str) {
         &format!("<p>{expected}</p>"),
     );
 }
+
+/// `...` is an ellipsis wherever it is in the text, followed by a zero-width space, as in
+/// Asciidoctor
+#[rstest]
+#[case::inside_a_word("a...b", "a&#8230;&#8203;b")]
+#[case::between_words("a ... b", "a &#8230;&#8203; b")]
+#[case::after_a_word("Wait... what", "Wait&#8230;&#8203; what")]
+#[case::ending_a_line("a...\nb", "a&#8230;&#8203;\nb")]
+#[case::starting_a_line("...and", "&#8230;&#8203;and")]
+#[case::four_dots("a.... b", "a&#8230;&#8203;. b")]
+#[case::after_formatting("*x* c... d", "x c&#8230;&#8203; d")]
+#[case::in_formatting("_a..._", "a&#8230;&#8203;")]
+#[case::before_a_quote("a...\"", "a&#8230;&#8203;\"")]
+#[case::two_dots("a.. b", "a.. b")]
+#[case::escaped("a\\... b", "a\\... b")]
+#[case::in_a_listing("----\na...b\n----\n", "\na...b\n")]
+fn test_ellipsis(#[case] adoc: &str, #[case] expected: &str) {
+    assert_eq!(parsed_text(adoc), expected);
+}
+
+/// A spaced `--` is an em dash at the start or end of a line too
+#[rstest]
+#[case::ending_a_line("a --\nb", "a &#8212;\nb")]
+#[case::starting_a_line("a\n-- b", "a\n&#8212; b")]
+#[case::ending_a_paragraph("a --\n\nb", "a &#8212;b")]
+#[case::ending_the_document("a --", "a &#8212;")]
+#[case::before_formatting("a --\n*b*", "a &#8212;\nb")]
+#[case::ending_an_item("* a --\n* b --\n", "a &#8212;b &#8212;")]
+// (a section's blocks come before its title in the JSON)
+#[case::ending_a_heading("== a --\n\nb", "ba &#8212;")]
+#[case::three_dashes("a ---\nb", "a ---\nb")]
+#[case::in_a_listing("----\na --\n----\n", "\na --\n")]
+fn test_em_dash_at_line_edges(#[case] adoc: &str, #[case] expected: &str) {
+    assert_eq!(parsed_text(adoc), expected);
+}
+
+/// A line of just `--` is still an open block's delimiter
+#[test]
+fn test_open_block_delimiter_is_not_an_em_dash() {
+    assert_eq!(
+        common::block_tree("a\n\n--\nb\n--\n"),
+        "paragraph open(paragraph)"
+    );
+}

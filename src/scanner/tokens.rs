@@ -214,7 +214,8 @@ impl Token {
                     "(C)" => self.literal = Some("&#169;".into()),
                     "(R)" => self.literal = Some("&#174;".into()),
                     "(TM)" => self.literal = Some("&#8482;".into()),
-                    "..." => self.literal = Some("&#8230;".into()),
+                    // (with a zero-width space, where a line may break, as in Asciidoctor)
+                    "..." => self.literal = Some("&#8230;&#8203;".into()),
                     "->" => self.literal = Some("&#8594;".into()),
                     "=>" => self.literal = Some("&#8658;".into()),
                     "<-" => self.literal = Some("&#8592;".into()),

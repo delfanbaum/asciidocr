@@ -888,11 +888,18 @@ impl<'a> Scanner<'a> {
         .contains(&self.peek())
             && !self.is_at_end()
             && !self.starts_link_macro(self.current)
+            && !self.starts_ellipsis(self.current)
             && (!self.in_table || !self.at_cell_separator())
         {
             self.current += 1;
         }
         self.add_token(TokenType::Text, true, 0)
+    }
+
+    /// Whether an ellipsis starts here: three dots with no backslash before them
+    fn starts_ellipsis(&self, at: usize) -> bool {
+        let bytes = self.source.as_bytes();
+        bytes.get(at..at + 3) == Some(b"...") && (at == 0 || bytes[at - 1] != b'\\')
     }
 
     /// Whether a `link:` macro starts here: `link:`, a target with no whitespace (which doesn't
@@ -1109,7 +1116,10 @@ impl<'a> Scanner<'a> {
 
     fn starts_text_symbol_replace_emdash(&mut self) -> bool {
         let after_char = self.peeks_ahead(2).chars().last().unwrap();
-        self.peek() == '-' && (after_char.is_alphanumeric() || [' ', '\0'].contains(&after_char))
+        // a spaced dash may end its line (but a line of `--` alone opens or closes a block)
+        let ends_line = after_char == '\n' && matches!(self.peek_back(), ' ' | '\t');
+        self.peek() == '-'
+            && (after_char.is_alphanumeric() || [' ', '\0'].contains(&after_char) || ends_line)
     }
 
     fn is_at_end(&self) -> bool {
@@ -2877,7 +2887,7 @@ mod tests {
     #[case("(C)", "&#169;")]
     #[case("(R)", "&#174;")]
     #[case("(TM)", "&#8482;")]
-    #[case("...", "&#8230;")]
+    #[case("...", "&#8230;&#8203;")]
     #[case("->", "&#8594;")]
     #[case("=>", "&#8658;")]
     #[case("<-", "&#8592;")]

@@ -1019,6 +1019,7 @@ mod tests {
     #[case::lt("&lt;", "<")]
     #[case::equals("&equals;", "=")]
     #[case::plus("&plus;", "+")]
+    #[case::ellipsis("&#8230;&#8203;", "…\u{200b}")]
     fn test_value_or_refd_char(#[case] entity: &str, #[case] replacement: &str) {
         let inline = InlineLiteral::new(
             InlineLiteralName::Charref,

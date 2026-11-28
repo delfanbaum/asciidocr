@@ -25,6 +25,7 @@ pub static CHARREF_MAP: Lazy<Mutex<HashMap<String, &'static str>>> = Lazy::new(|
     m.insert(String::from("&#8482;"), "™");
     m.insert(String::from("&trade;"), "™");
     m.insert(String::from("&#8230;"), "…");
+    m.insert(String::from("&#8230;&#8203;"), "…\u{200b}");
     m.insert(String::from("&#8594;"), "→");
     m.insert(String::from("&#8658;"), "⇒");
     m.insert(String::from("&#8592;"), "←");

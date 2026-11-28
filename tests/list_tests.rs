@@ -35,7 +35,7 @@ fn test_list_markers(#[case] adoc: &str, #[case] expected: &str) {
 
 /// Markup that looks like a marker, but isn't one
 #[rstest]
-#[case::ellipsis_at_line_start("...and then\n", "paragraph \"&#8230;and then\"")]
+#[case::ellipsis_at_line_start("...and then\n", "paragraph \"&#8230;&#8203;and then\"")]
 #[case::strong_at_line_start("**bold** text\n", "paragraph \"bold text\"")]
 #[case::number_without_space("1.5 cups\n", "paragraph \"1.5 cups\"")]
 #[case::dash_without_space("-x\n", "paragraph \"-x\"")]
