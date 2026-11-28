@@ -175,13 +175,6 @@ removed (with the helpers only it used, `InlineError`, and the never-created
   paragraph stays a paragraph. In the Asciidoctor-style backend, a `[quote]`
   paragraph's text is wrapped in a paragraph `div`, where Asciidoctor has the
   text directly in the `blockquote`
-* [ ] Literal paragraphs (a paragraph whose first line is indented) aren't
-  recognized; Asciidoctor makes them literal blocks, and attaches one to a list
-  item after a blank line (`+* a+`, a blank line, `  literal`)
-* [ ] List marker edge cases that differ from Asciidoctor: a tab after the
-  marker (`+*<TAB>a+`) isn't an item; six or more dots (`......`) are an
-  ellipsis rather than a marker; `+* +` with no text, then `+* b+`, gives
-  "* * b" (Asciidoctor: "** b")
 * [x] A `::` line directly after a list item (`+* a+`, `:: b`) dropped the text
   after it; Asciidoctor keeps "a:: b" as the item's text. (A line starting `::`
   was read as an attribute entry with no name)
@@ -199,10 +192,6 @@ removed (with the helpers only it used, `InlineError`, and the never-created
   ignored (the offset is reset to 0, as in Asciidoctor)
 * [ ] A heading inside a delimited block is a section; Asciidoctor keeps it as
   text
-* [ ] Three or more `+` lines in a row in a list item make two paragraphs;
-  Asciidoctor makes one ("+ b")
-* [ ] DOCX: a level 0 section gets a made-up "Heading 0" style, which Word
-  doesn't treat as a heading
 * [x] A table cell's text on a following line (`|a`, `more`, `|b`) went to the
   next cell
 * [x] A heading with six `=` signs (`====== A`) stopped the conversion;
@@ -234,8 +223,6 @@ removed (with the helpers only it used, `InlineError`, and the never-created
   formatting; Asciidoctor keeps `_b` as text
 * [x] A constrained mark after a space or directly before a letter closed a span
   (`+*a b *c+` gave "<strong>a b </strong>c")
-* [ ] Apostrophes in bare URLs and link targets stay straight
-  (`http://x.com/it's`); Asciidoctor curls them there too, in the `href` as well
 * [x] *Decided*: apostrophes in code stay straight (`` `foo's` ``), where
   Asciidoctor curls them, since a curly quote changes code (see LIMITATIONS)
 * [x] A bare URL stopped at `-`, `_`, `%`, `~` or `;` (`http://x.com/my-page`
@@ -245,13 +232,26 @@ removed (with the helpers only it used, `InlineError`, and the never-created
   Asciidoctor only makes the first row a header when a blank line follows it
 * [ ] `[TIP]` (or another admonition label) above a listing or literal block
   wraps it in an admonition; Asciidoctor ignores the label there
-* [ ] A listing's text in the ASG starts with the newline after the opening
-  delimiter (`"\ncode\n"`); check against the ASG schema
 * [x] A named attribute whose value is a lone quote (`+[role="]+`, also in a
   macro's brackets) panicked in `key_values_from_named_attribute`, as did
   non-ASCII text (`[aé]`); the fuzz run's mutations don't reach these. And
   `target_and_attrs_from_token` panicked on a token that isn't an image or
   include macro (it returns an error now)
+* [ ] A paragraph with a link macro (`http://a.com[x]` or `link:a[x]`) in a
+  section ends the section: the blocks after it go to the top of the document
+  (0.2.2 does this too)
+* [ ] `...` is only replaced at the start of a line (and without the zero-width
+  space Asciidoctor adds)
+* [ ] `--` isn't replaced at the start or end of a line, or before a closing
+  curly quote
+* [ ] `[role='x']` keeps the quotes in the class name, and an unknown style
+  above an open block (`[aside]`) isn't made a class
+* [ ] A constrained mark followed by a hyphen (`+_semi_-formal and _casual_+`)
+  doesn't close its span
+* [ ] `` `+*+` `` (a passthrough in backticks) comes out as empty code spans
+* [ ] A quoted paragraph (`"text"`, then `-- Author, Title`) isn't a quote
+* [ ] Some highlights with a role (`+([.note]#text#)+`) in a long document are
+  left as text; not yet reduced to a small example
 
 === Cross references and section IDs (M)
 
@@ -264,6 +264,8 @@ removed (with the helpers only it used, `InlineError`, and the never-created
 * [x] Custom xref text: `+<<id,custom text>>+`
 * [x] The `idprefix`, `idseparator` and `sectids` attributes (with the value
   they have at the end of the document)
+* [ ] An anchor with its own text (`+[[id,Text]]+`) loses the ID, and `reftext=`
+  isn't used for cross reference text
 
 === Quality and housekeeping (S)
 
@@ -280,7 +282,7 @@ removed (with the helpers only it used, `InlineError`, and the never-created
   and `-o` can't name the input. The tests also found that an output that
   couldn't be written caused a panic, and that `-c` mixed the count into a
   document sent to stdout; it now only prints the count
-* [ ] Compare a few more real documents against `asciidoctor -s` and file what
+* [x] Compare a few more real documents against `asciidoctor -s` and file what
   differs
 * [x] Commit `Cargo.lock` (done in 0.2.1)
 * [x] Code organization: every directory module uses `mod.rs` (clippy's
@@ -429,6 +431,17 @@ track.
 * [ ] The hardbreaks option (`[%hardbreaks]`, `:hardbreaks-option:`), for our
   poet friends who don't want to wrap everything in `[verse]`
 * [ ] `pass` blocks with roles
+* [ ] Literal paragraphs (a paragraph whose first line is indented) aren't
+  recognized; Asciidoctor makes them literal blocks, and attaches one to a list
+  item after a blank line (`+* a+`, a blank line, `  literal`)
+* [ ] List marker edge cases that differ from Asciidoctor: a tab after the
+  marker (`+*<TAB>a+`) isn't an item; six or more dots (`......`) are an
+  ellipsis rather than a marker; `+* +` with no text, then `+* b+`, gives
+  "* * b" (Asciidoctor: "** b")
+* [ ] Three or more `+` lines in a row in a list item make two paragraphs;
+  Asciidoctor makes one ("+ b")
+* [ ] A listing's text in the ASG starts with the newline after the opening
+  delimiter (`"\ncode\n"`); check against the ASG schema
 
 === Inlines (S each)
 
@@ -436,6 +449,21 @@ track.
 * [ ] `+ -- +` with thin spaces around the em dash (`+&#8201;&#8212;&#8201;+`),
   as Asciidoctor does
 * [ ] Email autolinks and `mailto:`
+* [ ] Apostrophes in bare URLs and link targets stay straight
+  (`http://x.com/it's`); Asciidoctor curls them there too, in the `href` as well
+* [ ] `::` in a code span (`` `http::` ``) makes a link, and `+* Term:: text+`
+  after a blank line is a description list where Asciidoctor keeps it as the
+  item's text
+* [ ] A closing curly single quote after a period isn't converted
+  (`+"`a '`b.`'`"+`)
+* [ ] A space at the end of a heading stays in the title
+* [ ] After a span, we curl an apostrophe (`+_Ada_'s+`) that Asciidoctor
+  leaves straight
+
+=== DOCX (S)
+
+* [ ] DOCX: a level 0 section gets a made-up "Heading 0" style, which Word
+  doesn't treat as a heading
 
 === Conformance (M)
 
